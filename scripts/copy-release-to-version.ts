@@ -9,7 +9,6 @@ const includeEntries = [
   "public",
   "prisma",
   "scripts",
-  "plugins",
   "package.json",
   "package-lock.json",
   "tsconfig.json",
@@ -36,7 +35,9 @@ function resetVersionDirectory() {
     if (preserveEntries.has(entry)) {
       continue
     }
-
+    if(entry === '.git'){
+        continue
+    }
     rmSync(join(versionDirectory, entry), { recursive: true, force: true })
   }
 }

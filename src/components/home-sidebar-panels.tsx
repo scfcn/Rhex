@@ -6,8 +6,7 @@ import { SidebarUserCard, type SidebarUserCardData } from "@/components/sidebar-
 import { UserAvatar } from "@/components/user-avatar"
 import type { AnnouncementItem } from "@/lib/announcements"
 import type { FriendLinkItem } from "@/lib/friend-links"
-import type { SidebarPluginPanelItem } from "@/lib/sidebar-plugin-panels"
-
+import type { HomeSidebarPanelItem } from "@/lib/home-sidebar-layout"
 
 interface HotTopicItem {
   id: string
@@ -26,24 +25,17 @@ interface HomeSidebarPanelsProps {
   friendLinks?: FriendLinkItem[]
   friendLinksEnabled?: boolean
   createPostHref?: string
-  pluginPanels?: {
-    top: SidebarPluginPanelItem[]
-    middle: SidebarPluginPanelItem[]
-    bottom: SidebarPluginPanelItem[]
-  }
+  topPanels?: HomeSidebarPanelItem[]
+  middlePanels?: HomeSidebarPanelItem[]
+  bottomPanels?: HomeSidebarPanelItem[]
 }
 
-export function HomeSidebarPanels({ user, hotTopics, announcements = [], friendLinks = [], friendLinksEnabled = false, createPostHref, pluginPanels }: HomeSidebarPanelsProps) {
-
-
+export function HomeSidebarPanels({ user, hotTopics, announcements = [], friendLinks = [], friendLinksEnabled = false, createPostHref, topPanels = [], middlePanels = [], bottomPanels = [] }: HomeSidebarPanelsProps) {
   return (
     <div className="sticky top-20 space-y-4">
       <SidebarUserCard user={user} createPostHref={createPostHref} />
 
-      {pluginPanels?.top.map((panel) => {
-        const PanelComponent = panel.component
-        return <PanelComponent key={panel.pluginId} pluginId={panel.pluginId} config={panel.config} panelData={panel.panelData} />
-      })}
+      {topPanels.map((panel) => <div key={panel.id}>{panel.content}</div>)}
 
       <HomeAnnouncementPanel announcements={announcements} />
 
@@ -65,11 +57,8 @@ export function HomeSidebarPanels({ user, hotTopics, announcements = [], friendL
         </div>
       </div>
 
-      {pluginPanels?.middle.map((panel) => {
-        const PanelComponent = panel.component
-        return <PanelComponent key={panel.pluginId} pluginId={panel.pluginId} config={panel.config} panelData={panel.panelData} />
-      })}
 
+      {middlePanels.map((panel) => <div key={panel.id}>{panel.content}</div>)}
 
       {friendLinksEnabled ? (
 
@@ -99,13 +88,7 @@ export function HomeSidebarPanels({ user, hotTopics, announcements = [], friendL
         </section>
       ) : null}
 
-      {pluginPanels?.bottom.map((panel) => {
-        const PanelComponent = panel.component
-        if (process.env.NODE_ENV !== "production") {
-          console.log("[home-sidebar-panels] render-bottom", panel.pluginId, (PanelComponent as { name?: string }).name ?? "anonymous")
-        }
-        return <PanelComponent key={panel.pluginId} pluginId={panel.pluginId} config={panel.config} panelData={panel.panelData} />
-      })}
+      {bottomPanels.map((panel) => <div key={panel.id}>{panel.content}</div>)}
     </div>
   )
 }

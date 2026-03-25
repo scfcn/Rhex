@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Plus, Sparkles, Star, Wallet, Zap } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 
 import { AdminModal } from "@/components/admin-modal"
 import { LevelBadge } from "@/components/level-badge"
@@ -138,16 +138,17 @@ export function SidebarUserCard({ user, createPostHref = "/write" }: { user: Sid
   const calendarEntries = useMemo(() => new Map((calendarData?.entries ?? []).map((item) => [item.date, item])), [calendarData?.entries])
   const calendarDays = useMemo(() => buildCalendarDays(calendarMonth), [calendarMonth])
 
-  useEffect(() => {
-    setPoints(user?.points ?? 0)
-    setCheckedInToday(Boolean(user?.checkedInToday))
-  }, [user?.points, user?.checkedInToday])
-
-  async function loadCalendar(targetMonth: string) {
+  const loadCalendar = useCallback(async (targetMonth: string) => {
     setCalendarLoading(true)
 
     try {
-      const response = await fetch(`/api/check-in?month=${targetMonth}`, { cache: "no-store" })
+      const response = await fetch(`/api/check-in?month=${targetMonth}`, {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+        },
+      })
       const result = await response.json()
 
       if (!response.ok) {
@@ -161,7 +162,12 @@ export function SidebarUserCard({ user, createPostHref = "/write" }: { user: Sid
     } finally {
       setCalendarLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    setPoints(user?.points ?? 0)
+    setCheckedInToday(Boolean(user?.checkedInToday))
+  }, [user?.points, user?.checkedInToday])
 
   useEffect(() => {
     if (!calendarOpen || !currentUser?.checkInEnabled) {
@@ -233,9 +239,7 @@ export function SidebarUserCard({ user, createPostHref = "/write" }: { user: Sid
       setCheckedInToday(true)
       setMessage(result.message ?? "签到成功")
       toast.success(result.message ?? "签到成功", "签到成功")
-      if (calendarOpen) {
-        void loadCalendar(calendarMonth)
-      }
+      await loadCalendar(calendarMonth)
       router.refresh()
     } finally {
       setLoading(false)
@@ -429,7 +433,7 @@ export function SidebarUserCard({ user, createPostHref = "/write" }: { user: Sid
                       <div className="space-y-1 text-[10px] leading-4">
                         {entry ? (
                           <>
-                            <div>{entry.isMakeUp ? "补签成功" : "已签到"}</div>
+                            <div>{entry.isMakeUp ? "已补签" : "已签到"}</div>
                           </>
                         ) : canMakeUp ? (
                           <>

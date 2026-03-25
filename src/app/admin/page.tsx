@@ -2,7 +2,6 @@ import { redirect } from "next/navigation"
 import { AlertTriangle, FileText, Settings2, Shield, Users } from "lucide-react"
 
 import { AdminAnnouncementManager } from "@/components/admin-announcement-manager"
-import { AdminPluginManager } from "@/components/admin-plugin-manager"
 import { AdminInviteCodeManager } from "@/components/admin-invite-code-manager"
 import { AdminFooterLinksSettingsForm } from "@/components/admin-footer-links-settings-form"
 import { AdminFriendLinksSettingsForm } from "@/components/admin-friend-links-settings-form"
@@ -33,7 +32,6 @@ import { getInviteCodeList } from "@/lib/invite-codes"
 import { getLevelDefinitions } from "@/lib/level-system"
 import { getRedeemCodeList } from "@/lib/redeem-codes"
 import { getAdminReports } from "@/lib/reports"
-import { listPluginInstallations } from "@/lib/plugins"
 import { getAdminFriendLinkPageData } from "@/lib/friend-links"
 import { getSensitiveWordPage, getSiteSettings } from "@/lib/site-settings"
 
@@ -138,7 +136,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const currentLogPage = searchParams?.logPage ?? "1"
   const currentLogPageSize = searchParams?.logPageSize ?? "20"
 
-  const [data, siteSettings, adminUsers, filteredPosts, levelDefinitions, badges, announcements, inviteCodes, redeemCodes, reports, sensitiveWordResult, logCenter, plugins, friendLinks] = await Promise.all([
+  const [data, siteSettings, adminUsers, filteredPosts, levelDefinitions, badges, announcements, inviteCodes, redeemCodes, reports, sensitiveWordResult, logCenter, friendLinks] = await Promise.all([
     getAdminDashboardData(),
     getSiteSettings(),
     getAdminUsers({
@@ -179,7 +177,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       page: Number(currentLogPage),
       pageSize: Number(currentLogPageSize),
     }),
-    listPluginInstallations(),
     getAdminFriendLinkPageData(),
   ])
 
@@ -251,6 +248,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         ) : null}
 
         {tab === "settings" ? <AdminSettingsTabs currentSection={currentSettingsSection} /> : null}
+        {tab === "settings" && currentSettingsSection === "apps" ? redirect("/admin/apps") : null}
 
         {tab === "users" ? <AdminUserList data={adminUsers} /> : null}
         {tab === "posts" ? <AdminPostList data={filteredPosts} /> : null}
@@ -288,7 +286,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         {tab === "settings" && currentSettingsSection === "redeem-codes" ? <AdminRedeemCodeManager initialRedeemCodes={redeemCodes} /> : null}
         {tab === "settings" && currentSettingsSection === "vip" ? <AdminVipSettingsForm initialSettings={siteSettings} /> : null}
         {tab === "settings" && currentSettingsSection === "upload" ? <AdminUploadSettingsForm initialSettings={siteSettings} /> : null}
-        {tab === "settings" && currentSettingsSection === "plugins" ? <AdminPluginManager initialPlugins={plugins} pointName={siteSettings.pointName} /> : null}
 
         {tab === "reports" ? <AdminReportCenter data={reports} /> : null}
         {tab === "logs" ? <AdminLogCenter data={logCenter} /> : null}

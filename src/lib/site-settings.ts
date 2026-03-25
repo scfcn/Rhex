@@ -83,7 +83,7 @@ export interface SiteSettingsData {
   uploadAllowedImageTypes: string[]
   uploadMaxFileSizeMb: number
   uploadAvatarMaxFileSizeMb: number
-  pluginStateJson?: string | null
+  appStateJson?: string | null
 }
 
 
@@ -154,7 +154,7 @@ function mapSiteSettings(record: {
   uploadAllowedImageTypes: string
   uploadMaxFileSizeMb: number
   uploadAvatarMaxFileSizeMb: number
-  pluginStateJson?: string | null
+  appStateJson?: string | null
   friendLinksEnabled: boolean
   friendLinkApplicationEnabled: boolean
   friendLinkAnnouncement: string
@@ -229,7 +229,7 @@ function mapSiteSettings(record: {
     uploadAllowedImageTypes: String(record.uploadAllowedImageTypes || "jpg,jpeg,png,gif,webp").split(/[，,\s]+/).map((item) => item.trim().toLowerCase()).filter(Boolean),
     uploadMaxFileSizeMb: record.uploadMaxFileSizeMb,
     uploadAvatarMaxFileSizeMb: record.uploadAvatarMaxFileSizeMb,
-    pluginStateJson: record.pluginStateJson,
+    appStateJson: record.appStateJson,
   }
 }
 

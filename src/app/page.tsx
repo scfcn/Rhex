@@ -12,9 +12,16 @@ import { getBoards } from "@/lib/boards"
 import { getFriendLinkListData } from "@/lib/friend-links"
 import { type FeedSort, getLatestFeed } from "@/lib/forum-feed"
 import { getHomeSidebarHotTopics, resolveSidebarUser } from "@/lib/home-sidebar"
+import { SelfServeAdsSidebar } from "@/components/self-serve-ads-sidebar"
+import { groupHomeSidebarPanels } from "@/lib/home-sidebar-layout"
 import { getSiteSettings } from "@/lib/site-settings"
-import { getHomeSidebarPluginPanels } from "@/lib/sidebar-plugin-panels"
+
+import { getSelfServeAdsAppConfig, getSelfServeAdsPanelData } from "@/lib/self-serve-ads"
+import { toSelfServeAdConfig } from "@/lib/self-serve-ads.shared"
 import { getZones } from "@/lib/zones"
+
+
+
 
 
 
@@ -50,7 +57,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function HomePage({ searchParams }: HomePageProps) {
   const currentPage = Number(searchParams?.page ?? "1") || 1
   const currentSort = normalizeSort(searchParams?.sort)
-  const [feed, boards, zones, currentUser, hotTopics, announcements, settings, friendLinks, pluginPanels] = await Promise.all([
+  const [feed, boards, zones, currentUser, hotTopics, announcements, settings, friendLinks, selfServeAdsConfig, selfServeAdsPanelData] = await Promise.all([
     getLatestFeed(currentPage, 35, currentSort),
     getBoards(),
     getZones(),
@@ -59,8 +66,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     getHomeAnnouncements(3),
     getSiteSettings(),
     getFriendLinkListData(),
-    getHomeSidebarPluginPanels(),
+    getSelfServeAdsAppConfig(),
+    getSelfServeAdsPanelData(),
   ])
+
 
 
 
@@ -68,10 +77,21 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const nextPage = currentPage + 1
   const prevPage = Math.max(1, currentPage - 1)
   const sidebarUser = await resolveSidebarUser(currentUser, settings)
+  const selfServeAdsResolvedConfig = toSelfServeAdConfig(selfServeAdsConfig)
+  const sidebarPanels = groupHomeSidebarPanels(
+    selfServeAdsPanelData && selfServeAdsResolvedConfig.enabled && selfServeAdsResolvedConfig.visibleOnHome
+      ? [{
 
-
+          id: "self-serve-ads",
+          slot: selfServeAdsResolvedConfig.sidebarSlot,
+          order: selfServeAdsResolvedConfig.sidebarOrder,
+          content: <SelfServeAdsSidebar AppId="self-serve-ads" config={selfServeAdsConfig} panelData={selfServeAdsPanelData} />,
+        }]
+      : [],
+  )
 
   return (
+
 
     <div className="min-h-screen bg-background">
       <SiteHeader />
@@ -110,8 +130,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               announcements={announcements}
               friendLinks={friendLinks.compact}
               friendLinksEnabled={settings.friendLinksEnabled}
-              pluginPanels={pluginPanels}
+              topPanels={sidebarPanels.top}
+              middlePanels={sidebarPanels.middle}
+              bottomPanels={sidebarPanels.bottom}
             />
+
+
 
           </div>
 

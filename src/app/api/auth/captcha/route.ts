@@ -2,8 +2,11 @@ import { NextResponse } from "next/server"
 
 import { createBuiltinCaptchaToken, hasBuiltinCaptchaSecret } from "@/lib/builtin-captcha"
 
+export const dynamic = "force-dynamic"
+export const revalidate = 0
 
 const CAPTCHA_LENGTH = 4
+
 const CAPTCHA_EXPIRE_SECONDS = 60 * 5
 const CAPTCHA_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const CAPTCHA_FONTS = [
@@ -74,7 +77,17 @@ function buildSvg(text: string) {
 
 export async function GET() {
   if (!hasBuiltinCaptchaSecret()) {
-    return NextResponse.json({ code: 503, message: "当前未配置内建验证码密钥" }, { status: 503 })
+    return NextResponse.json(
+      { code: 503, message: "当前未配置内建验证码密钥" },
+      {
+        status: 503,
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      },
+    )
   }
 
   const text = randomText(CAPTCHA_LENGTH)
@@ -82,13 +95,22 @@ export async function GET() {
   const token = createBuiltinCaptchaToken(text, expiresAt)
   const svg = buildSvg(text)
 
-  return NextResponse.json({
-
-    code: 0,
-    data: {
-      imageDataUrl: `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`,
-      captchaToken: token,
-      expiresAt,
+  return NextResponse.json(
+    {
+      code: 0,
+      data: {
+        imageDataUrl: `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`,
+        captchaToken: token,
+        expiresAt,
+      },
     },
-  })
+    {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
+    },
+  )
 }
+

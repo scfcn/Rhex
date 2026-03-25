@@ -199,7 +199,12 @@ async function resetDatabase() {
   await prisma.favorite.deleteMany()
   await prisma.comment.deleteMany()
   await prisma.pointLog.deleteMany()
+  await prisma.$executeRawUnsafe('DELETE FROM "GobangMove"')
+  await prisma.$executeRawUnsafe('DELETE FROM "GobangMatch"')
+  await prisma.$executeRawUnsafe('DELETE FROM "SelfServeAdOrder"')
   await prisma.postTag.deleteMany()
+
+
   await prisma.tag.deleteMany()
   await prisma.postAppendix.deleteMany()
   await prisma.post.deleteMany()
@@ -293,7 +298,7 @@ async function ensureSiteSettings() {
     uploadAllowedImageTypes: "jpg,jpeg,png,gif,webp",
     uploadMaxFileSizeMb: 5,
     uploadAvatarMaxFileSizeMb: 2,
-    pluginStateJson: "{}",
+    appStateJson: "{}",
   }
 
   return prisma.siteSetting.create({ data: siteSettingsData })

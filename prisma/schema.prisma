@@ -158,6 +158,24 @@ enum VerificationChannel {
   PHONE
 }
 
+enum GobangMatchStatus {
+  ONGOING
+  FINISHED
+}
+
+enum SelfServeAdSlotType {
+  IMAGE
+  TEXT
+}
+
+enum SelfServeAdOrderStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
 model User {
   id                Int            @id @default(autoincrement())
   username          String         @unique
@@ -239,6 +257,59 @@ model UserLevelProgress {
   updatedAt           DateTime @updatedAt
   createdAt           DateTime @default(now())
   user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model GobangMatch {
+  id          String            @id
+  creatorId   Int
+  challengerId Int?
+  status      GobangMatchStatus
+  winnerId    Int?
+  ticketCost  Int
+  winReward   Int
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([creatorId])
+  @@index([challengerId])
+  @@index([status])
+}
+
+model GobangMove {
+  id        String   @id
+  matchId    String
+  playerId   Int
+  step       Int
+  x          Int
+  y          Int
+  createdAt  DateTime @default(now())
+
+  @@index([matchId, step])
+}
+
+model SelfServeAdOrder {
+  id              String                @id
+  appCode         String                @default("self-serve-ads")
+  userId          Int
+  slotType        SelfServeAdSlotType
+  slotIndex       Int
+  title           String?
+  linkUrl         String
+  imageUrl        String?
+  textColor       String?
+  backgroundColor String?
+  durationMonths  Int
+  pricePoints     Int
+  status          SelfServeAdOrderStatus
+  reviewNote      String?
+  startsAt        DateTime?
+  endsAt          DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@map("SelfServeAdOrder")
+  @@index([status, slotType, slotIndex])
+  @@index([userId, createdAt])
 }
 
 model LevelDefinition {
@@ -920,7 +991,7 @@ model SiteSetting {
   uploadAllowedImageTypes       String   @default("jpg,jpeg,png,gif,webp")
   uploadMaxFileSizeMb           Int      @default(5)
   uploadAvatarMaxFileSizeMb     Int      @default(2)
-  pluginStateJson               String?  @default("{}")
+  appStateJson               String?  @default("{}")
   footerLinksJson               String?  @default("[{\"label\":\"关于\",\"href\":\"/about\"},{\"label\":\"小黑屋\",\"href\":\"/prison\"},{\"label\":\"帮助文档\",\"href\":\"/help\"},{\"label\":\"FAQ\",\"href\":\"/faq\"},{\"label\":\"协议\",\"href\":\"/terms\"}]")
   createdAt                     DateTime @default(now())
   updatedAt                     DateTime @updatedAt

@@ -73,6 +73,6 @@ export const defaultSiteSettingsCreateInput = {
   uploadAllowedImageTypes: "jpg,jpeg,png,gif,webp",
   uploadMaxFileSizeMb: 5,
   uploadAvatarMaxFileSizeMb: 2,
-  pluginStateJson: "{}",
+  appStateJson: "{}",
 } as const
 

@@ -75,7 +75,7 @@ export const siteSettingsSelect = {
   uploadMaxFileSizeMb: true,
   uploadAvatarMaxFileSizeMb: true,
   footerLinksJson: true,
-  pluginStateJson: true,
+  appStateJson: true,
 } as const
 
 export async function findSiteSettingsRecord() {

@@ -182,7 +182,6 @@ $env:SEED_RESET_DATABASE="true"; $env:SEED_WITH_DEMO_CONTENT="true"; npm run pri
 - `npm run prisma:generate`：生成 Prisma Client
 - `npm run prisma:push`：同步数据库结构
 - `npm run prisma:seed`：执行种子数据脚本
-- `npm run plugins:generate`：生成插件构建产物
 - `npm run version:sync`：同步发布版本内容
 
 ### 项目结构
