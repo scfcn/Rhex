@@ -1,18 +1,13 @@
 import { ChangeType } from "@/db/types"
 import { NextRequest, NextResponse } from "next/server"
 
-import { getCurrentUser } from "@/lib/auth"
-import { recordUserCheckInGrowth } from "@/lib/level-system"
 import { prisma } from "@/db/client"
+import { getCurrentUser } from "@/lib/auth"
+import { getLocalDateKey, getMonthKey } from "@/lib/date-key"
+import { recordUserCheckInGrowth } from "@/lib/level-system"
 import { getSiteSettings } from "@/lib/site-settings"
 import { isVipActive } from "@/lib/vip-status"
 
-function getLocalDateKey(date = new Date()) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  const day = String(date.getDate()).padStart(2, "0")
-  return `${year}-${month}-${day}`
-}
 
 function parseDateKey(input: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input)) {
@@ -165,7 +160,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ code: 403, message: "签到功能暂未开启" }, { status: 403 })
   }
 
-  const month = request.nextUrl.searchParams.get("month") || getLocalDateKey().slice(0, 7)
+  const month = request.nextUrl.searchParams.get("month") || getMonthKey()
+
 
   try {
     const entries = await buildCalendarData(user.id, month)

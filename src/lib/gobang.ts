@@ -26,10 +26,41 @@ const DIRECTIONS = [
 ] as const
 
 type GobangStatus = "ONGOING" | "FINISHED"
-type ChallengeMode = "FREE" | "PAID"
-type FirstHand = "PLAYER" | "AI"
+export type ChallengeMode = "FREE" | "PAID"
+export type FirstHand = "PLAYER" | "AI"
+
+export type GobangMatch = {
+  id: string
+  creatorId: number
+  status: GobangStatus
+  winnerId: number | null
+  ticketCost: number
+  winReward: number
+  challengeMode: ChallengeMode
+  firstHand: FirstHand
+  currentSide: FirstHand | null
+  createdAt: string
+  updatedAt: string
+  finishedAt: string
+  board: number[][]
+  moves: Array<{ id: string; playerId: number; step: number; x: number; y: number; createdAt: string }>
+}
+
+
+export type GobangPlayerSummary = {
+  pointName: string
+  points: number
+  freeTotal: number
+  freeUsed: number
+  freeRemaining: number
+  paidTotal: number
+  paidUsed: number
+  paidRemaining: number
+  challengeStatus: "not_started" | "in_progress"
+}
 
 type GobangMatchRow = {
+
   id: string
   creatorId: number
   challengerId: number | null
@@ -203,16 +234,17 @@ function resolveChallengeMode(match: GobangMatchRow): ChallengeMode {
   return match.ticketCost > 0 ? "PAID" : "FREE"
 }
 
-function mapMatch(match: GobangMatchRow, moves: GobangMoveRow[]) {
+function mapMatch(match: GobangMatchRow, moves: GobangMoveRow[]): GobangMatch {
   const challengeMode = resolveChallengeMode(match)
   const firstHand = resolveFirstHandFromMoves(moves)
-  const currentSide = match.status === "FINISHED"
+  const currentSide: FirstHand | null = match.status === "FINISHED"
     ? null
     : firstHand === "PLAYER"
       ? (moves.length % 2 === 0 ? "PLAYER" : "AI")
       : (moves.length % 2 === 0 ? "AI" : "PLAYER")
 
   return {
+
     id: match.id,
     creatorId: match.creatorId,
     status: match.status,
@@ -223,7 +255,9 @@ function mapMatch(match: GobangMatchRow, moves: GobangMoveRow[]) {
     firstHand,
     createdAt: match.createdAt.toISOString(),
     updatedAt: match.updatedAt.toISOString(),
+    finishedAt: match.updatedAt.toISOString(),
     currentSide,
+
     moves: moves.map((move) => ({
       id: move.id,
       playerId: move.playerId,
@@ -321,7 +355,8 @@ function resolveChallengePolicy(
   throw new Error("今日挑战次数已用完")
 }
 
-export async function getGobangPlayerSummary(user: CurrentUser) {
+export async function getGobangPlayerSummary(user: CurrentUser): Promise<GobangPlayerSummary> {
+
   const [config, todayCounts, settings] = await Promise.all([
     getGobangPluginConfig(),
     countTodayMatches(user.id),
@@ -424,7 +459,8 @@ export async function createGobangMatch(user: CurrentUser) {
   }
 }
 
-export async function listGobangMatches(userId: number) {
+export async function listGobangMatches(userId: number): Promise<GobangMatch[]> {
+
   const matches = await prisma.$queryRawUnsafe<GobangMatchRow[]>(`SELECT * FROM "GobangMatch" WHERE "creatorId" = $1 ORDER BY "createdAt" DESC LIMIT 20`, userId)
 
   if (matches.length === 0) {

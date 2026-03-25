@@ -1,19 +1,11 @@
 import type { SidebarUserCardData } from "@/components/sidebar-user-card"
 import { countSidebarUserBoardFollows, countSidebarUserFavorites, findHomeSidebarHotTopics, findSidebarCurrentUser, findSidebarUserCheckInRecord } from "@/db/home-sidebar-queries"
 import type { getCurrentUser } from "@/lib/auth"
+import { getLocalDateKey } from "@/lib/date-key"
 import { formatMonthDayTime } from "@/lib/formatters"
 import { getLevelBadgeData } from "@/lib/level-badge"
 import type { SiteSettingsData } from "@/lib/site-settings"
 import { getUserDisplayName } from "@/lib/users"
-
-
-
-function getLocalDateKey(date = new Date()) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  const day = String(date.getDate()).padStart(2, "0")
-  return `${year}-${month}-${day}`
-}
 
 export async function getHomeSidebarHotTopics(limit = 5) {
   const posts = await findHomeSidebarHotTopics(limit)

@@ -1,6 +1,7 @@
 import { findSidebarUserCheckInRecord } from "@/db/home-sidebar-queries"
 import { getUnreadConversationCount } from "@/db/message-read-queries"
 import { countUnreadNotifications } from "@/db/notification-read-queries"
+import { getLocalDateKey } from "@/lib/date-key"
 
 export interface HeaderUnreadCounts {
   unreadNotificationCount: number
@@ -11,12 +12,6 @@ export interface HeaderQuickActionsState {
   checkedInToday: boolean
 }
 
-function getLocalDateKey(date = new Date()) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  const day = String(date.getDate()).padStart(2, "0")
-  return `${year}-${month}-${day}`
-}
 
 export async function getHeaderUnreadCounts(userId?: number | null): Promise<HeaderUnreadCounts> {
   if (!userId) {

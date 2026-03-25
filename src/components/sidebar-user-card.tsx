@@ -12,6 +12,7 @@ import { UserStatusBadge } from "@/components/user-status-badge"
 import { VipBadge } from "@/components/vip-badge"
 import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/toast"
+import { getLocalDateKey, getMonthKey, getMonthTitle } from "@/lib/date-key"
 import { cn } from "@/lib/utils"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
 
@@ -79,26 +80,8 @@ function getRoleBadgeConfig(role?: SidebarUserCardData["role"]) {
   }
 }
 
-function getLocalDateKey(date = new Date()) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  const day = String(date.getDate()).padStart(2, "0")
-  return `${year}-${month}-${day}`
-}
-
-function getMonthKey(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  return `${year}-${month}`
-}
-
 function addMonths(date: Date, delta: number) {
   return new Date(date.getFullYear(), date.getMonth() + delta, 1)
-}
-
-function formatMonthTitle(monthKey: string) {
-  const [year, month] = monthKey.split("-")
-  return `${year} 年 ${Number(month)} 月`
 }
 
 function buildCalendarDays(monthKey: string) {
@@ -132,7 +115,7 @@ export function SidebarUserCard({ user, createPostHref = "/write" }: { user: Sid
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState("")
   const [calendarOpen, setCalendarOpen] = useState(false)
-  const [calendarMonth, setCalendarMonth] = useState(getMonthKey(new Date()))
+  const [calendarMonth, setCalendarMonth] = useState(getMonthKey())
   const [calendarLoading, setCalendarLoading] = useState(false)
   const [calendarData, setCalendarData] = useState<CheckInCalendarResponse | null>(null)
   const calendarEntries = useMemo(() => new Map((calendarData?.entries ?? []).map((item) => [item.date, item])), [calendarData?.entries])
@@ -367,8 +350,8 @@ export function SidebarUserCard({ user, createPostHref = "/write" }: { user: Sid
               <Button type="button" variant="outline" className="h-9 rounded-lg px-3" onClick={() => setCalendarMonth((current) => getMonthKey(addMonths(new Date(`${current}-01T00:00:00`), -1)))}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <div className="min-w-[120px] text-center text-sm font-semibold">{formatMonthTitle(calendarMonth)}</div>
-              <Button type="button" variant="outline" className="h-9 rounded-lg px-3" onClick={() => setCalendarMonth((current) => getMonthKey(addMonths(new Date(`${current}-01T00:00:00`), 1)))} disabled={calendarMonth >= getMonthKey(new Date())}>
+              <div className="min-w-[120px] text-center text-sm font-semibold">{getMonthTitle(calendarMonth)}</div>
+              <Button type="button" variant="outline" className="h-9 rounded-lg px-3" onClick={() => setCalendarMonth((current) => getMonthKey(addMonths(new Date(`${current}-01T00:00:00`), 1)))} disabled={calendarMonth >= getMonthKey()}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>

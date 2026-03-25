@@ -3,34 +3,24 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import type { GobangMatch, GobangPlayerSummary } from "@/lib/gobang"
 import { cn } from "@/lib/utils"
+
 
 import "@/styles/gobang.css"
 
 
 interface GobangPageProps {
-  AppId: string
   config: Record<string, boolean | number | string>
-}
-
-type GobangMatch = {
-  id: string
-  creatorId: number
-  status: "ONGOING" | "FINISHED"
-  winnerId: number | null
-  ticketCost: number
-  winReward: number
-  challengeMode: "FREE" | "PAID"
-  firstHand: "PLAYER" | "AI"
-  currentSide: "PLAYER" | "AI" | null
-  board: number[][]
-  moves: Array<{ id: string; playerId: number; step: number; x: number; y: number; createdAt: string }>
+  initialMatches: GobangMatch[]
+  initialSummary: PlayerSummary
 }
 
 type ChallengePolicy = { mode: "FREE" | "PAID"; remainingFree: number; remainingPaid: number }
 type CreateMatchResult = { matches: GobangMatch[]; policy: ChallengePolicy }
-type PlayerSummary = { pointName: string; points: number; freeTotal: number; freeUsed: number; freeRemaining: number; paidTotal: number; paidUsed: number; paidRemaining: number; challengeStatus: "not_started" | "in_progress" }
+type PlayerSummary = GobangPlayerSummary
 type ApiResponse<T> = { code: number; message?: string; data?: T }
+
 type Point = { r: number; c: number }
 type GobangViewState = {
   freeCount: number
@@ -66,10 +56,23 @@ const initialGameState: GobangViewState = {
 
 function formatMatchTime(value: string | undefined) {
   if (!value) return "时间未知"
-  const date = new Date(value)
+
+  const normalizedValue = value.includes("T") && !/[zZ]|[+-]\d{2}:\d{2}$/.test(value)
+    ? `${value}Z`
+    : value
+  const date = new Date(normalizedValue)
   if (Number.isNaN(date.getTime())) return "时间未知"
-  return new Intl.DateTimeFormat("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(date)
+
+  return new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date)
 }
+
 
 function resolveWinningLine(board: number[][], winnerId: number | null): Point[] | null {
   if (winnerId === null) return null
@@ -171,7 +174,8 @@ function PreviousResultModal({ open, match, message, winningLine, canSelectPrevi
           {match ? (
             <>
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-                <span>{formatMatchTime(match.moves.at(-1)?.createdAt ?? match.moves[0]?.createdAt)}</span>
+                <span>{formatMatchTime(match.finishedAt || match.updatedAt || match.moves.at(-1)?.createdAt || match.createdAt)}</span>
+
                 <span>{match.challengeMode === "FREE" ? "免费挑战" : `付费挑战 · ${match.ticketCost} 积分`}</span>
                 <span>{match.firstHand === "PLAYER" ? "你先手" : "AI 先手"}</span>
               </div>
@@ -194,14 +198,35 @@ function PreviousResultModal({ open, match, message, winningLine, canSelectPrevi
 }
 
 
-export function GobangPage({ config }: GobangPageProps) {
+export function GobangPage({ config, initialMatches, initialSummary }: GobangPageProps) {
   const assetBaseUrl = "/apps/gobang"
 
   const userMoveAudioUrl = useMemo(() => `${assetBaseUrl}/userxiaqi.mp3`, [assetBaseUrl])
   const aiMoveAudioUrl = useMemo(() => `${assetBaseUrl}/aixiaqi.mp3`, [assetBaseUrl])
   const noRegretAudioUrl = useMemo(() => `${assetBaseUrl}/wuhui.mp3`, [assetBaseUrl])
-  const [gameState, setGameState] = useState<GobangViewState>(initialGameState)
-  const [matches, setMatches] = useState<GobangMatch[]>([])
+  const [gameState, setGameState] = useState<GobangViewState>(() => ({
+    ...initialGameState,
+    freeCount: initialSummary.freeRemaining,
+    freeTotal: initialSummary.freeTotal,
+    freeUsed: initialSummary.freeUsed,
+    paidRemain: initialSummary.paidRemaining,
+    paidTotal: initialSummary.paidTotal,
+    paidUsed: initialSummary.paidUsed,
+    challengeStatus: initialMatches.some((item) => item.status === "ONGOING")
+      ? "in_progress"
+      : initialMatches[0]?.status === "FINISHED"
+        ? (initialMatches[0]?.winnerId === 0 ? "failed" : "completed")
+        : "not_started",
+    pointName: initialSummary.pointName,
+    points: initialSummary.points,
+    message: initialMatches.some((item) => item.status === "ONGOING")
+      ? ((initialMatches.find((item) => item.status === "ONGOING")?.currentSide === "PLAYER") ? "轮到你落子" : "对局进行中")
+      : initialMatches[0]?.status === "FINISHED"
+        ? (initialMatches[0]?.winnerId === 0 ? "AI 获胜，再接再厉" : "你赢了，奖励已到账")
+        : initialGameState.message,
+  }))
+  const [matches, setMatches] = useState<GobangMatch[]>(initialMatches)
+
   const [activeMatchId, setActiveMatchId] = useState<string | null>(null)
   const [rulesCollapsed, setRulesCollapsed] = useState(false)
   const [showNoRegret, setShowNoRegret] = useState(false)
