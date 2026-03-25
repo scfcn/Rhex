@@ -15,7 +15,6 @@ const DEFAULT_ADMIN_USERNAME = process.env.SEED_ADMIN_USERNAME?.trim() || "admin
 const DEFAULT_ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD?.trim() || "ChangeMe_123456"
 const DEFAULT_ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL?.trim() || undefined
 const DEFAULT_ADMIN_NICKNAME = process.env.SEED_ADMIN_NICKNAME?.trim() || "站长"
-const RESET_DATABASE = process.env.SEED_RESET_DATABASE === "true"
 
 
 const defaultLevelDefinitions = [
@@ -442,10 +441,6 @@ async function ensureAdminUser() {
 
 
 async function main() {
-  if (RESET_DATABASE) {
-    await resetDatabase()
-  }
-
   await ensureSiteSettings()
   await ensureLevelDefinitions()
   await ensureDefaultBadges()

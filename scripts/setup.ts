@@ -108,11 +108,8 @@ function shouldForceSeed() {
   return isTruthyEnv("SETUP_FORCE_SEED")
 }
 
-function shouldResetDatabase() {
-  return isTruthyEnv("SEED_RESET_DATABASE")
-}
-
 function runSchemaStep() {
+
   runStep("npx", ["prisma", "db", "push"], "同步数据库结构")
 }
 
@@ -245,12 +242,9 @@ function main() {
   const seedDecision = shouldRunSeed(databaseState)
 
   if (seedDecision === "run") {
-    if (shouldResetDatabase()) {
-      console.warn("\n警告：检测到 SEED_RESET_DATABASE=true，接下来 seed 脚本会清空现有业务数据。")
-    }
-
     runStep("npx", ["tsx", "prisma/seed.ts"], shouldForceSeed() ? "强制执行初始化数据写入" : "写入初始业务数据")
   } else {
+
     console.log("\n>>> 跳过初始化数据写入")
     console.log(statefulSkipReason(databaseState))
   }

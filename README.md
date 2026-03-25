@@ -134,7 +134,6 @@ npm run setup:start:prod
 - `SEED_ADMIN_PASSWORD`：初始管理员密码，默认 `ChangeMe_123456`
 - `SEED_ADMIN_EMAIL`：初始管理员邮箱
 - `SEED_ADMIN_NICKNAME`：初始管理员昵称，默认 `站长`
-- `SEED_RESET_DATABASE=true`：执行 seed 前清空现有业务数据
 - `SETUP_FORCE_SEED=true`：即使数据库已有核心数据也强制重新执行 seed
 
 验证码相关变量：
@@ -160,14 +159,15 @@ npm run setup:start:prod
 在类 Unix 环境中：
 
 ```bash
-SEED_RESET_DATABASE=true SEED_WITH_DEMO_CONTENT=true npm run prisma:seed
+SEED_WITH_DEMO_CONTENT=true npm run prisma:seed
 ```
 
 在 Windows PowerShell 中：
 
 ```powershell
-$env:SEED_RESET_DATABASE="true"; $env:SEED_WITH_DEMO_CONTENT="true"; npm run prisma:seed
+$env:SEED_WITH_DEMO_CONTENT="true"; npm run prisma:seed
 ```
+
 
 ### 常用脚本
 
