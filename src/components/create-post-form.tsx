@@ -268,8 +268,10 @@ function BoardSelectField({
 interface CreatePostFormProps {
   boardOptions: CreatePostFormBoardGroup[]
   pointName: string
+  postRedPacketEnabled?: boolean
   markdownEmojiMap?: MarkdownEmojiItem[]
   currentUser: {
+
 
     username: string
     nickname: string | null
@@ -362,7 +364,8 @@ function HiddenConfigChip({
   )
 }
 
-export function CreatePostForm({ boardOptions, pointName, markdownEmojiMap, currentUser, mode = "create", postId, successSlug, initialValues }: CreatePostFormProps) {
+export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled = false, markdownEmojiMap, currentUser, mode = "create", postId, successSlug, initialValues }: CreatePostFormProps) {
+
 
   const router = useRouter()
   const [title, setTitle] = useState(initialValues?.title ?? "")
@@ -909,21 +912,24 @@ export function CreatePostForm({ boardOptions, pointName, markdownEmojiMap, curr
               onClick={() => setActiveModal("view-level")}
               onClear={() => setMinViewLevel("0")}
             />
-            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-2">
-              <label className="inline-flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={redPacketEnabled}
-                  onChange={(event) => setRedPacketEnabled(event.target.checked)}
-                  className="h-4 w-4 rounded border-border"
-                  disabled={mode === "edit"}
-                />
-                <span>帖子红包</span>
-              </label>
-              <span className={redPacketEnabled ? "rounded-full bg-rose-500 px-2 py-0.5 text-[11px] text-white" : "rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground"}>
-                {redPacketEnabled ? "已开启" : "未开启"}
-              </span>
-            </div>
+            {postRedPacketEnabled ? (
+              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-2">
+                <label className="inline-flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={redPacketEnabled}
+                    onChange={(event) => setRedPacketEnabled(event.target.checked)}
+                    className="h-4 w-4 rounded border-border"
+                    disabled={mode === "edit"}
+                  />
+                  <span>帖子红包</span>
+                </label>
+                <span className={redPacketEnabled ? "rounded-full bg-rose-500 px-2 py-0.5 text-[11px] text-white" : "rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground"}>
+                  {redPacketEnabled ? "已开启" : "未开启"}
+                </span>
+              </div>
+            ) : null}
+
           </div>
           {redPacketEnabled ? (
             <div className="mt-4 grid gap-3 rounded-[20px] border border-rose-200 bg-rose-50/80 p-4 md:grid-cols-2 xl:grid-cols-4 dark:border-rose-500/20 dark:bg-rose-500/10">

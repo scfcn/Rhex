@@ -162,6 +162,7 @@ export default async function WritePage({ searchParams }: WritePageProps) {
               <CreatePostForm
                 boardOptions={boardOptions}
                 pointName={settings.pointName}
+                postRedPacketEnabled={settings.postRedPacketEnabled}
                 markdownEmojiMap={settings.markdownEmojiMap}
                 currentUser={{
 

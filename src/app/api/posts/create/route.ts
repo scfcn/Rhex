@@ -122,7 +122,10 @@ export async function POST(request: Request) {
       }
     }
 
-    const totalPointCost = Math.max(0, -(boardContext.settings.postPointDelta ?? 0)) + (postType === "BOUNTY" ? (bountyPoints ?? 0) : 0)
+    const totalPointCost = Math.max(0, -(boardContext.settings.postPointDelta ?? 0))
+      + (postType === "BOUNTY" ? (bountyPoints ?? 0) : 0)
+      + redPacketTotalPoints
+
 
     if (author.points < totalPointCost) {
       return NextResponse.json({ code: 400, message: `当前${settings.pointName}不足，无法在该节点发布此帖子` }, { status: 400 })
