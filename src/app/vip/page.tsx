@@ -7,8 +7,10 @@ import { VipBadge } from "@/components/vip-badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getCurrentUser } from "@/lib/auth"
+import { formatDateTime } from "@/lib/formatters"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
+
 
 
 const vipMilestones = (pointName: string) => [
@@ -65,7 +67,8 @@ export default async function VipPage() {
                   <p className="mt-1 text-sm text-white/75">{vipActive ? `你当前已开通 VIP${currentLevel}，可进入受限内容区域。` : `你当前还不是 VIP，可直接在下方使用${settings.pointName}购买开通。`}</p>
 
 
-                  <p className="mt-2 text-sm text-white/75">到期时间：{vipUser?.vipExpiresAt ? new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(vipUser.vipExpiresAt)) : "长期有效 / 暂未设置"}</p>
+                  <p className="mt-2 text-sm text-white/75">到期时间：{vipUser?.vipExpiresAt ? formatDateTime(vipUser.vipExpiresAt) : "长期有效 / 暂未设置"}</p>
+
 
                 </div>
               ) : (

@@ -14,7 +14,6 @@ const settingSections = [
   { key: "redeem-codes", label: "兑换码" },
   { key: "vip", label: "VIP" },
   { key: "upload", label: "上传" },
-  { key: "apps", label: "应用" },
 ] as const
 
 

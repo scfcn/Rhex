@@ -158,7 +158,7 @@ export function SidebarUserCard({ user, createPostHref = "/write" }: { user: Sid
     }
 
     void loadCalendar(calendarMonth)
-  }, [calendarMonth, calendarOpen, currentUser?.checkInEnabled])
+  }, [calendarMonth, calendarOpen, currentUser?.checkInEnabled, loadCalendar])
 
   if (!currentUser) {
     return (
@@ -192,6 +192,24 @@ export function SidebarUserCard({ user, createPostHref = "/write" }: { user: Sid
   const safeUser = currentUser
   const pointName = safeUser.pointName ?? "积分"
   const vipActive = isVipActive(safeUser)
+
+  function upsertCalendarEntry(entry: CheckInCalendarEntry) {
+    setCalendarData((current) => {
+      if (!current || current.month !== getMonthKey(new Date(`${entry.date}T00:00:00`))) {
+        return current
+      }
+
+      const entries = current.entries.filter((item) => item.date !== entry.date)
+      entries.push(entry)
+      entries.sort((left, right) => left.date.localeCompare(right.date))
+
+      return {
+        ...current,
+        entries,
+      }
+    })
+  }
+
   const roleBadge = getRoleBadgeConfig(safeUser.role)
   const isRestrictedUser = safeUser.status === "BANNED" || safeUser.status === "MUTED"
   const effectiveMakeUpPrice = vipActive ? (safeUser.checkInVipMakeUpCardPrice ?? 0) : (safeUser.checkInMakeUpCardPrice ?? 0)
@@ -218,11 +236,19 @@ export function SidebarUserCard({ user, createPostHref = "/write" }: { user: Sid
         return
       }
 
+      const checkedInDate = result.data?.date ?? todayKey
       setPoints(result.data?.points ?? points)
       setCheckedInToday(true)
+      upsertCalendarEntry({
+        date: checkedInDate,
+        reward: safeUser.checkInReward ?? 0,
+        isMakeUp: false,
+        makeUpCost: 0,
+        createdAt: new Date().toISOString(),
+      })
       setMessage(result.message ?? "签到成功")
       toast.success(result.message ?? "签到成功", "签到成功")
-      await loadCalendar(calendarMonth)
+      void loadCalendar(calendarMonth)
       router.refresh()
     } finally {
       setLoading(false)
@@ -312,7 +338,7 @@ export function SidebarUserCard({ user, createPostHref = "/write" }: { user: Sid
  
                 <Button className="h-9 w-full rounded-lg gap-1.5 text-xs" onClick={() => setCalendarOpen(true)}>
                   <CalendarDays className="h-4 w-4" />
-                  签到
+                  {checkedInToday ? "今日已签到" : "签到"}
                 </Button>
               </div>
             ) : null}

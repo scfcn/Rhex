@@ -1,5 +1,7 @@
 import { prisma } from "@/db/client"
+import { getBusinessDayRange } from "@/lib/formatters"
 import { getSiteSettings } from "@/lib/site-settings"
+
 
 export interface PostTipLeaderboardItem {
   userId: number
@@ -28,13 +30,9 @@ function buildTipReason(postId: string, amount: number, pointName: string) {
 }
 
 function getTodayRange() {
-  const now = new Date()
-  const start = new Date(now)
-  start.setHours(0, 0, 0, 0)
-  const end = new Date(start)
-  end.setDate(end.getDate() + 1)
-  return { start, end }
+  return getBusinessDayRange()
 }
+
 
 export async function getPostTipSummary(postId: string, currentUserId?: number): Promise<PostTipSummary> {
   const settings = await getSiteSettings()

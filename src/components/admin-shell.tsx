@@ -1,4 +1,4 @@
-import { Settings, ShieldAlert, Flag, LayoutGrid, Settings2, Sparkles, Users, BookText, Logs, Megaphone } from "lucide-react"
+import { Settings, ShieldAlert, Flag, LayoutGrid, Settings2, Sparkles, Users, BookText, Logs, Megaphone, AppWindow } from "lucide-react"
 import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,7 @@ const adminNavigation = [
   { href: "/admin?tab=reports", label: "举报中心", icon: Flag },
   { href: "/admin?tab=logs", label: "日志中心", icon: Logs },
   { href: "/admin?tab=security", label: "内容安全", icon: ShieldAlert },
+  { href: "/admin/apps", label: "应用", icon: AppWindow },
   { href: "/admin?tab=settings&section=profile", label: "站点设置", icon: Settings },
 ]
 

@@ -13,7 +13,7 @@ export default async function AdminAppsPage() {
   }
 
   return (
-    <AdminShell currentTab="settings" adminName={admin.nickname ?? admin.username}>
+    <AdminShell currentTab="/admin/apps" adminName={admin.nickname ?? admin.username}>
       <div className="space-y-6">
         <Card>
           <CardHeader>

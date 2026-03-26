@@ -248,7 +248,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         ) : null}
 
         {tab === "settings" ? <AdminSettingsTabs currentSection={currentSettingsSection} /> : null}
-        {tab === "settings" && currentSettingsSection === "apps" ? redirect("/admin/apps") : null}
 
         {tab === "users" ? <AdminUserList data={adminUsers} /> : null}
         {tab === "posts" ? <AdminPostList data={filteredPosts} /> : null}

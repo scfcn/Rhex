@@ -6,7 +6,9 @@ export { GobangAdminPage } from "@/components/gobang-admin-page"
 
 import { prisma } from "@/lib/prisma"
 import { getGobangAppConfig } from "@/lib/app-config"
+import { getBusinessDayRange } from "@/lib/formatters"
 import { getSiteSettings } from "@/lib/site-settings"
+
 
 const BOARD_SIZE = 15
 const PLAYER_MARKER = 1
@@ -286,13 +288,10 @@ async function getGobangPluginConfig() {
 }
 
 async function countTodayMatches(userId: number) {
-  const now = new Date()
-  const start = new Date(now)
-  start.setHours(0, 0, 0, 0)
-  const end = new Date(start)
-  end.setDate(end.getDate() + 1)
+  const { start, end } = getBusinessDayRange()
 
   const [totalRows, paidRows] = await Promise.all([
+
     prisma.$queryRawUnsafe<Array<{ count: bigint | number }>>(
       `SELECT COUNT(*)::bigint AS count FROM "GobangMatch" WHERE "creatorId" = $1 AND "createdAt" >= $2 AND "createdAt" < $3`,
       userId,

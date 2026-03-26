@@ -16,9 +16,12 @@ interface AdminSiteSettingsFormProps {
     siteLogoPath?: string | null
     siteSeoKeywords?: string[]
     vipMonthlyPrice: number
-
     vipQuarterlyPrice: number
     vipYearlyPrice: number
+    postOfflinePrice: number
+    postOfflineVip1Price: number
+    postOfflineVip2Price: number
+    postOfflineVip3Price: number
     uploadProvider: string
     uploadLocalPath: string
     uploadBaseUrl?: string | null
@@ -38,7 +41,12 @@ export function AdminSiteSettingsForm({ initialSettings }: AdminSiteSettingsForm
   const [vipMonthlyPrice, setVipMonthlyPrice] = useState(String(initialSettings.vipMonthlyPrice))
   const [vipQuarterlyPrice, setVipQuarterlyPrice] = useState(String(initialSettings.vipQuarterlyPrice))
   const [vipYearlyPrice, setVipYearlyPrice] = useState(String(initialSettings.vipYearlyPrice))
+  const [postOfflinePrice, setPostOfflinePrice] = useState(String(initialSettings.postOfflinePrice))
+  const [postOfflineVip1Price, setPostOfflineVip1Price] = useState(String(initialSettings.postOfflineVip1Price))
+  const [postOfflineVip2Price, setPostOfflineVip2Price] = useState(String(initialSettings.postOfflineVip2Price))
+  const [postOfflineVip3Price, setPostOfflineVip3Price] = useState(String(initialSettings.postOfflineVip3Price))
   const [uploadProvider, setUploadProvider] = useState(initialSettings.uploadProvider)
+
   const [uploadLocalPath, setUploadLocalPath] = useState(initialSettings.uploadLocalPath)
   const [uploadBaseUrl, setUploadBaseUrl] = useState(initialSettings.uploadBaseUrl ?? "")
   const [uploadOssBucket, setUploadOssBucket] = useState(initialSettings.uploadOssBucket ?? "")
@@ -100,7 +108,12 @@ export function AdminSiteSettingsForm({ initialSettings }: AdminSiteSettingsForm
               vipMonthlyPrice: Number(vipMonthlyPrice),
               vipQuarterlyPrice: Number(vipQuarterlyPrice),
               vipYearlyPrice: Number(vipYearlyPrice),
+              postOfflinePrice: Number(postOfflinePrice),
+              postOfflineVip1Price: Number(postOfflineVip1Price),
+              postOfflineVip2Price: Number(postOfflineVip2Price),
+              postOfflineVip3Price: Number(postOfflineVip3Price),
               uploadProvider,
+
               uploadLocalPath,
               uploadBaseUrl,
               uploadOssBucket,
@@ -157,14 +170,27 @@ export function AdminSiteSettingsForm({ initialSettings }: AdminSiteSettingsForm
 
         </div>
       </div>
-      <div className="rounded-[24px] border border-border p-5">
-        <h3 className="text-sm font-semibold">VIP 套餐价格</h3>
-        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <Field label="月卡积分价格（VIP1）" value={vipMonthlyPrice} onChange={setVipMonthlyPrice} placeholder="如 3000" />
-          <Field label="季卡积分价格（VIP2）" value={vipQuarterlyPrice} onChange={setVipQuarterlyPrice} placeholder="如 8000" />
-          <Field label="年卡积分价格（VIP3）" value={vipYearlyPrice} onChange={setVipYearlyPrice} placeholder="如 30000" />
+      <div className="rounded-[24px] border border-border p-5 space-y-5">
+        <div>
+          <h3 className="text-sm font-semibold">VIP 套餐价格</h3>
+          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <Field label="月卡积分价格（VIP1）" value={vipMonthlyPrice} onChange={setVipMonthlyPrice} placeholder="如 3000" />
+            <Field label="季卡积分价格（VIP2）" value={vipQuarterlyPrice} onChange={setVipQuarterlyPrice} placeholder="如 8000" />
+            <Field label="年卡积分价格（VIP3）" value={vipYearlyPrice} onChange={setVipYearlyPrice} placeholder="如 30000" />
+          </div>
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold">作者下线帖子价格</h3>
+          <p className="mt-1 text-xs text-muted-foreground">0 表示免费；普通用户与 VIP1 / VIP2 / VIP3 按当前身份分别结算。</p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <Field label="普通用户积分价格" value={postOfflinePrice} onChange={setPostOfflinePrice} placeholder="如 50" />
+            <Field label="VIP1 积分价格" value={postOfflineVip1Price} onChange={setPostOfflineVip1Price} placeholder="如 30" />
+            <Field label="VIP2 积分价格" value={postOfflineVip2Price} onChange={setPostOfflineVip2Price} placeholder="如 20" />
+            <Field label="VIP3 积分价格" value={postOfflineVip3Price} onChange={setPostOfflineVip3Price} placeholder="如 0" />
+          </div>
         </div>
       </div>
+
 
       <div className="rounded-[24px] border border-border p-5 space-y-4">
         <h3 className="text-sm font-semibold">上传存储设置</h3>

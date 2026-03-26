@@ -19,6 +19,11 @@ export function MobileHeaderQuickActions({ isLoggedIn, checkInEnabled, checkedIn
   const [checkedInToday, setCheckedInToday] = useState(initialCheckedInToday)
   const [loading, setLoading] = useState(false)
 
+  if (!isLoggedIn) {
+    return null
+  }
+
+
   async function handleCheckIn() {
     if (!isLoggedIn) {
       router.push("/login")

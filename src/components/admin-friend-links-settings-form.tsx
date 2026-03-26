@@ -220,9 +220,8 @@ export function AdminFriendLinksSettingsForm({ initialSettings, items, pendingCo
               <article key={item.id} className="rounded-[18px] border border-border bg-card px-3 py-3">
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-white p-1.5">
-                      {draft.logoPath ? <Image src={draft.logoPath} alt={`${draft.name || item.name} logo`} fill sizes="44px" className="object-contain" unoptimized /> : <span className="text-sm font-semibold text-muted-foreground">{(draft.name || item.name).slice(0, 1)}</span>}
-
+                    <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-white">
+                      {draft.logoPath ? <Image src={draft.logoPath} alt={`${draft.name || item.name} logo`} fill sizes="44px" className="object-contain p-1.5" unoptimized /> : <span className="text-sm font-semibold text-muted-foreground">{(draft.name || item.name).slice(0, 1)}</span>}
                     </div>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
@@ -380,7 +379,7 @@ function LogoUploader({ value, uploading, onValueChange, onUpload }: { value: st
       <input value={value} onChange={(event) => onValueChange(event.target.value)} className="h-10 w-full rounded-[16px] border border-border bg-background px-3 text-sm outline-none" placeholder="或直接填写 LOGO 地址" />
       {value ? (
         <div className="relative h-14 w-36 overflow-hidden rounded-xl border border-border bg-white p-2">
-          <Image src={value} alt="友情链接 LOGO" fill sizes="144px" className="object-contain" unoptimized />
+          <Image src={value} alt="友情链接 LOGO" fill sizes="144px" className="object-contain p-2" unoptimized />
         </div>
       ) : null}
 

@@ -1,5 +1,6 @@
 import { findPublishedAnnouncements } from "@/db/announcement-queries"
-import { formatMonthDayTime } from "@/lib/formatters"
+import { formatMonthDayTime, serializeDateTime } from "@/lib/formatters"
+
 
 export interface AnnouncementItem {
   id: string
@@ -12,9 +13,10 @@ export interface AnnouncementItem {
 }
 
 function mapAnnouncement(item: Awaited<ReturnType<typeof findPublishedAnnouncements>>[number]): AnnouncementItem {
-  const publishedAt = (item.publishedAt ?? item.createdAt).toISOString()
+  const publishedAt = serializeDateTime(item.publishedAt ?? item.createdAt) ?? item.createdAt.toISOString()
 
   return {
+
     id: item.id,
     title: item.title,
     content: item.content,

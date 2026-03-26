@@ -34,7 +34,7 @@ export default async function AdminAppPage({ params }: AdminAppPageProps) {
     const config = await getGobangAppConfig()
     const AppAdminComponent = GobangAdminPage as ComponentType<{ AppId: string; config: Record<string, boolean | number | string> }>
     return (
-      <AdminShell currentTab="settings" adminName={admin.nickname ?? admin.username}>
+      <AdminShell currentTab="/admin/apps" adminName={admin.nickname ?? admin.username}>
         <div className="space-y-6">
           <Card>
             <CardHeader>
@@ -51,7 +51,7 @@ export default async function AdminAppPage({ params }: AdminAppPageProps) {
     const config = await getSelfServeAdsAppConfig()
     const AppAdminComponent = SelfServeAdsAdminPage as ComponentType<{ AppId: string; config: Record<string, boolean | number | string> }>
     return (
-      <AdminShell currentTab="settings" adminName={admin.nickname ?? admin.username}>
+      <AdminShell currentTab="/admin/apps" adminName={admin.nickname ?? admin.username}>
         <div className="space-y-6">
           <Card>
             <CardHeader>

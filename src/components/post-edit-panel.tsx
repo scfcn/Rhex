@@ -11,15 +11,32 @@ interface PostEditPanelProps {
   editableUntil?: string | null
   lastAppendedAt?: string | null
   appendixCount?: number
+  offlinePrice?: number
+  offlinePriceLabel?: string
+  pointName?: string
+  canOffline?: boolean
 }
 
 const APPEND_INTERVAL_MINUTES = 60
 
-export function PostEditPanel({ postId, postSlug, editableUntil, lastAppendedAt, appendixCount = 0 }: PostEditPanelProps) {
+export function PostEditPanel({
+  postId,
+  postSlug,
+  editableUntil,
+  lastAppendedAt,
+  appendixCount = 0,
+  offlinePrice = 0,
+  offlinePriceLabel = "普通用户",
+  pointName = "积分",
+  canOffline = true,
+}: PostEditPanelProps) {
   const [appendText, setAppendText] = useState("")
+  const [offlineReason, setOfflineReason] = useState("")
   const [message, setMessage] = useState("")
   const [loading, setLoading] = useState(false)
+  const [offlineLoading, setOfflineLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
+  const [offlineModalOpen, setOfflineModalOpen] = useState(false)
 
   const canEditOriginal = useMemo(() => (editableUntil ? new Date(editableUntil).getTime() > Date.now() : false), [editableUntil])
   const nextAppendAt = useMemo(() => {
@@ -69,6 +86,34 @@ export function PostEditPanel({ postId, postSlug, editableUntil, lastAppendedAt,
     }
   }
 
+  async function handleOffline() {
+    setOfflineLoading(true)
+    setMessage("")
+
+    try {
+      const response = await fetch("/api/posts/offline", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          postId,
+          reason: offlineReason,
+        }),
+      })
+
+      const result = await response.json()
+      setMessage(result.message ?? (response.ok ? "帖子已下线" : "帖子下线失败"))
+
+      if (response.ok) {
+        setOfflineModalOpen(false)
+        window.location.reload()
+      }
+    } finally {
+      setOfflineLoading(false)
+    }
+  }
+
   return (
     <>
       <div className="rounded-[24px] border border-border bg-card p-5">
@@ -81,8 +126,16 @@ export function PostEditPanel({ postId, postSlug, editableUntil, lastAppendedAt,
             <p className="text-xs text-muted-foreground">
               已追加 {appendixCount} 条附言{!canEditOriginal ? `，每次追加需间隔 ${APPEND_INTERVAL_MINUTES} 分钟` : ""}。
             </p>
+            <p className="text-xs text-muted-foreground">
+              下线帖子费用：{offlinePrice === 0 ? "免费" : `${offlinePrice} ${pointName}`}（当前身份：{offlinePriceLabel}）。
+            </p>
           </div>
           <div className="flex items-center gap-3">
+            {canOffline ? (
+              <Button type="button" variant="outline" onClick={() => setOfflineModalOpen(true)}>
+                下线帖子
+              </Button>
+            ) : null}
             {!canEditOriginal ? (
               <Button type="button" variant="outline" onClick={() => setModalOpen(true)}>
                 追加附言
@@ -131,6 +184,44 @@ export function PostEditPanel({ postId, postSlug, editableUntil, lastAppendedAt,
               <Button type="button" variant="ghost" onClick={() => setModalOpen(false)} disabled={loading}>取消</Button>
               <Button type="button" onClick={handleAppend} disabled={loading || !canAppendNow}>
                 {loading ? "提交中..." : `发布第 ${appendixCount + 1} 条附言`}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {offlineModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
+          <div className="w-full max-w-xl rounded-[28px] border border-border bg-background shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border px-6 py-5">
+              <div>
+                <h4 className="text-lg font-semibold">下线帖子</h4>
+                <p className="mt-1 text-sm text-muted-foreground">帖子下线后将不再对普通用户展示，当前身份费用为 {offlinePrice === 0 ? "免费" : `${offlinePrice} ${pointName}`}。</p>
+              </div>
+              <Button type="button" variant="ghost" onClick={() => setOfflineModalOpen(false)}>
+                关闭
+              </Button>
+            </div>
+            <div className="space-y-4 px-6 py-5">
+              <div className="rounded-[18px] border border-border bg-card/60 px-4 py-3 text-sm text-muted-foreground">
+                结算身份：{offlinePriceLabel}。{offlinePrice > 0 ? `提交后将扣除 ${offlinePrice} ${pointName}。` : "当前配置为免费下线。"}
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">下线说明（可选）</p>
+                <textarea
+                  value={offlineReason}
+                  onChange={(event) => setOfflineReason(event.target.value)}
+                  placeholder="例如：内容已过期，暂时下线整理。"
+                  className="min-h-[140px] w-full rounded-[20px] border border-border bg-card px-4 py-3 text-sm outline-none"
+                  disabled={offlineLoading}
+                />
+              </div>
+              {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-border px-6 py-4">
+              <Button type="button" variant="ghost" onClick={() => setOfflineModalOpen(false)} disabled={offlineLoading}>取消</Button>
+              <Button type="button" onClick={handleOffline} disabled={offlineLoading}>
+                {offlineLoading ? "处理中..." : "确认下线"}
               </Button>
             </div>
           </div>

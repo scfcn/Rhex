@@ -30,6 +30,10 @@ export interface SiteSettingsData {
   checkInReward: number
   checkInMakeUpCardPrice: number
   checkInVipMakeUpCardPrice: number
+  postOfflinePrice: number
+  postOfflineVip1Price: number
+  postOfflineVip2Price: number
+  postOfflineVip3Price: number
   inviteRewardInviter: number
   inviteRewardInvitee: number
   registrationEnabled: boolean
@@ -101,6 +105,10 @@ function mapSiteSettings(record: {
   checkInReward: number
   checkInMakeUpCardPrice: number
   checkInVipMakeUpCardPrice: number
+  postOfflinePrice: number
+  postOfflineVip1Price: number
+  postOfflineVip2Price: number
+  postOfflineVip3Price: number
   inviteRewardInviter: number
   inviteRewardInvitee: number
   registrationEnabled: boolean
@@ -176,6 +184,10 @@ function mapSiteSettings(record: {
     checkInReward: record.checkInReward,
     checkInMakeUpCardPrice: record.checkInMakeUpCardPrice,
     checkInVipMakeUpCardPrice: record.checkInVipMakeUpCardPrice,
+    postOfflinePrice: record.postOfflinePrice,
+    postOfflineVip1Price: record.postOfflineVip1Price,
+    postOfflineVip2Price: record.postOfflineVip2Price,
+    postOfflineVip3Price: record.postOfflineVip3Price,
     inviteRewardInviter: record.inviteRewardInviter,
     inviteRewardInvitee: record.inviteRewardInvitee,
     registrationEnabled: record.registrationEnabled,
@@ -253,6 +265,10 @@ const getCachedSiteSettings = cache(async (): Promise<SiteSettingsData> => {
       ...defaultSiteSettingsCreateInput,
       checkInMakeUpCardPrice: 0,
       checkInVipMakeUpCardPrice: 0,
+      postOfflinePrice: 0,
+      postOfflineVip1Price: 0,
+      postOfflineVip2Price: 0,
+      postOfflineVip3Price: 0,
     })
   }
 

@@ -3,8 +3,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { formatBusinessMonthDayTime } from "@/lib/formatters"
 import type { GobangMatch, GobangPlayerSummary } from "@/lib/gobang"
 import { cn } from "@/lib/utils"
+
 
 
 import "@/styles/gobang.css"
@@ -55,23 +57,14 @@ const initialGameState: GobangViewState = {
 }
 
 function formatMatchTime(value: string | undefined) {
-  if (!value) return "时间未知"
+  if (!value) {
+    return "时间未知"
+  }
 
-  const normalizedValue = value.includes("T") && !/[zZ]|[+-]\d{2}:\d{2}$/.test(value)
-    ? `${value}Z`
-    : value
-  const date = new Date(normalizedValue)
-  if (Number.isNaN(date.getTime())) return "时间未知"
-
-  return new Intl.DateTimeFormat("zh-CN", {
-    timeZone: "Asia/Shanghai",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(date)
+  const formatted = formatBusinessMonthDayTime(value)
+  return formatted && formatted !== "-" ? formatted : "时间未知"
 }
+
 
 
 function resolveWinningLine(board: number[][], winnerId: number | null): Point[] | null {

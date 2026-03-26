@@ -3,6 +3,8 @@ import { AnnouncementStatus } from "@/db/types"
 import { prisma } from "@/db/client"
 
 import { requireAdminUser } from "@/lib/admin"
+import { serializeDateTime } from "@/lib/formatters"
+
 
 export interface AdminAnnouncementItem {
   id: string
@@ -35,6 +37,15 @@ function normalizeStatus(value: unknown): AnnouncementStatus {
   return AnnouncementStatus.DRAFT
 }
 
+function mapRequiredDateTime(input: string | Date): string {
+  const value = serializeDateTime(input)
+  if (!value) {
+    throw new Error("公告时间序列化失败")
+  }
+
+  return value
+}
+
 function mapAnnouncement(item: Awaited<ReturnType<typeof prisma.announcement.findMany>>[number] & {
   creator: {
     username: string
@@ -47,11 +58,12 @@ function mapAnnouncement(item: Awaited<ReturnType<typeof prisma.announcement.fin
     content: item.content,
     status: item.status,
     isPinned: item.isPinned,
-    createdAt: item.createdAt.toISOString(),
-    publishedAt: item.publishedAt?.toISOString() ?? null,
+    createdAt: mapRequiredDateTime(item.createdAt),
+    publishedAt: item.publishedAt ? mapRequiredDateTime(item.publishedAt) : null,
     creatorName: item.creator.nickname ?? item.creator.username,
   }
 }
+
 
 export async function getAdminAnnouncementList(): Promise<AdminAnnouncementItem[]> {
   const currentUser = await requireAdminUser()

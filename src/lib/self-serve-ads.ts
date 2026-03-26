@@ -10,7 +10,9 @@ import { prisma } from "@/db/client"
 import { countPendingSelfServeOrders, createSelfServeOrder, findSelfServeApprovedAds, findSelfServeOrderById, findSelfServeOrdersForAdmin, updateSelfServeOrder } from "@/db/self-serve-ads"
 import { getCurrentUser } from "@/lib/auth"
 import { getSelfServeAdsAppConfig as loadSelfServeAdsAppConfig } from "@/lib/app-config"
+import { serializeDateTime } from "@/lib/formatters"
 import { buildSelfServeAdPriceMap, getSelfServeAdPrice, toSelfServeAdConfig } from "@/lib/self-serve-ads.shared"
+
 import type { SelfServeAdItem, SelfServeAdPurchaseDraft, SelfServeAdSlotType, SelfServeAdsPanelData } from "@/lib/self-serve-ads.shared"
 import { getSiteSettings } from "@/lib/site-settings"
 
@@ -66,9 +68,9 @@ function mapItem(item: Awaited<ReturnType<typeof findSelfServeApprovedAds>>[numb
     pricePoints: item.pricePoints,
     status: item.status,
     reviewNote: item.reviewNote,
-    startsAt: item.startsAt ? item.startsAt.toISOString() : null,
-    endsAt: item.endsAt ? item.endsAt.toISOString() : null,
-    createdAt: item.createdAt.toISOString(),
+    startsAt: item.startsAt ? serializeDateTime(item.startsAt) : null,
+    endsAt: item.endsAt ? serializeDateTime(item.endsAt) : null,
+    createdAt: serializeDateTime(item.createdAt),
     isPlaceholder: false,
   }
 }

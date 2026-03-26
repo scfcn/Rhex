@@ -30,7 +30,9 @@ import { getPostDetailBySlug, getPostSeoBySlug, incrementPostViewCount } from "@
 
 import { getPostSidebarData } from "@/lib/post-sidebar"
 import { getPostTipSummary } from "@/lib/post-tips"
+import { getPostOfflineActionMeta } from "@/lib/post-offline"
 import { getPurchasedPostBlockIds } from "@/lib/post-unlock"
+
 import { buildArticleJsonLd, buildMetadataKeywords } from "@/lib/seo"
 import { getSiteSettings } from "@/lib/site-settings"
 
@@ -125,13 +127,16 @@ export default async function PostPage({ params, searchParams }: PostPageProps) 
   const userReplyCountPromise = canViewRestrictedPost ? getUserReplyCountByPost(basePost.id, currentUser?.id) : Promise.resolve(0)
   const purchasedBlockIdsPromise = canViewRestrictedPost ? getPurchasedPostBlockIds(basePost.id, currentUser?.id) : Promise.resolve(new Set<string>())
   const tipSummaryPromise = canViewRestrictedPost ? getPostTipSummary(basePost.id, currentUser?.id) : Promise.resolve(undefined)
+  const postOfflineMetaPromise = currentUser?.id === basePost.authorId ? getPostOfflineActionMeta(basePost.id) : Promise.resolve(null)
 
-  const [userReplyCount, purchasedBlockIds, tipSummary, commentResult, sidebarData, boards, zones] = await Promise.all([
+  const [userReplyCount, purchasedBlockIds, tipSummary, postOfflineMeta, commentResult, sidebarData, boards, zones] = await Promise.all([
 
     userReplyCountPromise,
     purchasedBlockIdsPromise,
     tipSummaryPromise,
+    postOfflineMetaPromise,
     getCommentsByPostId(basePost.id, { sort: currentSort, page: currentPage, pageSize: 15 }, {
+
       userId: currentUser?.id,
       isAdmin,
       postAuthorId: basePost.authorId,
@@ -332,7 +337,12 @@ export default async function PostPage({ params, searchParams }: PostPageProps) 
                     editableUntil={displayPost.editableUntil}
                     lastAppendedAt={displayPost.lastAppendedAt}
                     appendixCount={displayPost.appendices?.length ?? 0}
+                    offlinePrice={postOfflineMeta?.price.amount ?? 0}
+                    offlinePriceLabel={postOfflineMeta?.price.label ?? "普通用户"}
+                    pointName={postOfflineMeta?.pointName ?? settings.pointName}
+                    canOffline={Boolean(postOfflineMeta)}
                   />
+
                 ) : null}
 
                 {isAdmin ? (

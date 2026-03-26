@@ -214,10 +214,11 @@ export async function POST(request: NextRequest) {
       })
 
       if (result.alreadyCheckedIn) {
-        return NextResponse.json({ code: 0, message: "今天已经签到过了", data: { points: result.points, alreadyCheckedIn: true } })
+        return NextResponse.json({ code: 0, message: "今天已经签到过了", data: { points: result.points, alreadyCheckedIn: true, date: todayKey } })
       }
 
-      return NextResponse.json({ code: 0, message: `签到成功，获得 ${reward} ${settings.pointName}`, data: { points: result.points, alreadyCheckedIn: false } })
+      return NextResponse.json({ code: 0, message: `签到成功，获得 ${reward} ${settings.pointName}`, data: { points: result.points, alreadyCheckedIn: false, date: todayKey } })
+
     }
 
     const targetDate = String(body.date ?? "").trim()

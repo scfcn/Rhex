@@ -18,7 +18,12 @@ export const defaultSiteSettingsCreateInput = {
   checkInReward: 5,
   checkInMakeUpCardPrice: 0,
   checkInVipMakeUpCardPrice: 0,
+  postOfflinePrice: 0,
+  postOfflineVip1Price: 0,
+  postOfflineVip2Price: 0,
+  postOfflineVip3Price: 0,
   inviteRewardInviter: 0,
+
 
 
   inviteRewardInvitee: 0,

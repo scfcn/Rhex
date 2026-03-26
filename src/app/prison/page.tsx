@@ -4,6 +4,8 @@ import { UserStatus } from "@/db/types"
 
 import { SiteHeader } from "@/components/site-header"
 import { prisma } from "@/db/client"
+import { formatDateTime, serializeDate } from "@/lib/formatters"
+
 
 export const metadata: Metadata = {
   title: "小黑屋",
@@ -136,22 +138,13 @@ export default async function PrisonPage({ searchParams }: PrisonPageProps) {
                           <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 xl:grid-cols-3">
                             <div>
                               <span className="font-medium text-foreground">处理时间：</span>
-                              {new Intl.DateTimeFormat("zh-CN", {
-                                year: "numeric",
-                                month: "2-digit",
-                                day: "2-digit",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              }).format(new Date(user.updatedAt))}
+                              {formatDateTime(user.updatedAt)}
                             </div>
                             <div>
                               <span className="font-medium text-foreground">加入社区：</span>
-                              {new Intl.DateTimeFormat("zh-CN", {
-                                year: "numeric",
-                                month: "2-digit",
-                                day: "2-digit",
-                              }).format(new Date(user.createdAt))}
+                              {serializeDate(user.createdAt) ?? "-"}
                             </div>
+
                             <div>
                               <span className="font-medium text-foreground">当前状态：</span>
                               {isBanned ? "拉黑" : "禁言"}

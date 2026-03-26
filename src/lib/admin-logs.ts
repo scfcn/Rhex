@@ -1,7 +1,9 @@
 import type { Prisma } from "@/db/types"
 
 import { prisma } from "@/db/client"
+import { serializeDate, serializeDateTime } from "@/lib/formatters"
 import { normalizePageSize, normalizePositiveInteger } from "@/lib/shared/normalizers"
+
 
 export type AdminLogCenterTab = "admin" | "login" | "points" | "uploads" | "orders"
 
@@ -189,7 +191,7 @@ export async function getAdminLogCenter(options: GetAdminLogCenterOptions = {}):
       pagination,
       rows: rows.map((item) => ({
         id: item.id,
-        occurredAt: item.createdAt.toISOString(),
+        occurredAt: serializeDateTime(item.createdAt) ?? item.createdAt.toISOString(),
         actorPrimary: item.admin.nickname ?? item.admin.username,
         actorSecondary: `@${item.admin.username}`,
         typePrimary: item.action,
@@ -200,6 +202,7 @@ export async function getAdminLogCenter(options: GetAdminLogCenterOptions = {}):
         detailSecondary: item.ip ?? "IP 未记录",
         tone: resolveAdminTone(item.action),
       })),
+
     }
   }
 
@@ -381,7 +384,7 @@ export async function getAdminLogCenter(options: GetAdminLogCenterOptions = {}):
     pagination,
     rows: rows.map((item) => ({
       id: item.id,
-      occurredAt: item.createdAt.toISOString(),
+      occurredAt: serializeDateTime(item.createdAt) ?? item.createdAt.toISOString(),
       actorPrimary: item.user.nickname ?? item.user.username,
       actorSecondary: `@${item.user.username}`,
       typePrimary: item.orderType,
@@ -389,8 +392,9 @@ export async function getAdminLogCenter(options: GetAdminLogCenterOptions = {}):
       targetPrimary: item.amount ? `¥${item.amount / 100}` : `${item.pointsCost ?? 0} 积分`,
       targetSecondary: `${item.days} 天`,
       detailPrimary: item.remark ?? "无附加备注",
-      detailSecondary: item.expiresAt ? `到期 ${item.expiresAt.toISOString().slice(0, 10)}` : "未设置到期",
+      detailSecondary: item.expiresAt ? `到期 ${serializeDate(item.expiresAt) ?? item.expiresAt.toISOString().slice(0, 10)}` : "未设置到期",
       tone: "success",
     })),
+
   }
 }

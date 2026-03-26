@@ -5,9 +5,12 @@ import type { Prisma } from "@/db/types"
 import { getCurrentUser } from "@/lib/auth"
 import { resolveBoardSettings } from "@/lib/board-settings"
 import type { AdminPostListResult } from "@/lib/admin-post-management"
+import { getBusinessDayRange, serializeDateTime } from "@/lib/formatters"
+
 import { getPostStatusLabel, getPostTypeLabel, isLocalPostType, type LocalPostType } from "@/lib/post-types"
 import { prisma } from "@/db/client"
 import { normalizePageSize, normalizePositiveInteger } from "@/lib/shared/normalizers"
+
 
 
 interface AdminPostQuery {
@@ -192,8 +195,8 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     throw new Error("无权限访问后台数据")
   }
 
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
+  const { start: todayStart } = getBusinessDayRange()
+
 
   const [
     userCount,
@@ -378,7 +381,8 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
       displayName: user.nickname ?? user.username,
       role: user.role,
       status: user.status,
-      createdAt: user.createdAt.toISOString(),
+      createdAt: serializeDateTime(user.createdAt) ?? user.createdAt.toISOString(),
+
       postCount: user.postCount,
       commentCount: user.commentCount,
     })),
@@ -393,12 +397,13 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
       reviewNote: post.reviewNote ?? null,
       boardName: post.board.name,
       authorName: post.author.nickname ?? post.author.username,
-      createdAt: post.createdAt.toISOString(),
+      createdAt: serializeDateTime(post.createdAt) ?? post.createdAt.toISOString(),
       commentCount: post.commentCount,
       likeCount: post.likeCount,
       isPinned: post.isPinned,
       isFeatured: post.isFeatured,
     })),
+
     recentReports: recentReports.map((report) => ({
       id: report.id,
       targetType: report.targetType,
@@ -488,8 +493,9 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
       matchType: word.matchType,
       actionType: word.actionType,
       status: word.status,
-      createdAt: word.createdAt.toISOString(),
+      createdAt: serializeDateTime(word.createdAt) ?? word.createdAt.toISOString(),
     })),
+
     vipOrders: vipOrders.map((item) => ({
       id: item.id,
       username: item.user.username,
@@ -499,8 +505,9 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
       pointsCost: item.pointsCost ?? null,
       days: item.days,
       vipLevel: item.vipLevel,
-      expiresAt: item.expiresAt?.toISOString() ?? null,
-      createdAt: item.createdAt.toISOString(),
+      expiresAt: serializeDateTime(item.expiresAt),
+      createdAt: serializeDateTime(item.createdAt) ?? item.createdAt.toISOString(),
+
       remark: item.remark ?? null,
     })),
   }

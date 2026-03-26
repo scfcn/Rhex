@@ -1,36 +1,159 @@
-function formatWithOptions(input: string | Date, options: Intl.DateTimeFormatOptions, locale = "zh-CN") {
-  const date = input instanceof Date ? input : new Date(input)
+const BUSINESS_TIME_ZONE = "Asia/Shanghai"
 
-  if (Number.isNaN(date.getTime())) {
+type SupportedDateInput = string | Date
+
+function getDateParts(date = new Date(), timeZone = BUSINESS_TIME_ZONE) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+
+  const parts = formatter.formatToParts(date)
+  const year = parts.find((item) => item.type === "year")?.value
+  const month = parts.find((item) => item.type === "month")?.value
+  const day = parts.find((item) => item.type === "day")?.value
+
+  if (!year || !month || !day) {
+    throw new Error("无法解析日期")
+  }
+
+  return { year, month, day }
+}
+
+function normalizeDate(input: SupportedDateInput) {
+
+  const date = input instanceof Date ? input : new Date(input)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function formatWithOptions(input: string | Date, options: Intl.DateTimeFormatOptions, locale = "zh-CN") {
+  const date = normalizeDate(input)
+
+  if (!date) {
     return typeof input === "string" ? input : "-"
   }
 
-  return new Intl.DateTimeFormat(locale, options).format(date)
+  return new Intl.DateTimeFormat(locale, {
+    timeZone: BUSINESS_TIME_ZONE,
+    ...options,
+  }).format(date)
 }
 
-export function formatDateTime(input: string | Date, locale = "zh-CN") {
+function formatToParts(input: SupportedDateInput, options: Intl.DateTimeFormatOptions, locale = "zh-CN") {
+
+  const date = normalizeDate(input)
+  if (!date) {
+    return null
+  }
+
+  return new Intl.DateTimeFormat(locale, {
+    timeZone: BUSINESS_TIME_ZONE,
+    ...options,
+  }).formatToParts(date)
+}
+
+export function getLocalDateKey(date = new Date(), timeZone = BUSINESS_TIME_ZONE) {
+  const { year, month, day } = getDateParts(date, timeZone)
+  return `${year}-${month}-${day}`
+}
+
+export function getMonthKey(date = new Date(), timeZone = BUSINESS_TIME_ZONE) {
+  const { year, month } = getDateParts(date, timeZone)
+  return `${year}-${month}`
+}
+
+export function getMonthTitle(monthKey: string) {
+  const [year, month] = monthKey.split("-")
+  return `${year} 年 ${Number(month)} 月`
+}
+
+export function formatDateTime(input: SupportedDateInput, locale = "zh-CN") {
+
   return formatWithOptions(input, {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   }, locale)
 }
 
+export function serializeDateTime(input: string | Date | null | undefined) {
+  if (!input) {
+    return null
+  }
+
+  const parts = formatToParts(input, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  })
+
+  if (!parts) {
+    return null
+  }
+
+  const getPart = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? ""
+
+  return `${getPart("year")}-${getPart("month")}-${getPart("day")} ${getPart("hour")}:${getPart("minute")}:${getPart("second")}`
+}
+
+export function serializeDate(input: string | Date | null | undefined) {
+  if (!input) {
+    return null
+  }
+
+  const parts = formatToParts(input, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+
+  if (!parts) {
+    return null
+  }
+
+  const getPart = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? ""
+
+  return `${getPart("year")}-${getPart("month")}-${getPart("day")}`
+}
+
+export function getBusinessDayRange(date = new Date()) {
+  const dayKey = serializeDate(date)
+  if (!dayKey) {
+    throw new Error("无法计算业务日期边界")
+  }
+
+  const [year, month, day] = dayKey.split("-").map(Number)
+  const start = new Date(Date.UTC(year, month - 1, day, 0 - 8, 0, 0, 0))
+  const end = new Date(Date.UTC(year, month - 1, day + 1, 0 - 8, 0, 0, 0))
+
+  return { start, end, dayKey }
+}
+
 export function formatMonthDayTime(input: string | Date, locale = "zh-CN") {
+
   return formatWithOptions(input, {
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   }, locale)
 }
 
-export function formatRelativeTime(input: string | Date, locale = "zh-CN") {
-  const date = input instanceof Date ? input : new Date(input)
+export function formatRelativeTime(input: SupportedDateInput, locale = "zh-CN") {
 
-  if (Number.isNaN(date.getTime())) {
+  const date = normalizeDate(input)
+
+  if (!date) {
     return typeof input === "string" ? input : "-"
   }
 
@@ -60,3 +183,11 @@ export function formatRelativeTime(input: string | Date, locale = "zh-CN") {
 
   return formatDateTime(date, locale)
 }
+
+export function formatBusinessMonthDayTime(input: SupportedDateInput, locale = "zh-CN") {
+  return formatMonthDayTime(input, locale)
+}
+
+export { BUSINESS_TIME_ZONE }
+
+

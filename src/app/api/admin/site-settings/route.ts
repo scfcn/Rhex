@@ -248,9 +248,13 @@ export async function POST(request: Request) {
   }
 
   if (section === "vip") {
-    const vipMonthlyPrice = Number(body.vipMonthlyPrice ?? 0) || 0
-    const vipQuarterlyPrice = Number(body.vipQuarterlyPrice ?? 0) || 0
-    const vipYearlyPrice = Number(body.vipYearlyPrice ?? 0) || 0
+    const vipMonthlyPrice = Math.max(0, Number(body.vipMonthlyPrice ?? 0) || 0)
+    const vipQuarterlyPrice = Math.max(0, Number(body.vipQuarterlyPrice ?? 0) || 0)
+    const vipYearlyPrice = Math.max(0, Number(body.vipYearlyPrice ?? 0) || 0)
+    const postOfflinePrice = Math.max(0, Number(body.postOfflinePrice ?? 0) || 0)
+    const postOfflineVip1Price = Math.max(0, Number(body.postOfflineVip1Price ?? 0) || 0)
+    const postOfflineVip2Price = Math.max(0, Number(body.postOfflineVip2Price ?? 0) || 0)
+    const postOfflineVip3Price = Math.max(0, Number(body.postOfflineVip3Price ?? 0) || 0)
 
     const settings = await prisma.siteSetting.update({
       where: { id: existing.id },
@@ -258,6 +262,10 @@ export async function POST(request: Request) {
         vipMonthlyPrice,
         vipQuarterlyPrice,
         vipYearlyPrice,
+        postOfflinePrice,
+        postOfflineVip1Price,
+        postOfflineVip2Price,
+        postOfflineVip3Price,
       },
     })
 

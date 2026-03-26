@@ -21,7 +21,12 @@ export const siteSettingsSelect = {
   checkInReward: true,
   checkInMakeUpCardPrice: true,
   checkInVipMakeUpCardPrice: true,
+  postOfflinePrice: true,
+  postOfflineVip1Price: true,
+  postOfflineVip2Price: true,
+  postOfflineVip3Price: true,
   inviteRewardInviter: true,
+
   inviteRewardInvitee: true,
   registrationEnabled: true,
   registrationRequireInviteCode: true,
