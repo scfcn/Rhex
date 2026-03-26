@@ -496,10 +496,12 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
           enabled: true,
           grantMode: redPacketGrantMode,
           triggerType: redPacketTriggerType,
-          totalPoints: Number(redPacketTotalPoints),
+          totalPoints: redPacketGrantMode === "RANDOM" ? Number(redPacketTotalPoints) : Number(redPacketUnitPoints) * Number(redPacketPacketCount),
+          unitPoints: Number(redPacketUnitPoints),
           packetCount: Number(redPacketPacketCount),
         }
       : undefined
+
     const payload = mode === "edit"
 
 

@@ -10,7 +10,9 @@ export interface NormalizedPostRedPacketConfig {
   triggerType: PostRedPacketTriggerType
   totalPoints: number
   packetCount: number
+  unitPoints: number
 }
+
 
 export interface PostRedPacketClaimRecord {
   id: string
@@ -136,11 +138,10 @@ export async function normalizePostRedPacketConfig(input: unknown): Promise<{
     return { success: false, message: `红包份数不能超过总${settings.pointName}，必须保证每人至少获得 1 ${settings.pointName}`, data: null }
   }
 
-  if (grantMode === "FIXED" && totalPoints % packetCount !== 0) {
-    return { success: false, message: "固定红包必须保证总积分可被份数整除", data: null }
-  }
+  const normalizedUnitPoints = unitPoints ?? totalPoints
 
   return {
+
     success: true,
     data: {
       enabled: true,
@@ -148,8 +149,11 @@ export async function normalizePostRedPacketConfig(input: unknown): Promise<{
       triggerType: triggerType as PostRedPacketTriggerType,
       totalPoints,
       packetCount,
+      unitPoints: normalizedUnitPoints,
     },
   }
+
+
 }
 
 export async function assertPostRedPacketDailyLimit(params: { senderId: number; totalPoints: number }) {
