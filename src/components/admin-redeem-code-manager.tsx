@@ -9,6 +9,8 @@ interface AdminRedeemCodeManagerProps {
     id: string
     code: string
     points: number
+    codeCategory: string
+    categoryUserLimit: number | null
     createdAt: string
     createdByUsername: string | null
     redeemedAt: string | null
@@ -18,13 +20,17 @@ interface AdminRedeemCodeManagerProps {
   }[]
 }
 
+
 export function AdminRedeemCodeManager({ initialRedeemCodes }: AdminRedeemCodeManagerProps) {
   const [redeemCodes, setRedeemCodes] = useState(initialRedeemCodes)
   const [count, setCount] = useState("10")
   const [points, setPoints] = useState("100")
+  const [codeCategory, setCodeCategory] = useState("default")
+  const [categoryUserLimit, setCategoryUserLimit] = useState("1")
   const [note, setNote] = useState("")
   const [expiresAt, setExpiresAt] = useState("")
   const [feedback, setFeedback] = useState("")
+
   const [isPending, startTransition] = useTransition()
 
   const summary = useMemo(() => ({
@@ -35,7 +41,8 @@ export function AdminRedeemCodeManager({ initialRedeemCodes }: AdminRedeemCodeMa
   }), [redeemCodes])
 
   const pendingRedeemCodes = useMemo(() => redeemCodes.filter((item) => !item.redeemedByUsername), [redeemCodes])
-  const exportText = useMemo(() => pendingRedeemCodes.map((item) => [item.code, `${item.points}积分`, item.expiresAt ? `过期:${new Date(item.expiresAt).toLocaleString()}` : "不过期", item.note ?? ""].filter(Boolean).join("\t")).join("\n"), [pendingRedeemCodes])
+  const exportText = useMemo(() => pendingRedeemCodes.map((item) => [item.code, `${item.points}积分`, `分类:${item.codeCategory}`, item.categoryUserLimit === null ? "分类限额:不限" : `分类限额:${item.categoryUserLimit}`, item.expiresAt ? `过期:${new Date(item.expiresAt).toLocaleString()}` : "不过期", item.note ?? ""].filter(Boolean).join("\t")).join("\n"), [pendingRedeemCodes])
+
 
   async function handleCopyPendingCodes() {
     if (!exportText) {
@@ -83,7 +90,8 @@ export function AdminRedeemCodeManager({ initialRedeemCodes }: AdminRedeemCodeMa
             const response = await fetch("/api/admin/redeem-codes", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ count: Number(count), points: Number(points), note, expiresAt }),
+              body: JSON.stringify({ count: Number(count), points: Number(points), codeCategory, categoryUserLimit: categoryUserLimit.trim() ? Number(categoryUserLimit) : null, note, expiresAt }),
+
             })
             const result = await response.json()
             if (!response.ok) {
@@ -99,17 +107,20 @@ export function AdminRedeemCodeManager({ initialRedeemCodes }: AdminRedeemCodeMa
       >
         <div>
           <h3 className="text-sm font-semibold">兑换码批量生成</h3>
-          <p className="mt-1 text-xs text-muted-foreground">积分活动、补偿发放与运营投放统一从这里生成和导出。</p>
+          <p className="mt-1 text-xs text-muted-foreground">积分活动、补偿发放与运营投放统一从这里生成和导出，并支持按分类控制单个用户可兑换次数。</p>
         </div>
-        <div className="grid gap-3 xl:grid-cols-[120px_160px_minmax(0,1fr)_200px_auto]">
+        <div className="grid gap-3 xl:grid-cols-[100px_120px_140px_160px_minmax(0,1fr)_200px_auto]">
           <Field label="数量" value={count} onChange={setCount} placeholder="1-100" />
           <Field label="积分" value={points} onChange={setPoints} placeholder="如 100" />
+          <Field label="分类" value={codeCategory} onChange={setCodeCategory} placeholder="如 a / b / c" />
+          <Field label="分类限额" value={categoryUserLimit} onChange={setCategoryUserLimit} placeholder="留空=不限" />
           <Field label="备注" value={note} onChange={setNote} placeholder="如 活动发放 / 补偿" />
           <DateTimeField label="过期时间" value={expiresAt} onChange={setExpiresAt} />
           <div className="flex items-end">
             <Button disabled={isPending} className="h-10 rounded-full px-4 text-xs">{isPending ? "生成中..." : "生成兑换码"}</Button>
           </div>
         </div>
+
         <div className="flex flex-wrap items-center gap-3">
           <Button type="button" variant="outline" onClick={handleCopyPendingCodes} disabled={pendingRedeemCodes.length === 0}>复制未兑换兑换码</Button>
           <Button type="button" variant="outline" onClick={handleExportPendingCodes} disabled={pendingRedeemCodes.length === 0}>导出未兑换兑换码</Button>
@@ -119,25 +130,30 @@ export function AdminRedeemCodeManager({ initialRedeemCodes }: AdminRedeemCodeMa
       </form>
 
       <div className="overflow-hidden rounded-[22px] border border-border bg-card">
-        <div className="grid items-center gap-3 border-b border-border bg-secondary/40 px-4 py-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground lg:grid-cols-[minmax(0,1.1fr)_100px_160px_180px_minmax(0,1fr)]">
+        <div className="grid items-center gap-3 border-b border-border bg-secondary/40 px-4 py-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground lg:grid-cols-[minmax(0,1fr)_90px_180px_160px_180px_minmax(0,1fr)]">
           <span>兑换码</span>
           <span>积分</span>
+          <span>分类策略</span>
           <span>状态</span>
           <span>过期时间</span>
           <span>备注</span>
         </div>
+
         {redeemCodes.length === 0 ? <div className="px-4 py-10 text-sm text-muted-foreground">当前还没有兑换码。</div> : null}
         {redeemCodes.map((item) => (
-          <div key={item.id} className="grid items-center gap-3 border-b border-border px-4 py-3 text-xs last:border-b-0 lg:grid-cols-[minmax(0,1.1fr)_100px_160px_180px_minmax(0,1fr)]">
+          <div key={item.id} className="grid items-center gap-3 border-b border-border px-4 py-3 text-xs last:border-b-0 lg:grid-cols-[minmax(0,1fr)_90px_180px_160px_180px_minmax(0,1fr)]">
             <div className="min-w-0">
               <div className="truncate font-mono text-sm font-medium">{item.code}</div>
               <div className="mt-1 text-muted-foreground">{new Date(item.createdAt).toLocaleString("zh-CN")}</div>
             </div>
             <div>{item.points}</div>
+            <div className="text-muted-foreground">{item.codeCategory || "default"} / {item.categoryUserLimit == null ? "不限" : `${item.categoryUserLimit}次/人`}</div>
             <div className="text-muted-foreground">{item.redeemedByUsername ? `已被 ${item.redeemedByUsername} 兑换` : "未兑换"}</div>
+
             <div className="text-muted-foreground">{item.expiresAt ? new Date(item.expiresAt).toLocaleString() : "不过期"}</div>
             <div className="truncate text-muted-foreground">{item.note ?? "-"}</div>
           </div>
+
         ))}
       </div>
     </div>

@@ -61,8 +61,13 @@ async function resolveNotificationUrl(relatedType: RelatedType, relatedId: strin
 
   }
 
+  if (relatedType === RelatedType.YINYANG_CHALLENGE) {
+    return "/funs/yinyang-contract"
+  }
+
   return "/notifications"
 }
+
 
 
 

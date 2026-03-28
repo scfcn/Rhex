@@ -1246,19 +1246,23 @@ model InviteCode {
 }
 
 model RedeemCode {
-  id           String   @id @default(cuid())
-  code         String   @unique
-  points       Int
-  createdById  Int?
-  redeemedById Int?
-  redeemedAt   DateTime?   @db.Timestamptz(3)    
-  expiresAt    DateTime?   @db.Timestamptz(3)    
-  note         String?
-  createdAt    DateTime   @db.Timestamptz(3)    @default(now())
-  updatedAt    DateTime   @db.Timestamptz(3)    @updatedAt
-  createdBy    User?    @relation("RedeemCodeCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  redeemedBy   User?    @relation("RedeemCodeConsumer", fields: [redeemedById], references: [id], onDelete: SetNull)
+  id                String   @id @default(cuid())
+  code              String   @unique
+  points            Int
+  codeCategory      String   @default("default")
+  categoryUserLimit Int?
+  createdById       Int?
+  redeemedById      Int?
+  redeemedAt        DateTime?   @db.Timestamptz(3)    
+  expiresAt         DateTime?   @db.Timestamptz(3)    
+  note              String?
+  createdAt         DateTime   @db.Timestamptz(3)    @default(now())
+  updatedAt         DateTime   @db.Timestamptz(3)    @updatedAt
+  createdBy         User?    @relation("RedeemCodeCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  redeemedBy        User?    @relation("RedeemCodeConsumer", fields: [redeemedById], references: [id], onDelete: SetNull)
 
+  @@index([codeCategory, createdAt])
+  @@index([codeCategory, redeemedById])
   @@index([createdById])
   @@index([redeemedById])
   @@index([createdAt])

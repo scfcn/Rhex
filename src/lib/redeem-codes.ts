@@ -1,15 +1,53 @@
 import { randomBytes } from "crypto"
 
 import { prisma } from "@/db/client"
+
+import {
+
+  createRedeemCodeRecords,
+  createRedeemPointLogWithTx,
+  findRedeemCodeByCode,
+  findRedeemCodeByCodeWithTx,
+  findUserBaseById,
+  incrementUserPointsWithTx,
+  listRedeemCodes,
+  listRedeemCodesByCodes,
+  listRedeemedCodesByUserWithTx,
+  markRedeemCodeUsedWithTx,
+  type RedeemCodeCoreRow,
+  type RedeemCodeListRow,
+} from "@/db/redeem-code-queries"
+
+
+import { PublicRouteError } from "@/lib/public-route-error"
 import { getSiteSettings } from "@/lib/site-settings"
+
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const DEFAULT_CODE_LENGTH = 10
+const REDEEM_CODE_BAD_REQUEST_STATUS = 400
+
+function throwRedeemCodeError(message: string): never {
+  throw new PublicRouteError(message, REDEEM_CODE_BAD_REQUEST_STATUS)
+}
+
+interface RedeemCodeCategoryFields {
+  codeCategory?: string | null
+  categoryUserLimit?: number | null
+}
+
+type RedeemCodeRowWithRelations = RedeemCodeListRow & RedeemCodeCategoryFields
+
+
+
+
 
 export interface RedeemCodeItem {
   id: string
   code: string
   points: number
+  codeCategory: string
+  categoryUserLimit: number | null
   createdAt: string
   createdByUsername: string | null
   redeemedAt: string | null
@@ -29,138 +67,197 @@ function randomRedeemCode(length = DEFAULT_CODE_LENGTH) {
   return code
 }
 
-export async function generateUniqueRedeemCode(length = DEFAULT_CODE_LENGTH) {
-  for (let attempt = 0; attempt < 10; attempt += 1) {
-    const code = randomRedeemCode(length)
-    const existing = await prisma.redeemCode.findUnique({ where: { code } })
-    if (!existing) {
-      return code
-    }
+function normalizeRedeemCodeCategory(category: string | null | undefined) {
+  const normalized = category?.trim() || "default"
+  if (!normalized) {
+    throwRedeemCodeError("兑换码分类不能为空")
+  }
+  if (normalized.length > 32) {
+    throwRedeemCodeError("兑换码分类不能超过32个字符")
   }
 
-  throw new Error("兑换码生成失败，请重试")
+  return normalized
 }
 
-export async function createRedeemCodes(input: { count: number; points: number; createdById?: number | null; note?: string | null; expiresAt?: Date | null }) {
-  const count = Math.min(100, Math.max(1, Math.trunc(input.count)))
-  const points = Math.max(1, Math.trunc(input.points))
-  const rows = [] as { code: string; points: number; createdById?: number | null; note?: string | null; expiresAt?: Date | null }[]
-
-  for (let index = 0; index < count; index += 1) {
-    rows.push({
-      code: await generateUniqueRedeemCode(),
-      points,
-      createdById: input.createdById ?? null,
-      note: input.note?.trim() || null,
-      expiresAt: input.expiresAt ?? null,
-    })
+function normalizeCategoryUserLimit(limit: number | null | undefined) {
+  if (limit === null || limit === undefined || limit === 0) {
+    return null
   }
 
-  await prisma.redeemCode.createMany({ data: rows })
+  const normalized = Math.trunc(limit)
+  if (!Number.isFinite(normalized) || normalized < 1) {
+    throwRedeemCodeError("分类使用上限必须为正整数，或留空表示不限制")
+  }
 
-  return prisma.redeemCode.findMany({
-    where: {
-      code: {
-        in: rows.map((item) => item.code),
-      },
-    },
-    orderBy: { createdAt: "desc" },
-  })
+  return normalized
 }
 
-export async function getRedeemCodeList(limit = 100): Promise<RedeemCodeItem[]> {
-  const rows = await prisma.redeemCode.findMany({
-    orderBy: [{ redeemedAt: "asc" }, { createdAt: "desc" }],
-    take: Math.max(1, Math.min(limit, 200)),
-    include: {
-      createdBy: { select: { username: true } },
-      redeemedBy: { select: { username: true } },
-    },
-  })
 
-  return rows.map((row) => ({
+function toRedeemCodeItem(row: RedeemCodeRowWithRelations): RedeemCodeItem {
+  return {
     id: row.id,
     code: row.code,
     points: row.points,
+    codeCategory: row.codeCategory ?? "default",
+    categoryUserLimit: row.categoryUserLimit ?? null,
     createdAt: row.createdAt.toISOString(),
     createdByUsername: row.createdBy?.username ?? null,
     redeemedAt: row.redeemedAt?.toISOString() ?? null,
     redeemedByUsername: row.redeemedBy?.username ?? null,
     expiresAt: row.expiresAt?.toISOString() ?? null,
     note: row.note,
-  }))
+  }
 }
+
+function getRedeemCodeCategory(row: RedeemCodeCategoryFields) {
+  return row.codeCategory ?? "default"
+}
+
+function getCategoryUserLimit(row: RedeemCodeCategoryFields | RedeemCodeCoreRow) {
+
+  return row.categoryUserLimit ?? null
+}
+
+
+
+
+export async function generateUniqueRedeemCode(length = DEFAULT_CODE_LENGTH) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const code = randomRedeemCode(length)
+    const existing = await findRedeemCodeByCode(code)
+
+    if (!existing) {
+      return code
+    }
+  }
+
+  throwRedeemCodeError("兑换码生成失败，请重试")
+}
+
+
+export async function createRedeemCodes(input: {
+  count: number
+  points: number
+  codeCategory?: string | null
+  categoryUserLimit?: number | null
+  createdById?: number | null
+  note?: string | null
+  expiresAt?: Date | null
+}) {
+  const count = Math.min(100, Math.max(1, Math.trunc(input.count)))
+  const points = Math.max(1, Math.trunc(input.points))
+  const codeCategory = normalizeRedeemCodeCategory(input.codeCategory)
+  const categoryUserLimit = normalizeCategoryUserLimit(input.categoryUserLimit)
+  const rows: Array<{
+    code: string
+    points: number
+    codeCategory: string
+    categoryUserLimit: number | null
+    createdById?: number | null
+    note?: string | null
+    expiresAt?: Date | null
+  }> = []
+
+  for (let index = 0; index < count; index += 1) {
+    rows.push({
+      code: await generateUniqueRedeemCode(),
+      points,
+      codeCategory,
+      categoryUserLimit,
+      createdById: input.createdById ?? null,
+      note: input.note?.trim() || null,
+      expiresAt: input.expiresAt ?? null,
+    })
+  }
+
+  await createRedeemCodeRecords(rows)
+
+  const createdRows = await listRedeemCodesByCodes(rows.map((item) => item.code))
+
+
+  return createdRows.map((row) => toRedeemCodeItem(row as RedeemCodeRowWithRelations))
+}
+
+export async function getRedeemCodeList(limit = 100): Promise<RedeemCodeItem[]> {
+  const rows = await listRedeemCodes(limit)
+
+  return rows.map((row) => toRedeemCodeItem(row as RedeemCodeRowWithRelations))
+}
+
 
 export async function redeemPointsCode(input: { userId: number; code: string }) {
   const normalizedCode = input.code.trim().toUpperCase()
 
   if (!normalizedCode) {
-    throw new Error("请输入兑换码")
+    throwRedeemCodeError("请输入兑换码")
   }
 
   const [settings, user, redeemCode] = await Promise.all([
     getSiteSettings(),
-    prisma.user.findUnique({ where: { id: input.userId }, select: { id: true } }),
-    prisma.redeemCode.findUnique({ where: { code: normalizedCode } }),
+    findUserBaseById(input.userId),
+    findRedeemCodeByCode(normalizedCode),
   ])
 
+
   if (!user) {
-    throw new Error("用户不存在")
+    throwRedeemCodeError("用户不存在")
   }
 
   if (!redeemCode) {
-    throw new Error("兑换码不存在")
+    throwRedeemCodeError("兑换码不存在")
   }
 
   if (redeemCode.redeemedById) {
-    throw new Error("兑换码已被使用")
+    throwRedeemCodeError("兑换码已被使用")
   }
 
   if (redeemCode.expiresAt && redeemCode.expiresAt.getTime() < Date.now()) {
-    throw new Error("兑换码已过期")
+    throwRedeemCodeError("兑换码已过期")
   }
 
   return prisma.$transaction(async (tx) => {
-    const latestRedeemCode = await tx.redeemCode.findUnique({ where: { code: normalizedCode } })
+    const latestRedeemCode = await findRedeemCodeByCodeWithTx(tx, normalizedCode)
 
     if (!latestRedeemCode) {
-      throw new Error("兑换码不存在")
+      throwRedeemCodeError("兑换码不存在")
     }
 
-    if (latestRedeemCode.redeemedById) {
-      throw new Error("兑换码已被使用")
+    const activeRedeemCode: RedeemCodeCoreRow = latestRedeemCode
+
+
+    if (activeRedeemCode.redeemedById) {
+      throwRedeemCodeError("兑换码已被使用")
     }
 
-    if (latestRedeemCode.expiresAt && latestRedeemCode.expiresAt.getTime() < Date.now()) {
-      throw new Error("兑换码已过期")
+    if (activeRedeemCode.expiresAt && activeRedeemCode.expiresAt.getTime() < Date.now()) {
+      throwRedeemCodeError("兑换码已过期")
     }
 
-    await tx.redeemCode.update({
-      where: { id: latestRedeemCode.id },
-      data: {
-        redeemedById: input.userId,
-        redeemedAt: new Date(),
-      },
+    const latestCodeCategory = getRedeemCodeCategory(activeRedeemCode)
+    const latestCategoryUserLimit = getCategoryUserLimit(activeRedeemCode)
+
+    if (latestCategoryUserLimit !== null) {
+      const redeemedRows = await listRedeemedCodesByUserWithTx(tx, input.userId)
+      const redeemedCount = redeemedRows.filter((row) => getRedeemCodeCategory(row) === latestCodeCategory).length
+      if (redeemedCount >= latestCategoryUserLimit) {
+        throwRedeemCodeError(`当前分类兑换码每个用户最多可使用 ${latestCategoryUserLimit} 个`)
+      }
+    }
+
+    await markRedeemCodeUsedWithTx(tx, activeRedeemCode.id, input.userId)
+    await incrementUserPointsWithTx(tx, input.userId, activeRedeemCode.points)
+    await createRedeemPointLogWithTx({
+      tx,
+      userId: input.userId,
+      points: activeRedeemCode.points,
+      reason: `兑换码兑换获得${settings.pointName}（分类:${latestCodeCategory}）`,
     })
 
-    await tx.user.update({
-      where: { id: input.userId },
-      data: {
-        points: {
-          increment: latestRedeemCode.points,
-        },
-      },
-    })
-
-    await tx.pointLog.create({
-      data: {
-        userId: input.userId,
-        changeType: "INCREASE",
-        changeValue: latestRedeemCode.points,
-        reason: `兑换码兑换获得${settings.pointName}`,
-      },
-    })
-
-    return latestRedeemCode
+    return {
+      ...activeRedeemCode,
+      codeCategory: latestCodeCategory,
+      categoryUserLimit: latestCategoryUserLimit,
+    }
   })
 }
+

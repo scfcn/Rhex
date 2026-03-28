@@ -29,7 +29,11 @@ import {
 import { getBusinessDayRange, formatDateTime } from "@/lib/formatters"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getYinYangContractAppConfig } from "@/lib/app-config"
+import { enforceSensitiveText } from "@/lib/content-safety"
+import { PublicRouteError } from "@/lib/public-route-error"
 import { parsePositiveSafeInteger } from "@/lib/shared/safe-integer"
+
+
 
 
 export type YinYangOption = "A" | "B"
@@ -142,23 +146,30 @@ function createUuid() {
   return `yyq-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
 }
 
+function businessRuleError(message: string, statusCode = 400): never {
+  throw new PublicRouteError(message, statusCode)
+}
+
 function normalizeTrimmedText(value: string, label: string, maxLength: number) {
+
 
   const normalized = value.trim()
   if (!normalized) {
-    throw new Error(`${label}不能为空`)
+    businessRuleError(`${label}不能为空`)
   }
   if (normalized.length > maxLength) {
-    throw new Error(`${label}不能超过${maxLength}个字符`)
+    businessRuleError(`${label}不能超过${maxLength}个字符`)
   }
+
   return normalized
 }
 
 function toSafePositiveInteger(value: unknown, label: string) {
   const parsed = parsePositiveSafeInteger(value)
   if (parsed === null) {
-    throw new Error(`${label}必须为正整数`)
+    businessRuleError(`${label}必须为正整数`)
   }
+
   return parsed
 }
 
@@ -169,13 +180,15 @@ function calculateRewardPoints(stakePoints: number, taxRateBps: number) {
   const taxPoints = stake.multipliedBy(bps).dividedToIntegerBy(10_000)
   const rewardPoints = stake.minus(taxPoints)
   if (!taxPoints.isInteger() || !rewardPoints.isInteger()) {
-    throw new Error("奖励计算失败")
+    businessRuleError("奖励计算失败")
   }
+
   const reward = rewardPoints.toNumber()
   const tax = taxPoints.toNumber()
   if (reward <= 0) {
-    throw new Error("奖励积分必须大于0")
+    businessRuleError("奖励积分必须大于0")
   }
+
   return { rewardPoints: reward, taxPoints: tax }
 }
 
@@ -220,8 +233,9 @@ async function ensureCreateAllowance(userId: number, config: AppConfig) {
   const { start, end } = getBusinessDayRange()
   const createdToday = await countUserCreatedChallengesInRange(userId, start, end)
   if (createdToday >= Number(config.dailyCreateLimit ?? 5)) {
-    throw new Error("今日发起挑战次数已达上限")
+    businessRuleError("今日发起挑战次数已达上限")
   }
+
   return createdToday
 }
 
@@ -229,8 +243,9 @@ async function ensureAcceptAllowance(userId: number, config: AppConfig) {
   const { start, end } = getBusinessDayRange()
   const acceptedToday = await countUserAcceptedChallengesInRange(userId, start, end)
   if (acceptedToday >= Number(config.dailyAcceptLimit ?? 10)) {
-    throw new Error("今日应战次数已达上限")
+    businessRuleError("今日应战次数已达上限")
   }
+
   return acceptedToday
 }
 
@@ -261,8 +276,9 @@ async function applyBalanceChange(tx: PointMutationClient, userId: number, chang
     select: { id: true, points: true },
   })
   if (!current || current.points < amount) {
-    throw new Error("积分余额不足")
+    businessRuleError("积分余额不足")
   }
+
   await tx.user.update({
     where: { id: userId },
     data: {
@@ -431,27 +447,40 @@ export async function getYinYangLobbyData(user: CurrentUser | null): Promise<Yin
 export async function createYinYangChallenge(user: CurrentUser, input: CreateChallengeInput) {
   const { config } = await getConfigAndSettings()
   if (!Boolean(config.enabled)) {
-    throw new Error("阴阳契应用暂未开启")
+    businessRuleError("阴阳契应用暂未开启")
   }
+
   const question = normalizeTrimmedText(input.question, "问题", 120)
   const optionA = normalizeTrimmedText(input.optionA, "答案A", 40)
   const optionB = normalizeTrimmedText(input.optionB, "答案B", 40)
-  if (optionA === optionB) {
-    throw new Error("两个答案不能相同")
+  const [questionSafety, optionASafety, optionBSafety] = await Promise.all([
+    enforceSensitiveText({ scene: "yinyang.question", text: question }),
+    enforceSensitiveText({ scene: "yinyang.answer", text: optionA }),
+    enforceSensitiveText({ scene: "yinyang.answer", text: optionB }),
+  ])
+  const sanitizedQuestion = questionSafety.sanitizedText
+  const sanitizedOptionA = optionASafety.sanitizedText
+  const sanitizedOptionB = optionBSafety.sanitizedText
+  if (sanitizedOptionA === sanitizedOptionB) {
+    businessRuleError("两个答案不能相同")
   }
+
   if (input.correctOption !== "A" && input.correctOption !== "B") {
-    throw new Error("正确答案不合法")
+    businessRuleError("正确答案不合法")
   }
+
   const stakePoints = toSafePositiveInteger(input.stakePoints, "积分彩头")
   const minStakePoints = Number(config.minStakePoints ?? 10)
   const maxStakePoints = Number(config.maxStakePoints ?? 500)
   if (stakePoints < minStakePoints || stakePoints > maxStakePoints) {
-    throw new Error(`积分彩头必须在${minStakePoints}-${maxStakePoints}之间`)
+    businessRuleError(`积分彩头必须在${minStakePoints}-${maxStakePoints}之间`)
   }
+
   await ensureCreateAllowance(user.id, config)
   if ((user.points ?? 0) < stakePoints) {
-    throw new Error("积分不足，无法发起挑战")
+    businessRuleError("积分不足，无法发起挑战")
   }
+
 
   const { rewardPoints, taxPoints } = calculateRewardPoints(stakePoints, Number(config.taxRateBps ?? 1000))
   const challengeId = createUuid()
@@ -464,9 +493,10 @@ export async function createYinYangChallenge(user: CurrentUser, input: CreateCha
       id: challengeId,
       creatorId: user.id,
       status: "OPEN",
-      question,
-      optionA,
-      optionB,
+      question: sanitizedQuestion,
+      optionA: sanitizedOptionA,
+      optionB: sanitizedOptionB,
+
       correctOption: input.correctOption,
       stakePoints,
       rewardPoints,
@@ -491,26 +521,30 @@ export async function createYinYangChallenge(user: CurrentUser, input: CreateCha
 export async function acceptYinYangChallenge(user: CurrentUser, input: AcceptChallengeInput) {
   const challenge = await findChallengeById(input.challengeId)
   if (!challenge) {
-    throw new Error("挑战不存在")
+    businessRuleError("挑战不存在")
   }
   if (challenge.creatorId === user.id) {
-    throw new Error("不能应战自己的挑战")
+    businessRuleError("不能应战自己的挑战")
   }
   if (challenge.status !== "OPEN") {
-    throw new Error("该挑战已不可应战")
+    businessRuleError("该挑战已不可应战")
   }
 
   if ((user.points ?? 0) < challenge.stakePoints) {
-    throw new Error("积分不足，无法应战")
+    businessRuleError("积分不足，无法应战")
   }
-  const { config } = await getConfigAndSettings()
+
+  const { config, pointName: rewardPointName } = await getConfigAndSettings()
   await ensureAcceptAllowance(user.id, config)
+
+
 
   await prisma.$transaction(async (tx) => {
     const locked = await lockOpenChallenge(tx, challenge.id, user.id)
     if (!locked) {
-      throw new Error("该挑战已被其他用户抢先应战")
+      businessRuleError("该挑战已被其他用户抢先应战")
     }
+
 
     await applyBalanceChange(tx, user.id, -challenge.stakePoints)
     await tx.pointLog.create({
@@ -574,13 +608,36 @@ export async function acceptYinYangChallenge(user: CurrentUser, input: AcceptCha
     ])
   }
 
+  const challengerName = user.nickname?.trim() || user.username
+  const creatorWon = challenge.creatorId !== user.id && input.selectedOption !== challenge.correctOption
+  const resultTitle = creatorWon ? "你发起的阴阳契获胜了" : "你发起的阴阳契被破解了"
+  const resultContent = creatorWon
+    ? `${challengerName} 应战了你的问题“${challenge.question}”，结果答错。你已守擂成功，获得 ${challenge.rewardPoints} ${rewardPointName}。`
+    : `${challengerName} 应战了你的问题“${challenge.question}”，结果答对。你的本局彩头 ${challenge.stakePoints} ${rewardPointName} 已结算。`
+
+
+
+  await prisma.notification.create({
+    data: {
+      userId: challenge.creatorId,
+      type: "SYSTEM",
+      senderId: user.id,
+      relatedType: "YINYANG_CHALLENGE",
+      relatedId: challenge.id,
+      title: resultTitle,
+      content: resultContent,
+    },
+  })
+
   const refreshedUser = await prisma.user.findUnique({
+
     where: { id: user.id },
     select: { id: true, username: true, nickname: true, points: true },
   })
   if (!refreshedUser) {
-    throw new Error("用户状态已失效")
+    businessRuleError("用户状态已失效")
   }
+
 
   return getYinYangLobbyData(refreshedUser)
 }

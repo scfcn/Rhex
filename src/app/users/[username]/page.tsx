@@ -158,7 +158,7 @@ export default async function UserPage({ params }: UserPageProps) {
           <section className="space-y-4">
             <Card className="rounded-2xl border border-[#e8e8e8] shadow-sm">
               <CardContent className="p-4 sm:p-5">
-                <div className="flex flex-wrap items-end justify-between gap-2.5 lg:flex-nowrap">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                   <div className="min-w-0 flex-1">
                     <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Overview</p>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -167,9 +167,9 @@ export default async function UserPage({ params }: UserPageProps) {
                     </div>
                     <p className="mt-1.5 text-xs text-muted-foreground sm:text-[13px]">{restrictionDescription ?? "查看这位成员的公开内容、社区贡献与活跃概况。"}</p>
                   </div>
-                  <div className="flex shrink-0 flex-wrap gap-1.5">
+                  <div className="grid w-full grid-cols-2 gap-1.5 sm:grid-cols-3 lg:flex lg:w-auto lg:shrink-0 lg:flex-wrap lg:justify-end">
                     {statItems.map((item) => (
-                      <div key={item.label} className="min-w-[76px] rounded-xl px-3 py-2.5 text-center dark:bg-white/[0.04]">
+                      <div key={item.label} className="min-w-0 rounded-xl px-3 py-2.5 text-center dark:bg-white/[0.04] lg:min-w-[76px]">
                         <p className="text-base font-semibold text-foreground sm:text-[17px]">{item.value}</p>
                         <p className="mt-1 text-[10px] text-muted-foreground">{item.label}</p>
                       </div>
@@ -177,7 +177,7 @@ export default async function UserPage({ params }: UserPageProps) {
                     <RssSubscribeButton
                       href={`/users/${user.username}/rss.xml`}
                       label="订阅用户 RSS"
-                      className="inline-flex min-w-[76px] items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-center text-xs font-medium text-muted-foreground transition-colors hover:bg-[#f5f5f5] hover:text-foreground dark:bg-white/[0.04] dark:hover:bg-white/[0.08]"
+                      className="col-span-full inline-flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-center text-xs font-medium text-muted-foreground transition-colors hover:bg-[#f5f5f5] hover:text-foreground dark:bg-white/[0.04] dark:hover:bg-white/[0.08] lg:col-span-1 lg:min-w-[76px]"
                     />
                   </div>
                 </div>

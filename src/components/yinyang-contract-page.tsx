@@ -5,7 +5,9 @@ import { useEffect, useMemo, useState, useTransition } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "@/components/ui/toast"
+import { useContentSafety } from "@/hooks/use-content-safety"
 import type { YinYangChallengeCard, YinYangLobbyData, YinYangLeaderboardUser } from "@/lib/yinyang-contract"
+
 import { formatYinYangChallengeTime } from "@/lib/yinyang-contract"
 
 type ApiResponse<T> = { code: number; message?: string; data?: T }
@@ -66,7 +68,13 @@ export function YinYangContractPage({ initialData, canPlay }: YinYangContractPag
   const [resultFx, setResultFx] = useState<ResultFxState>(null)
   const [isPending, startTransition] = useTransition()
 
+  const questionSafety = useContentSafety(question, { maxLength: 120 })
+  const optionASafety = useContentSafety(optionA, { maxLength: 40 })
+  const optionBSafety = useContentSafety(optionB, { maxLength: 40 })
+  const createFormValid = questionSafety.valid && optionASafety.valid && optionBSafety.valid
+
   const myOpenChallengeIds = useMemo(() => new Set(data.recentChallenges.filter((item) => item.status === "OPEN").map((item) => item.id)), [data.recentChallenges])
+
 
   useEffect(() => {
     if (!resultFx) {
@@ -177,7 +185,12 @@ export function YinYangContractPage({ initialData, canPlay }: YinYangContractPag
         taxRateBps={data.config.taxRateBps}
         dailyCreateLimit={data.summary.dailyCreateLimit}
         dailyAcceptLimit={data.summary.dailyAcceptLimit}
+        questionSafety={questionSafety}
+        optionASafety={optionASafety}
+        optionBSafety={optionBSafety}
+        createFormValid={createFormValid}
         onClose={() => setCreateModalOpen(false)}
+
         onQuestionChange={setQuestion}
         onOptionAChange={setOptionA}
         onOptionBChange={setOptionB}
@@ -277,7 +290,7 @@ function ChallengeListItem({ challenge, pointName, isMine, onOpen }: {
   )
 }
 
-function CreateChallengeModal({ open, canPlay, isPending, question, optionA, optionB, correctOption, stakePoints, minStakePoints, maxStakePoints, taxRateBps, dailyCreateLimit, dailyAcceptLimit, onClose, onQuestionChange, onOptionAChange, onOptionBChange, onCorrectOptionChange, onStakePointsChange, onRollRandom, onSubmit }: {
+function CreateChallengeModal({ open, canPlay, isPending, question, optionA, optionB, correctOption, stakePoints, minStakePoints, maxStakePoints, taxRateBps, dailyCreateLimit, dailyAcceptLimit, questionSafety, optionASafety, optionBSafety, createFormValid, onClose, onQuestionChange, onOptionAChange, onOptionBChange, onCorrectOptionChange, onStakePointsChange, onRollRandom, onSubmit }: {
   open: boolean
   canPlay: boolean
   isPending: boolean
@@ -291,6 +304,10 @@ function CreateChallengeModal({ open, canPlay, isPending, question, optionA, opt
   taxRateBps: number
   dailyCreateLimit: number
   dailyAcceptLimit: number
+  questionSafety: ReturnType<typeof useContentSafety>
+  optionASafety: ReturnType<typeof useContentSafety>
+  optionBSafety: ReturnType<typeof useContentSafety>
+  createFormValid: boolean
   onClose: () => void
   onQuestionChange: (value: string) => void
   onOptionAChange: (value: string) => void
@@ -300,22 +317,24 @@ function CreateChallengeModal({ open, canPlay, isPending, question, optionA, opt
   onRollRandom: () => void
   onSubmit: () => void
 }) {
+
   if (!open) return null
 
   return (
     <ModalShell title="发起阴阳挑战" description="设置问题、双答案与正确答案，提交后挑战会进入大厅。" onClose={onClose}>
       <div className="space-y-4 text-sm">
-        <Field label="问题" action={<Button type="button" variant="outline" className="h-8 rounded-full px-3 text-xs" onClick={onRollRandom}>🎲 骰子</Button>}>
-          <textarea value={question} onChange={(event) => onQuestionChange(event.target.value)} className="min-h-[110px] w-full rounded-[16px] border border-border bg-background px-4 py-3 text-sm outline-none" placeholder="输入挑战问题" />
+        <Field label="问题" action={<Button type="button" variant="outline" className="h-8 rounded-full px-3 text-xs" onClick={onRollRandom}>🎲 骰子</Button>} hint={<span className={`inline-flex text-xs ${questionSafety.overLimit ? "text-rose-500" : "text-muted-foreground"}`}>{questionSafety.length}/120</span>}>
+          <textarea value={question} onChange={(event) => onQuestionChange(event.target.value)} className={`min-h-[110px] w-full rounded-[16px] border bg-background px-4 py-3 text-sm outline-none ${questionSafety.overLimit ? "border-rose-400 focus-visible:border-rose-500" : "border-border"}`} placeholder="输入挑战问题" />
         </Field>
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="答案 A">
-            <input value={optionA} onChange={(event) => onOptionAChange(event.target.value)} className="h-11 w-full rounded-[16px] border border-border bg-background px-4 text-sm outline-none" placeholder="输入答案 A" />
+          <Field label="答案 A" hint={<span className={`inline-flex text-xs ${optionASafety.overLimit ? "text-rose-500" : "text-muted-foreground"}`}>{optionASafety.length}/40</span>}>
+            <input value={optionA} onChange={(event) => onOptionAChange(event.target.value)} className={`h-11 w-full rounded-[16px] border bg-background px-4 text-sm outline-none ${optionASafety.overLimit ? "border-rose-400 focus-visible:border-rose-500" : "border-border"}`} placeholder="输入答案 A" />
           </Field>
-          <Field label="答案 B">
-            <input value={optionB} onChange={(event) => onOptionBChange(event.target.value)} className="h-11 w-full rounded-[16px] border border-border bg-background px-4 text-sm outline-none" placeholder="输入答案 B" />
+          <Field label="答案 B" hint={<span className={`inline-flex text-xs ${optionBSafety.overLimit ? "text-rose-500" : "text-muted-foreground"}`}>{optionBSafety.length}/40</span>}>
+            <input value={optionB} onChange={(event) => onOptionBChange(event.target.value)} className={`h-11 w-full rounded-[16px] border bg-background px-4 text-sm outline-none ${optionBSafety.overLimit ? "border-rose-400 focus-visible:border-rose-500" : "border-border"}`} placeholder="输入答案 B" />
           </Field>
         </div>
+
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="正确答案">
             <select value={correctOption} onChange={(event) => onCorrectOptionChange(event.target.value === "B" ? "B" : "A")} className="h-11 w-full rounded-[16px] border border-border bg-background px-4 text-sm outline-none">
@@ -333,7 +352,8 @@ function CreateChallengeModal({ open, canPlay, isPending, question, optionA, opt
         </div>
         <div className="flex items-center justify-end gap-3">
           <Button type="button" variant="outline" className="rounded-full" onClick={onClose}>关闭</Button>
-          <Button type="button" className="rounded-full" disabled={isPending || !canPlay} onClick={onSubmit}>{isPending ? "提交中..." : "确认发起"}</Button>
+          <Button type="button" className="rounded-full" disabled={isPending || !canPlay || !createFormValid} onClick={onSubmit}>{isPending ? "提交中..." : "确认发起"}</Button>
+
         </div>
       </div>
     </ModalShell>
@@ -522,17 +542,24 @@ function StatCard({ label, value, tone = "default" }: { label: string; value: st
   )
 }
 
-function Field({ label, children, action }: { label: string; children: React.ReactNode; action?: React.ReactNode }) {
+function Field({ label, children, action, hint }: { label: string; children: React.ReactNode; action?: React.ReactNode; hint?: React.ReactNode }) {
   return (
     <label className="space-y-2">
       <span className="flex items-center justify-between gap-3 text-sm font-medium text-foreground">
         <span>{label}</span>
-        {action}
+        <span className="flex items-center gap-3">
+          {hint}
+          {action}
+        </span>
       </span>
       {children}
     </label>
   )
 }
+
+
+
+
 
 function EmptyState({ text }: { text: string }) {
   return <div className="rounded-[16px] bg-muted p-4 text-sm text-muted-foreground">{text}</div>
