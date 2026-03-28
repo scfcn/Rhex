@@ -2,6 +2,7 @@ import Link from "next/link"
 import { Tag } from "lucide-react"
 
 import { SidebarUserCard, type SidebarUserCardData } from "@/components/sidebar-user-card"
+import { getPostPath } from "@/lib/post-links"
 
 interface RelatedTopic {
   id: string
@@ -19,9 +20,10 @@ interface PostSidebarPanelsProps {
   currentUser: SidebarUserCardData | null
   relatedTopics: RelatedTopic[]
   tags: TopicTag[]
+  postLinkDisplayMode?: "SLUG" | "ID"
 }
 
-export function PostSidebarPanels({ currentUser, relatedTopics, tags }: PostSidebarPanelsProps) {
+export function PostSidebarPanels({ currentUser, relatedTopics, tags, postLinkDisplayMode = "SLUG" }: PostSidebarPanelsProps) {
   return (
     <div className="space-y-4">
       <SidebarUserCard user={currentUser} />
@@ -34,7 +36,7 @@ export function PostSidebarPanels({ currentUser, relatedTopics, tags }: PostSide
             {relatedTopics.map((topic) => (
               <Link
                 key={topic.id}
-                href={`/posts/${topic.slug}`}
+                href={getPostPath({ id: topic.id, slug: topic.slug }, { mode: postLinkDisplayMode }) as string}
                 className="block truncate rounded-xl px-2 py-1 text-sm transition-colors hover:bg-accent/70 hover:text-primary"
                 title={topic.title}
               >

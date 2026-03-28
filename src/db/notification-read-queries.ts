@@ -37,7 +37,7 @@ export function countNotificationsByUserId(userId: number) {
 export function findPostSlugById(postId: string) {
   return prisma.post.findUnique({
     where: { id: postId },
-    select: { slug: true },
+    select: { id: true, slug: true, title: true },
   })
 }
 
@@ -48,7 +48,9 @@ export function findCommentPostSlugById(commentId: string) {
       id: true,
       post: {
         select: {
+          id: true,
           slug: true,
+          title: true,
         },
       },
     },

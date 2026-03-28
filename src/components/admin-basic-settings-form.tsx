@@ -18,6 +18,7 @@ interface AdminBasicSettingsFormProps {
     siteLogoPath?: string | null
     siteSeoKeywords?: string[]
     pointName: string
+    postLinkDisplayMode: "SLUG" | "ID"
     analyticsCode?: string | null
     checkInEnabled: boolean
     checkInReward: number
@@ -93,6 +94,7 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
   const [siteSeoKeywords, setSiteSeoKeywords] = useState((initialSettings.siteSeoKeywords ?? []).join(","))
   const [pointName, setPointName] = useState(initialSettings.pointName)
+  const [postLinkDisplayMode, setPostLinkDisplayMode] = useState<"SLUG" | "ID">(initialSettings.postLinkDisplayMode)
   const [analyticsCode, setAnalyticsCode] = useState(initialSettings.analyticsCode ?? "")
   const [checkInEnabled, setCheckInEnabled] = useState(initialSettings.checkInEnabled)
   const [checkInReward, setCheckInReward] = useState(String(initialSettings.checkInReward))
@@ -217,6 +219,7 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
         siteLogoPath,
         siteSeoKeywords,
         pointName,
+        postLinkDisplayMode,
         analyticsCode,
         checkInEnabled,
         checkInReward: Number(checkInReward),
@@ -320,6 +323,16 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
             <Field label="签到奖励数量" value={checkInReward} onChange={setCheckInReward} placeholder="如 5" />
             <Field label="普通用户补签价格" value={checkInMakeUpCardPrice} onChange={setCheckInMakeUpCardPrice} placeholder="如 20" />
             <Field label="VIP 补签价格" value={checkInVipMakeUpCardPrice} onChange={setCheckInVipMakeUpCardPrice} placeholder="如 10" />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-2">
+              <p className="text-sm font-medium">帖子链接显示模式</p>
+              <select value={postLinkDisplayMode} onChange={(event) => setPostLinkDisplayMode(event.target.value as "SLUG" | "ID")} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
+                <option value="SLUG">slug 模式（/posts/标题-id）</option>
+                <option value="ID">id 模式（/posts/id）</option>
+              </select>
+              <p className="text-xs leading-6 text-muted-foreground">只影响站内生成给用户看到的帖子链接；旧链接仍保持兼容并会规范跳转到标准地址。</p>
+            </div>
           </div>
           <Field label="站点 Slogan" value={siteSlogan} onChange={setSiteSlogan} placeholder="如 Waste your time on things you love" />
           <div className="space-y-3 rounded-[24px] border border-border p-5">

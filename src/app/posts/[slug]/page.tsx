@@ -3,6 +3,7 @@ import { Eye, MessageCircle } from "lucide-react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
+
 import { AccessDeniedCard } from "@/components/access-denied-card"
 import { CommentThread } from "@/components/comment-thread"
 import { LevelIcon } from "@/components/level-icon"
@@ -46,6 +47,7 @@ import { cn } from "@/lib/utils"
 
 import { getZones } from "@/lib/zones"
 import { getVipNameClass } from "@/lib/vip-status"
+import { getCanonicalPostPath } from "@/lib/post-links"
 
 interface PostPageProps {
   params: {
@@ -71,7 +73,7 @@ export async function generateMetadata({ params }: PostPageProps): Promise<Metad
     description: post.description,
     keywords: buildMetadataKeywords(settings.siteSeoKeywords, [post.title, post.slug, post.description, "帖子", "论坛帖子"]),
     alternates: {
-      canonical: `/posts/${post.slug}`,
+      canonical: getCanonicalPostPath({ slug: post.slug }) as string,
     },
     openGraph: {
       title: post.title,
@@ -105,7 +107,10 @@ export default async function PostPage({ params, searchParams }: PostPageProps) 
     notFound()
   }
 
+  const canonicalPath = getCanonicalPostPath({ slug: basePost.slug })
+
   const isAdmin = Boolean(currentUser && (currentUser.role === "ADMIN" || currentUser.role === "MODERATOR"))
+
   const isOwnerOrAdmin = Boolean(currentUser?.id === basePost.authorId || isAdmin)
   const canViewPendingPost = basePost.status === "PENDING" && isOwnerOrAdmin
   const canViewOfflinePost = basePost.status === "OFFLINE" && isAdmin
@@ -229,7 +234,7 @@ export default async function PostPage({ params, searchParams }: PostPageProps) 
     description: displayPost.description,
     publishedAt: displayPost.publishedAt,
     author: displayPost.author,
-    url: `/posts/${displayPost.slug}`,
+    url: canonicalPath,
   })
 
   return (
@@ -492,7 +497,8 @@ export default async function PostPage({ params, searchParams }: PostPageProps) 
           </article>
 
           <aside className="mt-6 hidden pb-12 lg:col-span-3 lg:block">
-            <PostSidebarPanels currentUser={sidebarUser} relatedTopics={sidebarData.relatedTopics} tags={sidebarData.tags} />
+            <PostSidebarPanels currentUser={sidebarUser} relatedTopics={sidebarData.relatedTopics} tags={sidebarData.tags} postLinkDisplayMode={settings.postLinkDisplayMode} />
+
           </aside>
         </div>
       </main>

@@ -155,7 +155,8 @@ export default async function ZonePage({ params, searchParams }: ZonePageProps) 
           </main>
 
           <aside className="mt-6 hidden pb-12 lg:col-span-3 lg:block">
-            <HomeSidebarPanels user={sidebarUser} hotTopics={hotTopics} createPostHref={zoneBoards[0] ? `/write?board=${zoneBoards[0].slug}` : "/write"} />
+            <HomeSidebarPanels user={sidebarUser} hotTopics={hotTopics} postLinkDisplayMode={settings.postLinkDisplayMode} createPostHref={zoneBoards[0] ? `/write?board=${zoneBoards[0].slug}` : "/write"} />
+
 
           </aside>
         </div>

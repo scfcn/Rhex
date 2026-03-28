@@ -17,6 +17,7 @@ import { describeBadgeRule, getBadgeCenterData } from "@/lib/badges"
 import { getCurrentUser } from "@/lib/auth"
 import { getUserPointLogs } from "@/lib/points"
 import { getSiteSettings } from "@/lib/site-settings"
+import { getPostPath } from "@/lib/post-links"
 import { getUserBoardFollows, getUserFavoritePosts } from "@/lib/user-panel"
 import { getCurrentUserLevelProgressView } from "@/lib/user-level-view"
 import { getUserAccountSettings, getUserProfile } from "@/lib/users"
@@ -192,7 +193,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
 
           {currentTab === "points" ? <PointsPanel pointLogs={pointLogs} currentPoints={profile.points} pointName={settings.pointName} /> : null}
 
-          {currentTab === "favorites" ? <FavoritesPanel favoritePosts={favoritePosts} /> : null}
+          {currentTab === "favorites" ? <FavoritesPanel favoritePosts={favoritePosts} postLinkDisplayMode={settings.postLinkDisplayMode} /> : null}
 
           {currentTab === "follows" ? <FollowsPanel followedBoards={followedBoards} /> : null}
         </SettingsShell>
@@ -348,7 +349,7 @@ function FollowsPanel({ followedBoards }: { followedBoards: Awaited<ReturnType<t
   )
 }
 
-function FavoritesPanel({ favoritePosts }: { favoritePosts: Awaited<ReturnType<typeof getUserFavoritePosts>> | null }) {
+function FavoritesPanel({ favoritePosts, postLinkDisplayMode }: { favoritePosts: Awaited<ReturnType<typeof getUserFavoritePosts>> | null; postLinkDisplayMode: "SLUG" | "ID" }) {
   if (!favoritePosts) {
     return (
       <Card>
@@ -368,7 +369,7 @@ function FavoritesPanel({ favoritePosts }: { favoritePosts: Awaited<ReturnType<t
       <CardContent className="space-y-4">
         {favoritePosts.items.length === 0 ? <p className="text-sm text-muted-foreground">当前还没有收藏的帖子。</p> : null}
         {favoritePosts.items.map((post) => (
-          <a key={post.id} href={`/posts/${post.slug}`} className="block rounded-[20px] border border-border bg-card p-4 transition-colors hover:bg-accent/40">
+          <a key={post.id} href={getPostPath({ id: post.id, slug: post.slug }, { mode: postLinkDisplayMode })} className="block rounded-[20px] border border-border bg-card p-4 transition-colors hover:bg-accent/40">
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <span>{post.board}</span>
               <span>·</span>

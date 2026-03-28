@@ -192,7 +192,8 @@ export function AdminPostList({ data }: AdminPostListProps) {
             </div>
 
             <div className="flex flex-wrap justify-end gap-1.5">
-              <Link href={`/posts/${post.slug}`} className="inline-flex h-7 items-center justify-center rounded-full border border-border px-2.5 text-xs transition-colors hover:bg-accent hover:text-foreground">
+              <Link href={post.href ?? `/posts/${post.id}`} className="inline-flex h-7 items-center justify-center rounded-full border border-border px-2.5 text-xs transition-colors hover:bg-accent hover:text-foreground">
+
                 前台
               </Link>
               <AdminPostPreviewModal post={post} />

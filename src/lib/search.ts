@@ -1,7 +1,9 @@
 import { buildPostSearchWhere, countSearchPosts, findSearchPosts } from "@/db/search-queries"
 import { getPostPath } from "@/lib/post-links"
+import { getSiteSettings } from "@/lib/site-settings"
 
 import { mapListPost } from "@/lib/post-map"
+
 
 
 
@@ -36,24 +38,27 @@ export async function searchPosts(keyword: string, page = 1, pageSize = 10): Pro
   try {
     const where = buildPostSearchWhere(normalizedKeyword)
 
-    const [total, posts] = await Promise.all([
+    const [total, posts, settings] = await Promise.all([
       countSearchPosts(where),
       findSearchPosts({
         where,
         page,
         pageSize,
       }),
+      getSiteSettings(),
+    ] as const)
 
-    ])
+
 
 
     return {
       keyword: normalizedKeyword,
       total,
-      items: posts.map((post) => ({
+      items: posts.map((post: (typeof posts)[number]) => ({
         ...mapListPost(post),
-        href: getPostPath(post),
+        href: getPostPath(post, { mode: settings.postLinkDisplayMode }),
       })),
+
     }
   } catch (error) {
     console.error(error)

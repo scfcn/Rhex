@@ -47,11 +47,13 @@ export function findPostMoveBoardContext(postId: string, boardSlug: string) {
     prisma.post.findUnique({
       where: { id: postId },
       select: {
+        id: true,
         slug: true,
         boardId: true,
         board: { select: { slug: true, name: true } },
       },
     }),
+
     prisma.board.findUnique({
       where: { slug: boardSlug },
       select: { id: true, slug: true, name: true, status: true },

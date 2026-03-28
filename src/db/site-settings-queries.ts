@@ -13,6 +13,7 @@ export const siteSettingsSelect = {
   siteSeoKeywords: true,
   pointName: true,
   analyticsCode: true,
+  postLinkDisplayMode: true,
   friendLinksEnabled: true,
   friendLinkApplicationEnabled: true,
   friendLinkAnnouncement: true,

@@ -9,6 +9,7 @@ import { MessageCircle } from "lucide-react"
 import { UserAvatar } from "@/components/user-avatar"
 import { UserStatusBadge } from "@/components/user-status-badge"
 import { cn } from "@/lib/utils"
+import { getPostPath } from "@/lib/post-links"
 
 interface ForumPostListItemProps {
   item: {
@@ -45,7 +46,9 @@ interface ForumPostListItemProps {
   }
   showBoard?: boolean
   compactFirstItem?: boolean
+  postLinkDisplayMode?: "SLUG" | "ID"
 }
+
 
 function getPinTone(pinScope?: string | null) {
   if (pinScope === "GLOBAL") {
@@ -72,7 +75,8 @@ function getPinTone(pinScope?: string | null) {
   return null
 }
 
-export function ForumPostListItem({ item, showBoard = true, compactFirstItem = false }: ForumPostListItemProps) {
+export function ForumPostListItem({ item, showBoard = true, compactFirstItem = false, postLinkDisplayMode = "SLUG" }: ForumPostListItemProps) {
+
   const isRestrictedAuthor = item.authorStatus === "BANNED" || item.authorStatus === "MUTED"
   const pinTone = getPinTone(item.pinScope)
 
@@ -87,7 +91,8 @@ export function ForumPostListItem({ item, showBoard = true, compactFirstItem = f
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-          <Link href={`/posts/${item.slug}`} className="min-w-0 flex-1">
+          <Link href={getPostPath({ id: item.id, slug: item.slug }, { mode: postLinkDisplayMode })} className="min-w-0 flex-1">
+
             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <h2 className={item.isFeatured ? "line-clamp-2 text-sm font-semibold text-emerald-700 transition-colors hover:text-emerald-600 sm:text-base dark:text-emerald-300 dark:hover:text-emerald-200" : pinTone ? pinTone.titleClassName : "line-clamp-2 text-sm font-medium text-foreground transition-colors hover:text-primary sm:text-base"}>
                 {item.title}
@@ -109,7 +114,10 @@ export function ForumPostListItem({ item, showBoard = true, compactFirstItem = f
           {item.type !== "NORMAL" ? <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground sm:px-2.5 sm:py-1 sm:text-xs">{item.typeLabel}</span> : null}
           {item.pinLabel && pinTone ? <span className={pinTone.badgeClassName}>{item.pinLabel}</span> : null}
           {item.isFeatured ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200 sm:px-2.5 sm:py-1 sm:text-xs">精华</span> : null}
-          <Link href={`/posts/${item.slug}#comments`} className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-normal transition-colors hover:opacity-90 sm:px-2.5 sm:py-1 sm:text-xs" style={{ backgroundColor: `${item.commentAccentColor}14`, color: item.commentAccentColor }}>
+          <Link href={{ pathname: getPostPath({ id: item.id, slug: item.slug }, { mode: postLinkDisplayMode }), hash: "comments" }} className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-normal transition-colors hover:opacity-90 sm:px-2.5 sm:py-1 sm:text-xs" style={{ backgroundColor: `${item.commentAccentColor}14`, color: item.commentAccentColor }}>
+
+
+
             <MessageCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             {item.commentCount}
           </Link>

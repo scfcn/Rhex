@@ -86,6 +86,7 @@ export async function ForumPostStream({ posts, showBoard = true, visiblePinScope
                 }}
                 showBoard={showBoard}
                 compactFirstItem={index === 0}
+                postLinkDisplayMode={settings.postLinkDisplayMode}
               />
             </div>
           )

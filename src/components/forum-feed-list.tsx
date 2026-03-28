@@ -10,6 +10,7 @@ import { getVipNameClass, isVipActive } from "@/lib/vip-status"
 interface ForumFeedListProps {
   items: ForumFeedItem[]
   currentSort: FeedSort
+  postLinkDisplayMode?: "SLUG" | "ID"
 }
 
 const tabs: Array<{ key: Exclude<FeedSort, "weekly">; label: string; icon: typeof Clock3 }> = [
@@ -28,7 +29,7 @@ function getFeedPinLabel(pinScope?: string | null) {
   return null
 }
 
-export async function ForumFeedList({ items, currentSort }: ForumFeedListProps) {
+export async function ForumFeedList({ items, currentSort, postLinkDisplayMode = "SLUG" }: ForumFeedListProps) {
   const settings = await getSiteSettings()
 
   return (
@@ -89,6 +90,7 @@ export async function ForumFeedList({ items, currentSort }: ForumFeedListProps) 
                 commentAccentColor: commentHeat.color,
               }}
               showBoard
+              postLinkDisplayMode={postLinkDisplayMode}
             />
           )
         })}

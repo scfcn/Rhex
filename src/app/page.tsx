@@ -101,7 +101,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <SidebarNavigation zones={zones} boards={boards} />
 
           <div className="pb-12 lg:col-span-7 py-1">
-            <ForumFeedList items={feed} currentSort={currentSort} />
+            <ForumFeedList items={feed} currentSort={currentSort} postLinkDisplayMode={settings.postLinkDisplayMode} />
+
             {feed.length === 0 ? <div className="mt-4 rounded-md border bg-background p-8 text-sm text-muted-foreground">当前排序下还没有可展示的帖子内容。</div> : null}
 
             <nav className="mx-auto flex w-full justify-center py-4" aria-label="pagination">
@@ -127,6 +128,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <HomeSidebarPanels
               user={sidebarUser}
               hotTopics={hotTopics}
+              postLinkDisplayMode={settings.postLinkDisplayMode}
+
               announcements={announcements}
               friendLinks={friendLinks.compact}
               friendLinksEnabled={settings.friendLinksEnabled}

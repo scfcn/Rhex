@@ -225,7 +225,8 @@ function HiddenConfigChip({
   )
 }
 
-export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled = false, markdownEmojiMap, currentUser, mode = "create", postId, successSlug, initialValues }: CreatePostFormProps) {
+export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled = false, markdownEmojiMap, currentUser, mode = "create", postId, initialValues }: CreatePostFormProps) {
+
 
 
   const router = useRouter()
@@ -639,7 +640,8 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
     setMessage(successMessage)
     toast.success(successMessage, mode === "edit" ? "保存成功" : "发布成功")
 
-    router.push(`/posts/${result.data?.slug ?? successSlug ?? postId}`)
+    router.push(`/posts/${result.data?.id ?? postId}`)
+
     router.refresh()
     setLoading(false)
   }

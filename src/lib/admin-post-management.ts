@@ -2,6 +2,8 @@ export interface AdminPostListItem {
   id: string
   title: string
   slug: string
+  href?: string
+
   summary: string | null
   boardName: string
   boardSlug: string

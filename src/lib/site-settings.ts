@@ -17,6 +17,8 @@ import { normalizeHeaderAppIconName, parseSiteHeaderAppLinks, type SiteHeaderApp
 
 export type { FooterLinkItem } from "@/lib/shared/config-parsers"
 
+export type PostLinkDisplayMode = "SLUG" | "ID"
+
 export interface SiteSettingsData {
   siteName: string
   siteSlogan: string
@@ -25,6 +27,7 @@ export interface SiteSettingsData {
   siteLogoPath?: string | null
   siteSeoKeywords: string[]
   pointName: string
+  postLinkDisplayMode: PostLinkDisplayMode
   footerLinks: FooterLinkItem[]
   headerAppLinks: SiteHeaderAppLinkItem[]
   headerAppIconName: string
@@ -110,6 +113,7 @@ function mapSiteSettings(record: {
   siteLogoPath?: string | null
   siteSeoKeywords?: string | null
   pointName: string
+  postLinkDisplayMode?: "SLUG" | "ID" | string | null
   footerLinksJson?: string | null
   headerAppLinksJson?: string | null
   headerAppIconName?: string | null
@@ -192,6 +196,7 @@ function mapSiteSettings(record: {
     siteLogoPath: record.siteLogoPath,
     siteSeoKeywords: String(record.siteSeoKeywords || "").split(/[，,\n]+/).map((item) => item.trim()).filter(Boolean),
     pointName: record.pointName,
+    postLinkDisplayMode: record.postLinkDisplayMode === "ID" ? "ID" : "SLUG",
     footerLinks: parseFooterLinks(record.footerLinksJson),
     headerAppLinks: parseSiteHeaderAppLinks(record.headerAppLinksJson),
     headerAppIconName: normalizeHeaderAppIconName(record.headerAppIconName),

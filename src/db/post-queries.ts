@@ -5,27 +5,41 @@ import { buildPostDetailInclude, pinnedPostOrderBy, postListInclude } from "@/db
 
 
 const postSeoSelect = {
+  id: true,
   slug: true,
   title: true,
   summary: true,
   content: true,
 } satisfies Prisma.PostSelect
 
-function extractSlugNumericSuffix(slug: string) {
-  return slug.match(/-(\d+)$/)?.[1] ?? null
+function extractPostRouteIdentifier(slug: string) {
+  const trimmed = slug.trim()
+
+  if (!trimmed) {
+    return null
+  }
+
+  return trimmed.match(/-([a-z0-9]+)$/i)?.[1] ?? trimmed.match(/^[a-z0-9]+$/i)?.[0] ?? null
 }
 
-function buildSlugSuffixFilter(slug: string): Prisma.PostWhereInput | null {
-  const suffix = extractSlugNumericSuffix(slug)
+function buildPostRouteFallbackFilter(slug: string): Prisma.PostWhereInput | null {
+  const identifier = extractPostRouteIdentifier(slug)
 
-  if (!suffix) {
+  if (!identifier) {
     return null
   }
 
   return {
-    slug: {
-      endsWith: `-${suffix}`,
-    },
+    OR: [
+      {
+        id: identifier,
+      },
+      {
+        slug: {
+          endsWith: `-${identifier}`,
+        },
+      },
+    ],
   }
 }
 
@@ -41,7 +55,7 @@ export async function findPostDetailBySlug(slug: string, currentUserId?: number)
     return post
   }
 
-  const fallbackWhere = buildSlugSuffixFilter(slug)
+  const fallbackWhere = buildPostRouteFallbackFilter(slug)
 
   if (!fallbackWhere) {
     return null
@@ -101,7 +115,7 @@ export async function findPostSeoBySlug(slug: string) {
     return post
   }
 
-  const fallbackWhere = buildSlugSuffixFilter(slug)
+  const fallbackWhere = buildPostRouteFallbackFilter(slug)
 
   if (!fallbackWhere) {
     return null

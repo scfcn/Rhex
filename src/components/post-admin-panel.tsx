@@ -30,7 +30,6 @@ interface AdminQuickAction {
 
 export function PostAdminPanel({
   postId,
-  postSlug,
   currentBoardSlug,
   postAuthorId,
   postAuthorUsername,
@@ -80,8 +79,8 @@ export function PostAdminPanel({
       setFeedback(result.message ?? (response.ok ? "操作成功" : "操作失败"))
       if (response.ok) {
         if (action === "post.moveBoard") {
-          const slug = typeof result.data?.slug === "string" && result.data.slug ? result.data.slug : postSlug
-          window.location.href = `/posts/${slug}`
+          const nextPostId = typeof result.data?.id === "string" && result.data.id ? result.data.id : postId
+          window.location.href = `/posts/${nextPostId}`
           return
         }
         window.location.reload()

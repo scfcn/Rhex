@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import type { KeyboardEvent } from "react"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { ChevronLeft, ChevronUp, MessageSquareMore, Send, SmilePlus } from "lucide-react"
@@ -62,6 +63,8 @@ export function MessageThreadPanel({ conversation, currentUserId, usingDemoData,
 
     return conversation?.participants.find((item) => item.id !== currentUserId)
   }, [conversation, currentUserId])
+
+  const recipientProfileHref = recipient ? `/users/${recipient.username}` : null
 
   function insertEmoji(emoji: string) {
     const element = textareaRef.current
@@ -192,9 +195,28 @@ export function MessageThreadPanel({ conversation, currentUserId, usingDemoData,
               <ChevronLeft className="h-4 w-4" />
             </button>
           ) : null}
-          <UserAvatar name={recipient.displayName} avatarPath={recipient.avatarPath} size="md" />
+          {recipientProfileHref ? (
+            <Link
+              href={recipientProfileHref}
+              className="shrink-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              aria-label={`查看 ${recipient.displayName} 的主页`}
+            >
+              <UserAvatar name={recipient.displayName} avatarPath={recipient.avatarPath} size="md" />
+            </Link>
+          ) : (
+            <UserAvatar name={recipient.displayName} avatarPath={recipient.avatarPath} size="md" />
+          )}
           <div className="min-w-0">
-            <h2 className="truncate text-[17px] font-semibold">{conversation.title}</h2>
+            {recipientProfileHref ? (
+              <Link
+                href={recipientProfileHref}
+                className="block truncate text-[17px] font-semibold transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                {conversation.title}
+              </Link>
+            ) : (
+              <h2 className="truncate text-[17px] font-semibold">{conversation.title}</h2>
+            )}
             <p className="mt-1 truncate text-sm text-muted-foreground">{conversation.subtitle}</p>
           </div>
         </div>

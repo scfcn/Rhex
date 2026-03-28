@@ -11,9 +11,11 @@ interface PostCardListProps {
   pointName?: string
   compact?: boolean
   showBoard?: boolean
+  postLinkDisplayMode?: "SLUG" | "ID"
 }
 
-export function PostCardList({ posts, pointName = "积分", compact = false, showBoard = true }: PostCardListProps) {
+export function PostCardList({ posts, pointName = "积分", compact = false, showBoard = true, postLinkDisplayMode = "SLUG" }: PostCardListProps) {
+
 
   return (
     <>
@@ -41,7 +43,8 @@ export function PostCardList({ posts, pointName = "积分", compact = false, sho
             ) : null}
           </div>
 
-          <Link href={getPostPath(post)}>
+          <Link href={getPostPath(post, { mode: postLinkDisplayMode })}>
+
             <h2 className="text-xl font-semibold leading-8 transition-colors hover:text-primary">{post.title}</h2>
           </Link>
           {compact ? null : <p className="mt-3 text-sm leading-7 text-muted-foreground">{post.excerpt}</p>}

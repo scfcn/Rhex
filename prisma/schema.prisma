@@ -1009,6 +1009,7 @@ model SiteSetting {
   siteSeoKeywords               String?  @default("")
   pointName                     String   @default("积分")
   analyticsCode                 String?
+  postLinkDisplayMode           String   @default("SLUG")
   friendLinksEnabled            Boolean  @default(true)
   friendLinkApplicationEnabled  Boolean  @default(true)
   friendLinkAnnouncement        String   @default("欢迎与本站交换友情链接，请先添加我方链接后再提交申请，我们会在 1-3 个工作日内完成审核。")

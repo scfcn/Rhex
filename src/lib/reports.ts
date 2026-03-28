@@ -7,7 +7,10 @@ import { resolvePagination } from "@/db/helpers"
 
 
 import type { AdminReportListResult } from "@/lib/admin-report-management"
+import { getPostCommentPath, getPostPath } from "@/lib/post-links"
+import { getSiteSettings } from "@/lib/site-settings"
 import { getUserDisplayName } from "@/lib/users"
+
 
 export const REPORT_REASON_OPTIONS = [
   "垃圾广告",
@@ -31,7 +34,10 @@ export interface CreateReportInput {
 }
 
 async function resolveReportTarget(targetType: TargetType, targetId: string) {
+  const settings = await getSiteSettings()
+
   if (targetType === TargetType.POST) {
+
     const post = await findReportTargetPost(targetId)
 
 
@@ -42,7 +48,9 @@ async function resolveReportTarget(targetType: TargetType, targetId: string) {
     return {
       title: post.title,
       description: `帖子作者：${getUserDisplayName(post.author)}`,
-      href: `/posts/${post.slug}`,
+      href: getPostPath({ id: post.id, slug: post.slug }, { mode: settings.postLinkDisplayMode }),
+
+
       ownerUserId: null as number | null,
       relatedType: RelatedType.POST,
       relatedId: post.id,
@@ -60,7 +68,9 @@ async function resolveReportTarget(targetType: TargetType, targetId: string) {
     return {
       title: `评论：${comment.post.title}`,
       description: `评论人：${getUserDisplayName(comment.user)} · ${comment.content.slice(0, 56) || "无内容"}`,
-      href: `/posts/${comment.post.slug}#comment-${comment.id}`,
+      href: getPostCommentPath({ id: comment.post.id, slug: comment.post.slug, title: comment.post.title }, comment.id, { mode: settings.postLinkDisplayMode }),
+
+
       ownerUserId: comment.userId,
       relatedType: RelatedType.COMMENT,
       relatedId: comment.id,

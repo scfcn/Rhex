@@ -371,7 +371,7 @@ export function CommentThread({ comments, postId, canReply, currentPage, pageSiz
 
             {commentActions.length > 0 ? (
               <div className="pointer-events-none absolute bottom-5 right-0 z-10 opacity-0 transition-opacity duration-200 group-hover:pointer-events-auto group-hover:opacity-100">
-                <div className="flex max-w-[360px] flex-wrap justify-end gap-1.5 rounded-2xl border border-border/70 bg-background/95 p-2 shadow-sm backdrop-blur-sm">
+                <div className="flex max-w-[360px] flex-wrap justify-end gap-1.5 rounded-2xl p-2">
                   {commentActions.map((action) => (
                     <Button
                       key={`${comment.id}-${action.key}`}

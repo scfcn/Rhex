@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Search, Trash2 } from "lucide-react"
@@ -77,6 +78,7 @@ export function MessageConversationSidebar({ conversations, activeConversationId
           const active = conversation.id === activeConversationId
           const mainParticipant = conversation.participants.find((item) => !item.isCurrentUser) ?? conversation.participants[0]
           const isDeleting = deletingConversationId === conversation.id
+          const profileHref = `/users/${mainParticipant.username}`
 
           return (
             <div
@@ -86,22 +88,36 @@ export function MessageConversationSidebar({ conversations, activeConversationId
                 active ? "border-foreground/15 bg-secondary/60" : "border-transparent hover:border-border hover:bg-secondary/40",
               )}
             >
-              <button type="button" onClick={() => handleSelect(conversation.id)} className="flex min-w-0 flex-1 items-start gap-3 text-left">
-                <div className="relative shrink-0">
-                  <UserAvatar name={mainParticipant.displayName} avatarPath={mainParticipant.avatarPath} size="md" />
-                  {conversation.unreadCount > 0 ? <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">{conversation.unreadCount > 99 ? "99+" : conversation.unreadCount}</span> : null}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">{conversation.title}</p>
-                      <p className="mt-1 truncate text-xs text-muted-foreground">{conversation.subtitle}</p>
-                    </div>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">{conversation.updatedAt}</span>
+              <div className="flex min-w-0 flex-1 items-start gap-3">
+                <Link
+                  href={profileHref}
+                  className="relative z-10 shrink-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  aria-label={`查看 ${mainParticipant.displayName} 的主页`}
+                >
+                  <div className="relative shrink-0">
+                    <UserAvatar name={mainParticipant.displayName} avatarPath={mainParticipant.avatarPath} size="md" />
+                    {conversation.unreadCount > 0 ? <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">{conversation.unreadCount > 99 ? "99+" : conversation.unreadCount}</span> : null}
                   </div>
-                  <p className="mt-2.5 line-clamp-2 text-sm leading-6 text-muted-foreground">{conversation.preview}</p>
-                </div>
-              </button>
+                </Link>
+                <button type="button" onClick={() => handleSelect(conversation.id)} className="flex min-w-0 flex-1 items-start gap-3 text-left">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <Link
+                          href={profileHref}
+                          className="relative z-10 truncate text-sm font-semibold transition-colors hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          {conversation.title}
+                        </Link>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">{conversation.subtitle}</p>
+                      </div>
+                      <span className="shrink-0 text-[11px] text-muted-foreground">{conversation.updatedAt}</span>
+                    </div>
+                    <p className="mt-2.5 line-clamp-2 text-sm leading-6 text-muted-foreground">{conversation.preview}</p>
+                  </div>
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => onDeleteConversation(conversation.id)}

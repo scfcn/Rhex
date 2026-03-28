@@ -34,7 +34,9 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
     const siteSeoKeywords = readOptionalStringField(body, "siteSeoKeywords").split(/[，,\n]+/).map((item) => item.trim()).filter(Boolean).join(",")
     const pointName = readOptionalStringField(body, "pointName")
     const analyticsCode = readOptionalStringField(body, "analyticsCode")
+    const postLinkDisplayMode = readOptionalStringField(body, "postLinkDisplayMode") === "ID" ? "ID" : "SLUG"
     const checkInEnabled = Boolean(body.checkInEnabled)
+
 
 
     const checkInReward = Math.max(0, readOptionalNumberField(body, "checkInReward") ?? 0)
@@ -58,14 +60,15 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
         siteSeoKeywords,
         pointName: pointName || "积分",
         analyticsCode: analyticsCode || null,
+        postLinkDisplayMode,
         checkInEnabled,
-
         checkInReward,
         checkInMakeUpCardPrice,
         checkInVipMakeUpCardPrice,
         nicknameChangePointCost,
       },
     })
+
 
     return { settings, message: "基础信息已保存", revalidatePaths: ["/", "/write", "/admin"] }
 

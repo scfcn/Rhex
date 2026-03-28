@@ -51,11 +51,15 @@ export const adminPostActionHandlers: Record<string, AdminActionDefinition> = {
     if (post.boardId === targetBoard.id) apiError(400, "帖子已在当前节点，无需移动")
     await prisma.post.update({ where: { id: context.targetId }, data: { boardId: targetBoard.id } })
     await writeAdminActionLog(context, adminPostActionHandlers["post.moveBoard"].metadata)
+    const postId = context.targetId
+
     return {
       message: `帖子已移动到 ${targetBoard.name}`,
-      data: { slug: post.slug, boardSlug: targetBoard.slug },
-      revalidatePaths: [`/posts/${post.slug}`, `/boards/${post.board.slug}`, `/boards/${targetBoard.slug}`, "/", "/admin"],
+      data: { id: postId, slug: post.slug, boardSlug: targetBoard.slug },
+      revalidatePaths: [`/posts/${post.slug}`, `/posts/${postId}`, `/boards/${post.board.slug}`, `/boards/${targetBoard.slug}`, "/", "/admin"],
     }
+
+
   }),
   "post.approve": defineAdminAction({ targetType: "POST", revalidatePaths: ["/", "/admin"], buildDetail: () => "管理员审核通过帖子" }, async (context) => {
     await updatePostStatus(context.targetId, PostStatus.NORMAL, context.message || null, new Date())

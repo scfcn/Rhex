@@ -174,7 +174,8 @@ export default async function BoardPage({ params, searchParams }: BoardPageProps
           </main>
 
           <aside className="mt-6 hidden pb-12 lg:col-span-3 lg:block">
-            <HomeSidebarPanels user={sidebarUser} hotTopics={hotTopics} createPostHref={`/write?board=${board.slug}`} />
+            <HomeSidebarPanels user={sidebarUser} hotTopics={hotTopics} postLinkDisplayMode={settings.postLinkDisplayMode} createPostHref={`/write?board=${board.slug}`} />
+
 
           </aside>
         </div>

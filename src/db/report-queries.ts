@@ -22,7 +22,8 @@ export function findReportTargetComment(targetId: string) {
       content: true,
       userId: true,
       user: { select: { username: true, nickname: true } },
-      post: { select: { slug: true, title: true } },
+      post: { select: { id: true, slug: true, title: true } },
+
     },
   })
 }

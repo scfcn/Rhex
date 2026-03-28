@@ -7,6 +7,7 @@ import { UserAvatar } from "@/components/user-avatar"
 import type { AnnouncementItem } from "@/lib/announcements"
 import type { FriendLinkItem } from "@/lib/friend-links"
 import type { HomeSidebarPanelItem } from "@/lib/home-sidebar-layout"
+import { getPostPath } from "@/lib/post-links"
 
 interface HotTopicItem {
   id: string
@@ -21,6 +22,7 @@ interface HotTopicItem {
 interface HomeSidebarPanelsProps {
   user: SidebarUserCardData | null
   hotTopics: HotTopicItem[]
+  postLinkDisplayMode?: "SLUG" | "ID"
   announcements?: AnnouncementItem[]
   friendLinks?: FriendLinkItem[]
   friendLinksEnabled?: boolean
@@ -30,7 +32,7 @@ interface HomeSidebarPanelsProps {
   bottomPanels?: HomeSidebarPanelItem[]
 }
 
-export function HomeSidebarPanels({ user, hotTopics, announcements = [], friendLinks = [], friendLinksEnabled = false, createPostHref, topPanels = [], middlePanels = [], bottomPanels = [] }: HomeSidebarPanelsProps) {
+export function HomeSidebarPanels({ user, hotTopics, postLinkDisplayMode = "SLUG", announcements = [], friendLinks = [], friendLinksEnabled = false, createPostHref, topPanels = [], middlePanels = [], bottomPanels = [] }: HomeSidebarPanelsProps) {
   return (
     <div className="sticky top-20 space-y-4">
       <SidebarUserCard user={user} createPostHref={createPostHref} />
@@ -46,7 +48,7 @@ export function HomeSidebarPanels({ user, hotTopics, announcements = [], friendL
         </div>
         <div className="space-y-2">
           {hotTopics.map((topic) => (
-            <Link key={topic.id} href={`/posts/${topic.slug}`} className="-mx-1.5 flex items-start gap-2.5 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-accent/70">
+            <Link key={topic.id} href={getPostPath({ id: topic.id, slug: topic.slug }, { mode: postLinkDisplayMode })} className="-mx-1.5 flex items-start gap-2.5 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-accent/70">
               <UserAvatar name={topic.authorName} avatarPath={topic.authorAvatarPath} size="sm" />
               <div className="min-w-0 flex-1">
                 <div title={topic.title} className="truncate whitespace-nowrap text-sm leading-snug">{topic.title}</div>

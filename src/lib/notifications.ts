@@ -2,7 +2,10 @@ import { NotificationType, RelatedType } from "@/db/types"
 
 import { countNotificationsByUserId, countUnreadNotifications, findCommentPostSlugById, findNotificationsByUserId, findPostSlugById } from "@/db/notification-read-queries"
 import { formatMonthDayTime } from "@/lib/formatters"
+import { getPostCommentPath, getPostPath } from "@/lib/post-links"
+import { getSiteSettings } from "@/lib/site-settings"
 import { getUserDisplayName } from "@/lib/users"
+
 
 
 const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
@@ -42,20 +45,25 @@ export async function getUserUnreadNotificationCount(userId: number) {
 
 
 async function resolveNotificationUrl(relatedType: RelatedType, relatedId: string) {
+  const settings = await getSiteSettings()
+
   if (relatedType === RelatedType.POST) {
     const post = await findPostSlugById(relatedId)
 
-    return post ? `/posts/${post.slug}` : "/notifications"
+    return post ? getPostPath({ id: post.id, slug: post.slug }, settings.postLinkDisplayMode) : "/notifications"
+
   }
 
   if (relatedType === RelatedType.COMMENT) {
     const comment = await findCommentPostSlugById(relatedId)
 
-    return comment?.post?.slug ? `/posts/${comment.post.slug}#comment-${comment.id}` : "/notifications"
+    return comment?.post ? getPostCommentPath({ id: comment.post.id, slug: comment.post.slug }, comment.id, settings.postLinkDisplayMode) : "/notifications"
+
   }
 
   return "/notifications"
 }
+
 
 
 export async function getUserNotifications(userId: number, page: number, pageSize: number): Promise<UserNotificationsResult> {

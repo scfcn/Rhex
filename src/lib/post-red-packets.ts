@@ -1,6 +1,11 @@
+import { randomInt } from "crypto"
+
+
+
 import { ChangeType, PostRedPacketGrantMode, PostRedPacketStatus, PostRedPacketTriggerType, type Prisma } from "@/db/types"
 
 import { claimPostRedPacketInTransaction, findCurrentUserPostRedPacketClaim, findPostRedPacketSummaryData } from "@/db/post-red-packet-queries"
+
 
 import { getBusinessDayRange, formatRelativeTime } from "@/lib/formatters"
 
@@ -205,10 +210,19 @@ function allocateRandomAmount(remainingPoints: number, remainingCount: number) {
     return remainingPoints
   }
 
-  const max = remainingPoints - (remainingCount - 1)
-  const amount = Math.floor(Math.random() * max) + 1
-  return Math.min(max, Math.max(1, amount))
+  const guaranteedReserve = remainingCount - 1
+  const distributionLimit = remainingPoints - guaranteedReserve
+  if (distributionLimit <= 0) {
+    return 1
+  }
+
+  const average = remainingPoints / remainingCount
+  const doubledMeanLimit = Math.max(1, Math.floor(average * 2) - 1)
+  const safeMax = Math.min(distributionLimit, doubledMeanLimit)
+  return randomInt(1, safeMax + 1)
 }
+
+
 
 function allocateRedPacketAmount(packet: {
   grantMode: PostRedPacketGrantMode

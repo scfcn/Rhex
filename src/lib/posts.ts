@@ -35,10 +35,12 @@ interface PostDetailRelations {
 
 
 export interface PostSeoData {
+  id: string
   slug: string
   title: string
   description: string
 }
+
 
 export interface SitePostItem {
 
@@ -334,10 +336,12 @@ export async function getPostSeoBySlug(slug: string): Promise<PostSeoData | null
       .slice(0, 160)
 
     return {
+      id: post.id,
       slug: post.slug,
       title: post.title,
       description: post.summary?.trim() || fallbackDescription,
     }
+
 
   } catch (error) {
     console.error(error)
