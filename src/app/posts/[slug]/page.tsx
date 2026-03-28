@@ -267,7 +267,7 @@ export default async function PostPage({ params, searchParams }: PostPageProps) 
 
               <>
                 <Card>
-                  <CardContent className="p-4 sm:p-6 md:p-8">
+                  <CardContent className="pt-4 px-4 pb-4 sm:px-6 sm:pb-6 md:px-8 md:pb-8">
                     <div className="space-y-3 sm:space-y-4">
                       <div className="flex items-start justify-between gap-3 sm:hidden">
                         <div className={cn("min-w-0 flex-1 space-y-2", isRestrictedAuthor && "grayscale")}>

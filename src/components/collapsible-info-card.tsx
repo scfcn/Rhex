@@ -26,9 +26,11 @@ interface CollapsibleInfoCardProps {
   pills: CategoryPill[]
   defaultVisibleCount?: number
   actions?: ReactNode
+  summaryActions?: ReactNode
 }
 
-export function CollapsibleInfoCard({ badge, title, icon, description, summary, pills, defaultVisibleCount = 7, actions }: CollapsibleInfoCardProps) {
+export function CollapsibleInfoCard({ badge, title, icon, description, summary, pills, defaultVisibleCount = 7, actions, summaryActions }: CollapsibleInfoCardProps) {
+
   const [open, setOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)
 
@@ -94,17 +96,21 @@ export function CollapsibleInfoCard({ badge, title, icon, description, summary, 
               </div>
             </div>
             <p className="max-w-2xl text-sm leading-7 text-white/75 md:text-base">{description}</p>
-            <div className="mt-4 flex items-center justify-between gap-3 text-sm text-white/70">
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-white/70">
               <span>{summary}</span>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs text-white transition-colors hover:bg-white/15"
-                onClick={() => setOpen(false)}
-              >
-                <X className="h-3.5 w-3.5" />
-                收起
-              </button>
+              <div className="flex items-center gap-2">
+                {summaryActions}
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs text-white transition-colors hover:bg-white/15"
+                  onClick={() => setOpen(false)}
+                >
+                  <X className="h-3.5 w-3.5" />
+                  收起
+                </button>
+              </div>
             </div>
+
           </div>
         </div>
       ) : null}

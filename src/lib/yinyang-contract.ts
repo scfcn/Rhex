@@ -1,0 +1,592 @@
+import BigNumber from "bignumber.js"
+import type { Prisma } from "@prisma/client"
+
+export { YinYangContractPage } from "@/components/yinyang-contract-page"
+
+export { YinYangContractAdminPage } from "@/components/yinyang-contract-admin-page"
+
+import { prisma } from "@/db/client"
+import {
+  countUserAcceptedChallengesInRange,
+  countUserCreatedChallengesInRange,
+  createDailyStatRecord,
+  createYinYangChallengeAttempt,
+  createYinYangChallengeRecord,
+  findChallengeById,
+  getOrCreateDailyStat,
+  listOpenYinYangChallenges,
+  listRecentYinYangChallengesByUser,
+  getTopKingByDateKey,
+  listTopTodayKings,
+  listTopYinYangEarners,
+  listTopYinYangWinners,
+
+  lockOpenChallenge,
+  settleChallengeRecord,
+  updateDailyStat,
+  type YinYangChallengeDetailRow,
+} from "@/db/yinyang-contract-queries"
+import { getBusinessDayRange, formatDateTime } from "@/lib/formatters"
+import { getSiteSettings } from "@/lib/site-settings"
+import { getYinYangContractAppConfig } from "@/lib/app-config"
+import { parsePositiveSafeInteger } from "@/lib/shared/safe-integer"
+
+
+export type YinYangOption = "A" | "B"
+export type YinYangChallengeStatus = "OPEN" | "LOCKED" | "SETTLED" | "CANCELLED"
+
+export type YinYangChallengeCard = {
+  id: string
+  creatorId: number
+  creatorName: string
+  challengerId: number | null
+  challengerName: string | null
+  status: YinYangChallengeStatus
+  question: string
+  optionA: string
+  optionB: string
+  correctOption: YinYangOption | null
+  selectedOption: YinYangOption | null
+  isCorrect: boolean | null
+  stakePoints: number
+  rewardPoints: number
+  taxPoints: number
+  winnerId: number | null
+  loserId: number | null
+  createdAt: string
+  settledAt: string | null
+  expiresAt: string | null
+}
+
+export type YinYangMyStats = {
+  userId: number | null
+  pointName: string
+  points: number
+  winCount: number
+
+  loseCount: number
+  todayProfitPoints: number
+  todayLossPoints: number
+  totalProfitPoints: number
+  totalLossPoints: number
+  dailyCreateLimit: number
+  dailyAcceptLimit: number
+  createdToday: number
+  acceptedToday: number
+}
+
+export type YinYangLeaderboardUser = {
+  userId: number
+  userName: string
+  winCount: number
+  loseCount: number
+  todayProfitPoints: number
+  todayLossPoints: number
+  totalProfitPoints: number
+  totalLossPoints: number
+  winRate: number
+  badge: "阴阳王" | null
+}
+
+export type YinYangLobbyData = {
+  summary: YinYangMyStats
+  openChallenges: YinYangChallengeCard[]
+  recentChallenges: YinYangChallengeCard[]
+  winnerLeaderboard: YinYangLeaderboardUser[]
+  earnerLeaderboard: YinYangLeaderboardUser[]
+  kings: {
+    previousKing: string | null
+    currentKing: string | null
+  }
+  config: {
+    entryLabel: string
+    pointName: string
+    minStakePoints: number
+    maxStakePoints: number
+    taxRateBps: number
+    dailyCreateLimit: number
+    dailyAcceptLimit: number
+  }
+}
+
+
+type CurrentUser = {
+  id: number
+  username: string
+  nickname?: string | null
+  points?: number | null
+}
+
+type CreateChallengeInput = {
+  question: string
+  optionA: string
+  optionB: string
+  correctOption: YinYangOption
+  stakePoints: number
+}
+
+type AcceptChallengeInput = {
+  challengeId: string
+  selectedOption: YinYangOption
+}
+
+type AppConfig = Awaited<ReturnType<typeof getYinYangContractAppConfig>>
+
+
+
+function createUuid() {
+  if (typeof globalThis.crypto !== "undefined" && typeof globalThis.crypto.randomUUID === "function") {
+    return globalThis.crypto.randomUUID()
+  }
+
+  return `yyq-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
+}
+
+function normalizeTrimmedText(value: string, label: string, maxLength: number) {
+
+  const normalized = value.trim()
+  if (!normalized) {
+    throw new Error(`${label}不能为空`)
+  }
+  if (normalized.length > maxLength) {
+    throw new Error(`${label}不能超过${maxLength}个字符`)
+  }
+  return normalized
+}
+
+function toSafePositiveInteger(value: unknown, label: string) {
+  const parsed = parsePositiveSafeInteger(value)
+  if (parsed === null) {
+    throw new Error(`${label}必须为正整数`)
+  }
+  return parsed
+}
+
+
+function calculateRewardPoints(stakePoints: number, taxRateBps: number) {
+  const stake = new BigNumber(stakePoints)
+  const bps = new BigNumber(taxRateBps)
+  const taxPoints = stake.multipliedBy(bps).dividedToIntegerBy(10_000)
+  const rewardPoints = stake.minus(taxPoints)
+  if (!taxPoints.isInteger() || !rewardPoints.isInteger()) {
+    throw new Error("奖励计算失败")
+  }
+  const reward = rewardPoints.toNumber()
+  const tax = taxPoints.toNumber()
+  if (reward <= 0) {
+    throw new Error("奖励积分必须大于0")
+  }
+  return { rewardPoints: reward, taxPoints: tax }
+}
+
+function mapChallengeRow(row: YinYangChallengeDetailRow): YinYangChallengeCard {
+  return {
+    id: row.id,
+    creatorId: row.creatorId,
+    creatorName: row.creator.nickname?.trim() || row.creator.username,
+    challengerId: row.challengerId,
+    challengerName: row.challenger ? (row.challenger.nickname?.trim() || row.challenger.username) : null,
+    status: row.status,
+    question: row.question,
+    optionA: row.optionA,
+    optionB: row.optionB,
+    correctOption: row.status === "SETTLED" ? row.correctOption : null,
+    selectedOption: row.attempt?.selectedOption ?? null,
+    isCorrect: row.attempt?.isCorrect ?? null,
+    stakePoints: row.stakePoints,
+    rewardPoints: row.rewardPoints,
+    taxPoints: row.taxPoints,
+    winnerId: row.winnerId,
+    loserId: row.loserId,
+    createdAt: row.createdAt.toISOString(),
+    settledAt: row.settledAt ? row.settledAt.toISOString() : null,
+    expiresAt: row.expiresAt ? row.expiresAt.toISOString() : null,
+  }
+}
+
+async function getConfigAndSettings() {
+  const [config, settings] = await Promise.all([
+    getYinYangContractAppConfig(),
+    getSiteSettings(),
+  ])
+  return {
+    config,
+    settings,
+    pointName: settings.pointName,
+  }
+}
+
+async function ensureCreateAllowance(userId: number, config: AppConfig) {
+  const { start, end } = getBusinessDayRange()
+  const createdToday = await countUserCreatedChallengesInRange(userId, start, end)
+  if (createdToday >= Number(config.dailyCreateLimit ?? 5)) {
+    throw new Error("今日发起挑战次数已达上限")
+  }
+  return createdToday
+}
+
+async function ensureAcceptAllowance(userId: number, config: AppConfig) {
+  const { start, end } = getBusinessDayRange()
+  const acceptedToday = await countUserAcceptedChallengesInRange(userId, start, end)
+  if (acceptedToday >= Number(config.dailyAcceptLimit ?? 10)) {
+    throw new Error("今日应战次数已达上限")
+  }
+  return acceptedToday
+}
+
+
+
+type PointMutationClient = Pick<Prisma.TransactionClient, "user">
+
+async function applyBalanceChange(tx: PointMutationClient, userId: number, changeValue: number) {
+
+
+  if (changeValue === 0) {
+    return
+  }
+  if (changeValue > 0) {
+    await tx.user.update({
+      where: { id: userId },
+      data: {
+        points: {
+          increment: changeValue,
+        },
+      },
+    })
+    return
+  }
+  const amount = Math.abs(changeValue)
+  const current = await tx.user.findUnique({
+    where: { id: userId },
+    select: { id: true, points: true },
+  })
+  if (!current || current.points < amount) {
+    throw new Error("积分余额不足")
+  }
+  await tx.user.update({
+    where: { id: userId },
+    data: {
+      points: {
+        decrement: amount,
+      },
+    },
+  })
+}
+
+async function bumpDailyStats(userId: number, patch: { winCount?: number; loseCount?: number; todayProfitPoints?: number; todayLossPoints?: number }) {
+  const { start } = getBusinessDayRange()
+  const dateKey = start.toISOString().slice(0, 10)
+  const existing = await getOrCreateDailyStat(userId, dateKey)
+  if (!existing) {
+    await createDailyStatRecord({
+      userId,
+      dateKey,
+      winCount: patch.winCount ?? 0,
+      loseCount: patch.loseCount ?? 0,
+      todayProfitPoints: patch.todayProfitPoints ?? 0,
+      todayLossPoints: patch.todayLossPoints ?? 0,
+    })
+    return
+  }
+  await updateDailyStat(existing.id, {
+    winCount: (patch.winCount ?? 0) + existing.winCount,
+    loseCount: (patch.loseCount ?? 0) + existing.loseCount,
+    todayProfitPoints: (patch.todayProfitPoints ?? 0) + existing.todayProfitPoints,
+    todayLossPoints: (patch.todayLossPoints ?? 0) + existing.todayLossPoints,
+  })
+}
+
+async function buildSummary(user: CurrentUser): Promise<YinYangMyStats> {
+  const [{ pointName, config }, createdToday, acceptedToday, aggregates] = await Promise.all([
+    getConfigAndSettings(),
+    countUserCreatedChallengesInRange(user.id, getBusinessDayRange().start, getBusinessDayRange().end),
+    countUserAcceptedChallengesInRange(user.id, getBusinessDayRange().start, getBusinessDayRange().end),
+    prisma.yinYangChallenge.aggregate({
+      where: {
+        status: "SETTLED",
+        OR: [{ winnerId: user.id }, { loserId: user.id }],
+      },
+      _count: {
+        id: true,
+      },
+    }),
+  ])
+
+  const [winCount, loseCount, today, totalProfit, totalLoss] = await Promise.all([
+    prisma.yinYangChallenge.count({ where: { status: "SETTLED", winnerId: user.id } }),
+    prisma.yinYangChallenge.count({ where: { status: "SETTLED", loserId: user.id } }),
+    prisma.yinYangChallengeDailyStat.findUnique({ where: { userId_dateKey: { userId: user.id, dateKey: getBusinessDayRange().start.toISOString().slice(0, 10) } } }),
+    prisma.yinYangChallenge.aggregate({ where: { status: "SETTLED", winnerId: user.id }, _sum: { rewardPoints: true } }),
+    prisma.yinYangChallenge.aggregate({ where: { status: "SETTLED", loserId: user.id }, _sum: { stakePoints: true } }),
+  ])
+
+  void aggregates
+
+  return {
+    userId: user.id,
+    pointName,
+    points: user.points ?? 0,
+    winCount,
+    loseCount,
+
+    todayProfitPoints: today?.todayProfitPoints ?? 0,
+    todayLossPoints: today?.todayLossPoints ?? 0,
+    totalProfitPoints: totalProfit._sum.rewardPoints ?? 0,
+    totalLossPoints: totalLoss._sum.stakePoints ?? 0,
+    dailyCreateLimit: Number(config.dailyCreateLimit ?? 5),
+    dailyAcceptLimit: Number(config.dailyAcceptLimit ?? 10),
+    createdToday,
+    acceptedToday,
+  }
+}
+
+async function buildLeaderboards() {
+  const todayRange = getBusinessDayRange()
+  const yesterdayRange = getBusinessDayRange(new Date(todayRange.start.getTime() - 24 * 60 * 60 * 1000))
+
+  const [winnerRows, earnerRows, todayKings, previousKing] = await Promise.all([
+    listTopYinYangWinners(10),
+    listTopYinYangEarners(10),
+    listTopTodayKings(1),
+    getTopKingByDateKey(yesterdayRange.start.toISOString().slice(0, 10)),
+  ])
+
+  const kingUserId = todayKings[0]?.userId ?? null
+
+
+  const normalize = (row: { userId: number; nickname: string | null; username: string; winCount: number; loseCount: number; todayProfitPoints: number; todayLossPoints: number; totalProfitPoints: number; totalLossPoints: number }) => ({
+    userId: row.userId,
+    userName: row.nickname?.trim() || row.username,
+    winCount: row.winCount,
+    loseCount: row.loseCount,
+    todayProfitPoints: row.todayProfitPoints,
+    todayLossPoints: row.todayLossPoints,
+    totalProfitPoints: row.totalProfitPoints,
+    totalLossPoints: row.totalLossPoints,
+    winRate: row.winCount + row.loseCount > 0 ? Number((row.winCount / (row.winCount + row.loseCount)).toFixed(4)) : 0,
+    badge: row.userId === kingUserId && row.todayProfitPoints > 0 ? "阴阳王" : null,
+  } satisfies YinYangLeaderboardUser)
+
+  return {
+    winnerLeaderboard: winnerRows.map(normalize),
+    earnerLeaderboard: earnerRows.map(normalize),
+    previousKing: previousKing ? (previousKing.user.nickname?.trim() || previousKing.user.username) : null,
+    currentKing: todayKings[0] ? (todayKings[0].user.nickname?.trim() || todayKings[0].user.username) : null,
+  }
+}
+
+
+export async function getYinYangLobbyData(user: CurrentUser | null): Promise<YinYangLobbyData> {
+  const [{ config, pointName }, openRows, summary, recentRows, leaderboards] = await Promise.all([
+    getConfigAndSettings(),
+    listOpenYinYangChallenges(20),
+    user ? buildSummary(user) : Promise.resolve({
+      userId: null,
+      pointName: "积分",
+      points: 0,
+      winCount: 0,
+
+      loseCount: 0,
+      todayProfitPoints: 0,
+      todayLossPoints: 0,
+      totalProfitPoints: 0,
+      totalLossPoints: 0,
+      dailyCreateLimit: 0,
+      dailyAcceptLimit: 0,
+      createdToday: 0,
+      acceptedToday: 0,
+    }),
+    user ? listRecentYinYangChallengesByUser(user.id, 20) : Promise.resolve([]),
+    buildLeaderboards(),
+  ])
+
+  return {
+    summary: user ? summary : {
+      ...summary,
+      pointName,
+      dailyCreateLimit: Number(config.dailyCreateLimit ?? 5),
+      dailyAcceptLimit: Number(config.dailyAcceptLimit ?? 10),
+    },
+    openChallenges: openRows.map(mapChallengeRow),
+    recentChallenges: recentRows.map(mapChallengeRow),
+    winnerLeaderboard: leaderboards.winnerLeaderboard,
+    earnerLeaderboard: leaderboards.earnerLeaderboard,
+    kings: {
+      previousKing: leaderboards.previousKing,
+      currentKing: leaderboards.currentKing,
+    },
+    config: {
+
+      entryLabel: String(config.entryLabel ?? "阴阳契"),
+      pointName,
+      minStakePoints: Number(config.minStakePoints ?? 10),
+      maxStakePoints: Number(config.maxStakePoints ?? 500),
+      taxRateBps: Number(config.taxRateBps ?? 1000),
+      dailyCreateLimit: Number(config.dailyCreateLimit ?? 5),
+      dailyAcceptLimit: Number(config.dailyAcceptLimit ?? 10),
+    },
+  }
+}
+
+export async function createYinYangChallenge(user: CurrentUser, input: CreateChallengeInput) {
+  const { config } = await getConfigAndSettings()
+  if (!Boolean(config.enabled)) {
+    throw new Error("阴阳契应用暂未开启")
+  }
+  const question = normalizeTrimmedText(input.question, "问题", 120)
+  const optionA = normalizeTrimmedText(input.optionA, "答案A", 40)
+  const optionB = normalizeTrimmedText(input.optionB, "答案B", 40)
+  if (optionA === optionB) {
+    throw new Error("两个答案不能相同")
+  }
+  if (input.correctOption !== "A" && input.correctOption !== "B") {
+    throw new Error("正确答案不合法")
+  }
+  const stakePoints = toSafePositiveInteger(input.stakePoints, "积分彩头")
+  const minStakePoints = Number(config.minStakePoints ?? 10)
+  const maxStakePoints = Number(config.maxStakePoints ?? 500)
+  if (stakePoints < minStakePoints || stakePoints > maxStakePoints) {
+    throw new Error(`积分彩头必须在${minStakePoints}-${maxStakePoints}之间`)
+  }
+  await ensureCreateAllowance(user.id, config)
+  if ((user.points ?? 0) < stakePoints) {
+    throw new Error("积分不足，无法发起挑战")
+  }
+
+  const { rewardPoints, taxPoints } = calculateRewardPoints(stakePoints, Number(config.taxRateBps ?? 1000))
+  const challengeId = createUuid()
+
+  await prisma.$transaction(async (tx) => {
+
+    await applyBalanceChange(tx, user.id, -stakePoints)
+    await createYinYangChallengeRecord({
+      tx,
+      id: challengeId,
+      creatorId: user.id,
+      status: "OPEN",
+      question,
+      optionA,
+      optionB,
+      correctOption: input.correctOption,
+      stakePoints,
+      rewardPoints,
+      taxRateBps: Number(config.taxRateBps ?? 1000),
+      taxPoints,
+    })
+    await tx.pointLog.create({
+      data: {
+        userId: user.id,
+        changeType: "DECREASE",
+        changeValue: stakePoints,
+        reason: "[app:阴阳契] 发起挑战扣除托管本金",
+        relatedType: "YINYANG_CHALLENGE",
+        relatedId: challengeId,
+      },
+    })
+  })
+
+  return getYinYangLobbyData(user)
+}
+
+export async function acceptYinYangChallenge(user: CurrentUser, input: AcceptChallengeInput) {
+  const challenge = await findChallengeById(input.challengeId)
+  if (!challenge) {
+    throw new Error("挑战不存在")
+  }
+  if (challenge.creatorId === user.id) {
+    throw new Error("不能应战自己的挑战")
+  }
+  if (challenge.status !== "OPEN") {
+    throw new Error("该挑战已不可应战")
+  }
+
+  if ((user.points ?? 0) < challenge.stakePoints) {
+    throw new Error("积分不足，无法应战")
+  }
+  const { config } = await getConfigAndSettings()
+  await ensureAcceptAllowance(user.id, config)
+
+  await prisma.$transaction(async (tx) => {
+    const locked = await lockOpenChallenge(tx, challenge.id, user.id)
+    if (!locked) {
+      throw new Error("该挑战已被其他用户抢先应战")
+    }
+
+    await applyBalanceChange(tx, user.id, -challenge.stakePoints)
+    await tx.pointLog.create({
+      data: {
+        userId: user.id,
+        changeType: "DECREASE",
+        changeValue: challenge.stakePoints,
+        reason: "[app:阴阳契] 应战扣除托管本金",
+        relatedType: "YINYANG_CHALLENGE",
+        relatedId: challenge.id,
+      },
+    })
+
+    const isCorrect = input.selectedOption === challenge.correctOption
+    const winnerId = isCorrect ? user.id : challenge.creatorId
+    const loserId = isCorrect ? challenge.creatorId : user.id
+    const winnerSettlement = challenge.stakePoints + challenge.rewardPoints
+
+    await applyBalanceChange(tx, winnerId, winnerSettlement)
+    await tx.pointLog.create({
+      data: {
+        userId: winnerId,
+        changeType: "INCREASE",
+        changeValue: winnerSettlement,
+        reason: isCorrect ? "[app:阴阳契] 挑战胜利返还本金并发放奖励" : "[app:阴阳契] 守擂成功返还本金并发放奖励",
+        relatedType: "YINYANG_CHALLENGE",
+        relatedId: challenge.id,
+      },
+    })
+
+    await createYinYangChallengeAttempt({
+      tx,
+      id: createUuid(),
+
+      challengeId: challenge.id,
+      challengerId: user.id,
+      selectedOption: input.selectedOption,
+      isCorrect,
+      stakePoints: challenge.stakePoints,
+      rewardPoints: challenge.rewardPoints,
+      taxPoints: challenge.taxPoints,
+    })
+
+    await settleChallengeRecord({
+      tx,
+      challengeId: challenge.id,
+      winnerId,
+      loserId,
+    })
+  })
+
+  if (input.selectedOption === challenge.correctOption) {
+    await Promise.all([
+      bumpDailyStats(user.id, { winCount: 1, todayProfitPoints: challenge.rewardPoints }),
+      bumpDailyStats(challenge.creatorId, { loseCount: 1, todayLossPoints: challenge.stakePoints }),
+    ])
+  } else {
+    await Promise.all([
+      bumpDailyStats(challenge.creatorId, { winCount: 1, todayProfitPoints: challenge.rewardPoints }),
+      bumpDailyStats(user.id, { loseCount: 1, todayLossPoints: challenge.stakePoints }),
+    ])
+  }
+
+  const refreshedUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { id: true, username: true, nickname: true, points: true },
+  })
+  if (!refreshedUser) {
+    throw new Error("用户状态已失效")
+  }
+
+  return getYinYangLobbyData(refreshedUser)
+}
+
+
+
+export function formatYinYangChallengeTime(value: string | null) {
+  return value ? formatDateTime(value) : "-"
+}

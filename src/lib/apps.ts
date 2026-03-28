@@ -9,6 +9,15 @@ export const HOST_APPS = [
     category: "游戏",
   },
   {
+    id: "yinyang-contract",
+    slug: "yinyang-contract",
+    name: "阴阳契",
+    description: "双选项积分挑战应用，支持托管彩头、税率配置、战绩统计与盈利排行榜。",
+    href: "/funs/yinyang-contract",
+    adminHref: "/admin/apps/yinyang-contract",
+    category: "游戏",
+  },
+  {
     id: "self-serve-ads",
     slug: "self-serve-ads",
     name: "自助广告位",
@@ -18,6 +27,7 @@ export const HOST_APPS = [
     category: "运营",
   },
 ] as const
+
 
 export type HostAppItem = (typeof HOST_APPS)[number]
 

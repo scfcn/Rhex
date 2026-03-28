@@ -37,6 +37,14 @@ export interface SelfServeAdPurchaseDraft {
   durationMonths: 1 | 3 | 6 | 12
 }
 
+export interface SelfServeAdPurchaseValidationResult {
+  success: boolean
+  normalized: SelfServeAdPurchaseDraft
+  errors: Partial<Record<"title" | "linkUrl" | "imageUrl" | "textColor" | "backgroundColor", string>>
+  firstError?: string
+}
+
+
 export interface SelfServeAdItem {
   id: string
   slotType: SelfServeAdSlotType
@@ -81,6 +89,91 @@ export const SELF_SERVE_AD_TEXT_COLORS = ["#0f172a", "#1d4ed8", "#0f766e", "#be1
 export const SELF_SERVE_AD_BACKGROUND_COLORS = ["#f8fafc", "#dbeafe", "#dcfce7", "#fce7f3", "#fef3c7", "#111827"] as const
 
 import { normalizeNonNegativeInteger } from "@/lib/shared/normalizers"
+
+const SELF_SERVE_AD_TITLE_MAX_LENGTH = 30
+const SELF_SERVE_AD_IMAGE_URL_MAX_LENGTH = 500
+const SELF_SERVE_AD_LINK_URL_MAX_LENGTH = 500
+const HEX_COLOR_PATTERN = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/
+
+function normalizeSelfServeAdText(value: unknown, maxLength: number) {
+  return String(value ?? "").trim().slice(0, maxLength)
+}
+
+function normalizeSelfServeAdUrl(value: unknown, fieldLabel: string) {
+  const url = String(value ?? "").trim()
+  if (!url) {
+    return { value: "", error: `请填写${fieldLabel}` }
+  }
+  if (url.length > SELF_SERVE_AD_LINK_URL_MAX_LENGTH) {
+    return { value: url.slice(0, SELF_SERVE_AD_LINK_URL_MAX_LENGTH), error: `${fieldLabel}不能超过 ${SELF_SERVE_AD_LINK_URL_MAX_LENGTH} 个字符` }
+  }
+  if (!/^https?:\/\//i.test(url)) {
+    return { value: url, error: `${fieldLabel}必须以 http:// 或 https:// 开头` }
+  }
+
+  try {
+    return { value: new URL(url).toString() }
+  } catch {
+    return { value: url, error: `请输入有效的${fieldLabel}` }
+  }
+}
+
+function normalizeSelfServeAdColor(value: unknown, fallback: string) {
+  const color = String(value ?? "").trim()
+  return HEX_COLOR_PATTERN.test(color) ? color : fallback
+}
+
+export function validateSelfServeAdPurchaseDraft(input: SelfServeAdPurchaseDraft): SelfServeAdPurchaseValidationResult {
+  const slotType = input.slotType === "IMAGE" ? "IMAGE" : "TEXT"
+  const title = normalizeSelfServeAdText(input.title, SELF_SERVE_AD_TITLE_MAX_LENGTH)
+  const linkResult = normalizeSelfServeAdUrl(input.linkUrl, "广告链接")
+  const imageResult = slotType === "IMAGE"
+    ? normalizeSelfServeAdUrl(String(input.imageUrl ?? "").trim().slice(0, SELF_SERVE_AD_IMAGE_URL_MAX_LENGTH), "广告图片地址")
+    : { value: "" }
+  const textColor = slotType === "TEXT" ? normalizeSelfServeAdColor(input.textColor, "#0f172a") : "#0f172a"
+  const backgroundColor = slotType === "TEXT" ? normalizeSelfServeAdColor(input.backgroundColor, "#f8fafc") : "#f8fafc"
+  const durationMonths = input.durationMonths === 1 || input.durationMonths === 3 || input.durationMonths === 6 || input.durationMonths === 12 ? input.durationMonths : 1
+
+  const errors: SelfServeAdPurchaseValidationResult["errors"] = {}
+  if (slotType === "TEXT" && !title) {
+    errors.title = "请填写广告标题"
+  }
+  if (slotType === "TEXT" && title.length > 12) {
+    errors.title = "文字广告标题建议控制在 12 个字以内"
+  }
+  if (linkResult.error) {
+    errors.linkUrl = linkResult.error
+  }
+  if (slotType === "IMAGE") {
+    if (!input.imageUrl?.trim()) {
+      errors.imageUrl = "请填写广告图片地址"
+    } else if (String(input.imageUrl).trim().length > SELF_SERVE_AD_IMAGE_URL_MAX_LENGTH) {
+      errors.imageUrl = `广告图片地址不能超过 ${SELF_SERVE_AD_IMAGE_URL_MAX_LENGTH} 个字符`
+    } else if (imageResult.error) {
+      errors.imageUrl = imageResult.error
+    }
+  }
+
+  const normalized: SelfServeAdPurchaseDraft = {
+    slotType,
+    slotIndex: Math.max(0, Number(input.slotIndex) || 0),
+    title,
+    linkUrl: linkResult.value,
+    imageUrl: slotType === "IMAGE" ? imageResult.value : "",
+    textColor,
+    backgroundColor,
+    durationMonths,
+  }
+
+  const firstError = errors.title ?? errors.linkUrl ?? errors.imageUrl ?? errors.textColor ?? errors.backgroundColor
+  return {
+    success: !firstError,
+    normalized,
+    errors,
+    firstError,
+  }
+}
+
 
 export function toSelfServeAdConfig(config: Record<string, boolean | number | string>): SelfServeAdConfig {
   return {

@@ -8,6 +8,7 @@ import { enforceSensitiveText } from "@/lib/content-safety"
 import { extractSummaryFromContent } from "@/lib/content"
 import { parseBusinessDateTime } from "@/lib/formatters"
 import { determineLotteryTriggerMode, normalizeLotteryConfig } from "@/lib/lottery"
+import { createPostMentionNotifications } from "@/lib/post-mentions"
 
 import { buildPostContentDocument, getAllPostContentText, serializePostContentDocument } from "@/lib/post-content"
 import { createPostRedPacketAfterPostCreated, normalizePostRedPacketConfig } from "@/lib/post-red-packets"
@@ -208,6 +209,16 @@ export async function createPostFlow(body: unknown) {
         postCount: { increment: 1 },
       },
     })
+
+    if (!shouldPending) {
+      await createPostMentionNotifications({
+        tx,
+        postId: createdPost.id,
+        senderId: author.id,
+        senderName: author.nickname ?? author.username,
+        rawPostContent: serializedContent,
+      })
+    }
 
     return createdPost
   })

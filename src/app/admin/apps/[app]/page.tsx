@@ -7,9 +7,11 @@ import { requireAdminUser } from "@/lib/admin"
 import { getHostAppBySlug } from "@/lib/apps"
 import type { ComponentType } from "react"
 
-import { getGobangAppConfig, getSelfServeAdsAppConfig } from "@/lib/app-config"
+import { getGobangAppConfig, getSelfServeAdsAppConfig, getYinYangContractAppConfig } from "@/lib/app-config"
 import { GobangAdminPage } from "@/components/gobang-admin-page"
 import { SelfServeAdsAdminPage } from "@/components/self-serve-ads-admin-page"
+import { YinYangContractAdminPage } from "@/components/yinyang-contract-admin-page"
+
 
 
 
@@ -64,6 +66,23 @@ export default async function AdminAppPage({ params }: AdminAppPageProps) {
     )
   }
 
+  if (app.slug === "yinyang-contract") {
+    const config = await getYinYangContractAppConfig()
+    const AppAdminComponent = YinYangContractAdminPage as ComponentType<{ AppId: string; config: Record<string, boolean | number | string> }>
+    return (
+      <AdminShell currentTab="/admin/apps" adminName={admin.nickname ?? admin.username}>
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>{app.name} · 应用后台</CardTitle>
+            </CardHeader>
+          </Card>
+          <AppAdminComponent AppId="yinyang-contract" config={config} />
+        </div>
+      </AdminShell>
+    )
+  }
 
   notFound()
 }
+

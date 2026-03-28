@@ -20,6 +20,7 @@ import { DEFAULT_ALLOWED_POST_TYPES } from "@/lib/post-types"
 import { buildMetadataKeywords } from "@/lib/seo"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getZoneBoards, getZoneBySlug, getZonePosts, getZones } from "@/lib/zones"
+import { RssSubscribeButton } from "@/components/rss-subscribe-button"
 
 
 interface ZonePageProps {
@@ -110,7 +111,9 @@ export default async function ZonePage({ params, searchParams }: ZonePageProps) 
                 icon={zone.icon}
                 description={zone.description}
                 summary={`当前分区共覆盖 ${zoneBoards.length} 个节点，累计 ${zone.count} 篇内容`}
+                summaryActions={<RssSubscribeButton href={`/zones/${zone.slug}/rss.xml`} label="订阅分区 RSS" />}
                 pills={[
+
                   {
                     id: `zone-${zone.id}`,
                     label: "全部",

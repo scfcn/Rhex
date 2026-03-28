@@ -6,6 +6,7 @@ import { ForumPostStream } from "@/components/forum-post-stream"
 import { LevelBadge } from "@/components/level-badge"
 import { LevelIcon } from "@/components/level-icon"
 import { ReportDialog } from "@/components/report-dialog"
+import { RssSubscribeButton } from "@/components/rss-subscribe-button"
 import { SiteHeader } from "@/components/site-header"
 import { UserAvatar } from "@/components/user-avatar"
 import { UserStatusBadge } from "@/components/user-status-badge"
@@ -155,24 +156,29 @@ export default async function UserPage({ params }: UserPageProps) {
           </aside>
 
           <section className="space-y-4">
-            <Card className="rounded-2xl border border-[#e8e8e8]  shadow-sm">
-              <CardContent className="p-5">
-                <div className="flex flex-wrap items-end justify-between gap-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Overview</p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <h2 className="text-2xl font-semibold text-foreground">{user.displayName} 的主页</h2>
+            <Card className="rounded-2xl border border-[#e8e8e8] shadow-sm">
+              <CardContent className="p-4 sm:p-5">
+                <div className="flex flex-wrap items-end justify-between gap-2.5 lg:flex-nowrap">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Overview</p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      <h2 className="text-xl font-semibold text-foreground sm:text-[22px]">{user.displayName} 的主页</h2>
                       {restrictionLabel ? <UserStatusBadge status={user.status} /> : null}
                     </div>
-                    <p className="mt-2 text-sm text-muted-foreground">{restrictionDescription ?? "查看这位成员的公开内容、社区贡献与活跃概况。"}</p>
+                    <p className="mt-1.5 text-xs text-muted-foreground sm:text-[13px]">{restrictionDescription ?? "查看这位成员的公开内容、社区贡献与活跃概况。"}</p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex shrink-0 flex-wrap gap-1.5">
                     {statItems.map((item) => (
-                      <div key={item.label} className="min-w-[88px] rounded-xl  px-4 py-3 text-center dark:bg-white/[0.04]">
-                        <p className="text-lg font-semibold text-foreground">{item.value}</p>
-                        <p className="mt-1 text-[11px] text-muted-foreground">{item.label}</p>
+                      <div key={item.label} className="min-w-[76px] rounded-xl px-3 py-2.5 text-center dark:bg-white/[0.04]">
+                        <p className="text-base font-semibold text-foreground sm:text-[17px]">{item.value}</p>
+                        <p className="mt-1 text-[10px] text-muted-foreground">{item.label}</p>
                       </div>
                     ))}
+                    <RssSubscribeButton
+                      href={`/users/${user.username}/rss.xml`}
+                      label="订阅用户 RSS"
+                      className="inline-flex min-w-[76px] items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-center text-xs font-medium text-muted-foreground transition-colors hover:bg-[#f5f5f5] hover:text-foreground dark:bg-white/[0.04] dark:hover:bg-white/[0.08]"
+                    />
                   </div>
                 </div>
               </CardContent>

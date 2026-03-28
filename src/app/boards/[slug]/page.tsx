@@ -6,8 +6,10 @@ import { AccessDeniedCard } from "@/components/access-denied-card"
 import { BoardFollowButton } from "@/components/board-follow-button"
 import { CollapsibleInfoCard } from "@/components/collapsible-info-card"
 import { ForumPostStream } from "@/components/forum-post-stream"
+import { RssSubscribeButton } from "@/components/rss-subscribe-button"
 
 import { HomeSidebarPanels } from "@/components/home-sidebar-panels"
+
 import { SidebarNavigation } from "@/components/sidebar-navigation"
 import { SiteHeader } from "@/components/site-header"
 
@@ -126,7 +128,9 @@ export default async function BoardPage({ params, searchParams }: BoardPageProps
                 icon={board.icon}
                 description={board.description}
                 summary={`当前共收录 ${board.count} 篇内容`}
+                summaryActions={<RssSubscribeButton href={`/boards/${board.slug}/rss.xml`} label="订阅节点 RSS" />}
                 actions={<BoardFollowButton boardId={board.id} initialFollowed={isFollowingBoard} />}
+
                 pills={[
                   {
                     id: `zone-${parentZone?.id ?? board.id}`,

@@ -10,7 +10,9 @@ import {
 const APP_CONFIG_KEYS = {
   gobang: "app.gobang",
   selfServeAds: "app.self-serve-ads",
+  yinYangContract: "app.yinyang-contract",
 } as const
+
 
 
 export type AppConfigValue = Record<string, boolean | number | string>
@@ -164,7 +166,19 @@ export const SELF_SERVE_ADS_DEFAULT_CONFIG = {
   placeholderLabel: "点击购买",
 } satisfies AppConfigValue
 
+export const YINYANG_CONTRACT_DEFAULT_CONFIG = {
+  enabled: true,
+  entryLabel: "阴阳契",
+  taxRateBps: 1000,
+  minStakePoints: 10,
+  maxStakePoints: 500,
+  dailyCreateLimit: 5,
+  dailyAcceptLimit: 10,
+} satisfies AppConfigValue
+
+
 export async function getGobangAppConfig() {
+
   const { state } = await readStateMap()
   return normalizeConfig(GOBANG_DEFAULT_CONFIG, state[APP_CONFIG_KEYS.gobang]?.config)
 }
@@ -181,3 +195,13 @@ export async function getSelfServeAdsAppConfig() {
 export async function updateSelfServeAdsAppConfig(input: Record<string, unknown>) {
   return upsertAppConfig(APP_CONFIG_KEYS.selfServeAds, SELF_SERVE_ADS_DEFAULT_CONFIG, input)
 }
+
+export async function getYinYangContractAppConfig() {
+  const { state } = await readStateMap()
+  return normalizeConfig(YINYANG_CONTRACT_DEFAULT_CONFIG, state[APP_CONFIG_KEYS.yinYangContract]?.config)
+}
+
+export async function updateYinYangContractAppConfig(input: Record<string, unknown>) {
+  return upsertAppConfig(APP_CONFIG_KEYS.yinYangContract, YINYANG_CONTRACT_DEFAULT_CONFIG, input)
+}
+

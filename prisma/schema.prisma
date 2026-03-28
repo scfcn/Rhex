@@ -109,6 +109,7 @@ enum RelatedType {
   COMMENT
   REPORT
   ANNOUNCEMENT
+  YINYANG_CHALLENGE
 }
 
 enum TargetType {
@@ -201,6 +202,18 @@ enum SelfServeAdOrderStatus {
   CANCELLED
 }
 
+enum YinYangChallengeStatus {
+  OPEN
+  LOCKED
+  SETTLED
+  CANCELLED
+}
+
+enum YinYangOption {
+  A
+  B
+}
+
 model User {
   id                Int            @id @default(autoincrement())
   username          String         @unique
@@ -269,6 +282,10 @@ model User {
   verificationCodes       VerificationCode[]
   verificationApplications UserVerification[] @relation("userVerificationApplicant")
   reviewedVerifications    UserVerification[] @relation("userVerificationReviewer")
+  yinYangChallengesCreated YinYangChallenge[] @relation("YinYangChallengeCreator")
+  yinYangChallengesJoined  YinYangChallenge[] @relation("YinYangChallengeChallenger")
+  yinYangChallengeAttempts YinYangChallengeAttempt[]
+  yinYangChallengeDailyStats YinYangChallengeDailyStat[]
 
   @@index([role])
   @@index([status])
@@ -331,14 +348,78 @@ model SelfServeAdOrder {
   pricePoints     Int
   status          SelfServeAdOrderStatus
   reviewNote      String?
-  startsAt        DateTime?   @db.Timestamptz(3)    
-  endsAt          DateTime?   @db.Timestamptz(3)    
-  createdAt       DateTime   @db.Timestamptz(3)                 @default(now())
-  updatedAt       DateTime   @db.Timestamptz(3)                 @updatedAt
+  startsAt        DateTime?   @db.Timestamptz(3)
+  endsAt          DateTime?   @db.Timestamptz(3)
+  createdAt       DateTime   @db.Timestamptz(3) @default(now())
+  updatedAt       DateTime   @db.Timestamptz(3) @updatedAt
 
   @@map("SelfServeAdOrder")
   @@index([status, slotType, slotIndex])
   @@index([userId, createdAt])
+}
+
+model YinYangChallenge {
+  id            String                 @id
+  creatorId     Int
+  challengerId  Int?
+  status        YinYangChallengeStatus
+  question      String
+  optionA       String
+  optionB       String
+  correctOption YinYangOption
+  stakePoints   Int
+  rewardPoints  Int
+  taxRateBps    Int
+  taxPoints     Int
+  winnerId      Int?
+  loserId       Int?
+  expiresAt     DateTime?   @db.Timestamptz(3)
+  settledAt     DateTime?   @db.Timestamptz(3)
+  createdAt     DateTime   @db.Timestamptz(3) @default(now())
+  updatedAt     DateTime   @db.Timestamptz(3) @updatedAt
+  creator       User       @relation("YinYangChallengeCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  challenger    User?      @relation("YinYangChallengeChallenger", fields: [challengerId], references: [id], onDelete: SetNull)
+  attempt       YinYangChallengeAttempt?
+
+  @@index([creatorId, createdAt])
+  @@index([challengerId, updatedAt])
+  @@index([status, createdAt])
+  @@index([winnerId, settledAt])
+  @@index([loserId, settledAt])
+}
+
+model YinYangChallengeAttempt {
+  id             String         @id
+  challengeId    String         @unique
+  challengerId   Int
+  selectedOption YinYangOption
+  isCorrect      Boolean
+  stakePoints    Int
+  rewardPoints   Int
+  taxPoints      Int
+  createdAt      DateTime   @db.Timestamptz(3) @default(now())
+  settledAt      DateTime   @db.Timestamptz(3) @default(now())
+  challenge      YinYangChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  challenger     User            @relation(fields: [challengerId], references: [id], onDelete: Cascade)
+
+  @@index([challengerId, createdAt])
+}
+
+model YinYangChallengeDailyStat {
+  id                String   @id @default(cuid())
+  userId            Int
+  dateKey           String
+  winCount          Int      @default(0)
+  loseCount         Int      @default(0)
+  todayProfitPoints Int      @default(0)
+  todayLossPoints   Int      @default(0)
+  createdAt         DateTime   @db.Timestamptz(3) @default(now())
+  updatedAt         DateTime   @db.Timestamptz(3) @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dateKey])
+  @@index([dateKey, todayProfitPoints])
+  @@index([userId, updatedAt])
 }
 
 model LevelDefinition {

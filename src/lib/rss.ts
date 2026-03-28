@@ -1,10 +1,9 @@
-import { findRssPosts, RSS_POST_LIMIT } from "@/db/rss-queries"
-import { getPostPath } from "@/lib/post-links"
+import { findBoardRssPosts, findRssPosts, RSS_POST_LIMIT, type RssPostRecord, findUserRssPosts, findZoneRssPosts } from "@/db/rss-queries"
+import { getCanonicalPostPath } from "@/lib/post-links"
 import { getPublicPostContentText } from "@/lib/post-content"
 import { getSiteSettings } from "@/lib/site-settings"
 import { resolveSiteOrigin, toAbsoluteSiteUrl } from "@/lib/site-origin"
 import { getUserDisplayName } from "@/lib/users"
-
 
 interface RssFeedItem {
   title: string
@@ -14,6 +13,18 @@ interface RssFeedItem {
   author: string
   category: string
   pubDate: string
+}
+
+interface RssFeedChannel {
+  title: string
+  link: string
+  description: string
+  feedPath: string
+}
+
+interface RssFeedSource {
+  channel: RssFeedChannel
+  posts: RssPostRecord[]
 }
 
 function escapeXml(value: string) {
@@ -28,7 +39,6 @@ function escapeXml(value: string) {
 function wrapCdata(value: string) {
   return `<![CDATA[${value.replace(/]]>/g, "]]><![CDATA[>") }]]>`
 }
-
 
 function normalizeText(value: string | null | undefined) {
   return String(value ?? "")
@@ -49,26 +59,20 @@ function buildDescription(summary: string | null, content: string) {
     .slice(0, 200)
 }
 
-
-
 function formatRssDate(value: Date | string) {
   return new Date(value).toUTCString()
 }
 
-async function buildRssItems(): Promise<RssFeedItem[]> {
-  const posts = await findRssPosts(RSS_POST_LIMIT)
-
-
+function buildRssItems(posts: RssPostRecord[]): RssFeedItem[] {
   return posts.map((post) => {
     const author = getUserDisplayName(post.author)
-    const link = toAbsoluteSiteUrl(getPostPath(post))
-
+    const link = toAbsoluteSiteUrl(getCanonicalPostPath(post))
     const publishedAt = post.publishedAt ?? post.createdAt
 
     return {
       title: normalizeText(post.title),
       link,
-      guid: `${link}#${post.id}`,
+      guid: link,
       description: buildDescription(post.summary, post.content),
       author,
       category: normalizeText(post.board.name),
@@ -77,17 +81,26 @@ async function buildRssItems(): Promise<RssFeedItem[]> {
   })
 }
 
+async function buildDefaultChannel(): Promise<RssFeedChannel> {
+  const settings = await getSiteSettings()
+
+  return {
+    title: normalizeText(settings.siteName),
+    link: toAbsoluteSiteUrl("/"),
+    description: normalizeText(settings.siteDescription || settings.siteSlogan || settings.siteName),
+    feedPath: "/rss.xml",
+  }
+}
+
 export async function getRssFeedUrl() {
   return toAbsoluteSiteUrl("/rss.xml")
 }
 
-export async function generateRssXml() {
+async function generateRssXmlBySource(sourcePromise: Promise<RssFeedSource>) {
   resolveSiteOrigin()
-  const [settings, items] = await Promise.all([getSiteSettings(), buildRssItems()])
-
-  const feedUrl = toAbsoluteSiteUrl("/rss.xml")
-  const siteUrl = toAbsoluteSiteUrl("/")
-
+  const source = await sourcePromise
+  const items = buildRssItems(source.posts)
+  const feedUrl = toAbsoluteSiteUrl(source.channel.feedPath)
   const lastBuildDate = items[0]?.pubDate ?? new Date().toUTCString()
 
   const itemXml = items
@@ -104,22 +117,94 @@ export async function generateRssXml() {
     ].join("\n"))
     .join("\n")
 
-
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">',
-    '  <channel>',
-    `    <title>${escapeXml(normalizeText(settings.siteName))}</title>`,
-    `    <link>${escapeXml(siteUrl)}</link>`,
-    `    <description>${escapeXml(normalizeText(settings.siteDescription || settings.siteSlogan || settings.siteName))}</description>`,
-    '    <language>zh-cn</language>',
-    '    <generator>Next.js</generator>',
+    "  <channel>",
+    `    <title>${escapeXml(source.channel.title)}</title>`,
+    `    <link>${escapeXml(source.channel.link)}</link>`,
+    `    <description>${escapeXml(source.channel.description)}</description>`,
+    "    <language>zh-cn</language>",
+    "    <generator>Next.js</generator>",
     `    <lastBuildDate>${escapeXml(lastBuildDate)}</lastBuildDate>`,
     `    <atom:link href="${escapeXml(feedUrl)}" rel="self" type="application/rss+xml" />`,
     itemXml,
-    '  </channel>',
-    '</rss>',
-    '',
+    "  </channel>",
+    "</rss>",
+    "",
   ].join("\n")
 }
+
+export async function generateRssXml() {
+  return generateRssXmlBySource((async () => {
+    const [channel, posts] = await Promise.all([
+      buildDefaultChannel(),
+      findRssPosts(RSS_POST_LIMIT),
+    ])
+
+    return {
+      channel,
+      posts,
+    }
+  })())
+}
+
+export async function generateZoneRssXml(zone: { slug: string; name: string; description?: string | null }) {
+  return generateRssXmlBySource((async () => {
+    const [settings, posts] = await Promise.all([
+      getSiteSettings(),
+      findZoneRssPosts(zone.slug, RSS_POST_LIMIT),
+    ])
+
+    return {
+      channel: {
+        title: `${normalizeText(zone.name)} - ${normalizeText(settings.siteName)}`,
+        link: toAbsoluteSiteUrl(`/zones/${encodeURIComponent(zone.slug)}`),
+        description: normalizeText(zone.description || `${zone.name} 分区最新帖子订阅`),
+        feedPath: `/zones/${encodeURIComponent(zone.slug)}/rss.xml`,
+      },
+      posts,
+    }
+  })())
+}
+
+export async function generateBoardRssXml(board: { slug: string; name: string; description?: string | null }) {
+  return generateRssXmlBySource((async () => {
+    const [settings, posts] = await Promise.all([
+      getSiteSettings(),
+      findBoardRssPosts(board.slug, RSS_POST_LIMIT),
+    ])
+
+    return {
+      channel: {
+        title: `${normalizeText(board.name)} - ${normalizeText(settings.siteName)}`,
+        link: toAbsoluteSiteUrl(`/boards/${encodeURIComponent(board.slug)}`),
+        description: normalizeText(board.description || `${board.name} 节点最新帖子订阅`),
+        feedPath: `/boards/${encodeURIComponent(board.slug)}/rss.xml`,
+      },
+      posts,
+    }
+  })())
+}
+
+export async function generateUserRssXml(user: { username: string; displayName?: string; bio?: string | null }) {
+  return generateRssXmlBySource((async () => {
+    const [settings, posts] = await Promise.all([
+      getSiteSettings(),
+      findUserRssPosts(user.username, RSS_POST_LIMIT),
+    ])
+    const displayName = normalizeText(user.displayName || user.username)
+
+    return {
+      channel: {
+        title: `${displayName} - ${normalizeText(settings.siteName)}`,
+        link: toAbsoluteSiteUrl(`/users/${encodeURIComponent(user.username)}`),
+        description: normalizeText(user.bio || `${displayName} 发布的最新帖子订阅`),
+        feedPath: `/users/${encodeURIComponent(user.username)}/rss.xml`,
+      },
+      posts,
+    }
+  })())
+}
+
 

@@ -11,7 +11,8 @@ import { createSystemNotification, submitSelfServeAdOrderTransaction } from "@/d
 import { getCurrentUser } from "@/lib/auth"
 import { getSelfServeAdsAppConfig as loadSelfServeAdsAppConfig } from "@/lib/app-config"
 import { serializeDateTime } from "@/lib/formatters"
-import { buildSelfServeAdPriceMap, getSelfServeAdPrice, toSelfServeAdConfig } from "@/lib/self-serve-ads.shared"
+import { buildSelfServeAdPriceMap, getSelfServeAdPrice, toSelfServeAdConfig, validateSelfServeAdPurchaseDraft } from "@/lib/self-serve-ads.shared"
+
 import { normalizeNonNegativeInteger, normalizePositiveInteger } from "@/lib/shared/normalizers"
 
 import type { SelfServeAdItem, SelfServeAdPurchaseDraft, SelfServeAdSlotType, SelfServeAdsPanelData } from "@/lib/self-serve-ads.shared"
@@ -24,34 +25,8 @@ function normalizeText(value: unknown, maxLength: number) {
   return String(value ?? "").trim().slice(0, maxLength)
 }
 
-function normalizeColor(value: unknown, fallback: string) {
-  const color = String(value ?? "").trim()
-  return /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(color) ? color : fallback
-}
-
-function normalizeUrl(value: unknown) {
-  const url = String(value ?? "").trim()
-  if (!url) throw new Error("请填写广告链接")
-  if (!/^https?:\/\//i.test(url)) throw new Error("广告链接必须以 http:// 或 https:// 开头")
-  try {
-    return new URL(url).toString()
-  } catch {
-    throw new Error("请输入有效的广告链接")
-  }
-}
-
-function normalizeImageUrl(value: unknown) {
-  const url = String(value ?? "").trim()
-  if (!url) throw new Error("请填写广告图片地址")
-  if (!/^https?:\/\//i.test(url)) throw new Error("广告图片地址必须以 http:// 或 https:// 开头")
-  try {
-    return new URL(url).toString()
-  } catch {
-    throw new Error("请输入有效的广告图片地址")
-  }
-}
-
 function buildPlaceholder(slotType: SelfServeAdSlotType, slotIndex: number): SelfServeAdItem {
+
   return { id: `placeholder-${slotType}-${slotIndex}`, slotType, slotIndex, title: null, linkUrl: null, imageUrl: null, textColor: null, backgroundColor: null, durationMonths: null, pricePoints: null, status: "EMPTY", reviewNote: null, startsAt: null, endsAt: null, createdAt: null, isPlaceholder: true }
 }
 
@@ -114,13 +89,11 @@ export async function submitSelfServeAdOrder(input: SelfServeAdPurchaseDraft) {
   const slotIndex = Math.max(0, Number(input.slotIndex) || 0)
   if (slotIndex >= slotLimit) throw new Error("广告位不存在或已失效")
 
-  const durationMonths = input.durationMonths === 1 || input.durationMonths === 3 || input.durationMonths === 6 || input.durationMonths === 12 ? input.durationMonths : 1
-  const linkUrl = normalizeUrl(input.linkUrl)
-  const title = normalizeText(input.title, 30)
-  const imageUrl = slotType === "IMAGE" ? normalizeImageUrl(input.imageUrl) : null
-  const textColor = slotType === "TEXT" ? normalizeColor(input.textColor, "#0f172a") : null
-  const backgroundColor = slotType === "TEXT" ? normalizeColor(input.backgroundColor, "#f8fafc") : null
-  if (slotType === "TEXT" && !title) throw new Error("请填写广告标题")
+  const validation = validateSelfServeAdPurchaseDraft(input)
+  if (!validation.success) throw new Error(validation.firstError ?? "广告表单校验失败")
+
+  const { title, linkUrl, imageUrl, textColor, backgroundColor, durationMonths } = validation.normalized
+
 
   const pricePoints = getSelfServeAdPrice(config, slotType, durationMonths)
   if (pricePoints <= 0) throw new Error("当前广告价格未配置，暂不可购买")
@@ -191,11 +164,19 @@ export async function reviewSelfServeAdOrder(input: {
   const durationMonths = normalizePositiveInteger(input.durationMonths ?? existing.durationMonths, existing.durationMonths ?? 1)
 
   const reviewNote = normalizeText(input.reviewNote ?? existing.reviewNote, 300) || null
-  const title = existing.slotType === "TEXT" ? normalizeText(input.title ?? existing.title, 30) : null
-  const linkUrl = normalizeUrl(input.linkUrl ?? existing.linkUrl)
-  const imageUrl = existing.slotType === "IMAGE" ? normalizeImageUrl(input.imageUrl ?? existing.imageUrl) : null
-  const textColor = existing.slotType === "TEXT" ? normalizeColor(input.textColor ?? existing.textColor, "#0f172a") : null
-  const backgroundColor = existing.slotType === "TEXT" ? normalizeColor(input.backgroundColor ?? existing.backgroundColor, "#f8fafc") : null
+  const adminDraftValidation = validateSelfServeAdPurchaseDraft({
+    slotType: existing.slotType,
+    slotIndex,
+    title: String(input.title ?? existing.title ?? ""),
+    linkUrl: String(input.linkUrl ?? existing.linkUrl ?? ""),
+    imageUrl: String(input.imageUrl ?? existing.imageUrl ?? ""),
+    textColor: String(input.textColor ?? existing.textColor ?? "#0f172a"),
+    backgroundColor: String(input.backgroundColor ?? existing.backgroundColor ?? "#f8fafc"),
+    durationMonths: durationMonths === 1 || durationMonths === 3 || durationMonths === 6 || durationMonths === 12 ? durationMonths : 1,
+  })
+  if (!adminDraftValidation.success) throw new Error(adminDraftValidation.firstError ?? "广告表单校验失败")
+  const { title, linkUrl, imageUrl, textColor, backgroundColor } = adminDraftValidation.normalized
+
 
   if (input.action === "approve") {
     const startsAt = new Date()

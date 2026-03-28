@@ -1,7 +1,9 @@
 import { prisma } from "@/db/client"
 import { apiError, readOptionalStringField, type JsonObject } from "@/lib/api-route"
+import { extractSummaryFromContent } from "@/lib/content"
 import { enforceSensitiveText } from "@/lib/content-safety"
-import { buildPostContentDocument, serializePostContentDocument } from "@/lib/post-content"
+import { createPostMentionNotifications } from "@/lib/post-mentions"
+import { buildPostContentDocument, getAllPostContentText, serializePostContentDocument } from "@/lib/post-content"
 import { syncPostTaxonomy } from "@/lib/post-editor"
 import { parseNonNegativeSafeInteger, parsePositiveSafeInteger } from "@/lib/shared/safe-integer"
 
@@ -78,7 +80,6 @@ export async function updatePostFlow(input: {
   }
 
   if (!isAppendRequest && canEditOriginal) {
-
     if (!title || !content) {
       apiError(400, "标题和正文不能为空")
     }
@@ -95,16 +96,37 @@ export async function updatePostFlow(input: {
       purchaseUnlockContent: purchaseUnlockSafety?.sanitizedText ?? "",
       purchasePrice: purchaseUnlockContent ? purchasePrice : undefined,
     }))
+    const summary = extractSummaryFromContent(getAllPostContentText(serializedContent))
+    const shouldReview = Boolean(
+      titleSafety.shouldReview
+      || contentSafety.shouldReview
+      || replyUnlockSafety?.shouldReview
+      || purchaseUnlockSafety?.shouldReview,
+    )
 
-    await prisma.post.update({
-      where: { id: postId },
-      data: {
-        title: titleSafety.sanitizedText,
-        content: serializedContent,
-        commentsVisibleToAuthorOnly,
-        minViewLevel,
-        reviewNote: titleSafety.shouldReview || contentSafety.shouldReview ? "编辑内容命中敏感词规则，请复核" : undefined,
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.post.update({
+        where: { id: postId },
+        data: {
+          title: titleSafety.sanitizedText,
+          content: serializedContent,
+          summary,
+          commentsVisibleToAuthorOnly,
+          minViewLevel,
+          reviewNote: titleSafety.shouldReview || contentSafety.shouldReview ? "编辑内容命中敏感词规则，请复核" : undefined,
+        },
+      })
+
+      if (!shouldReview) {
+        await createPostMentionNotifications({
+          tx,
+          postId,
+          senderId: input.currentUser.id,
+          senderName: input.currentUser.id === post.authorId ? "楼主" : "管理员",
+          rawPostContent: serializedContent,
+          excludeUserIds: [post.authorId],
+        })
+      }
     })
 
     await syncPostTaxonomy(postId, titleSafety.sanitizedText, serializedContent)
@@ -112,7 +134,7 @@ export async function updatePostFlow(input: {
     return {
       post,
       mode: "edit" as const,
-      shouldReview: titleSafety.shouldReview || contentSafety.shouldReview,
+      shouldReview,
     }
   }
 
@@ -130,19 +152,32 @@ export async function updatePostFlow(input: {
   const appendSafety = await enforceSensitiveText({ scene: "post.content", text: appendedContent })
   const nextSortOrder = (post.appendices[0]?.sortOrder ?? -1) + 1
 
-  await prisma.post.update({
-    where: { id: postId },
-    data: {
-      appendedContent: appendSafety.sanitizedText,
-      lastAppendedAt: new Date(),
-      reviewNote: appendSafety.shouldReview ? "追加内容命中敏感词审核规则，请复核" : undefined,
-      appendices: {
-        create: {
-          content: appendSafety.sanitizedText,
-          sortOrder: nextSortOrder,
+  await prisma.$transaction(async (tx) => {
+    await tx.post.update({
+      where: { id: postId },
+      data: {
+        appendedContent: appendSafety.sanitizedText,
+        lastAppendedAt: new Date(),
+        reviewNote: appendSafety.shouldReview ? "追加内容命中敏感词审核规则，请复核" : undefined,
+        appendices: {
+          create: {
+            content: appendSafety.sanitizedText,
+            sortOrder: nextSortOrder,
+          },
         },
       },
-    },
+    })
+
+    if (!appendSafety.shouldReview) {
+      await createPostMentionNotifications({
+        tx,
+        postId,
+        senderId: input.currentUser.id,
+        senderName: input.currentUser.id === post.authorId ? "楼主" : "管理员",
+        rawPostContent: appendSafety.sanitizedText,
+        excludeUserIds: [post.authorId],
+      })
+    }
   })
 
   return {
