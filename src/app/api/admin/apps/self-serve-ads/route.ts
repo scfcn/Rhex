@@ -1,6 +1,9 @@
 import { revalidatePath } from "next/cache"
 
 import { apiSuccess, createAdminRouteHandler, readJsonBody } from "@/lib/api-route"
+
+export const dynamic = "force-dynamic"
+
 import { updateSelfServeAdsAppConfig } from "@/lib/app-config"
 import { getSelfServeAdsAdminData, reviewSelfServeAdOrder } from "@/lib/self-serve-ads"
 

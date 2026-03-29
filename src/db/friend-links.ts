@@ -47,7 +47,15 @@ export async function findFriendLinkById(id: string) {
   })
 }
 
+export async function findFriendLinkByUrl(url: string) {
+  return prisma.friendLink.findFirst({
+    where: { url: { equals: url, mode: "insensitive" } },
+    select: friendLinkListSelect,
+  })
+}
+
 export async function createFriendLink(data: Prisma.FriendLinkCreateInput) {
+
   return prisma.friendLink.create({
     data,
     select: friendLinkListSelect,

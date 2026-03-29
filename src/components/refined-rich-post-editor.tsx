@@ -5,12 +5,22 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 
 import { createPortal } from "react-dom"
 
-import { Bold, Heading2, Highlighter, ImageIcon, Maximize2, Minimize2, Quote, Smile, Video } from "lucide-react"
+import { AlignCenter, AlignLeft, AlignRight, Bold, Code2, Highlighter, ImageIcon, Link2, List, ListOrdered, ListTodo, Maximize2, Minimize2, Quote, SeparatorHorizontal, Smile, Strikethrough, Table2, Video } from "lucide-react"
+
+
 
 import { EmojiPicker } from "@/components/emoji-picker"
 import { MarkdownContent } from "@/components/markdown-content"
 import { useMarkdownEmojiMap } from "@/components/site-settings-provider"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select"
 import type { MarkdownEmojiItem } from "@/lib/markdown-emoji"
+import { cn } from "@/lib/utils"
+
 
 
 
@@ -37,6 +47,8 @@ type FloatingPanelPosition = {
   maxHeight: number
 }
 
+const EDITOR_LINE_HEIGHT_REM = 1.75
+const EDITOR_LINE_NUMBER_GUTTER_WIDTH_CLASS = "w-7"
 
 const VIDEO_EXTENSIONS = [".mp4", ".webm", ".ogg", ".mov", ".m3u8"]
 
@@ -60,8 +72,54 @@ function getBlockInsertPrefix(source: string, position: number) {
   return "\n\n"
 }
 
+function isBlankSelection(value: string) {
+  return value.trim().length === 0
+}
+
+function buildLinkMarkdown(linkText: string, url: string) {
+  const normalizedText = linkText.trim() || "链接文字"
+  const normalizedUrl = url.trim() || "https://example.com"
+  return `[${normalizedText}](${normalizedUrl})`
+}
+
+function buildInlineCodeMarkdown(selectedText: string) {
+  return isBlankSelection(selectedText) ? "`代码`" : `\`${selectedText}\``
+}
+
+function buildInlineHighlightMarkdown(selectedText: string) {
+  return isBlankSelection(selectedText) ? "==高亮内容==" : `==${selectedText}==`
+}
+
+function buildCodeBlockMarkdown(selectedText: string) {
+  const normalized = selectedText.trimEnd()
+  const body = normalized || "// 在这里输入代码"
+  return `\`\`\`ts\n${body}\n\`\`\``
+}
+
+function buildSizedTableMarkdown(rows: number, columns: number) {
+  const safeRows = Math.max(1, rows)
+  const safeColumns = Math.max(1, columns)
+  const header = Array.from({ length: safeColumns }, (_, index) => `列 ${index + 1}`)
+  const separator = Array.from({ length: safeColumns }, () => "---")
+  const body = Array.from({ length: safeRows }, (_, rowIndex) => (
+    Array.from({ length: safeColumns }, (_, columnIndex) => `内容 ${rowIndex + 1}-${columnIndex + 1}`)
+  ))
+
+  return [header, separator, ...body].map((row) => `| ${row.join(" | ")} |`).join("\n")
+}
+
+function buildAlignmentHtml(alignment: "left" | "center" | "right", selectedText: string) {
+  const body = selectedText.trim() || "输入内容"
+  if (alignment === "center") {
+    return `<center>${body}</center>`
+  }
+
+  return `<p align="${alignment}">${body}</p>`
+}
+
 
 function normalizeMediaUrl(input: string) {
+
   const value = input.trim()
   if (!value) {
     return null
@@ -120,13 +178,202 @@ function ToolButton({ title, onClick, children, disabled = false, active = false
       onMouseDown={onMouseDown}
       onClick={onClick}
       disabled={disabled}
-
-      className={active ? "rounded-lg bg-accent p-2 text-foreground transition-colors disabled:cursor-not-allowed disabled:opacity-50" : "rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"}
+      className={active ? "shrink-0 rounded-lg bg-accent p-2 text-foreground transition-colors disabled:cursor-not-allowed disabled:opacity-50" : "shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"}
     >
       {children}
     </button>
   )
 }
+
+function ToolbarSelectTrigger({ ariaLabel, children }: { ariaLabel: string; children: React.ReactNode }) {
+  return (
+    <SelectTrigger
+      aria-label={ariaLabel}
+      className="h-9 w-9 shrink-0 justify-center gap-0.5 rounded-xl border-0 bg-transparent px-0 text-sm font-semibold text-muted-foreground shadow-none hover:bg-accent hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:flex [&>span]:w-auto [&>span]:items-center [&>span]:justify-center [&>span]:text-center [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:opacity-55"
+    >
+      {children}
+    </SelectTrigger>
+  )
+}
+
+function HeadingSelect({ disabled, onOpenChange, onSelect, onMouseDown }: { disabled?: boolean; onOpenChange?: (open: boolean) => void; onSelect: (level: 1 | 2 | 3) => void; onMouseDown?: () => void }) {
+  const [value, setValue] = useState("")
+
+  return (
+    <Select
+      value={value}
+      onOpenChange={(open) => {
+        if (open) {
+          onMouseDown?.()
+        }
+        onOpenChange?.(open)
+      }}
+      onValueChange={(nextValue) => {
+        setValue(nextValue)
+        const level = Number(nextValue)
+        if (level === 1 || level === 2 || level === 3) {
+          onSelect(level)
+        }
+        requestAnimationFrame(() => {
+          setValue("")
+        })
+      }}
+      disabled={disabled}
+    >
+      <ToolbarSelectTrigger ariaLabel="标题层级">
+        <svg className="h-4 w-4 shrink-0" viewBox="0 0 1047 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1574" width="200" height="200"><path d="M472.296727 930.909091v-372.363636H116.363636v372.363636h-93.090909V93.090909h93.090909v372.363636h355.886546V93.090909h93.090909v837.818182z" p-id="1575"></path><path d="M874.170182 930.955636v-0.418909h-120.413091v-69.818182h120.413091v-364.171636a283.927273 283.927273 0 0 1-120.413091 67.072V483.141818a301.335273 301.335273 0 0 0 74.146909-31.278545 304.500364 304.500364 0 0 0 66.187636-52.922182h60.183273v461.730909h93.090909v69.818182h-93.090909V930.909091z" p-id="1576"></path></svg>
+      </ToolbarSelectTrigger>
+      <SelectContent className="bg-background/100">
+        <SelectItem value="1" className="flex items-center gap-2 pl-3 [&>span:last-child]:inline-flex [&>span:last-child]:items-center [&>span:last-child]:gap-2">
+          <svg className="h-4 w-4 shrink-0" viewBox="0 0 1047 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1574" width="200" height="200"><path d="M472.296727 930.909091v-372.363636H116.363636v372.363636h-93.090909V93.090909h93.090909v372.363636h355.886546V93.090909h93.090909v837.818182z" p-id="1575"></path><path d="M874.170182 930.955636v-0.418909h-120.413091v-69.818182h120.413091v-364.171636a283.927273 283.927273 0 0 1-120.413091 67.072V483.141818a301.335273 301.335273 0 0 0 74.146909-31.278545 304.500364 304.500364 0 0 0 66.187636-52.922182h60.183273v461.730909h93.090909v69.818182h-93.090909V930.909091z" p-id="1576"></path></svg>
+          一级标题
+        </SelectItem>
+        <SelectItem value="2" className="flex items-center gap-2 pl-3 [&>span:last-child]:inline-flex [&>span:last-child]:items-center [&>span:last-child]:gap-2">
+          <svg className="h-4 w-4 shrink-0" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1574" width="200" height="200"><path d="M662.667636 930.909091a203.776 203.776 0 0 1 52.130909-139.310546 667.787636 667.787636 0 0 1 118.225455-96.954181 547.467636 547.467636 0 0 0 74.891636-61.021091 130.653091 130.653091 0 0 0 35.979637-87.179637 86.946909 86.946909 0 0 0-24.250182-67.025454 102.4 102.4 0 0 0-71.214546-22.341818 86.853818 86.853818 0 0 0-74.938181 34.257454 163.607273 163.607273 0 0 0-27.927273 97.745455h-80.058182a206.196364 206.196364 0 0 1 50.688-143.034182 170.402909 170.402909 0 0 1 134.981818-57.344 176.267636 176.267636 0 0 1 124.136728 43.938909 150.807273 150.807273 0 0 1 47.662545 114.734545 185.530182 185.530182 0 0 1-51.2 125.952 740.864 740.864 0 0 1-108.683636 85.690182 258.513455 258.513455 0 0 0-101.329455 100.538182H1024V930.909091z m-216.482909 0v-372.363636H93.090909v372.363636H0V93.090909h93.090909v372.363636h353.047273V93.090909h93.090909v837.818182z" p-id="1575"></path></svg>
+          二级标题
+        </SelectItem>
+        <SelectItem value="3" className="flex items-center gap-2 pl-3 [&>span:last-child]:inline-flex [&>span:last-child]:items-center [&>span:last-child]:gap-2">
+          <svg className="h-4 w-4 shrink-0" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1724" width="200" height="200"><path d="M707.490909 894.417455a188.509091 188.509091 0 0 1-61.719273-136.331637h80.802909a110.033455 110.033455 0 0 0 34.490182 82.711273 105.006545 105.006545 0 0 0 74.845091 26.810182 114.641455 114.641455 0 0 0 81.547637-29.789091 90.670545 90.670545 0 0 0 27.22909-66.327273 82.199273 82.199273 0 0 0-28.672-69.259636 119.202909 119.202909 0 0 0-78.568727-22.434909h-38.167273v-61.067637h37.515637a107.799273 107.799273 0 0 0 72.657454-21.643636 78.382545 78.382545 0 0 0 24.994909-61.812364 80.709818 80.709818 0 0 0-22.807272-61.067636 102.4 102.4 0 0 0-71.261091-21.643636 104.866909 104.866909 0 0 0-74.146909 24.66909 110.312727 110.312727 0 0 0-31.604364 73.681455h-78.568727a174.638545 174.638545 0 0 1 58.042182-123.671273 177.524364 177.524364 0 0 1 125.672727-43.938909 194.699636 194.699636 0 0 1 127.022545 38.772364 133.352727 133.352727 0 0 1 47.010909 107.054545 115.246545 115.246545 0 0 1-86.667636 117.015273 146.338909 146.338909 0 0 1 70.516364 43.892364 113.943273 113.943273 0 0 1 26.391272 77.544727 158.999273 158.999273 0 0 1-49.943272 120.645818 200.471273 200.471273 0 0 1-137.309091 47.662546 193.117091 193.117091 0 0 1-129.303273-41.472z m-261.306182 41.890909v-382.976H93.090909v372.363636H0v-837.818182h93.090909v372.363637h353.093818V98.304h93.090909v837.818182z" p-id="1725"></path></svg>
+          三级标题
+        </SelectItem>
+      </SelectContent>
+    </Select>
+  )
+}
+
+function AlignmentSelect({ disabled, onOpenChange, onSelect, onMouseDown }: { disabled?: boolean; onOpenChange?: (open: boolean) => void; onSelect: (alignment: "left" | "center" | "right") => void; onMouseDown?: () => void }) {
+  const [value, setValue] = useState("")
+
+  return (
+    <Select
+      value={value}
+      onOpenChange={(open) => {
+        if (open) {
+          onMouseDown?.()
+        }
+        onOpenChange?.(open)
+      }}
+      onValueChange={(nextValue) => {
+        setValue(nextValue)
+        if (nextValue === "left" || nextValue === "center" || nextValue === "right") {
+          onSelect(nextValue)
+        }
+        requestAnimationFrame(() => {
+          setValue("")
+        })
+      }}
+      disabled={disabled}
+    >
+      <ToolbarSelectTrigger ariaLabel="内容对齐">
+        <AlignLeft className="h-4 w-4 shrink-0" />
+      </ToolbarSelectTrigger>
+      <SelectContent className="bg-background/100">
+        <SelectItem value="left" className="flex items-center gap-2 pl-3 [&>span:last-child]:inline-flex [&>span:last-child]:items-center [&>span:last-child]:gap-2">
+          <AlignLeft className="h-4 w-4 shrink-0" />
+          左对齐
+        </SelectItem>
+        <SelectItem value="center" className="flex items-center gap-2 pl-3 [&>span:last-child]:inline-flex [&>span:last-child]:items-center [&>span:last-child]:gap-2">
+          <AlignCenter className="h-4 w-4 shrink-0" />
+          居中
+        </SelectItem>
+        <SelectItem value="right" className="flex items-center gap-2 pl-3 [&>span:last-child]:inline-flex [&>span:last-child]:items-center [&>span:last-child]:gap-2">
+          <AlignRight className="h-4 w-4 shrink-0" />
+          右对齐
+        </SelectItem>
+      </SelectContent>
+    </Select>
+  )
+}
+
+function ListSelect({ disabled, onOpenChange, onSelect, onMouseDown }: { disabled?: boolean; onOpenChange?: (open: boolean) => void; onSelect: (value: "unordered" | "unordered-star" | "ordered" | "task") => void; onMouseDown?: () => void }) {
+  const [value, setValue] = useState("")
+
+  return (
+    <Select
+      value={value}
+      onOpenChange={(open) => {
+        if (open) {
+          onMouseDown?.()
+        }
+        onOpenChange?.(open)
+      }}
+      onValueChange={(nextValue) => {
+        setValue(nextValue)
+        if (nextValue === "unordered" || nextValue === "unordered-star" || nextValue === "ordered" || nextValue === "task") {
+          onSelect(nextValue)
+        }
+        requestAnimationFrame(() => {
+          setValue("")
+        })
+      }}
+      disabled={disabled}
+    >
+      <ToolbarSelectTrigger ariaLabel="列表格式">
+        <List className="h-4 w-4 shrink-0" />
+      </ToolbarSelectTrigger>
+      <SelectContent className="bg-background/100">
+        <SelectItem value="unordered" className="flex items-center gap-2 pl-3 [&>span:last-child]:inline-flex [&>span:last-child]:items-center [&>span:last-child]:gap-2">
+          <List className="h-4 w-4 shrink-0" />
+          无序列表
+        </SelectItem>
+        <SelectItem value="unordered-star" className="flex items-center gap-2 pl-3 [&>span:last-child]:inline-flex [&>span:last-child]:items-center [&>span:last-child]:gap-2">
+          <List className="h-4 w-4 shrink-0" />
+          星号列表
+        </SelectItem>
+        <SelectItem value="ordered" className="flex items-center gap-2 pl-3 [&>span:last-child]:inline-flex [&>span:last-child]:items-center [&>span:last-child]:gap-2">
+          <ListOrdered className="h-4 w-4 shrink-0" />
+          有序列表
+        </SelectItem>
+        <SelectItem value="task" className="flex items-center gap-2 pl-3 [&>span:last-child]:inline-flex [&>span:last-child]:items-center [&>span:last-child]:gap-2">
+          <ListTodo className="h-4 w-4 shrink-0" />
+          待办列表
+        </SelectItem>
+      </SelectContent>
+    </Select>
+  )
+}
+
+function CodeFormatSelect({ disabled, onOpenChange, onSelect, onMouseDown }: { disabled?: boolean; onOpenChange?: (open: boolean) => void; onSelect: (value: "inline-code" | "code-block") => void; onMouseDown?: () => void }) {
+  const [value, setValue] = useState("")
+
+  return (
+    <Select
+      value={value}
+      onOpenChange={(open) => {
+        if (open) {
+          onMouseDown?.()
+        }
+        onOpenChange?.(open)
+      }}
+      onValueChange={(nextValue) => {
+        setValue(nextValue)
+        if (nextValue === "inline-code" || nextValue === "code-block") {
+          onSelect(nextValue)
+        }
+        requestAnimationFrame(() => {
+          setValue("")
+        })
+      }}
+      disabled={disabled}
+    >
+      <ToolbarSelectTrigger ariaLabel="行内代码与代码块">
+        <Code2 className="h-4 w-4 shrink-0" />
+      </ToolbarSelectTrigger>
+      <SelectContent className="bg-background/100">
+        <SelectItem value="inline-code" className="flex items-center gap-2 pl-3 [&>span:last-child]:inline-flex [&>span:last-child]:items-center [&>span:last-child]:gap-2">
+          <Code2 className="h-4 w-4 shrink-0" />
+          行内代码
+        </SelectItem>
+        <SelectItem value="code-block" className="flex items-center gap-2 pl-3 [&>span:last-child]:inline-flex [&>span:last-child]:items-center [&>span:last-child]:gap-2">
+          <Code2 className="h-4 w-4 shrink-0" />
+          代码块
+        </SelectItem>
+      </SelectContent>
+    </Select>
+  )
+}
+
+
 
 export function RefinedRichPostEditor({
   value,
@@ -142,8 +389,12 @@ export function RefinedRichPostEditor({
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const mediaPanelRef = useRef<HTMLDivElement | null>(null)
   const emojiPanelRef = useRef<HTMLDivElement | null>(null)
+  const tablePanelRef = useRef<HTMLDivElement | null>(null)
+  const linkPanelRef = useRef<HTMLDivElement | null>(null)
   const mediaButtonRef = useRef<HTMLDivElement | null>(null)
   const emojiButtonRef = useRef<HTMLDivElement | null>(null)
+  const tableButtonRef = useRef<HTMLDivElement | null>(null)
+  const linkButtonRef = useRef<HTMLDivElement | null>(null)
   const selectionRef = useRef({ start: 0, end: 0 })
 
   const [activeTab, setActiveTab] = useState<"write" | "preview">("write")
@@ -152,21 +403,51 @@ export function RefinedRichPostEditor({
   const [message, setMessage] = useState("")
   const [showEmojiPanel, setShowEmojiPanel] = useState(false)
   const [showMediaPanel, setShowMediaPanel] = useState(false)
+  const [showTablePanel, setShowTablePanel] = useState(false)
+  const [showLinkPanel, setShowLinkPanel] = useState(false)
   const [mediaUrl, setMediaUrl] = useState("")
+  const [linkText, setLinkText] = useState("")
+  const [linkUrl, setLinkUrl] = useState("")
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [mediaPanelPosition, setMediaPanelPosition] = useState<FloatingPanelPosition | null>(null)
   const [emojiPanelPosition, setEmojiPanelPosition] = useState<FloatingPanelPosition | null>(null)
+  const [tablePanelPosition, setTablePanelPosition] = useState<FloatingPanelPosition | null>(null)
+  const [linkPanelPosition, setLinkPanelPosition] = useState<FloatingPanelPosition | null>(null)
   const [isClient, setIsClient] = useState(false)
   const [isMediaPanelReady, setIsMediaPanelReady] = useState(false)
   const [isEmojiPanelReady, setIsEmojiPanelReady] = useState(false)
+  const [isTablePanelReady, setIsTablePanelReady] = useState(false)
+  const [isLinkPanelReady, setIsLinkPanelReady] = useState(false)
+  const [editorScrollTop, setEditorScrollTop] = useState(0)
+  const [activeLineNumber, setActiveLineNumber] = useState(1)
+  const [tableHoverSize, setTableHoverSize] = useState({ rows: 0, columns: 0 })
   const markdownEmojiMap = useMarkdownEmojiMap(externalMarkdownEmojiMap)
 
 
   const contentMinHeight = isFullscreen ? "calc(100vh - 220px)" : minHeight
+  const lineCount = useMemo(() => {
 
+    if (!value) {
+      return 1
+    }
+
+    return value.split("\n").length
+  }, [value])
+  const lineNumbers = useMemo(() => Array.from({ length: lineCount }, (_, index) => index + 1), [lineCount])
+
+
+  useEffect(() => {
+    const element = textareaRef.current
+    if (!element) {
+      setActiveLineNumber(1)
+      return
+    }
+
+    const caretPosition = element.selectionStart ?? 0
+    setActiveLineNumber(value.slice(0, caretPosition).split("\n").length)
+  }, [value])
 
   const mediaHint = useMemo(() => {
-
     if (!mediaUrl.trim()) {
       return "粘贴视频或音频地址，将插入可解析媒体标记。"
     }
@@ -174,6 +455,22 @@ export function RefinedRichPostEditor({
     const parsed = inferMediaInsert(mediaUrl)
     return parsed?.message ?? "请输入有效的媒体地址"
   }, [mediaUrl])
+
+  const linkHint = useMemo(() => {
+    if (!linkUrl.trim()) {
+      return ""
+    }
+
+    return /^https?:\/\//i.test(linkUrl.trim()) ? "" : "建议输入完整链接，例如 https://example.com"
+  }, [linkUrl])
+
+  const tableHint = useMemo(() => {
+    if (!tableHoverSize.rows || !tableHoverSize.columns) {
+      return "移动鼠标选择要插入的表格尺寸"
+    }
+
+    return `${tableHoverSize.rows} 行 × ${tableHoverSize.columns} 列`
+  }, [tableHoverSize.columns, tableHoverSize.rows])
 
   useEffect(() => {
     setIsClient(true)
@@ -256,10 +553,28 @@ export function RefinedRichPostEditor({
       setEmojiPanelPosition(null)
       setIsEmojiPanelReady(false)
     }
-  }, [showEmojiPanel, showMediaPanel, updateFloatingPanelPosition])
+
+    if (showTablePanel) {
+      const nextTablePosition = updateFloatingPanelPosition(tableButtonRef.current, tablePanelRef.current, 292)
+      setTablePanelPosition(nextTablePosition)
+      setIsTablePanelReady(Boolean(nextTablePosition && tablePanelRef.current?.offsetHeight))
+    } else {
+      setTablePanelPosition(null)
+      setIsTablePanelReady(false)
+    }
+
+    if (showLinkPanel) {
+      const nextLinkPosition = updateFloatingPanelPosition(linkButtonRef.current, linkPanelRef.current, 320)
+      setLinkPanelPosition(nextLinkPosition)
+      setIsLinkPanelReady(Boolean(nextLinkPosition && linkPanelRef.current?.offsetHeight))
+    } else {
+      setLinkPanelPosition(null)
+      setIsLinkPanelReady(false)
+    }
+  }, [showEmojiPanel, showLinkPanel, showMediaPanel, showTablePanel, updateFloatingPanelPosition])
 
   useLayoutEffect(() => {
-    if (!showMediaPanel && !showEmojiPanel) {
+    if (!showMediaPanel && !showEmojiPanel && !showTablePanel && !showLinkPanel) {
       return
     }
 
@@ -272,12 +587,12 @@ export function RefinedRichPostEditor({
     return () => {
       window.cancelAnimationFrame(frameId)
     }
-  }, [showEmojiPanel, showMediaPanel, syncFloatingPanels])
+  }, [showEmojiPanel, showLinkPanel, showMediaPanel, showTablePanel, syncFloatingPanels])
 
 
 
   useEffect(() => {
-    if (!showMediaPanel && !showEmojiPanel) {
+    if (!showMediaPanel && !showEmojiPanel && !showTablePanel && !showLinkPanel) {
       return
     }
 
@@ -298,6 +613,23 @@ export function RefinedRichPostEditor({
           setShowEmojiPanel(false)
         }
       }
+
+      if (showTablePanel) {
+        const clickedTableButton = tableButtonRef.current?.contains(target)
+        const clickedTablePanel = tablePanelRef.current?.contains(target)
+        if (!clickedTableButton && !clickedTablePanel) {
+          setShowTablePanel(false)
+          setTableHoverSize({ rows: 0, columns: 0 })
+        }
+      }
+
+      if (showLinkPanel) {
+        const clickedLinkButton = linkButtonRef.current?.contains(target)
+        const clickedLinkPanel = linkPanelRef.current?.contains(target)
+        if (!clickedLinkButton && !clickedLinkPanel) {
+          setShowLinkPanel(false)
+        }
+      }
     }
 
     function handleViewportChange() {
@@ -312,7 +644,7 @@ export function RefinedRichPostEditor({
       window.removeEventListener("scroll", handleViewportChange, true)
       document.removeEventListener("mousedown", handlePointerDown)
     }
-  }, [showEmojiPanel, showMediaPanel, syncFloatingPanels])
+  }, [showEmojiPanel, showLinkPanel, showMediaPanel, showTablePanel, syncFloatingPanels])
 
 
   const syncSelection = useCallback(() => {
@@ -351,15 +683,81 @@ export function RefinedRichPostEditor({
     event.preventDefault()
   }, [disabled, syncSelection])
 
+  const handleToolbarSelectMouseDown = useCallback(() => {
+    if (disabled) {
+      return
+    }
+
+    syncSelection()
+  }, [disabled, syncSelection])
+
+  const handleToolbarSelectOpenChange = useCallback((open: boolean) => {
+    if (!open) {
+      return
+    }
+
+    handleToolbarSelectMouseDown()
+  }, [handleToolbarSelectMouseDown])
+
+
+
   const toggleMediaPanel = useCallback(() => {
     setShowEmojiPanel(false)
+    setShowTablePanel(false)
+    setShowLinkPanel(false)
     setShowMediaPanel((current) => !current)
   }, [])
 
   const toggleEmojiPanel = useCallback(() => {
     setShowMediaPanel(false)
+    setShowTablePanel(false)
+    setShowLinkPanel(false)
     setShowEmojiPanel((current) => !current)
   }, [])
+
+  const toggleTablePanel = useCallback(() => {
+    setShowMediaPanel(false)
+    setShowEmojiPanel(false)
+    setShowLinkPanel(false)
+    setTableHoverSize({ rows: 0, columns: 0 })
+    setShowTablePanel((current) => !current)
+  }, [])
+
+  const toggleLinkPanel = useCallback(() => {
+    setShowMediaPanel(false)
+    setShowEmojiPanel(false)
+    setShowTablePanel(false)
+    setShowLinkPanel((current) => {
+      const nextOpen = !current
+      if (nextOpen) {
+        const { start, end } = selectionRef.current
+        const selectedText = value.slice(start, end).trim()
+        setLinkText(selectedText && !/^https?:\/\//i.test(selectedText) ? selectedText : "")
+        setLinkUrl(/^https?:\/\//i.test(selectedText) ? selectedText : "")
+      }
+      return nextOpen
+    })
+  }, [value])
+
+  const updateActiveLineNumber = useCallback((element: HTMLTextAreaElement | null) => {
+    if (!element) {
+      setActiveLineNumber(1)
+      return
+    }
+
+    const caretPosition = element.selectionStart ?? 0
+    const nextLineNumber = value.slice(0, caretPosition).split("\n").length
+    setActiveLineNumber(nextLineNumber)
+  }, [value])
+
+  const handleTextareaScroll = useCallback((event: React.UIEvent<HTMLTextAreaElement>) => {
+    setEditorScrollTop(event.currentTarget.scrollTop)
+    updateActiveLineNumber(event.currentTarget)
+  }, [updateActiveLineNumber])
+
+  const handleTextareaSelect = useCallback((event: React.SyntheticEvent<HTMLTextAreaElement>) => {
+    updateActiveLineNumber(event.currentTarget)
+  }, [updateActiveLineNumber])
 
 
   function applyWrap(before: string, after = "") {
@@ -376,7 +774,26 @@ export function RefinedRichPostEditor({
     restoreSelection(start + before.length, end + before.length)
   }
 
+  function insertSelection(transform: (selectedText: string) => string) {
+    const element = textareaRef.current
+    if (!element) {
+      const nextContent = transform("")
+      const prefix = getBlockInsertPrefix(value, value.length)
+      onChange(`${value}${prefix}${nextContent}`)
+      return
+    }
+
+    const { start, end } = syncSelection()
+    const selectedText = value.slice(start, end)
+    const nextText = transform(selectedText)
+    const nextValue = `${value.slice(0, start)}${nextText}${value.slice(end)}`
+    onChange(nextValue)
+    restoreSelection(start, start + nextText.length)
+  }
+
+
   function insertLinePrefix(prefix: string) {
+
     const element = textareaRef.current
     if (!element) {
       const nextValue = value ? `${value}\n${prefix}` : prefix
@@ -393,6 +810,48 @@ export function RefinedRichPostEditor({
 
     onChange(nextValue)
     restoreSelection(lineStart, lineStart + nextBlock.length)
+  }
+
+  function insertOrderedList() {
+    const element = textareaRef.current
+    if (!element) {
+      const nextValue = value ? `${value}\n1. ` : "1. "
+      onChange(nextValue)
+      return
+    }
+
+    const { start, end } = syncSelection()
+    const lineStart = value.lastIndexOf("\n", Math.max(0, start - 1)) + 1
+    const selectedText = value.slice(lineStart, end)
+    const lines = selectedText.split("\n")
+    const nextBlock = lines.map((line, index) => `${index + 1}. ${line}`).join("\n")
+    const nextValue = `${value.slice(0, lineStart)}${nextBlock}${value.slice(end)}`
+
+    onChange(nextValue)
+    restoreSelection(lineStart, lineStart + nextBlock.length)
+  }
+
+  function applyListFormat(listType: "unordered" | "unordered-star" | "ordered" | "task") {
+    if (listType === "ordered") {
+      insertOrderedList()
+      return
+    }
+
+    if (listType === "task") {
+      insertLinePrefix("- [ ] ")
+      return
+    }
+
+    insertLinePrefix(listType === "unordered-star" ? "* " : "- ")
+  }
+
+  function applyCodeFormat(codeType: "inline-code" | "code-block") {
+    if (codeType === "code-block") {
+      insertSelection(buildCodeBlockMarkdown)
+      return
+    }
+
+    insertSelection(buildInlineCodeMarkdown)
   }
 
   function insertTemplate(template: string) {
@@ -425,6 +884,25 @@ export function RefinedRichPostEditor({
     setMessage(result.message)
     setMediaUrl("")
     setShowMediaPanel(false)
+  }
+
+  function handleInsertLink() {
+    if (!linkUrl.trim()) {
+      setMessage("请输入有效的链接地址")
+      return
+    }
+
+    const nextLinkMarkdown = buildLinkMarkdown(linkText, linkUrl)
+    insertSelection(() => nextLinkMarkdown)
+    setLinkText("")
+    setLinkUrl("")
+    setShowLinkPanel(false)
+  }
+
+  function handleInsertTable(rows: number, columns: number) {
+    insertTemplate(buildSizedTableMarkdown(rows, columns))
+    setShowTablePanel(false)
+    setTableHoverSize({ rows: 0, columns: 0 })
   }
 
   async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -497,97 +975,178 @@ export function RefinedRichPostEditor({
             </div>
           ) : null}
           <div className="border-b border-border px-5 pt-4">
-            <div className="flex gap-4">
-              <button
-                type="button"
-                onClick={() => setActiveTab("write")}
-                className={activeTab === "write" ? "border-b-2 border-foreground pb-2 text-sm font-medium text-foreground transition-colors" : "pb-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"}
-              >
-                正文
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("preview")}
-                className={activeTab === "preview" ? "border-b-2 border-foreground pb-2 text-sm font-medium text-foreground transition-colors" : "pb-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"}
-              >
-                预览
-              </button>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("write")}
+                  className={activeTab === "write" ? "border-b-2 border-foreground pb-2 text-sm font-medium text-foreground transition-colors" : "pb-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"}
+                >
+                  正文
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("preview")}
+                  className={activeTab === "preview" ? "border-b-2 border-foreground pb-2 text-sm font-medium text-foreground transition-colors" : "pb-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"}
+                >
+                  预览
+                </button>
+              </div>
+
+
+              
+              <div className="flex items-center gap-3 pb-2">
+                <p className="text-xs text-muted-foreground">{value.length} 字符{uploading ? " · 上传中" : ""}</p>
+                {!disabled && !isFullscreen ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsFullscreen(true)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    aria-label="进入全屏"
+                    title="进入全屏"
+                  >
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  </button>
+                ) : null}
+              </div>
             </div>
           </div>
 
-          <div className={isFullscreen ? "flex min-h-0 flex-1 flex-col px-3 pb-4 pt-3 sm:px-5 sm:pb-8" : "px-3 pb-4 pt-3 sm:px-5"}>
+
+          <div className={activeTab === "write"
+            ? (isFullscreen ? "flex min-h-0 flex-1 flex-col pl-2 pr-3 pb-4 pt-3 sm:pl-4 sm:pr-5 sm:pb-8" : "pl-1 pr-3 pb-4 pt-3 sm:pl-1 sm:pr-5")
+            : (isFullscreen ? "flex min-h-0 flex-1 flex-col px-3 pb-4 pt-3 sm:px-5 sm:pb-8" : "px-3 pb-4 pt-3 sm:px-5")}>
+
 
             {activeTab === "write" ? (
-              <textarea
-                ref={textareaRef}
-                value={value}
-                onChange={(event) => onChange(event.target.value)}
-                disabled={disabled}
-                className="w-full resize-none overflow-y-auto rounded-xl border-0 bg-transparent px-0 py-1 font-mono text-sm leading-7 outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60"
-                placeholder={placeholder}
+              <div
+                className="flex overflow-hidden rounded-xl bg-transparent"
                 style={{ minHeight: contentMinHeight, maxHeight: contentMinHeight }}
-              />
+              >
+                <div
+                  aria-hidden="true"
+                  className={cn(
+                    "hidden flex-none select-none overflow-hidden pr-1 pt-1 text-right font-mono text-[10px] text-muted-foreground/45 sm:block",
+                    EDITOR_LINE_NUMBER_GUTTER_WIDTH_CLASS,
+                  )}
+                >
+                  <div style={{ transform: `translateY(-${editorScrollTop}px)` }}>
+                    {lineNumbers.map((lineNumber) => (
+                      <div
+                        key={lineNumber}
+                        className={lineNumber === activeLineNumber ? "leading-7 text-foreground/85" : "leading-7 text-muted-foreground/45"}
+                        style={{ height: `${EDITOR_LINE_HEIGHT_REM}rem` }}
+                      >
+                        {lineNumber}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <textarea
+                  ref={textareaRef}
+                  value={value}
+                  onChange={(event) => onChange(event.target.value)}
+                  onScroll={handleTextareaScroll}
+                  onKeyUp={handleTextareaSelect}
+                  onClick={handleTextareaSelect}
+                  onSelect={handleTextareaSelect}
+                  disabled={disabled}
+                  className="w-full resize-none overflow-y-auto rounded-none border-0 bg-transparent pl-2 pr-0 py-1 font-mono text-sm leading-7 outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                  placeholder={placeholder}
+                  style={{ minHeight: contentMinHeight, maxHeight: contentMinHeight }}
+                />
+              </div>
             ) : (
               <div className="min-w-0 overflow-y-auto" style={{ minHeight: contentMinHeight, maxHeight: contentMinHeight }}>
+
 
                 <MarkdownContent content={value} emptyText="暂无预览内容" markdownEmojiMap={markdownEmojiMap} />
 
               </div>
             )}
 
-            <div className={`relative mt-2 flex flex-col gap-3 border-t border-border ${isFullscreen ? "" : "pt-2"} sm:flex-row sm:items-center sm:justify-between`}>
-              <div className="-mx-1 flex w-full items-center gap-1 overflow-x-auto px-1 pb-1 sm:mx-0 sm:w-auto sm:px-0 sm:pb-0">
+            {activeTab === "write" ? (
+              <div className={`relative mt-2 flex flex-col gap-3 border-t border-border ${isFullscreen ? "" : "pt-2"} sm:flex-row sm:items-center sm:justify-between`}>
+                <div className="-mx-1 flex w-full items-center gap-1 overflow-x-auto px-1 pb-1 sm:mx-0 sm:w-auto sm:px-0 sm:pb-0">
+                 <HeadingSelect
+                    disabled={disabled}
+                    onMouseDown={handleToolbarSelectMouseDown}
+                    onOpenChange={handleToolbarSelectOpenChange}
+                    onSelect={(level) => insertLinePrefix(`${"#".repeat(level)} `)}
+                  />
 
-                <ToolButton title="加粗" onMouseDown={handleToolbarMouseDown} onClick={() => applyWrap("**", "**")} disabled={disabled}>
-
-                  <Bold className="h-4 w-4" />
-                </ToolButton>
-                <ToolButton title="一级标题" onClick={() => insertLinePrefix("# ")} disabled={disabled}>
-                  <span className="text-xs font-semibold leading-none">H1</span>
-                </ToolButton>
-                <ToolButton title="二级标题" onClick={() => insertLinePrefix("## ")} disabled={disabled}>
-                  <Heading2 className="h-4 w-4" />
-                </ToolButton>
-                <ToolButton title="三级标题" onClick={() => insertLinePrefix("### ")} disabled={disabled}>
-                  <span className="text-xs font-semibold leading-none">H3</span>
-                </ToolButton>
-                <ToolButton title="高亮" onClick={() => applyWrap("`", "`")} disabled={disabled}>
-                  <Highlighter className="h-4 w-4" />
-                </ToolButton>
-                <ToolButton title="引用" onMouseDown={handleToolbarMouseDown} onClick={() => insertLinePrefix("> ")} disabled={disabled}>
-
-                  <Quote className="h-4 w-4" />
-                </ToolButton>
-
-
-                <div className="relative" ref={mediaButtonRef}>
-                  <ToolButton title="插入媒体" onMouseDown={handleToolbarMouseDown} onClick={toggleMediaPanel} disabled={disabled} active={showMediaPanel}>
-                    <Video className="h-4 w-4" />
+                  <ToolButton title="加粗" onMouseDown={handleToolbarMouseDown} onClick={() => applyWrap("**", "**")} disabled={disabled}>
+                    <Bold className="h-4 w-4" />
                   </ToolButton>
+                  <ToolButton title="删除线" onMouseDown={handleToolbarMouseDown} onClick={() => applyWrap("~~", "~~")} disabled={disabled}>
+                    <Strikethrough className="h-4 w-4" />
+                  </ToolButton>
+                  <ToolButton title="高亮" onMouseDown={handleToolbarMouseDown} onClick={() => insertSelection(buildInlineHighlightMarkdown)} disabled={disabled}>
+                    <Highlighter className="h-4 w-4" />
+                  </ToolButton>
+                  <CodeFormatSelect
+                    disabled={disabled}
+                    onMouseDown={handleToolbarSelectMouseDown}
+                    onOpenChange={handleToolbarSelectOpenChange}
+                    onSelect={applyCodeFormat}
+                  />
+                  <ToolButton title="引用" onMouseDown={handleToolbarMouseDown} onClick={() => insertLinePrefix("> ")} disabled={disabled}>
+                    <Quote className="h-4 w-4" />
+                  </ToolButton>
+                  <ListSelect
+                    disabled={disabled}
+                    onMouseDown={handleToolbarSelectMouseDown}
+                    onOpenChange={handleToolbarSelectOpenChange}
+                    onSelect={applyListFormat}
+                  />
+            
+                  <div className="relative" ref={linkButtonRef}>
+                    <ToolButton title="插入链接" onMouseDown={handleToolbarMouseDown} onClick={toggleLinkPanel} disabled={disabled} active={showLinkPanel}>
+                      <Link2 className="h-4 w-4" />
+                    </ToolButton>
+                  </div>
+                  <div className="relative" ref={tableButtonRef}>
+                    <ToolButton title="插入表格" onMouseDown={handleToolbarMouseDown} onClick={toggleTablePanel} disabled={disabled} active={showTablePanel}>
+                      <Table2 className="h-4 w-4" />
+                    </ToolButton>
+                  </div>
+                  <ToolButton title="分割线" onMouseDown={handleToolbarMouseDown} onClick={() => insertTemplate("---")} disabled={disabled}>
+                    <SeparatorHorizontal className="h-4 w-4" />
+                  </ToolButton>
+                  <AlignmentSelect
+                    disabled={disabled}
+                    onMouseDown={handleToolbarSelectMouseDown}
+                    onOpenChange={handleToolbarSelectOpenChange}
+                    onSelect={(alignment) => insertSelection((selectedText) => buildAlignmentHtml(alignment, selectedText))}
+                  />
+
+                  <div className="relative" ref={mediaButtonRef}>
+
+                    <ToolButton title="插入媒体" onMouseDown={handleToolbarMouseDown} onClick={toggleMediaPanel} disabled={disabled} active={showMediaPanel}>
+                      <Video className="h-4 w-4" />
+                    </ToolButton>
+                  </div>
+
+                  <div className="relative" ref={emojiButtonRef}>
+                    <ToolButton title="表情" onMouseDown={handleToolbarMouseDown} onClick={toggleEmojiPanel} disabled={disabled} active={showEmojiPanel}>
+                      <Smile className="h-4 w-4" />
+                    </ToolButton>
+                  </div>
+
+
+                  <ToolButton title="添加图片" onMouseDown={handleToolbarMouseDown} onClick={() => fileInputRef.current?.click()} disabled={disabled || uploading}>
+
+                    <ImageIcon className="h-4 w-4" />
+                  </ToolButton>
+                  <input ref={fileInputRef} accept="image/*" multiple className="hidden" type="file" onChange={handleUpload} disabled={disabled || uploading} />
+
                 </div>
 
-                <div className="relative" ref={emojiButtonRef}>
-                  <ToolButton title="表情" onMouseDown={handleToolbarMouseDown} onClick={toggleEmojiPanel} disabled={disabled} active={showEmojiPanel}>
-                    <Smile className="h-4 w-4" />
-                  </ToolButton>
-                </div>
-
-
-                <ToolButton title="添加图片" onMouseDown={handleToolbarMouseDown} onClick={() => fileInputRef.current?.click()} disabled={disabled || uploading}>
-
-                  <ImageIcon className="h-4 w-4" />
-                </ToolButton>
-                <ToolButton title={isFullscreen ? "退出全屏" : "全屏编辑"} onMouseDown={handleToolbarMouseDown} onClick={() => setIsFullscreen((current) => !current)} disabled={disabled}>
-
-                  {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-                </ToolButton>
-
-                <input ref={fileInputRef} accept="image/*" multiple className="hidden" type="file" onChange={handleUpload} disabled={disabled || uploading} />
               </div>
-              <p className="text-xs text-muted-foreground">{value.length} 字符{uploading ? " · 上传中" : ""}</p>
-            </div>
+            ) : null}
 
             {message ? <p className="mt-2 text-xs text-muted-foreground">{message}</p> : null}
+
           </div>
         </div>
       </div>
@@ -637,6 +1196,122 @@ export function RefinedRichPostEditor({
               disabled={!mediaUrl.trim()}
             >
               插入
+            </button>
+          </div>
+        </div>,
+        document.body,
+      ) : null}
+      {isClient && showLinkPanel && linkPanelPosition && !disabled ? createPortal(
+        <div
+          ref={linkPanelRef}
+          className="fixed z-[90] overflow-y-auto rounded-2xl border border-border bg-background p-4 shadow-2xl"
+          style={{
+            left: linkPanelPosition.left,
+            top: linkPanelPosition.top,
+            width: linkPanelPosition.width,
+            maxHeight: linkPanelPosition.maxHeight,
+            opacity: isLinkPanelReady ? 1 : 0,
+            pointerEvents: isLinkPanelReady ? "auto" : "none",
+          }}
+          aria-hidden={!isLinkPanelReady}
+        >
+          <div className="mb-3 space-y-1">
+            <div className="text-sm font-medium text-foreground">插入链接</div>
+            <p className="text-xs leading-5 text-muted-foreground">填写链接文本和链接地址。</p>
+          </div>
+          <div className="space-y-3">
+            <input
+              type="text"
+              value={linkText}
+              onChange={(event) => setLinkText(event.target.value)}
+              placeholder="链接文本"
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none ring-0 transition focus:border-foreground"
+            />
+            <input
+              type="url"
+              value={linkUrl}
+              onChange={(event) => setLinkUrl(event.target.value)}
+              placeholder="https://example.com"
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none ring-0 transition focus:border-foreground"
+            />
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">{linkHint}</p>
+          <div className="mt-3 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              className="rounded-full px-3 py-1.5 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground"
+              onClick={() => {
+                setShowLinkPanel(false)
+                setLinkText("")
+                setLinkUrl("")
+              }}
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              className="rounded-full bg-foreground px-3 py-1.5 text-xs text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={handleInsertLink}
+              disabled={!linkUrl.trim()}
+            >
+              插入
+            </button>
+          </div>
+        </div>,
+        document.body,
+      ) : null}
+      {isClient && showTablePanel && tablePanelPosition && !disabled ? createPortal(
+        <div
+          ref={tablePanelRef}
+          className="fixed z-[90] overflow-y-auto rounded-2xl border border-border bg-background p-4 shadow-2xl"
+          style={{
+            left: tablePanelPosition.left,
+            top: tablePanelPosition.top,
+            width: tablePanelPosition.width,
+            maxHeight: tablePanelPosition.maxHeight,
+            opacity: isTablePanelReady ? 1 : 0,
+            pointerEvents: isTablePanelReady ? "auto" : "none",
+          }}
+          aria-hidden={!isTablePanelReady}
+        >
+          <div className="mb-3 space-y-1">
+            <div className="text-sm font-medium text-foreground">插入表格</div>
+            <p className="text-xs leading-5 text-muted-foreground">选择表格尺寸，点击即可插入对应行列的表格。</p>
+          </div>
+          <div className="grid grid-cols-8 gap-1 rounded-xl border border-border/80 bg-muted/20 p-3">
+            {Array.from({ length: 6 }, (_, rowIndex) => (
+              Array.from({ length: 8 }, (_, columnIndex) => {
+                const active = rowIndex < tableHoverSize.rows && columnIndex < tableHoverSize.columns
+                return (
+                  <button
+                    key={`${rowIndex + 1}-${columnIndex + 1}`}
+                    type="button"
+                    className={cn(
+                      "h-6 w-6 rounded-[6px] border transition-colors",
+                      active ? "border-foreground bg-foreground/80" : "border-border bg-background hover:border-foreground/40 hover:bg-accent",
+                    )}
+                      onMouseEnter={() => setTableHoverSize({ rows: rowIndex + 1, columns: columnIndex + 1 })}
+                      onMouseLeave={() => setTableHoverSize({ rows: 0, columns: 0 })}
+                      onFocus={() => setTableHoverSize({ rows: rowIndex + 1, columns: columnIndex + 1 })}
+                      onBlur={() => setTableHoverSize({ rows: 0, columns: 0 })}
+                      onClick={() => handleInsertTable(rowIndex + 1, columnIndex + 1)}
+                    aria-label={`插入 ${rowIndex + 1} 行 ${columnIndex + 1} 列表格`}
+                  />
+                )
+              })
+            ))}
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">{tableHint}</p>
+            <button
+              type="button"
+              className="rounded-full px-3 py-1.5 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground"
+              onClick={() => {
+                setShowTablePanel(false)
+                setTableHoverSize({ rows: 0, columns: 0 })
+              }}
+            >
+              取消
             </button>
           </div>
         </div>,

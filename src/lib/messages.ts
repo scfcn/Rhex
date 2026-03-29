@@ -27,8 +27,10 @@ import { UserStatus } from "@/db/types"
 
 
 
+import { apiError } from "@/lib/api-route"
 import { formatMonthDayTime } from "@/lib/formatters"
 import type {
+
 
   MessageBubbleItem,
   MessageCenterData,
@@ -407,8 +409,9 @@ async function getDatabaseConversationDetail(currentUserId: number, conversation
 
 export async function ensureConversationWithUser(currentUserId: number, targetUserId: number) {
   if (currentUserId === targetUserId) {
-    throw new Error("不能给自己发送私信")
+    apiError(400, "不能给自己发送私信")
   }
+
 
   const recipient = await findMessageRecipientById(targetUserId)
 
@@ -466,22 +469,21 @@ export async function sendDirectMessage(senderId: number, recipientId: number, b
 export async function getConversationHistory(currentUserId: number, conversationId: string, beforeMessageId: string): Promise<MessageHistoryResult> {
   const canonicalConversationId = await resolveCanonicalConversationId(currentUserId, conversationId)
   if (!canonicalConversationId) {
-    throw new Error("会话不存在或无权查看")
+    apiError(404, "会话不存在或无权查看")
   }
 
   const participant = await findConversationParticipantByUser(canonicalConversationId, currentUserId)
 
-
   if (!participant) {
-    throw new Error("会话不存在或无权查看")
+    apiError(404, "会话不存在或无权查看")
   }
 
   const anchor = await findMessageHistoryAnchor(beforeMessageId, canonicalConversationId)
 
-
   if (!anchor) {
-    throw new Error("历史消息定位失败")
+    apiError(404, "历史消息定位失败")
   }
+
 
   const history = await findConversationHistoryBatch(canonicalConversationId, anchor.createdAt, MESSAGE_HISTORY_BATCH_SIZE)
 
@@ -498,8 +500,9 @@ export async function getConversationHistory(currentUserId: number, conversation
 export async function deleteConversationForUser(conversationId: string, currentUserId: number) {
   const canonicalConversationId = await resolveCanonicalConversationId(currentUserId, conversationId)
   if (!canonicalConversationId) {
-    throw new Error("会话不存在或无权删除")
+    apiError(404, "会话不存在或无权删除")
   }
+
 
   await withDbTransaction(async (tx) => {
     await removeConversationForUser(tx, canonicalConversationId, currentUserId)

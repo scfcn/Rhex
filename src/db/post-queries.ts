@@ -3,7 +3,6 @@ import type { Prisma } from "@prisma/client"
 import { prisma } from "@/db/client"
 import { buildPostDetailInclude, pinnedPostOrderBy, postListInclude } from "@/db/queries"
 
-
 const postSeoSelect = {
   id: true,
   slug: true,
@@ -90,6 +89,15 @@ export async function findEditablePostBySlug(slug: string) {
         },
       },
       redPacket: true,
+      tags: {
+        include: {
+          tag: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
     },
   })
 }

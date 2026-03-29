@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
@@ -13,10 +13,11 @@ import {
 
 import { multiplyPositiveSafeIntegers, parsePositiveSafeInteger } from "@/lib/shared/safe-integer"
 
-
+import { ensureJiebaReady, extractAutoTags } from "@/lib/post-taxonomy"
 
 const LOTTERY_NUMERIC_CONDITION_TYPES = new Set(["REPLY_CONTENT_LENGTH", "REGISTER_DAYS", "USER_LEVEL", "VIP_LEVEL", "USER_POINTS"])
 const LOTTERY_TEXT_CONDITION_TYPES = new Set(["REPLY_KEYWORD"])
+const MAX_MANUAL_TAGS = 10
 
 function getLotteryConditionPlaceholder(type: string, pointName: string) {
   switch (type) {
@@ -89,10 +90,17 @@ function buildLotteryConditionItem(type: string, pointName: string, groupKey = "
   }
 }
 
-import { ChevronDown, Info, MessageSquareLock } from "lucide-react"
+function normalizeManualTags(tags: string[]) {
+  return tags
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((item, index, array) => array.findIndex((candidate) => candidate.toLowerCase() === item.toLowerCase()) === index)
+    .slice(0, MAX_MANUAL_TAGS)
+}
 
+import { ChevronDown, Info, MessageSquareLock, Sparkles } from "lucide-react"
 
-
+import { AdminModal } from "@/components/admin-modal"
 import { BoardSelectField } from "@/components/board-select-field"
 import { HiddenContentModal } from "@/components/hidden-content-modal"
 import { PostDraftNotice } from "@/components/post-draft-notice"
@@ -102,11 +110,7 @@ import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/toast"
 import type { MarkdownEmojiItem } from "@/lib/markdown-emoji"
 
-
 import { DEFAULT_ALLOWED_POST_TYPES, DEFAULT_POST_TYPE, type LocalPostType } from "@/lib/post-types"
-
-
-
 
 interface CreatePostFormBoardItem {
   value: string
@@ -123,17 +127,12 @@ interface CreatePostFormBoardGroup {
   items: CreatePostFormBoardItem[]
 }
 
-
-
-
 interface CreatePostFormProps {
   boardOptions: CreatePostFormBoardGroup[]
   pointName: string
   postRedPacketEnabled?: boolean
   markdownEmojiMap?: MarkdownEmojiItem[]
   currentUser: {
-
-
     username: string
     nickname: string | null
     level: number
@@ -158,6 +157,7 @@ interface CreatePostFormProps {
     purchaseUnlockContent?: string
     purchasePrice?: number | null
     minViewLevel?: number | null
+    tags?: string[]
     lotteryConfig?: {
       startsAt?: string | null
       endsAt?: string | null
@@ -173,15 +173,10 @@ interface CreatePostFormProps {
       unitPoints?: number | null
       packetCount?: number | null
     }
-
   }
 }
 
-
-
-
 type HiddenModalType = "reply" | "purchase" | "view-level" | null
-
 
 function HoverTip({ text }: { text: string }) {
   return (
@@ -226,9 +221,6 @@ function HiddenConfigChip({
 }
 
 export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled = false, markdownEmojiMap, currentUser, mode = "create", postId, initialValues }: CreatePostFormProps) {
-
-
-
   const router = useRouter()
   const [title, setTitle] = useState(initialValues?.title ?? "")
   const [content, setContent] = useState(initialValues?.content ?? "")
@@ -244,24 +236,23 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
   const [redPacketUnitPoints, setRedPacketUnitPoints] = useState(String(initialValues?.redPacketConfig?.unitPoints ?? initialValues?.redPacketConfig?.totalPoints ?? 10))
   const [redPacketTotalPoints, setRedPacketTotalPoints] = useState(String(initialValues?.redPacketConfig?.totalPoints ?? 10))
   const [redPacketPacketCount, setRedPacketPacketCount] = useState(String(initialValues?.redPacketConfig?.packetCount ?? 1))
-
-
-
   const [postType, setPostType] = useState<LocalPostType>(initialValues?.postType ?? DEFAULT_POST_TYPE)
-
   const [bountyPoints, setBountyPoints] = useState(String(initialValues?.bountyPoints ?? 100))
   const [pollOptions, setPollOptions] = useState(initialValues?.pollOptions && initialValues.pollOptions.length > 0 ? initialValues.pollOptions : ["", ""])
   const [pollExpiresAt, setPollExpiresAt] = useState(initialValues?.pollExpiresAt ?? "")
+  const [manualTags, setManualTags] = useState(() => normalizeManualTags(initialValues?.tags ?? []))
+  const [tagInput, setTagInput] = useState("")
+  const [tagModalOpen, setTagModalOpen] = useState(false)
+  const [tagEditingIndex, setTagEditingIndex] = useState<number | null>(null)
+  const [tagEditingValue, setTagEditingValue] = useState("")
   const [lotteryStartsAt, setLotteryStartsAt] = useState(initialValues?.lotteryConfig?.startsAt ?? "")
   const [lotteryEndsAt, setLotteryEndsAt] = useState(initialValues?.lotteryConfig?.endsAt ?? "")
   const [lotteryParticipantGoal, setLotteryParticipantGoal] = useState(String(initialValues?.lotteryConfig?.participantGoal ?? ""))
   const [lotteryPrizes, setLotteryPrizes] = useState(initialValues?.lotteryConfig?.prizes && initialValues.lotteryConfig.prizes.length > 0 ? initialValues.lotteryConfig.prizes.map((item) => ({ title: item.title, quantity: String(item.quantity), description: item.description })) : [{ title: "一等奖", quantity: "1", description: "填写奖品描述" }])
   const [lotteryConditions, setLotteryConditions] = useState(initialValues?.lotteryConfig?.conditions && initialValues.lotteryConfig.conditions.length > 0 ? initialValues.lotteryConfig.conditions.map((item) => ({ type: item.type, value: item.value, operator: item.operator ?? "GTE", description: item.description ?? "", groupKey: item.groupKey ?? "default" })) : [buildLotteryConditionItem("REPLY_CONTENT_LENGTH", pointName)])
-
   const [message, setMessage] = useState("")
   const [pendingDraftToRestore, setPendingDraftToRestore] = useState<LocalPostDraft | null>(null)
   const [pendingDraftUpdatedAt, setPendingDraftUpdatedAt] = useState<string | null>(null)
-
   const [loading, setLoading] = useState(false)
   const [showBoardTips, setShowBoardTips] = useState(false)
   const [activeModal, setActiveModal] = useState<HiddenModalType>(null)
@@ -270,19 +261,20 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
   const hasPromptedDraftRef = useRef(false)
 
   const normalizedPollOptions = useMemo(() => pollOptions.map((item) => item.trim()).filter(Boolean), [pollOptions])
-
   const normalizedRedPacketUnitPoints = useMemo(() => parsePositiveSafeInteger(redPacketUnitPoints), [redPacketUnitPoints])
   const normalizedRedPacketPacketCount = useMemo(() => parsePositiveSafeInteger(redPacketPacketCount), [redPacketPacketCount])
-
   const fixedRedPacketTotalPoints = useMemo(
     () => multiplyPositiveSafeIntegers(normalizedRedPacketUnitPoints, normalizedRedPacketPacketCount),
     [normalizedRedPacketPacketCount, normalizedRedPacketUnitPoints],
   )
   const allBoards = useMemo(() => boardOptions.flatMap((group) => group.items), [boardOptions])
-
   const selectedBoard = allBoards.find((item) => item.value === boardSlug) ?? allBoards[0]
   const allowedPostTypes = useMemo<LocalPostType[]>(() => (selectedBoard?.allowedPostTypes ?? DEFAULT_ALLOWED_POST_TYPES) as LocalPostType[], [selectedBoard])
   const storageMode = mode === "edit" ? "edit" : "create"
+  const [jiebaReady, setJiebaReady] = useState(false)
+  const autoExtractedTags = useMemo(() => (jiebaReady ? extractAutoTags(title, content) : []), [content, jiebaReady, title])
+  const finalTags = useMemo(() => manualTags, [manualTags])
+
   const initialDraftData = useMemo<LocalPostDraft>(() => {
     if (initialValues) {
       return {
@@ -298,6 +290,7 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
         purchaseUnlockContent: initialValues.purchaseUnlockContent ?? "",
         purchasePrice: String(initialValues.purchasePrice ?? 20),
         minViewLevel: String(initialValues.minViewLevel ?? 0),
+        manualTags: normalizeManualTags(initialValues.tags ?? []),
         lotteryStartsAt: initialValues.lotteryConfig?.startsAt ?? "",
         lotteryEndsAt: initialValues.lotteryConfig?.endsAt ?? "",
         lotteryParticipantGoal: String(initialValues.lotteryConfig?.participantGoal ?? ""),
@@ -320,7 +313,6 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
   }, [boardOptions, initialValues, pointName])
 
   const draftData = useMemo<LocalPostDraft>(() => ({
-
     title,
     content,
     boardSlug,
@@ -333,6 +325,7 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
     purchaseUnlockContent,
     purchasePrice,
     minViewLevel,
+    manualTags,
     lotteryStartsAt,
     lotteryEndsAt,
     lotteryParticipantGoal,
@@ -354,6 +347,7 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
     lotteryParticipantGoal,
     lotteryPrizes,
     lotteryStartsAt,
+    manualTags,
     minViewLevel,
     pollExpiresAt,
     pollOptions,
@@ -370,7 +364,6 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
     title,
   ])
 
-
   const isVipActive = Boolean(currentUser.vipExpiresAt && new Date(currentUser.vipExpiresAt).getTime() > Date.now())
   const currentVipLevel = isVipActive ? (currentUser.vipLevel ?? 0) : 0
   const minPostVipLevel = selectedBoard?.minPostVipLevel ?? 0
@@ -378,6 +371,25 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
     && currentUser.level >= (selectedBoard?.minPostLevel ?? 0)
     && currentVipLevel >= minPostVipLevel
 
+  useEffect(() => {
+    let cancelled = false
+
+    ensureJiebaReady()
+      .then(() => {
+        if (!cancelled) {
+          setJiebaReady(true)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setJiebaReady(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (!allowedPostTypes.includes(postType)) {
@@ -416,10 +428,8 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
       }
     }, 800)
 
-
     return () => window.clearTimeout(timer)
   }, [draftData, initialDraftData, postId, storageMode])
-
 
   function restoreDraft(draft: LocalPostDraft) {
     setTitle(draft.title)
@@ -434,6 +444,7 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
     setPurchaseUnlockContent(draft.purchaseUnlockContent)
     setPurchasePrice(draft.purchasePrice)
     setMinViewLevel(draft.minViewLevel)
+    setManualTags(normalizeManualTags(draft.manualTags))
     setLotteryStartsAt(draft.lotteryStartsAt)
     setLotteryEndsAt(draft.lotteryEndsAt)
     setLotteryParticipantGoal(draft.lotteryParticipantGoal)
@@ -494,8 +505,107 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
     toast.info("当前页面对应的本地草稿已删除", "草稿已清除")
   }
 
-  function updatePollOption(index: number, value: string) {
+  function addManualTag(value: string) {
+    const nextTag = value.trim()
+    if (!nextTag) {
+      return false
+    }
 
+    if (manualTags.length >= MAX_MANUAL_TAGS) {
+      toast.info(`最多保留 ${MAX_MANUAL_TAGS} 个最终标签`, "标签数量已满")
+      return false
+    }
+
+    if (manualTags.some((item) => item.toLowerCase() === nextTag.toLowerCase())) {
+      setTagInput("")
+      return false
+    }
+
+    setManualTags((current) => normalizeManualTags([...current, nextTag]))
+    setTagInput("")
+    return true
+  }
+
+  function startEditingTag(index: number) {
+    setTagEditingIndex(index)
+    setTagEditingValue(manualTags[index] ?? "")
+  }
+
+  function commitEditingTag(index = tagEditingIndex) {
+    if (index === null) {
+      return
+    }
+
+    const nextValue = tagEditingValue.trim()
+    setManualTags((current) => {
+      if (!nextValue) {
+        return current.filter((_, currentIndex) => currentIndex !== index)
+      }
+
+      return normalizeManualTags(current.map((item, currentIndex) => (currentIndex === index ? nextValue : item)))
+    })
+    setTagEditingIndex(null)
+    setTagEditingValue("")
+  }
+
+  function cancelEditingTag() {
+    setTagEditingIndex(null)
+    setTagEditingValue("")
+  }
+
+  function removeManualTag(tag: string) {
+    const removedIndex = manualTags.findIndex((item) => item.toLowerCase() === tag.toLowerCase())
+    setManualTags((current) => current.filter((item) => item.toLowerCase() !== tag.toLowerCase()))
+    setTagEditingIndex((current) => {
+      if (removedIndex < 0 || current === null) {
+        return current
+      }
+      if (current === removedIndex) {
+        return null
+      }
+      return current > removedIndex ? current - 1 : current
+    })
+    if (tagEditingIndex === removedIndex) {
+      setTagEditingValue("")
+    }
+  }
+
+  function clearManualTags() {
+    setManualTags([])
+    setTagInput("")
+    setTagEditingIndex(null)
+    setTagEditingValue("")
+  }
+
+  function handleTagInputConfirm() {
+    if (!tagInput.trim()) {
+      return
+    }
+
+    const candidates = tagInput.split(/[，,\n]/).map((item) => item.trim()).filter(Boolean)
+    let added = 0
+    candidates.forEach((item) => {
+      if (addManualTag(item)) {
+        added += 1
+      }
+    })
+    if (added > 0) {
+      setTagEditingIndex(null)
+    }
+  }
+
+  function applyAutoTagsToManual() {
+    const nextTags = normalizeManualTags([...manualTags, ...autoExtractedTags])
+    const addedCount = nextTags.length - manualTags.length
+    setManualTags(nextTags)
+    if (addedCount > 0) {
+      toast.success(`已加入 ${addedCount} 个可编辑标签`, "标签已更新")
+      return
+    }
+    toast.info("当前自动结果都已在最终标签中", "无需重复添加")
+  }
+
+  function updatePollOption(index: number, value: string) {
     setPollOptions((current) => current.map((item, currentIndex) => (currentIndex === index ? value : item)))
   }
 
@@ -536,19 +646,15 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
     }))
   }
 
-
   function addLotteryCondition(type = "LIKE_POST", groupKey = "default") {
     setLotteryConditions((current) => (current.length >= 20 ? current : [...current, buildLotteryConditionItem(type, pointName, groupKey)]))
   }
-
-
 
   function removeLotteryCondition(index: number) {
     setLotteryConditions((current) => (current.length <= 1 ? current : current.filter((_, currentIndex) => currentIndex !== index)))
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-
     event.preventDefault()
     setLoading(true)
     setMessage("")
@@ -576,10 +682,7 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
         }
       : undefined
 
-
     const payload = mode === "edit"
-
-
       ? {
           postId,
           title,
@@ -595,8 +698,8 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
           bountyPoints: postType === "BOUNTY" ? Number(bountyPoints) : undefined,
           pollOptions: postType === "POLL" ? normalizedPollOptions : undefined,
           lotteryConfig,
+          manualTags,
         }
-
       : {
           title,
           content,
@@ -613,10 +716,8 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
           pollExpiresAt,
           lotteryConfig,
           redPacketConfig,
+          manualTags,
         }
-
-
-
 
     const response = await fetch(endpoint, {
       method: "POST",
@@ -641,7 +742,6 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
     toast.success(successMessage, mode === "edit" ? "保存成功" : "发布成功")
 
     router.push(`/posts/${result.data?.id ?? postId}`)
-
     router.refresh()
     setLoading(false)
   }
@@ -655,7 +755,6 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
 
   const availablePostTypes = postTypes.filter((item) => allowedPostTypes.includes(item.value))
 
-
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-5">
@@ -667,7 +766,6 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
               {mode === "edit" ? "编辑模式下暂不允许切换节点，避免跨节点权限和审核状态不一致。" : "你只能选择具体节点发帖，不能直接发到分区；现在支持搜索分区、节点名和 slug，节点变多后也能快速找到。"}
             </p>
           </div>
-
 
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-3">
@@ -707,7 +805,6 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
             {showBoardTips ? (
               <div className="mt-3 space-y-2 text-sm text-muted-foreground">
                 <p>当前节点要求：最低{pointName} {selectedBoard?.minPostPoints ?? 0}，最低等级 Lv.{selectedBoard?.minPostLevel ?? 0}，最低 VIP 等级 {minPostVipLevel}，{selectedBoard?.requirePostReview ? "发帖后需审核" : "发帖默认直发"}。</p>
-
                 <p>当前账号：{currentUser.nickname ?? currentUser.username} · Lv.{currentUser.level} · {currentUser.points} {pointName} {isVipActive ? `· VIP ${currentVipLevel}` : "· 非 VIP"}</p>
               </div>
             ) : null}
@@ -775,161 +872,85 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
             <div>
               <p className="text-sm font-medium">抽奖设置</p>
               <p className="mt-1 text-xs leading-6 text-muted-foreground">支持多个奖项、多个参与方案（方案内全部满足即可，满足任一方案即可参与）、手动开奖与人数达标自动开奖。</p>
-
             </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <div className="space-y-2">
                 <p className="text-sm font-medium">开始时间</p>
                 <input type="datetime-local" value={lotteryStartsAt} onChange={(event) => setLotteryStartsAt(event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none" disabled={mode === "edit"} />
-                <p className="text-xs text-muted-foreground">留空则默认审核通过后立即开始。</p>
               </div>
               <div className="space-y-2">
-                <p className="text-sm font-medium">结束时间 / 自动开奖人数</p>
-                <input type="datetime-local" value={lotteryEndsAt} onChange={(event) => setLotteryEndsAt(event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none" disabled={mode === "edit" || Boolean(lotteryParticipantGoal.trim())} />
-                <input value={lotteryParticipantGoal} onChange={(event) => setLotteryParticipantGoal(event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none" placeholder="达到多少参与人数自动开奖" disabled={mode === "edit" || Boolean(lotteryEndsAt)} />
-                <p className="text-xs text-muted-foreground">二选一：填结束时间则手动开奖；填人数则人数达标后自动开奖。</p>
+                <p className="text-sm font-medium">结束时间</p>
+                <input type="datetime-local" value={lotteryEndsAt} onChange={(event) => setLotteryEndsAt(event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none" disabled={mode === "edit"} />
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">目标参与人数</p>
+                <input value={lotteryParticipantGoal} onChange={(event) => setLotteryParticipantGoal(event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none" placeholder="留空表示不限制" disabled={mode === "edit"} />
               </div>
             </div>
-
-            <div className="space-y-3">
+            <div className="space-y-3 rounded-[20px] border border-border bg-background p-4">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium">奖项设置</p>
-                <Button type="button" variant="outline" onClick={addLotteryPrize} disabled={mode === "edit" || lotteryPrizes.length >= 20}>增加奖项</Button>
-              </div>
-              {lotteryPrizes.map((prize, index) => (
-                <div key={`prize-${index}`} className="space-y-3 rounded-[20px] border border-border bg-background p-4">
-                  <div className="grid gap-3 md:grid-cols-[1fr_140px_auto]">
-                    <input value={prize.title} onChange={(event) => updateLotteryPrize(index, "title", event.target.value)} className="h-11 rounded-full border border-border bg-card px-4 text-sm outline-none" placeholder="如：一等奖" disabled={mode === "edit"} />
-                    <input value={prize.quantity} onChange={(event) => updateLotteryPrize(index, "quantity", event.target.value)} className="h-11 rounded-full border border-border bg-card px-4 text-sm outline-none" placeholder="数量" disabled={mode === "edit"} />
-                    <Button type="button" variant="ghost" onClick={() => removeLotteryPrize(index)} disabled={mode === "edit" || lotteryPrizes.length <= 1}>删除</Button>
-                  </div>
-                  <textarea value={prize.description} onChange={(event) => updateLotteryPrize(index, "description", event.target.value)} className="min-h-[88px] w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm outline-none" placeholder="填写奖品描述、领奖说明等" disabled={mode === "edit"} />
+                <div>
+                  <p className="text-sm font-medium">奖项配置</p>
+                  <p className="mt-1 text-xs text-muted-foreground">至少保留 1 个奖项，可继续新增。</p>
                 </div>
-              ))}
+                <Button type="button" variant="outline" onClick={addLotteryPrize} disabled={mode === "edit" || lotteryPrizes.length >= 20}>新增奖项</Button>
+              </div>
+              <div className="space-y-3">
+                {lotteryPrizes.map((prize, index) => (
+                  <div key={`lottery-prize-${index}`} className="space-y-3 rounded-[18px] border border-border bg-card p-4">
+                    <div className="grid gap-3 md:grid-cols-[1fr_180px_auto]">
+                      <input value={prize.title} onChange={(event) => updateLotteryPrize(index, "title", event.target.value)} className="h-11 rounded-full border border-border bg-background px-4 text-sm outline-none" placeholder="奖项名称，如 一等奖" disabled={mode === "edit"} />
+                      <input value={prize.quantity} onChange={(event) => updateLotteryPrize(index, "quantity", event.target.value)} className="h-11 rounded-full border border-border bg-background px-4 text-sm outline-none" placeholder="数量" disabled={mode === "edit"} />
+                      <Button type="button" variant="ghost" onClick={() => removeLotteryPrize(index)} disabled={mode === "edit" || lotteryPrizes.length <= 1}>删除</Button>
+                    </div>
+                    <input value={prize.description} onChange={(event) => updateLotteryPrize(index, "description", event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none" placeholder="奖品描述，如 周边、积分、兑换码" disabled={mode === "edit"} />
+                  </div>
+                ))}
+              </div>
             </div>
-
-            <div className="space-y-4">
+            <div className="space-y-3 rounded-[20px] border border-border bg-background p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium">参与条件</p>
-                  <p className="mt-1 text-xs text-muted-foreground">将条件拆成行为条件与门槛条件；同一参与方案内全部满足即可，命中任一参与方案即可参与。</p>
-
+                  <p className="mt-1 text-xs text-muted-foreground">支持点赞、收藏、回帖、等级、VIP 等条件组合。</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" onClick={() => addLotteryCondition("LIKE_POST")} disabled={mode === "edit" || lotteryConditions.length >= 20}>增加行为条件</Button>
-                  <Button type="button" variant="outline" onClick={() => addLotteryCondition("REGISTER_DAYS")} disabled={mode === "edit" || lotteryConditions.length >= 20}>增加门槛条件</Button>
+                  <Button type="button" variant="outline" onClick={() => addLotteryCondition("LIKE_POST")} disabled={mode === "edit" || lotteryConditions.length >= 20}>加点赞条件</Button>
+                  <Button type="button" variant="outline" onClick={() => addLotteryCondition("REGISTER_DAYS")} disabled={mode === "edit" || lotteryConditions.length >= 20}>加门槛条件</Button>
                 </div>
               </div>
-
-              <div className="space-y-3 rounded-[20px] border border-border bg-background/70 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium">行为条件</p>
-                    <p className="mt-1 text-xs text-muted-foreground">要求用户先完成互动行为，比如回复、点赞、收藏。</p>
-                  </div>
-                  <span className="rounded-full bg-secondary px-3 py-1 text-[11px] text-muted-foreground">回复 / 点赞 / 收藏</span>
-                </div>
-                <div className="space-y-3">
-                  {lotteryConditions.map((condition, index) => {
-                    if (!["REPLY_CONTENT_LENGTH", "REPLY_KEYWORD", "LIKE_POST", "FAVORITE_POST"].includes(condition.type)) {
-                      return null
-                    }
-
-                    const requiresNumericValue = LOTTERY_NUMERIC_CONDITION_TYPES.has(condition.type)
-                    const requiresTextValue = LOTTERY_TEXT_CONDITION_TYPES.has(condition.type)
-                    const requiresValue = requiresNumericValue || requiresTextValue
-                    const requiresOperator = requiresNumericValue
-
-                    return (
-                      <div key={`behavior-condition-${index}`} className="space-y-3 rounded-[20px] border border-border bg-card p-4">
-                        <div className="grid gap-3 md:grid-cols-2">
-                          <input value={condition.groupKey} onChange={(event) => updateLotteryCondition(index, "groupKey", event.target.value)} className="h-11 rounded-full border border-border bg-background px-4 text-sm outline-none" placeholder="参与方案，如 方案A / VIP直通" disabled={mode === "edit"} />
-                          <select value={condition.type} onChange={(event) => updateLotteryCondition(index, "type", event.target.value)} className="h-11 rounded-full border border-border bg-background px-4 text-sm outline-none" disabled={mode === "edit"}>
-                            <option value="REPLY_CONTENT_LENGTH">回帖字数 ≥ X</option>
-                            <option value="REPLY_KEYWORD">回帖包含指定内容</option>
-                            <option value="LIKE_POST">点赞本帖</option>
-                            <option value="FAVORITE_POST">收藏本帖</option>
-                          </select>
-                        </div>
-                        <div className={`grid gap-3 ${requiresValue ? "md:grid-cols-2" : "md:grid-cols-1"}`}>
-                          {requiresValue ? (
-                            <input
-                              value={condition.value}
-                              onChange={(event) => updateLotteryCondition(index, "value", event.target.value)}
-                              className="h-11 rounded-full border border-border bg-background px-4 text-sm outline-none"
-                              placeholder={getLotteryConditionPlaceholder(condition.type, pointName)}
-                              disabled={mode === "edit"}
-                            />
-                          ) : null}
-                          {requiresOperator ? (
-                            <select value={condition.operator} onChange={(event) => updateLotteryCondition(index, "operator", event.target.value)} className="h-11 rounded-full border border-border bg-background px-4 text-sm outline-none" disabled={mode === "edit"}>
-                              <option value="GTE">大于等于</option>
-                              <option value="EQ">等于</option>
-                            </select>
-                          ) : null}
-                        </div>
-                        <div className={`grid gap-3 ${requiresOperator ? "md:grid-cols-[1fr_auto]" : "md:grid-cols-[1fr_auto]"}`}>
-
-                          <input value={condition.description} onChange={(event) => updateLotteryCondition(index, "description", event.target.value)} className="h-11 rounded-full border border-border bg-background px-4 text-sm outline-none" placeholder="前端展示文案，可留空自动生成" disabled={mode === "edit"} />
-
-                          <Button type="button" variant="ghost" onClick={() => removeLotteryCondition(index)} disabled={mode === "edit" || lotteryConditions.length <= 1}>删除</Button>
-                        </div>
-                        {!requiresValue ? <p className="text-xs text-muted-foreground">该条件为动作型条件，用户完成对应行为后会自动判断，无需额外填写阈值。</p> : null}
+              <div className="space-y-3">
+                {lotteryConditions.map((condition, index) => {
+                  const valueDisabled = !LOTTERY_NUMERIC_CONDITION_TYPES.has(condition.type) && !LOTTERY_TEXT_CONDITION_TYPES.has(condition.type)
+                  return (
+                    <div key={`lottery-condition-${index}`} className="space-y-3 rounded-[18px] border border-border bg-card p-4">
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <select value={condition.type} onChange={(event) => updateLotteryCondition(index, "type", event.target.value)} className="h-11 rounded-full border border-border bg-background px-4 text-sm outline-none" disabled={mode === "edit"}>
+                          <option value="LIKE_POST">点赞帖子</option>
+                          <option value="FAVORITE_POST">收藏帖子</option>
+                          <option value="REPLY_CONTENT_LENGTH">回帖内容长度</option>
+                          <option value="REPLY_KEYWORD">回帖关键词</option>
+                          <option value="REGISTER_DAYS">注册天数</option>
+                          <option value="USER_LEVEL">用户等级</option>
+                          <option value="VIP_LEVEL">VIP 等级</option>
+                          <option value="USER_POINTS">用户积分</option>
+                        </select>
+                        <input value={condition.value} onChange={(event) => updateLotteryCondition(index, "value", event.target.value)} className="h-11 rounded-full border border-border bg-background px-4 text-sm outline-none" placeholder={getLotteryConditionPlaceholder(condition.type, pointName)} disabled={mode === "edit" || valueDisabled} />
                       </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              <div className="space-y-3 rounded-[20px] border border-border bg-background/70 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium">门槛条件</p>
-                    <p className="mt-1 text-xs text-muted-foreground">限制账号资质，适合防小号、防低质参与。</p>
-                  </div>
-                  <span className="rounded-full bg-secondary px-3 py-1 text-[11px] text-muted-foreground">注册 / 等级 / VIP / 积分</span>
-                </div>
-                <div className="space-y-3">
-                  {lotteryConditions.map((condition, index) => {
-                    if (!["REGISTER_DAYS", "USER_LEVEL", "VIP_LEVEL", "USER_POINTS"].includes(condition.type)) {
-                      return null
-                    }
-
-                    return (
-                      <div key={`threshold-condition-${index}`} className="space-y-3 rounded-[20px] border border-border bg-card p-4">
-                        <div className="grid gap-3 md:grid-cols-2">
-                          <select value={condition.type} onChange={(event) => updateLotteryCondition(index, "type", event.target.value)} className="h-11 rounded-full border border-border bg-background px-4 text-sm outline-none" disabled={mode === "edit"}>
-                            <option value="REGISTER_DAYS">注册天数 ≥ X</option>
-                            <option value="USER_LEVEL">用户等级 ≥ X</option>
-                            <option value="VIP_LEVEL">VIP 等级 ≥ X</option>
-                            <option value="USER_POINTS">积分数量 ≥ X</option>
-                          </select>
-                          <input
-                            value={condition.value}
-                            onChange={(event) => updateLotteryCondition(index, "value", event.target.value)}
-                            className="h-11 rounded-full border border-border bg-background px-4 text-sm outline-none"
-                            placeholder={getLotteryConditionPlaceholder(condition.type, pointName)}
-                            disabled={mode === "edit"}
-                          />
-                        </div>
-                        <div className="grid gap-3 md:grid-cols-[180px_180px_1fr_auto]">
-                          <select value={condition.operator} onChange={(event) => updateLotteryCondition(index, "operator", event.target.value)} className="h-11 rounded-full border border-border bg-background px-4 text-sm outline-none" disabled={mode === "edit"}>
-                            <option value="GTE">大于等于</option>
-                            <option value="EQ">等于</option>
-                          </select>
-                          <input value={condition.groupKey} onChange={(event) => updateLotteryCondition(index, "groupKey", event.target.value)} className="h-11 rounded-full border border-border bg-background px-4 text-sm outline-none" placeholder="参与方案，如 方案A / 老用户" disabled={mode === "edit"} />
-
-                          <input value={condition.description} onChange={(event) => updateLotteryCondition(index, "description", event.target.value)} className="h-11 rounded-full border border-border bg-background px-4 text-sm outline-none" placeholder="前端展示文案，可留空自动生成" disabled={mode === "edit"} />
-                          <Button type="button" variant="ghost" onClick={() => removeLotteryCondition(index)} disabled={mode === "edit" || lotteryConditions.length <= 1}>删除</Button>
-                        </div>
+                      <div className="grid gap-3 md:grid-cols-[180px_180px_1fr_auto]">
+                        <select value={condition.operator} onChange={(event) => updateLotteryCondition(index, "operator", event.target.value)} className="h-11 rounded-full border border-border bg-background px-4 text-sm outline-none" disabled={mode === "edit"}>
+                          <option value="GTE">大于等于</option>
+                          <option value="EQ">等于</option>
+                        </select>
+                        <input value={condition.groupKey} onChange={(event) => updateLotteryCondition(index, "groupKey", event.target.value)} className="h-11 rounded-full border border-border bg-background px-4 text-sm outline-none" placeholder="参与方案，如 老用户组" disabled={mode === "edit"} />
+                        <input value={condition.description} onChange={(event) => updateLotteryCondition(index, "description", event.target.value)} className="h-11 rounded-full border border-border bg-background px-4 text-sm outline-none" placeholder="前端展示文案，可留空自动生成" disabled={mode === "edit"} />
+                        <Button type="button" variant="ghost" onClick={() => removeLotteryCondition(index)} disabled={mode === "edit" || lotteryConditions.length <= 1}>删除</Button>
                       </div>
-                    )
-                  })}
-                </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
-
           </div>
         ) : null}
 
@@ -940,19 +961,21 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
           <input value={title} onChange={(event) => setTitle(event.target.value)} className="h-11 w-full rounded-full border border-border bg-card px-4 text-sm outline-none" placeholder="写一个让人愿意点进来的标题" />
         </div>
 
-
-
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-medium">公开正文</p>
             <p className="text-xs text-muted-foreground">请遵守社区规则，文明发帖！</p>
           </div>
-          <RefinedRichPostEditor value={content} onChange={setContent} placeholder="文明社区，文明发言。支持 Markdown 语法。" markdownEmojiMap={markdownEmojiMap} />
-
+          <RefinedRichPostEditor value={content} onChange={setContent} placeholder="文明社区，文明发言。支持 Markdown 语法" markdownEmojiMap={markdownEmojiMap} />
         </div>
 
         <div className="rounded-[24px] border border-border bg-card px-4 py-3">
           <div className="flex flex-wrap items-center gap-2">
+                        <Button type="button" variant="outline" className={finalTags.length > 0 ? "h-9 border-foreground px-4 text-sm" : "h-9 px-4 text-sm"} onClick={() => setTagModalOpen(true)}>
+              <Sparkles className="mr-2 h-4 w-4" />
+              标签提取
+              <span className={finalTags.length > 0 ? "ml-2 rounded-full bg-foreground px-2 py-0.5 text-[11px] text-background" : "ml-2 rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground"}>{finalTags.length > 0 ? finalTags.length : autoExtractedTags.length}</span>
+            </Button>
             <label className={commentsVisibleToAuthorOnly ? "inline-flex items-center gap-2 rounded-full border border-foreground bg-accent px-3 py-2 text-sm" : "inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-sm text-muted-foreground"}>
               <input
                 type="checkbox"
@@ -963,6 +986,8 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
               <span>评论仅楼主可见</span>
               <HoverTip text="开启后，其他用户发表的评论仅帖子作者和管理员可见。" />
             </label>
+
+
 
             <HiddenConfigChip
               icon={<MessageSquareLock className="h-4 w-4" />}
@@ -993,7 +1018,7 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
             />
             {postRedPacketEnabled ? (
               <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-2">
-                <label className="inline-flex items-center gap-2 text-sm">
+                <label className={redPacketEnabled ? "inline-flex items-center gap-2 text-sm" : "inline-flex items-center gap-2 text-sm text-muted-foreground"}>
                   <input
                     type="checkbox"
                     checked={redPacketEnabled}
@@ -1008,14 +1033,22 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
                 </span>
               </div>
             ) : null}
-
           </div>
+          {finalTags.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+              {finalTags.map((tag) => (
+                <span key={tag} className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1">
+                  <span>#{tag}</span>
+                  <button type="button" onClick={() => removeManualTag(tag)} className="transition-opacity hover:opacity-70">×</button>
+                </span>
+              ))}
+            </div>
+          ) : null}
           {redPacketEnabled ? (
             <div className="mt-4 grid gap-3 rounded-[20px] border border-rose-200 bg-rose-50/80 p-4 md:grid-cols-2 xl:grid-cols-4 dark:border-rose-500/20 dark:bg-rose-500/10">
               <div className="space-y-2">
                 <p className="text-sm font-medium">发放方式</p>
                 <select value={redPacketGrantMode} onChange={(event) => setRedPacketGrantMode(event.target.value as "FIXED" | "RANDOM")} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none" disabled={mode === "edit"}>
-
                   <option value="FIXED">固定红包</option>
                   <option value="RANDOM">拼手气红包</option>
                 </select>
@@ -1023,7 +1056,6 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
               <div className="space-y-2">
                 <p className="text-sm font-medium">领取条件</p>
                 <select value={redPacketTriggerType} onChange={(event) => setRedPacketTriggerType(event.target.value as "REPLY" | "LIKE" | "FAVORITE")} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none" disabled={mode === "edit"}>
-
                   <option value="REPLY">回复帖子</option>
                   <option value="LIKE">点赞帖子</option>
                   <option value="FAVORITE">收藏帖子</option>
@@ -1040,13 +1072,10 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
               <div className="md:col-span-2 xl:col-span-4 rounded-[16px] bg-background/80 px-4 py-3 text-xs leading-6 text-muted-foreground">
                 <p>领取行为满足后自动发放；所有红包均按整数分配，每人至少 1 {pointName}。</p>
                 <p>{redPacketGrantMode === "FIXED" ? `当前总计需要 ${fixedRedPacketTotalPoints ?? 0} ${pointName}。` : "拼手气红包要求总积分不小于份数。"}</p>
-
               </div>
-
             </div>
           ) : null}
         </div>
-
 
         {pendingDraftToRestore ? (
           <PostDraftNotice
@@ -1075,14 +1104,136 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
             <Button disabled={loading || !canPostInBoard}>{loading ? (mode === "edit" ? "保存中..." : "发布中...") : (mode === "edit" ? "保存帖子" : "发布帖子")}</Button>
           </div>
         </div>
-
       </form>
 
+      <AdminModal
+        open={tagModalOpen}
+        onClose={() => {
+          cancelEditingTag()
+          setTagModalOpen(false)
+        }}
+        title="标签提取"
+        description="自动提取仅作为候选结果，只有你手动添加后才会进入最终提交标签，并且可以继续编辑。"
+        size="lg"
+        footer={(
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">左侧是候选标签，右侧和下方是最终提交标签，只有手动采用的标签才会被保存。</p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="ghost" onClick={manualTags.length > 0 ? clearManualTags : () => {
+                cancelEditingTag()
+                setTagModalOpen(false)
+              }}>{manualTags.length > 0 ? "清空最终标签" : "关闭"}</Button>
+              <Button type="button" variant="outline" onClick={applyAutoTagsToManual} disabled={autoExtractedTags.length === 0}>加入全部自动标签</Button>
+            </div>
+          </div>
+        )}
+      >
+        <div className="space-y-5">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-3 rounded-[24px] border border-border bg-card p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">自动提取</p>
+                  <p className="mt-1 text-xs leading-6 text-muted-foreground">基于当前标题和正文自动计算。</p>
+                </div>
+                <span className="rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">{autoExtractedTags.length} 个</span>
+              </div>
+              <div className="rounded-[18px] border border-dashed border-border bg-background/60 px-4 py-3 text-xs leading-6 text-muted-foreground">
+                自动提取只会显示在这里，点击某个候选标签后，才会加入右侧最终标签，之后还能继续编辑。
+              </div>
+              <div className="flex min-h-[84px] flex-wrap gap-2">
+                {autoExtractedTags.length > 0 ? autoExtractedTags.map((tag) => {
+                  const adopted = manualTags.some((item) => item.toLowerCase() === tag.toLowerCase())
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => addManualTag(tag)}
+                      className={adopted ? "rounded-full border border-foreground bg-accent px-3 py-1.5 text-sm" : "rounded-full border border-border bg-background px-3 py-1.5 text-sm hover:bg-accent"}
+                    >
+                      #{tag}
+                      <span className="ml-2 text-xs text-muted-foreground">{adopted ? "已加入" : "加入"}</span>
+                    </button>
+                  )
+                }) : <p className="text-sm text-muted-foreground">暂未提取到标签，可以先补充标题或正文。</p>}
+              </div>
+            </div>
+
+            <div className="space-y-3 rounded-[24px] border border-border bg-card p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">最终标签</p>
+                  <p className="mt-1 text-xs leading-6 text-muted-foreground">支持手动新增、删除和编辑，最多 {MAX_MANUAL_TAGS} 个。</p>
+                </div>
+                <span className={manualTags.length > 0 ? "rounded-full bg-foreground px-3 py-1 text-xs text-background" : "rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground"}>{manualTags.length} / {MAX_MANUAL_TAGS}</span>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={tagInput}
+                  onChange={(event) => setTagInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault()
+                      handleTagInputConfirm()
+                    }
+                  }}
+                  className="h-11 flex-1 rounded-full border border-border bg-background px-4 text-sm outline-none"
+                  placeholder="输入标签后回车，可用逗号批量添加"
+                />
+                <Button type="button" variant="outline" onClick={handleTagInputConfirm}>添加</Button>
+              </div>
+              <div className="rounded-[18px] border border-dashed border-border bg-background/60 px-4 py-3 text-xs leading-6 text-muted-foreground">
+                点击标签可直接编辑，编辑时可点“完成”保存或点“取消”放弃。
+              </div>
+              <div className="flex min-h-[84px] flex-wrap gap-2">
+                {manualTags.length > 0 ? manualTags.map((tag, index) => (
+                  tagEditingIndex === index ? (
+                    <div key={`${tag}-${index}`} className="flex items-center gap-2 rounded-full border border-foreground bg-accent px-3 py-1.5">
+                      <span className="text-sm text-muted-foreground">#</span>
+                      <input
+                        value={tagEditingValue}
+                        onChange={(event) => setTagEditingValue(event.target.value)}
+                        onBlur={() => commitEditingTag(index)}
+                        autoFocus
+                        className="h-7 min-w-[96px] bg-transparent text-sm outline-none"
+                      />
+                      <Button type="button" variant="ghost" className="h-7 rounded-full px-2 text-xs" onMouseDown={(event) => event.preventDefault()} onClick={() => commitEditingTag(index)}>完成</Button>
+                      <Button type="button" variant="ghost" className="h-7 rounded-full px-2 text-xs" onMouseDown={(event) => event.preventDefault()} onClick={() => cancelEditingTag()}>取消</Button>
+                    </div>
+                  ) : (
+                    <div key={`${tag}-${index}`} className="inline-flex items-center gap-2 rounded-full border border-foreground bg-accent px-3 py-1.5 text-sm">
+                      <button type="button" onClick={() => startEditingTag(index)} className="transition-opacity hover:opacity-80">
+                        #{tag}
+                      </button>
+                      <Button type="button" variant="ghost" className="h-7 rounded-full px-2 text-xs" onClick={() => removeManualTag(tag)}>删除</Button>
+                    </div>
+                  )
+                )) : <p className="text-sm text-muted-foreground">还没有最终标签，点左侧候选标签加入，或自行输入即可。</p>}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[24px] border border-border bg-card p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">最终提交标签</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">候选 {autoExtractedTags.length}</span>
+                <span className="rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">最终 {finalTags.length}</span>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {finalTags.length > 0 ? finalTags.map((tag) => (
+                <span key={tag} className="rounded-full border border-foreground bg-accent px-3 py-1.5 text-sm">#{tag}</span>
+              )) : <p className="text-sm text-muted-foreground">当前还没有可提交的标签。</p>}
+            </div>
+          </div>
+        </div>
+      </AdminModal>
 
       <HiddenContentModal
         open={activeModal === "reply"}
-
-
         title="配置回复后可看"
         description="用户在本帖回复 1 次后即可解锁。详细说明已收进这里，页面主区域只保留一行入口。"
         value={replyUnlockContent}
@@ -1111,3 +1262,4 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
     </>
   )
 }
+

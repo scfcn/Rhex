@@ -9,7 +9,9 @@ import {
   findLotteryInteractionState,
   upsertLotteryParticipantEligibility,
 } from "@/db/lottery-queries"
+import { apiError } from "@/lib/api-route"
 import { canSendEmail } from "@/lib/mailer"
+
 
 import { parseBusinessDateTime } from "@/lib/formatters"
 import { getSiteSettings } from "@/lib/site-settings"
@@ -524,31 +526,31 @@ async function sendLotteryWinnerEmails(input: {
 export async function drawLotteryWinners(postId: string, options?: { force?: boolean; actorId?: number | null }) {
   const post = await findLotteryDrawContext(postId)
 
-
   if (!post || post.type !== "LOTTERY") {
-    throw new Error("抽奖帖不存在")
+    apiError(404, "抽奖帖不存在")
   }
 
   if (post.lotteryStatus === LotteryStatus.DRAWN && !options?.force) {
-    throw new Error("该抽奖已开奖")
+    apiError(409, "该抽奖已开奖")
   }
 
   if (post.lotteryTriggerMode === LotteryTriggerMode.MANUAL && !options?.force) {
     if (!post.lotteryEndsAt || post.lotteryEndsAt.getTime() > Date.now()) {
-      throw new Error("未到结束时间，暂不可开奖")
+      apiError(409, "未到结束时间，暂不可开奖")
     }
   }
 
   if (post.lotteryTriggerMode === LotteryTriggerMode.AUTO_PARTICIPANT_COUNT && !options?.force) {
     const goal = post.lotteryParticipantGoal ?? 0
     if (goal <= 0 || post.lotteryParticipants.length < goal) {
-      throw new Error("未达到自动开奖人数")
+      apiError(409, "未达到自动开奖人数")
     }
   }
 
   if (post.lotteryPrizes.length === 0) {
-    throw new Error("当前未配置奖项")
+    apiError(400, "当前未配置奖项")
   }
+
 
   const lockedAt = new Date()
   const pool = secureShuffle(post.lotteryParticipants)

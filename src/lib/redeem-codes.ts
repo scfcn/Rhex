@@ -109,9 +109,10 @@ function toRedeemCodeItem(row: RedeemCodeRowWithRelations): RedeemCodeItem {
   }
 }
 
-function getRedeemCodeCategory(row: RedeemCodeCategoryFields) {
+function getRedeemCodeCategory(row: RedeemCodeCategoryFields | RedeemCodeCoreRow) {
   return row.codeCategory ?? "default"
 }
+
 
 function getCategoryUserLimit(row: RedeemCodeCategoryFields | RedeemCodeCoreRow) {
 

@@ -2,7 +2,9 @@ import { randomBytes } from "crypto"
 
 import { createInviteCodesBatch, findInviteCodeByCode, findInviteCodeForUse, findInviteCodeList, findInviteCodesByCodes, findInvitePurchaseUser, findUserInviteResolverById, findUserInviteResolverByUsername } from "@/db/invite-code-queries"
 import { purchaseInviteCodeTransaction } from "@/db/invite-code-write-queries"
+import { apiError } from "@/lib/api-route"
 import { getSiteSettings } from "@/lib/site-settings"
+
 
 
 
@@ -39,9 +41,9 @@ export async function generateUniqueInviteCode(length = DEFAULT_CODE_LENGTH) {
     }
   }
 
-
-  throw new Error("邀请码生成失败，请重试")
+  apiError(500, "邀请码生成失败，请重试")
 }
+
 
 export async function createInviteCodes(input: { count: number; createdById?: number | null; note?: string | null }) {
   const count = Math.min(100, Math.max(1, Math.trunc(input.count)))
@@ -85,7 +87,7 @@ export async function resolveInviter(input: { inviterUsername?: string; inviteCo
   }
 
   if (inviterUsername && inviterUsername === input.username) {
-    throw new Error("邀请人不能填写自己")
+    apiError(400, "邀请人不能填写自己")
   }
 
   let inviteCodeRecord: null | { id: string; code: string; createdById: number | null } = null
@@ -93,13 +95,12 @@ export async function resolveInviter(input: { inviterUsername?: string; inviteCo
   if (inviteCode) {
     const foundCode = await findInviteCodeForUse(inviteCode)
 
-
     if (!foundCode) {
-      throw new Error("邀请码不存在")
+      apiError(404, "邀请码不存在")
     }
 
     if (foundCode.usedById) {
-      throw new Error("邀请码已被使用")
+      apiError(409, "邀请码已被使用")
     }
 
     inviteCodeRecord = { id: foundCode.id, code: foundCode.code, createdById: foundCode.createdById }
@@ -111,14 +112,14 @@ export async function resolveInviter(input: { inviterUsername?: string; inviteCo
       ? await findUserInviteResolverById(inviteCodeRecord.createdById)
       : null
 
-
   if (inviter && inviter.username === input.username) {
-    throw new Error("邀请人不能填写自己")
+    apiError(400, "邀请人不能填写自己")
   }
 
   if (inviterUsername && !inviter) {
-    throw new Error("邀请人不存在")
+    apiError(404, "邀请人不存在")
   }
+
 
   return {
     inviter,
@@ -132,24 +133,24 @@ export async function purchaseInviteCode(userId: number) {
     findInvitePurchaseUser(userId),
   ])
 
-
   if (!user) {
-    throw new Error("用户不存在")
+    apiError(404, "用户不存在")
   }
 
   if (!settings.inviteCodePurchaseEnabled) {
-    throw new Error("当前未开启邀请码购买")
+    apiError(400, "当前未开启邀请码购买")
   }
 
   const price = Math.max(0, settings.inviteCodePrice)
 
   if (price < 1) {
-    throw new Error("邀请码价格未设置")
+    apiError(400, "邀请码价格未设置")
   }
 
   if (user.points < price) {
-    throw new Error(`${settings.pointName}不足，无法购买邀请码`)
+    apiError(409, `${settings.pointName}不足，无法购买邀请码`)
   }
+
 
   const code = await generateUniqueInviteCode()
 

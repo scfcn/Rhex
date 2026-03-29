@@ -5,11 +5,14 @@ import {
   createFriendLink,
   findApprovedFriendLinks,
   findFriendLinkById,
+  findFriendLinkByUrl,
   findFriendLinksForAdmin,
   updateFriendLink,
 } from "@/db/friend-links"
 import { getCurrentUser } from "@/lib/auth"
+import { apiError } from "@/lib/api-route"
 import { getSiteSettings } from "@/lib/site-settings"
+
 
 export interface FriendLinkItem {
   id: string
@@ -58,15 +61,16 @@ function normalizeUrl(value: unknown) {
   }
 
   if (!/^https?:\/\//i.test(url)) {
-    throw new Error("链接地址必须以 http:// 或 https:// 开头")
+    apiError(400, "链接地址必须以 http:// 或 https:// 开头")
   }
 
   try {
     return new URL(url).toString()
   } catch {
-    throw new Error("请输入有效的链接地址")
+    apiError(400, "请输入有效的链接地址")
   }
 }
+
 
 function mapItem(item: Awaited<ReturnType<typeof findApprovedFriendLinks>>[number]): FriendLinkItem {
   return {
@@ -136,11 +140,11 @@ export async function submitFriendLinkApplication(input: FriendLinkSubmissionInp
   const settings = await getSiteSettings()
 
   if (!settings.friendLinksEnabled) {
-    throw new Error("站点暂未开启友情链接")
+    apiError(400, "站点暂未开启友情链接")
   }
 
   if (!settings.friendLinkApplicationEnabled) {
-    throw new Error("当前暂未开放友情链接申请")
+    apiError(400, "当前暂未开放友情链接申请")
   }
 
   const name = normalizeText(input.name, 40)
@@ -148,17 +152,16 @@ export async function submitFriendLinkApplication(input: FriendLinkSubmissionInp
   const logoPath = normalizeText(input.logoPath, 300)
 
   if (!name) {
-    throw new Error("请输入网站名称")
+    apiError(400, "请输入网站名称")
   }
 
   if (!url) {
-    throw new Error("请输入网站链接")
+    apiError(400, "请输入网站链接")
   }
 
-  const existing = await findFriendLinksForAdmin("ALL")
-  const duplicated = existing.find((item) => item.url.toLowerCase() === url.toLowerCase())
+  const duplicated = await findFriendLinkByUrl(url)
   if (duplicated) {
-    throw new Error("该网站链接已存在，请勿重复提交")
+    apiError(409, "该网站链接已存在，请勿重复提交")
   }
 
   return createFriendLink({
@@ -167,8 +170,8 @@ export async function submitFriendLinkApplication(input: FriendLinkSubmissionInp
     logoPath: logoPath || null,
     status: FriendLinkStatus.PENDING,
   })
-
 }
+
 
 export async function createFriendLinkByAdmin(input: AdminFriendLinkInput) {
   const name = normalizeText(input.name, 40)
@@ -178,12 +181,16 @@ export async function createFriendLinkByAdmin(input: AdminFriendLinkInput) {
   const sortOrder = Math.max(0, Number(input.sortOrder ?? 0) || 0)
 
   if (!name) {
-    throw new Error("请输入网站名称")
+    apiError(400, "请输入网站名称")
   }
 
-  const existing = await findFriendLinksForAdmin("ALL")
-  if (existing.some((item) => item.url.toLowerCase() === url.toLowerCase())) {
-    throw new Error("该网站链接已存在，请勿重复创建")
+  if (!url) {
+    apiError(400, "请输入网站链接")
+  }
+
+  const duplicated = await findFriendLinkByUrl(url)
+  if (duplicated) {
+    apiError(409, "该网站链接已存在，请勿重复创建")
   }
 
   return createFriendLink({
@@ -198,6 +205,7 @@ export async function createFriendLinkByAdmin(input: AdminFriendLinkInput) {
 }
 
 
+
 export async function reviewFriendLink(input: {
   id: string
   action: "approve" | "reject" | "disable" | "update"
@@ -207,17 +215,16 @@ export async function reviewFriendLink(input: {
   url?: string
   logoPath?: string
 }) {
-
-
   const currentUser = await getCurrentUser()
   if (!currentUser) {
-    throw new Error("请先登录")
+    apiError(401, "请先登录")
   }
 
   const existing = await findFriendLinkById(input.id)
   if (!existing) {
-    throw new Error("友情链接不存在")
+    apiError(404, "友情链接不存在")
   }
+
 
   const reviewNote = normalizeText(input.reviewNote, 300) || null
   const sortOrder = Math.max(0, Number(input.sortOrder ?? existing.sortOrder) || 0)

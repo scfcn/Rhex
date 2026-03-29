@@ -3,8 +3,10 @@ import { hashSync } from "bcryptjs"
 import { VerificationChannel } from "@/db/types"
 
 import { findUserByEmail, updateUserPasswordById } from "@/db/password-reset-queries"
+import { apiError } from "@/lib/api-route"
 import { canSendEmail, sendResetPasswordVerificationEmail } from "@/lib/mailer"
 import { sendVerificationCode, verifyCode } from "@/lib/verification"
+
 
 const PASSWORD_RESET_PURPOSE = "password_reset"
 
@@ -16,11 +18,12 @@ function ensurePassword(value: string) {
   const password = value.trim()
 
   if (password.length < 6 || password.length > 64) {
-    throw new Error("密码长度需为 6-64 位")
+    apiError(400, "密码长度需为 6-64 位")
   }
 
   return password
 }
+
 
 export function getPasswordResetPurpose() {
   return PASSWORD_RESET_PURPOSE
@@ -34,24 +37,25 @@ export async function sendPasswordResetCode(input: {
   const email = normalizeEmail(input.email)
 
   if (!email) {
-    throw new Error("请输入邮箱")
+    apiError(400, "请输入邮箱")
   }
 
   const smtpReady = await canSendEmail()
 
   if (!smtpReady) {
-    throw new Error("当前站点未配置邮件发送能力，暂不可找回密码")
+    apiError(400, "当前站点未配置邮件发送能力，暂不可找回密码")
   }
 
   const user = await findUserByEmail(email)
 
   if (!user) {
-    throw new Error("该邮箱未绑定账号")
+    apiError(404, "该邮箱未绑定账号")
   }
 
   if (user.status === "BANNED") {
-    throw new Error("该账号已被禁用，无法找回密码")
+    apiError(403, "该账号已被禁用，无法找回密码")
   }
+
 
   const result = await sendVerificationCode({
     channel: VerificationChannel.EMAIL,
@@ -84,22 +88,23 @@ export async function resetPasswordByEmailCode(input: {
   const code = input.code.trim()
 
   if (!email) {
-    throw new Error("请输入邮箱")
+    apiError(400, "请输入邮箱")
   }
 
   if (!/^\d{6}$/.test(code)) {
-    throw new Error("验证码格式不正确")
+    apiError(400, "验证码格式不正确")
   }
 
   const user = await findUserByEmail(email)
 
   if (!user) {
-    throw new Error("该邮箱未绑定账号")
+    apiError(404, "该邮箱未绑定账号")
   }
 
   if (user.status === "BANNED") {
-    throw new Error("该账号已被禁用，无法重置密码")
+    apiError(403, "该账号已被禁用，无法重置密码")
   }
+
 
   await verifyCode({
     channel: VerificationChannel.EMAIL,

@@ -2,6 +2,8 @@ import { prisma } from "@/db/client"
 import type { Prisma } from "@/db/types"
 
 import { getCurrentSessionActor } from "@/lib/auth"
+import { apiError } from "@/lib/api-route"
+
 
 export const currentUserRecordSelect = {
   id: true,
@@ -37,7 +39,7 @@ export async function requireCurrentUserRecord(): Promise<CurrentUserRecord> {
   const user = await getCurrentUserRecord()
 
   if (!user) {
-    throw new Error("当前登录用户不存在")
+    apiError(401, "当前登录用户不存在")
   }
 
   return user
@@ -47,9 +49,10 @@ export async function requireActiveCurrentUserRecord(): Promise<CurrentUserRecor
   const user = await requireCurrentUserRecord()
 
   if (user.status !== "ACTIVE") {
-    throw new Error("当前账号状态不可执行该操作")
+    apiError(403, "当前账号状态不可执行该操作")
   }
 
   return user
 }
+
 

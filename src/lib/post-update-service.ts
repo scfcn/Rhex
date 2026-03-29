@@ -4,7 +4,7 @@ import { extractSummaryFromContent } from "@/lib/content"
 import { enforceSensitiveText } from "@/lib/content-safety"
 import { createPostMentionNotifications } from "@/lib/post-mentions"
 import { buildPostContentDocument, getAllPostContentText, serializePostContentDocument } from "@/lib/post-content"
-import { syncPostTaxonomy } from "@/lib/post-editor"
+import { normalizeManualTags, syncPostTaxonomy } from "@/lib/post-editor"
 import { parseNonNegativeSafeInteger, parsePositiveSafeInteger } from "@/lib/shared/safe-integer"
 
 const APPEND_INTERVAL_MS = 60 * 60 * 1000
@@ -26,6 +26,11 @@ export async function updatePostFlow(input: {
   const purchasePrice = parsePositiveSafeInteger(input.body.purchasePrice) ?? 0
   const minViewLevel = parseNonNegativeSafeInteger(input.body.minViewLevel) ?? 0
   const appendedContent = readOptionalStringField(input.body, "appendedContent")
+  const manualTags = normalizeManualTags(Array.isArray(input.body.manualTags)
+    ? input.body.manualTags.filter((item): item is string => typeof item === "string")
+    : [])
+  const tagsSafety = manualTags.length > 0 ? await enforceSensitiveText({ scene: "post.tags", text: manualTags.join("\n") }) : null
+  const sanitizedManualTags = normalizeManualTags(tagsSafety?.sanitizedText.split(/\n+/).map((item) => item.trim()).filter(Boolean) ?? manualTags)
 
   if (!postId) {
     apiError(400, "缺少帖子 ID")
@@ -101,7 +106,8 @@ export async function updatePostFlow(input: {
       titleSafety.shouldReview
       || contentSafety.shouldReview
       || replyUnlockSafety?.shouldReview
-      || purchaseUnlockSafety?.shouldReview,
+      || purchaseUnlockSafety?.shouldReview
+      || tagsSafety?.shouldReview,
     )
 
     await prisma.$transaction(async (tx) => {
@@ -113,7 +119,7 @@ export async function updatePostFlow(input: {
           summary,
           commentsVisibleToAuthorOnly,
           minViewLevel,
-          reviewNote: titleSafety.shouldReview || contentSafety.shouldReview ? "编辑内容命中敏感词规则，请复核" : undefined,
+          reviewNote: titleSafety.shouldReview || contentSafety.shouldReview || tagsSafety?.shouldReview ? "编辑内容命中敏感词规则，请复核" : undefined,
         },
       })
 
@@ -129,7 +135,7 @@ export async function updatePostFlow(input: {
       }
     })
 
-    await syncPostTaxonomy(postId, titleSafety.sanitizedText, serializedContent)
+    await syncPostTaxonomy(postId, titleSafety.sanitizedText, serializedContent, sanitizedManualTags)
 
     return {
       post,

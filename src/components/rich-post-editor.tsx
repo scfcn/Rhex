@@ -1,7 +1,7 @@
 "use client"
 
 import {  useCallback, useMemo, useRef, useState } from "react"
-import { ImagePlus, List, ListOrdered, SmilePlus, Table2, TextQuote } from "lucide-react"
+import { ImagePlus, List, SmilePlus, Table2, TextQuote } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { DEFAULT_MARKDOWN_EMOJI_ITEMS, type MarkdownEmojiItem } from "@/lib/markdown-emoji"
@@ -156,10 +156,6 @@ export function RichPostEditor({ value, onChange, placeholder, minHeight = 260 }
           <List className="mr-1 h-4 w-4" />
           列表
         </Button>
-        <Button type="button" variant="outline" onClick={() => insertTemplate("1. 步骤一\n2. 步骤二")}>
-          <ListOrdered className="mr-1 h-4 w-4" />
-          有序
-        </Button>
         <Button type="button" variant="outline" onMouseDown={handleToolbarMouseDown} onClick={() => applyWrap("> ")}>
           <TextQuote className="mr-1 h-4 w-4" />
           引用
@@ -209,7 +205,8 @@ export function RichPostEditor({ value, onChange, placeholder, minHeight = 260 }
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-        <p>支持图片、表情短码、列表、引用、表格和基础 Markdown 标记，前台会自动渲染。</p>
+        <p>支持图片、表情短码、列表、引用、表格、基础 Markdown。</p>
+
         <p>{stats.paragraphs} 段 · {stats.chars} 字</p>
       </div>
 

@@ -13,6 +13,7 @@ export interface LocalPostDraft {
   purchaseUnlockContent: string
   purchasePrice: string
   minViewLevel: string
+  manualTags: string[]
   lotteryStartsAt: string
   lotteryEndsAt: string
   lotteryParticipantGoal: string
@@ -50,6 +51,7 @@ export function createEmptyLocalPostDraft(boardSlug = ""): LocalPostDraft {
     purchaseUnlockContent: "",
     purchasePrice: "20",
     minViewLevel: "0",
+    manualTags: [],
     lotteryStartsAt: "",
     lotteryEndsAt: "",
     lotteryParticipantGoal: "",
@@ -120,7 +122,14 @@ export function loadPostDraftFromStorage(mode: PostDraftMode, postId?: string) {
       return null
     }
 
-    return parsed
+    return {
+      ...parsed,
+      data: {
+        ...createEmptyLocalPostDraft(parsed.data.boardSlug || ""),
+        ...parsed.data,
+        manualTags: Array.isArray(parsed.data.manualTags) ? parsed.data.manualTags.filter((item): item is string => typeof item === "string") : [],
+      },
+    }
   } catch {
     return null
   }

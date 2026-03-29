@@ -1,6 +1,7 @@
 import { BadgeRuleOperator, BadgeRuleType, BadgeGrantSource } from "@/db/types"
 
-import { prisma } from "@/db/client"
+import { createSelfClaimUserBadge, findAllBadgesWithRules, findBadgeEligibilityUserSnapshot, findDisplayedUserBadges, findGrantedBadgesForUserRecord, findGrantedUserBadge, findUserBadgeDisplayStates, findUserBadgeWithBadge, updateUserBadgeDisplayById } from "@/db/badge-queries"
+import { apiError } from "./api-route"
 
 export interface BadgeRuleItem {
   id: string
@@ -153,27 +154,8 @@ export function describeBadgeRules(rules: BadgeRuleItem[]) {
 }
 
 export async function getBadgeEligibilitySnapshot(userId: number): Promise<BadgeEligibilitySnapshot | null> {
-  const [user, progress] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        createdAt: true,
-        postCount: true,
-        commentCount: true,
-        likeReceivedCount: true,
-        inviteCount: true,
-        acceptedAnswerCount: true,
-        level: true,
-        vipLevel: true,
-      },
+  const [user, progress] = await findBadgeEligibilityUserSnapshot(userId)
 
-    }),
-    prisma.userLevelProgress.findUnique({
-      where: { userId },
-      select: { checkInDays: true },
-    }),
-  ])
 
   if (!user) {
     return null
@@ -245,16 +227,9 @@ function evaluateSingleRule(snapshot: BadgeEligibilitySnapshot, rule: BadgeRuleI
 export async function getBadgeEligibilityResult(userId: number, badge: BadgeItem): Promise<BadgeEligibilityResult> {
   const [snapshot, existing] = await Promise.all([
     getBadgeEligibilitySnapshot(userId),
-    prisma.userBadge.findUnique({
-      where: {
-        userId_badgeId: {
-          userId,
-          badgeId: badge.id,
-        },
-      },
-      select: { id: true },
-    }),
+    findGrantedUserBadge(userId, badge.id),
   ])
+
 
   if (!snapshot) {
     return {
@@ -283,19 +258,8 @@ export async function getBadgeEligibilityResult(userId: number, badge: BadgeItem
 }
 
 export async function getAllBadges(): Promise<BadgeItem[]> {
-  const badges = await prisma.badge.findMany({
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
-    include: {
-      rules: {
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      },
-      _count: {
-        select: {
-          users: true,
-        },
-      },
-    },
-  })
+  const badges = await findAllBadgesWithRules()
+
 
   return badges.map((badge) => ({
     id: badge.id,
@@ -326,24 +290,8 @@ export async function getAllBadges(): Promise<BadgeItem[]> {
 }
 
 export async function getGrantedBadgesForUser(userId: number): Promise<BadgeItem[]> {
-  const records = await prisma.userBadge.findMany({
-    where: { userId },
-    orderBy: [{ grantedAt: "desc" }],
-    include: {
-      badge: {
-        include: {
-          rules: {
-            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-          },
-          _count: {
-            select: {
-              users: true,
-            },
-          },
-        },
-      },
-    },
-  })
+  const records = await findGrantedBadgesForUserRecord(userId)
+
 
   return records
     .map((record) => record.badge)
@@ -402,15 +350,9 @@ export async function getBadgeCenterData(userId: number | null) {
       ...badge,
       eligibility: await getBadgeEligibilityResult(userId, badge),
     }))),
-    prisma.userBadge.findMany({
-      where: { userId },
-      select: {
-        badgeId: true,
-        isDisplayed: true,
-        displayOrder: true,
-      },
-    }),
+    findUserBadgeDisplayStates(userId),
   ])
+
 
   const stateMap = new Map(userBadgeStates.map((item) => [item.badgeId, item]))
 
@@ -432,58 +374,46 @@ export async function claimBadge(userId: number, badgeId: string) {
   const badge = badges.find((item) => item.id === badgeId && item.status)
 
   if (!badge) {
-    throw new Error("勋章不存在")
+    apiError(404, "勋章不存在")
   }
+
 
   const eligibility = await getBadgeEligibilityResult(userId, badge)
 
   if (eligibility.alreadyGranted) {
-    throw new Error("你已经领取过这个勋章")
+    apiError(409, "你已经领取过这个勋章")
   }
 
   if (!eligibility.eligible) {
-    throw new Error(eligibility.failedRules[0] ?? "当前还不满足领取条件")
+    apiError(400, eligibility.failedRules[0] ?? "当前还不满足领取条件")
   }
 
   const snapshot = await getBadgeEligibilitySnapshot(userId)
 
-  await prisma.userBadge.create({
-    data: {
-      userId,
-      badgeId,
-      grantSource: BadgeGrantSource.SELF_CLAIM,
-      grantSnapshot: snapshot ? JSON.stringify(snapshot) : null,
-    },
+  await createSelfClaimUserBadge({
+    userId,
+    badgeId,
+    grantSource: BadgeGrantSource.SELF_CLAIM,
+    grantSnapshot: snapshot ? JSON.stringify(snapshot) : null,
   })
+
 
   return badge
 }
 
 export async function toggleDisplayedBadge(userId: number, badgeId: string) {
-  const userBadge = await prisma.userBadge.findUnique({
-    where: {
-      userId_badgeId: {
-        userId,
-        badgeId,
-      },
-    },
-    include: {
-      badge: true,
-    },
-  })
+  const userBadge = await findUserBadgeWithBadge(userId, badgeId)
 
   if (!userBadge || !userBadge.badge.status) {
-    throw new Error("请先领取勋章后再设置展示")
+    apiError(400, "请先领取勋章后再设置展示")
   }
 
   if (userBadge.isDisplayed) {
-    await prisma.userBadge.update({
-      where: { id: userBadge.id },
-      data: {
-        isDisplayed: false,
-        displayOrder: 0,
-      },
+    await updateUserBadgeDisplayById(userBadge.id, {
+      isDisplayed: false,
+      displayOrder: 0,
     })
+
 
     return {
       badgeId,
@@ -492,31 +422,20 @@ export async function toggleDisplayedBadge(userId: number, badgeId: string) {
     }
   }
 
-  const displayedBadges = await prisma.userBadge.findMany({
-    where: {
-      userId,
-      isDisplayed: true,
-    },
-    orderBy: [{ displayOrder: "asc" }, { grantedAt: "desc" }],
-    select: {
-      id: true,
-      displayOrder: true,
-    },
-  })
+  const displayedBadges = await findDisplayedUserBadges(userId)
 
   if (displayedBadges.length >= MAX_DISPLAYED_BADGES) {
-    throw new Error(`最多只能展示 ${MAX_DISPLAYED_BADGES} 个勋章，请先取消其他已展示勋章`)
+    apiError(409, `最多只能展示 ${MAX_DISPLAYED_BADGES} 个勋章，请先取消其他已展示勋章`)
   }
+
 
   const nextOrder = displayedBadges.length === 0 ? 1 : Math.max(...displayedBadges.map((item) => item.displayOrder), 0) + 1
 
-  await prisma.userBadge.update({
-    where: { id: userBadge.id },
-    data: {
-      isDisplayed: true,
-      displayOrder: nextOrder,
-    },
+  await updateUserBadgeDisplayById(userBadge.id, {
+    isDisplayed: true,
+    displayOrder: nextOrder,
   })
+
 
   return {
     badgeId,

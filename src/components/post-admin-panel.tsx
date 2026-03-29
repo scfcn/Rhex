@@ -30,6 +30,7 @@ interface AdminQuickAction {
 
 export function PostAdminPanel({
   postId,
+  postSlug,
   currentBoardSlug,
   postAuthorId,
   postAuthorUsername,
@@ -70,7 +71,7 @@ export function PostAdminPanel({
     setFeedback("")
 
     startTransition(async () => {
-      const response = await fetch("/api/admin/actions", {
+      const response = await fetch("/a​pi/admin/actions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, targetId, ...extra }),
@@ -86,6 +87,10 @@ export function PostAdminPanel({
         window.location.reload()
       }
     })
+  }
+
+  function openEditPage() {
+    window.location.href = `/write?mode=edit&post=${encodeURIComponent(postSlug)}`
   }
 
   function openMoveDialog() {
@@ -150,6 +155,9 @@ export function PostAdminPanel({
         </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
+        <Button variant="outline" className="h-8 px-3 text-xs" onClick={openEditPage} disabled={pendingAction}>
+          编辑帖子
+        </Button>
         <Button variant="outline" className="h-8 px-3 text-xs" onClick={openMoveDialog} disabled={pendingAction}>
           移动节点
         </Button>

@@ -1,5 +1,7 @@
 import { prisma } from "@/db/client"
 import { createUserRouteHandler } from "@/lib/api-route"
+
+export const dynamic = "force-dynamic"
 import {
   buildHeartbeatPayload,
   buildMessageEventPayload,

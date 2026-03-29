@@ -8,7 +8,10 @@ import {
 } from "@/db/admin-announcement-queries"
 
 import { requireAdminUser } from "@/lib/admin"
+import { apiError } from "@/lib/api-route"
 import { serializeDateTime } from "@/lib/formatters"
+
+
 
 
 
@@ -47,11 +50,12 @@ function normalizeStatus(value: unknown): AnnouncementStatus {
 function mapRequiredDateTime(input: string | Date): string {
   const value = serializeDateTime(input)
   if (!value) {
-    throw new Error("公告时间序列化失败")
+    apiError(500, "公告时间序列化失败")
   }
 
   return value
 }
+
 
 function mapAnnouncement(item: AdminAnnouncementRecord): AdminAnnouncementItem {
 
@@ -71,19 +75,19 @@ function mapAnnouncement(item: AdminAnnouncementRecord): AdminAnnouncementItem {
 export async function getAdminAnnouncementList(): Promise<AdminAnnouncementItem[]> {
   const currentUser = await requireAdminUser()
   if (!currentUser) {
-    throw new Error("无权限访问公告数据")
+    apiError(403, "无权限访问公告数据")
   }
 
   const items = await findAdminAnnouncements()
 
-
   return items.map(mapAnnouncement)
 }
+
 
 export async function saveAdminAnnouncement(input: AdminAnnouncementInput): Promise<AdminAnnouncementItem> {
   const currentUser = await requireAdminUser()
   if (!currentUser) {
-    throw new Error("无权操作公告")
+    apiError(403, "无权操作公告")
   }
 
   const title = normalizeText(input.title, 120)
@@ -92,12 +96,13 @@ export async function saveAdminAnnouncement(input: AdminAnnouncementInput): Prom
   const isPinned = Boolean(input.isPinned)
 
   if (!title) {
-    throw new Error("公告标题不能为空")
+    apiError(400, "公告标题不能为空")
   }
 
   if (!content) {
-    throw new Error("公告内容不能为空")
+    apiError(400, "公告内容不能为空")
   }
+
 
   const publishedAt = status === AnnouncementStatus.PUBLISHED ? new Date() : null
 
@@ -125,41 +130,41 @@ export async function saveAdminAnnouncement(input: AdminAnnouncementInput): Prom
 export async function removeAdminAnnouncement(id: string) {
   const currentUser = await requireAdminUser()
   if (!currentUser) {
-    throw new Error("无权删除公告")
+    apiError(403, "无权删除公告")
   }
 
   if (!id) {
-    throw new Error("公告不存在")
+    apiError(404, "公告不存在")
   }
 
   await deleteAdminAnnouncementById(id)
-
 }
+
 
 export async function toggleAdminAnnouncementPin(id: string, isPinned: boolean) {
   const currentUser = await requireAdminUser()
   if (!currentUser) {
-    throw new Error("无权更新公告")
+    apiError(403, "无权更新公告")
   }
 
   if (!id) {
-    throw new Error("公告不存在")
+    apiError(404, "公告不存在")
   }
 
   const updated = await updateAdminAnnouncementById(id, { isPinned })
 
-
   return mapAnnouncement(updated)
 }
+
 
 export async function updateAdminAnnouncementStatus(id: string, status: string) {
   const currentUser = await requireAdminUser()
   if (!currentUser) {
-    throw new Error("无权更新公告")
+    apiError(403, "无权更新公告")
   }
 
   if (!id) {
-    throw new Error("公告不存在")
+    apiError(404, "公告不存在")
   }
 
   const normalizedStatus = normalizeStatus(status)
@@ -168,6 +173,6 @@ export async function updateAdminAnnouncementStatus(id: string, status: string) 
     publishedAt: normalizedStatus === AnnouncementStatus.PUBLISHED ? new Date() : normalizedStatus === AnnouncementStatus.DRAFT ? null : undefined,
   })
 
-
   return mapAnnouncement(updated)
 }
+

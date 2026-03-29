@@ -1,5 +1,7 @@
 import { prisma } from "@/db/client"
 
+import { apiError } from "@/lib/api-route"
+
 export async function purchaseInviteCodeTransaction(params: {
   userId: number
   price: number
@@ -10,12 +12,13 @@ export async function purchaseInviteCodeTransaction(params: {
     const latestUser = await tx.user.findUnique({ where: { id: params.userId }, select: { id: true, points: true, username: true } })
 
     if (!latestUser) {
-      throw new Error("用户不存在")
+      apiError(404, "用户不存在")
     }
 
     if (latestUser.points < params.price) {
-      throw new Error(`${params.pointName}不足，无法购买邀请码`)
+      apiError(409, `${params.pointName}不足，无法购买邀请码`)
     }
+
 
     const inviteCode = await tx.inviteCode.create({
       data: {

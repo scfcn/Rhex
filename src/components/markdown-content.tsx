@@ -185,9 +185,40 @@ function applyMarkdownEmojiShortcodes(input: string, emojiItems: MarkdownEmojiIt
   })
 }
 
+const ALLOWED_MARKDOWN_HTML_ALIGNMENTS = new Set(["left", "center", "right"])
+
+function sanitizeMarkdownInlineHtml(input: string) {
+  return input.replace(/<(\/)?([a-zA-Z][\w-]*)([^>]*)>/g, (raw, closingSlash: string | undefined, rawTagName: string, rawAttributes: string) => {
+    const tagName = rawTagName.toLowerCase()
+
+    if (closingSlash) {
+      if (tagName === "center" || tagName === "p") {
+        return `</${tagName}>`
+      }
+      return escapeHtml(raw)
+    }
+
+    if (tagName === "center") {
+      return "<center>"
+    }
+
+    if (tagName !== "p") {
+      return escapeHtml(raw)
+    }
+
+    const alignMatch = rawAttributes.match(/\balign\s*=\s*(["']?)(left|center|right)\1/i)
+    const alignment = alignMatch?.[2]?.toLowerCase()
+    if (!alignment || !ALLOWED_MARKDOWN_HTML_ALIGNMENTS.has(alignment)) {
+      return escapeHtml(raw)
+    }
+
+    return `<p align="${alignment}">`
+  })
+}
+
 function createMarkdownRenderer(emojiItems: MarkdownEmojiItem[]) {
   const md = new MarkdownIt({
-    html: false,
+    html: true,
     linkify: true,
     typographer: true,
     breaks: true,
@@ -260,7 +291,8 @@ function createMarkdownRenderer(emojiItems: MarkdownEmojiItem[]) {
 
 function renderMarkdown(input: string, emojiItems: MarkdownEmojiItem[]) {
   const markdown = createMarkdownRenderer(emojiItems)
-  const lines = input.split("\n")
+  const sanitizedInput = sanitizeMarkdownInlineHtml(input)
+  const lines = sanitizedInput.split("\n")
   const htmlChunks: string[] = []
   const markdownBuffer: string[] = []
 
@@ -287,7 +319,11 @@ function renderMarkdown(input: string, emojiItems: MarkdownEmojiItem[]) {
   flushMarkdownBuffer()
 
   return htmlChunks.join("\n")
+    .replace(/<center>/g, '<center class="my-3 block text-center">')
     .replace(/<p>/g, '<p class="my-3 leading-7 text-foreground">')
+    .replace(/<p align="left">/g, '<p align="left" class="my-3 leading-7 text-left text-foreground">')
+    .replace(/<p align="center">/g, '<p align="center" class="my-3 leading-7 text-center text-foreground">')
+    .replace(/<p align="right">/g, '<p align="right" class="my-3 leading-7 text-right text-foreground">')
     .replace(/<ul>/g, '<ul class="my-4 list-disc space-y-2 pl-6 text-foreground">')
     .replace(/<ol>/g, '<ol class="my-4 list-decimal space-y-2 pl-6 text-foreground">')
     .replace(/<li>/g, '<li class="leading-7">')

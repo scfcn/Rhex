@@ -1,34 +1,55 @@
 import { prisma } from "@/db/client"
 import { extractSummaryFromContent } from "@/lib/content"
 import { getAllPostContentText } from "@/lib/post-content"
-import { extractAutoTags, slugifyTagName } from "@/lib/post-taxonomy"
 
-function buildTagOperations(title: string, content: string) {
-  const normalizedContent = getAllPostContentText(content)
-  const autoTags = extractAutoTags(title, normalizedContent)
+function normalizeTagSlug(name: string) {
+  return name
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\u4e00-\u9fa5\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .slice(0, 32)
+}
 
-  return autoTags.map((name) => ({
+export function normalizeManualTags(tags?: string[]) {
+  if (!Array.isArray(tags)) {
+    return []
+  }
+
+  return tags
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((item, index, array) => array.findIndex((candidate) => candidate.toLowerCase() === item.toLowerCase()) === index)
+    .slice(0, 10)
+}
+
+function buildTagOperations(tags?: string[]) {
+  const normalizedTags = normalizeManualTags(tags)
+
+  return normalizedTags.map((name) => ({
     tag: {
       connectOrCreate: {
         where: {
-          slug: slugifyTagName(name),
+          slug: normalizeTagSlug(name),
         },
         create: {
           name,
-          slug: slugifyTagName(name),
+          slug: normalizeTagSlug(name),
         },
       },
     },
   }))
 }
 
-export async function syncPostTaxonomy(postId: string, title: string, content: string) {
+export async function syncPostTaxonomy(postId: string, title: string, content: string, manualTags?: string[]) {
   await prisma.postTag.deleteMany({
     where: { postId },
   })
 
   const normalizedContent = getAllPostContentText(content)
-  const tagOperations = buildTagOperations(title, content)
+  const tagOperations = buildTagOperations(manualTags)
 
   await prisma.post.update({
     where: { id: postId },
@@ -42,4 +63,3 @@ export async function syncPostTaxonomy(postId: string, title: string, content: s
     },
   })
 }
-

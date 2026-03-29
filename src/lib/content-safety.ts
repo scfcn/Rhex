@@ -3,7 +3,7 @@ import { findActiveSensitiveWords } from "@/db/content-safety-queries"
 
 export type SensitiveMatchType = "EXACT" | "CONTAINS" | "REGEX"
 export type SensitiveActionType = "REJECT" | "REVIEW" | "REPLACE"
-export type SensitiveScene = "post.title" | "post.content" | "comment.content" | "profile.nickname" | "profile.bio" | "yinyang.question" | "yinyang.answer"
+export type SensitiveScene = "post.title" | "post.content" | "post.tags" | "comment.content" | "profile.nickname" | "profile.bio" | "yinyang.question" | "yinyang.answer"
 
 
 export interface SensitiveWordRule {

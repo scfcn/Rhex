@@ -5,13 +5,12 @@ import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getCurrentUser } from "@/lib/auth"
-import { getBoards } from "@/lib/boards"
+import { getBoards, type SiteBoardItem } from "@/lib/boards"
 import { parsePostContentDocument } from "@/lib/post-content"
 import { getEditablePostBySlug } from "@/lib/posts"
 import { DEFAULT_ALLOWED_POST_TYPES } from "@/lib/post-types"
 import { getSiteSettings } from "@/lib/site-settings"
-import { getZones } from "@/lib/zones"
-
+import { getZones, type SiteZoneItem } from "@/lib/zones"
 
 interface WritePageProps {
   searchParams?: {
@@ -21,46 +20,54 @@ interface WritePageProps {
   }
 }
 
+interface BoardOptionItem {
+  value: string
+  label: string
+  allowedPostTypes: string[]
+  requirePostReview: boolean
+  minPostPoints: number
+  minPostLevel: number
+  minPostVipLevel: number
+}
+
+interface BoardOptionGroup {
+  zone: string
+  items: BoardOptionItem[]
+}
+
+function mapBoardOption(board: SiteBoardItem): BoardOptionItem {
+  return {
+    value: board.slug,
+    label: board.name,
+    allowedPostTypes: board.allowedPostTypes ?? DEFAULT_ALLOWED_POST_TYPES,
+    requirePostReview: board.requirePostReview ?? false,
+    minPostPoints: board.minPostPoints ?? 0,
+    minPostLevel: board.minPostLevel ?? 0,
+    minPostVipLevel: board.minPostVipLevel ?? 0,
+  }
+}
+
 export default async function WritePage({ searchParams }: WritePageProps) {
   const [user, zones, boards, settings] = await Promise.all([getCurrentUser(), getZones(), getBoards(), getSiteSettings()])
   const mode = searchParams?.mode === "edit" ? "edit" : "create"
   const editingSlug = searchParams?.post
   const preferredBoardSlug = searchParams?.board ?? ""
 
-
-  const groupedBoardOptions = zones
-    .map((zone) => ({
+  const groupedBoardOptions: BoardOptionGroup[] = zones
+    .map((zone: SiteZoneItem) => ({
       zone: zone.name,
       items: boards
-        .filter((board) => zone.boardSlugs.includes(board.slug))
-        .map((board) => ({
-          value: board.slug,
-          label: board.name,
-          allowedPostTypes: board.allowedPostTypes ?? DEFAULT_ALLOWED_POST_TYPES,
-          requirePostReview: board.requirePostReview ?? false,
-          minPostPoints: board.minPostPoints ?? 0,
-          minPostLevel: board.minPostLevel ?? 0,
-          minPostVipLevel: board.minPostVipLevel ?? 0,
-        })),
-
+        .filter((board: SiteBoardItem) => zone.boardSlugs.includes(board.slug))
+        .map((board: SiteBoardItem) => mapBoardOption(board)),
     }))
-    .filter((group) => group.items.length > 0)
+    .filter((group: BoardOptionGroup) => group.items.length > 0)
 
-  const groupedBoardSlugs = new Set(groupedBoardOptions.flatMap((group) => group.items.map((item) => item.value)))
-  const ungroupedBoards = boards
-    .filter((board) => !groupedBoardSlugs.has(board.slug))
-    .map((board) => ({
-      value: board.slug,
-      label: board.name,
-      allowedPostTypes: board.allowedPostTypes ?? DEFAULT_ALLOWED_POST_TYPES,
-      requirePostReview: board.requirePostReview ?? false,
-      minPostPoints: board.minPostPoints ?? 0,
-      minPostLevel: board.minPostLevel ?? 0,
-      minPostVipLevel: board.minPostVipLevel ?? 0,
-    }))
+  const groupedBoardSlugs = new Set(groupedBoardOptions.flatMap((group: BoardOptionGroup) => group.items.map((item: BoardOptionItem) => item.value)))
+  const ungroupedBoards: BoardOptionItem[] = boards
+    .filter((board: SiteBoardItem) => !groupedBoardSlugs.has(board.slug))
+    .map((board: SiteBoardItem) => mapBoardOption(board))
 
-
-  const boardOptions = ungroupedBoards.length > 0
+  const boardOptions: BoardOptionGroup[] = ungroupedBoards.length > 0
     ? [...groupedBoardOptions, { zone: "未分区节点", items: ungroupedBoards }]
     : groupedBoardOptions
 
@@ -89,7 +96,6 @@ export default async function WritePage({ searchParams }: WritePageProps) {
     ? await getEditablePostBySlug(editingSlug)
     : null
 
-
   const contentDocument = editingPost ? parsePostContentDocument(editingPost.content) : null
   const publicBlock = contentDocument?.blocks.find((block) => block.type === "PUBLIC")
   const replyUnlockBlock = contentDocument?.blocks.find((block) => block.type === "REPLY_UNLOCK")
@@ -108,7 +114,6 @@ export default async function WritePage({ searchParams }: WritePageProps) {
             <CardTitle>{mode === "edit" ? "编辑帖子" : "发布新帖子"}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-
             {mode === "edit" ? (
               !editingPost ? (
                 <div className="rounded-[24px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">未找到要编辑的帖子。</div>
@@ -122,7 +127,6 @@ export default async function WritePage({ searchParams }: WritePageProps) {
                   pointName={settings.pointName}
                   markdownEmojiMap={settings.markdownEmojiMap}
                   currentUser={{
-
                     username: user.username,
                     nickname: user.nickname,
                     level: user.level,
@@ -138,24 +142,27 @@ export default async function WritePage({ searchParams }: WritePageProps) {
                     content: publicBlock?.text ?? editingPost.content,
                     commentsVisibleToAuthorOnly: editingPost.commentsVisibleToAuthorOnly,
                     replyUnlockContent: replyUnlockBlock?.text ?? "",
-
                     replyThreshold: replyUnlockBlock?.replyThreshold ?? 1,
                     purchaseUnlockContent: purchaseUnlockBlock?.text ?? "",
                     purchasePrice: purchaseUnlockBlock?.price ?? null,
                     minViewLevel: editingPost.minViewLevel,
                     boardSlug: editingPost.board.slug,
-
                     postType: editingPost.type,
                     bountyPoints: editingPost.bountyPoints,
                     pollOptions: editingPost.pollOptions.map((item) => item.content),
-                    redPacketConfig: editingPost.redPacket ? {
-                      enabled: true,
-                      grantMode: editingPost.redPacket.grantMode,
-                      triggerType: editingPost.redPacket.triggerType,
-                      totalPoints: editingPost.redPacket.totalPoints,
-                      unitPoints: editingPost.redPacket.grantMode === "FIXED" ? Math.floor(editingPost.redPacket.totalPoints / Math.max(1, editingPost.redPacket.packetCount)) : editingPost.redPacket.totalPoints,
-                      packetCount: editingPost.redPacket.packetCount,
-                    } : undefined,
+                    tags: editingPost.tags.map((item) => item.tag.name),
+                    redPacketConfig: editingPost.redPacket
+                      ? {
+                          enabled: true,
+                          grantMode: editingPost.redPacket.grantMode,
+                          triggerType: editingPost.redPacket.triggerType,
+                          totalPoints: editingPost.redPacket.totalPoints,
+                          unitPoints: editingPost.redPacket.grantMode === "FIXED"
+                            ? Math.floor(editingPost.redPacket.totalPoints / Math.max(1, editingPost.redPacket.packetCount))
+                            : editingPost.redPacket.totalPoints,
+                          packetCount: editingPost.redPacket.packetCount,
+                        }
+                      : undefined,
                   }}
                 />
               )
@@ -166,7 +173,6 @@ export default async function WritePage({ searchParams }: WritePageProps) {
                 postRedPacketEnabled={settings.postRedPacketEnabled}
                 markdownEmojiMap={settings.markdownEmojiMap}
                 currentUser={{
-
                   username: user.username,
                   nickname: user.nickname,
                   level: user.level,
@@ -183,5 +189,3 @@ export default async function WritePage({ searchParams }: WritePageProps) {
     </div>
   )
 }
-
-

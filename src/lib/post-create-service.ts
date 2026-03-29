@@ -4,15 +4,15 @@ import { ChangeType, type Prisma } from "@/db/types"
 import { prisma } from "@/db/client"
 import { apiError } from "@/lib/api-route"
 import { checkBoardPermission, getBoardAccessContextBySlug } from "@/lib/board-access"
-import { enforceSensitiveText } from "@/lib/content-safety"
 import { extractSummaryFromContent } from "@/lib/content"
+import { enforceSensitiveText } from "@/lib/content-safety"
 import { parseBusinessDateTime } from "@/lib/formatters"
 import { determineLotteryTriggerMode, normalizeLotteryConfig } from "@/lib/lottery"
 import { createPostMentionNotifications } from "@/lib/post-mentions"
 
 import { buildPostContentDocument, getAllPostContentText, serializePostContentDocument } from "@/lib/post-content"
 import { createPostRedPacketAfterPostCreated, normalizePostRedPacketConfig } from "@/lib/post-red-packets"
-import { syncPostTaxonomy } from "@/lib/post-editor"
+import { normalizeManualTags, syncPostTaxonomy } from "@/lib/post-editor"
 import { getSiteSettings } from "@/lib/site-settings"
 import { validatePostPayload } from "@/lib/validators"
 
@@ -37,6 +37,11 @@ export async function createPostFlow(body: unknown) {
   const { title, content, boardSlug, postType, bountyPoints, pollOptions, commentsVisibleToAuthorOnly, replyUnlockContent, replyThreshold, purchaseUnlockContent, purchasePrice, minViewLevel, lotteryConfig } = validated.data
 
   const rawBody = body as Record<string, unknown>
+  const manualTags = normalizeManualTags(Array.isArray(rawBody?.manualTags)
+    ? rawBody.manualTags.filter((item): item is string => typeof item === "string")
+    : [])
+  const tagsSafety = manualTags.length > 0 ? await enforceSensitiveText({ scene: "post.tags", text: manualTags.join("\n") }) : null
+  const sanitizedManualTags = normalizeManualTags(tagsSafety?.sanitizedText.split(/\n+/).map((item) => item.trim()).filter(Boolean) ?? manualTags)
   const redPacketConfig = rawBody?.redPacketConfig && typeof rawBody.redPacketConfig === "object" && !Array.isArray(rawBody.redPacketConfig)
     ? rawBody.redPacketConfig as Record<string, unknown>
     : null
@@ -109,7 +114,7 @@ export async function createPostFlow(body: unknown) {
     apiError(400, `当前${settings.pointName}不足，无法在该节点发布此帖子`)
   }
 
-  const shouldPending = Boolean(boardContext.settings.requirePostReview || titleSafety.shouldReview || contentSafety.shouldReview || replyUnlockSafety?.shouldReview || purchaseUnlockSafety?.shouldReview)
+  const shouldPending = Boolean(boardContext.settings.requirePostReview || titleSafety.shouldReview || contentSafety.shouldReview || replyUnlockSafety?.shouldReview || purchaseUnlockSafety?.shouldReview || tagsSafety?.shouldReview)
 
   const post = await prisma.$transaction(async (tx) => {
     const lotteryData = normalizedLottery?.data
@@ -137,7 +142,7 @@ export async function createPostFlow(body: unknown) {
       lotteryParticipantGoal: postType === "LOTTERY" ? (lotteryData?.participantGoal ?? null) : null,
       editableUntil: new Date(Date.now() + 10 * 60 * 1000),
       publishedAt: shouldPending ? null : new Date(),
-      reviewNote: titleSafety.shouldReview || contentSafety.shouldReview ? "命中敏感词规则，已进入审核" : null,
+      reviewNote: titleSafety.shouldReview || contentSafety.shouldReview || tagsSafety?.shouldReview ? "命中敏感词规则，已进入审核" : null,
       pollOptions: postType === "POLL" ? { create: pollOptions.map((option, index) => ({ content: option, sortOrder: index })) } : undefined,
       lotteryPrizes: postType === "LOTTERY" ? { create: (lotteryData?.prizes ?? []).map((prize, index) => ({ title: prize.title, description: prize.description, quantity: prize.quantity, sortOrder: index })) } : undefined,
       lotteryConditions: postType === "LOTTERY" ? { create: (lotteryData?.conditions ?? []).map((condition, index) => ({ type: condition.type, operator: condition.operator ?? "GTE", value: condition.value, description: condition.description, groupKey: condition.groupKey ?? "default", sortOrder: index })) } : undefined,
@@ -223,7 +228,7 @@ export async function createPostFlow(body: unknown) {
     return createdPost
   })
 
-  await syncPostTaxonomy(post.id, titleSafety.sanitizedText, serializedContent)
+  await syncPostTaxonomy(post.id, titleSafety.sanitizedText, serializedContent, sanitizedManualTags)
 
   return {
     post,

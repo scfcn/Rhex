@@ -3,6 +3,8 @@ import { RelatedType, TargetType } from "@/db/types"
 
 import { countReportsByStatus, createReportRecord, createReportResultNotification, findAdminReportsPage, findDuplicatedPendingReport, findReportById, findReportTargetComment, findReportTargetPost, findReportTargetUser } from "@/db/report-queries"
 import { resolvePagination } from "@/db/helpers"
+import { apiError } from "@/lib/api-route"
+
 
 
 
@@ -99,25 +101,25 @@ export async function createReport(input: CreateReportInput) {
   const normalizedReasonDetail = input.reasonDetail?.trim() || null
 
   if (!normalizedReasonType) {
-    throw new Error("请选择举报原因")
+    apiError(400, "请选择举报原因")
   }
 
   const target = await resolveReportTarget(input.targetType, input.targetId)
 
   if (!target) {
-    throw new Error("举报目标不存在或已被删除")
+    apiError(404, "举报目标不存在或已被删除")
   }
 
   if (target.ownerUserId && target.ownerUserId === input.reporterId) {
-    throw new Error("不能举报自己")
+    apiError(400, "不能举报自己")
   }
 
   const duplicatedReport = await findDuplicatedPendingReport(input.reporterId, input.targetType, input.targetId)
 
-
   if (duplicatedReport) {
-    throw new Error("你已经举报过该内容，处理中请耐心等待")
+    apiError(409, "你已经举报过该内容，处理中请耐心等待")
   }
+
 
   return await createReportRecord({
     reporterId: input.reporterId,

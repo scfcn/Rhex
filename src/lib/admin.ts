@@ -12,6 +12,7 @@ import { getPostStatusLabel, getPostTypeLabel, isLocalPostType, type LocalPostTy
 import { prisma } from "@/db/client"
 import { getAdminDashboardRawData } from "@/db/admin-dashboard-queries"
 import { normalizePageSize, normalizePositiveInteger } from "@/lib/shared/normalizers"
+import { apiError } from "./api-route"
 
 
 
@@ -221,8 +222,9 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
   const currentUser = await requireAdminUser()
 
   if (!currentUser) {
-    throw new Error("无权限访问后台数据")
+    apiError(403, "无权限访问后台数据")
   }
+
 
   const data = await getAdminDashboardRawData()
 
