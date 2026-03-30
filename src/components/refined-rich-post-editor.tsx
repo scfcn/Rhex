@@ -53,13 +53,11 @@ function useFloatingPanel() {
   const [isReady, setIsReady] = useState(false)
   const ref = useRef<HTMLDivElement | null>(null)
 
-  return {
-    position,
-    setPosition,
-    isReady,
-    setIsReady,
-    ref,
-  }
+  const panelRef = useRef({ position, setPosition, isReady, setIsReady, ref })
+  panelRef.current.position = position
+  panelRef.current.isReady = isReady
+
+  return panelRef.current
 }
 
 const EDITOR_LINE_HEIGHT_REM = 1.75
