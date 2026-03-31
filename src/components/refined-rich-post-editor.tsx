@@ -437,6 +437,23 @@ export function RefinedRichPostEditor({
     uploadFolder,
     onInsert: insertTemplate,
   })
+  const uploadSummary = useMemo(() => {
+    const totalCount = uploadResults.length
+    const queuedCount = uploadResults.filter((item) => item.status === "queued").length
+    const activeCount = uploadResults.filter((item) => item.status === "uploading").length
+    const successCount = uploadResults.filter((item) => item.status === "success").length
+    const errorCount = uploadResults.filter((item) => item.status === "error").length
+    const completedCount = successCount + errorCount
+
+    return {
+      totalCount,
+      queuedCount,
+      activeCount,
+      successCount,
+      errorCount,
+      completedCount,
+    }
+  }, [uploadResults])
 
   const contentMinHeight = isFullscreen ? "calc(100vh - 220px)" : minHeight
   const logicalLines = useMemo(() => value.split("\n"), [value])
@@ -1468,7 +1485,9 @@ export function RefinedRichPostEditor({
           <div className="mb-3 space-y-1">
             <div className="text-sm font-medium text-foreground">图片上传</div>
             <p className="text-xs leading-5 text-muted-foreground">
-              {uploading ? "正在上传图片，请稍候…" : "以下是本次上传结果。"}
+              {uploading
+                ? `队列处理中：正在上传 ${uploadSummary.activeCount} 张，等待 ${uploadSummary.queuedCount} 张，已完成 ${uploadSummary.completedCount}/${uploadSummary.totalCount}。`
+                : `本次上传完成：成功 ${uploadSummary.successCount} 张，失败 ${uploadSummary.errorCount} 张。`}
             </p>
           </div>
           <ul className="space-y-2">
@@ -1479,15 +1498,23 @@ export function RefinedRichPostEditor({
                     "mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
                     item.status === "success" && "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400",
                     item.status === "error" && "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400",
-                    item.status === "pending" && "bg-muted text-muted-foreground",
+                    item.status === "uploading" && "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400",
+                    item.status === "queued" && "bg-muted text-muted-foreground",
                   ].filter(Boolean).join(" ")}
                 >
                   {item.status === "success" && "✓"}
                   {item.status === "error" && "✗"}
-                  {item.status === "pending" && "…"}
+                  {item.status === "uploading" && "↑"}
+                  {item.status === "queued" && "…"}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium text-foreground">{item.name}</span>
+                  {item.status === "queued" && (
+                    <span className="block text-muted-foreground">排队中，等待前面的任务完成</span>
+                  )}
+                  {item.status === "uploading" && (
+                    <span className="block text-sky-700 dark:text-sky-400">上传中…</span>
+                  )}
                   {item.status === "error" && item.errorMessage && (
                     <span className="block text-red-600 dark:text-red-400">{item.errorMessage}</span>
                   )}

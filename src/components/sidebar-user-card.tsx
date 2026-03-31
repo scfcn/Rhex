@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Plus, Sparkles, Star, Wallet, Zap } from "lucide-react"
@@ -229,8 +230,8 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "ç
       <div className="overflow-hidden rounded-[24px] border border-border bg-card shadow-sm shadow-black/5 dark:shadow-black/30">
         <div className="sidebar-user-card-header p-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-foreground text-background shadow-sm shadow-black/10 dark:shadow-black/30">
-              <Sparkles className="h-4.5 w-4.5" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl">
+              <Image src="/icon.svg" alt="" width={18} height={18} className="h-10 w-10" />
             </div>
             <div>
               <h3 className="text-sm font-semibold">{siteName}</h3>

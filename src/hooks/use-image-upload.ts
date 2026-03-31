@@ -1,6 +1,8 @@
 import { useCallback, useState } from "react"
 
-export type UploadFileStatus = "pending" | "success" | "error"
+const IMAGE_UPLOAD_MAX_CONCURRENCY = 1
+
+export type UploadFileStatus = "queued" | "uploading" | "success" | "error"
 
 export type UploadFileResult = {
   name: string
@@ -37,11 +39,28 @@ export function useImageUpload({ uploadFolder = "posts", onInsert }: UseImageUpl
     setUploading(true)
     const initialResults: UploadFileResult[] = files.map((file) => ({
       name: file.name,
-      status: "pending",
+      status: "queued",
     }))
     setUploadResults(initialResults)
 
+    const updateUploadResult = (index: number, next: Partial<UploadFileResult> & Pick<UploadFileResult, "status">) => {
+      setUploadResults((prev) => prev.map((item, i) => (
+        i === index
+          ? {
+            ...item,
+            ...next,
+          }
+          : item
+      )))
+    }
+
     const uploadOne = async (file: File, index: number): Promise<string | null> => {
+      updateUploadResult(index, {
+        status: "uploading",
+        errorMessage: undefined,
+        urlPath: undefined,
+      })
+
       const formData = new FormData()
       formData.append("file", file)
       formData.append("folder", uploadFolder)
@@ -55,28 +74,43 @@ export function useImageUpload({ uploadFolder = "posts", onInsert }: UseImageUpl
 
         if (!response.ok) {
           const errorMessage = result.message ?? `${file.name} 上传失败`
-          setUploadResults((prev) => prev.map((item, i) =>
-            i === index ? { ...item, status: "error", errorMessage } : item,
-          ))
+          updateUploadResult(index, { status: "error", errorMessage })
           return null
         }
 
         const urlPath: string = result.data?.urlPath ?? ""
-        setUploadResults((prev) => prev.map((item, i) =>
-          i === index ? { ...item, status: "success", urlPath } : item,
-        ))
+        updateUploadResult(index, {
+          status: "success",
+          urlPath,
+          errorMessage: undefined,
+        })
         return urlPath
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : `${file.name} 上传失败`
-        setUploadResults((prev) => prev.map((item, i) =>
-          i === index ? { ...item, status: "error", errorMessage } : item,
-        ))
+        updateUploadResult(index, {
+          status: "error",
+          errorMessage,
+          urlPath: undefined,
+        })
         return null
       }
     }
 
     try {
-      const urlPaths = await Promise.all(files.map((file, index) => uploadOne(file, index)))
+      const urlPaths = Array<string | null>(files.length).fill(null)
+      let nextIndex = 0
+      const workerCount = Math.min(IMAGE_UPLOAD_MAX_CONCURRENCY, files.length)
+
+      const workers = Array.from({ length: workerCount }, async () => {
+        while (nextIndex < files.length) {
+          const currentIndex = nextIndex
+          nextIndex += 1
+          urlPaths[currentIndex] = await uploadOne(files[currentIndex], currentIndex)
+        }
+      })
+
+      await Promise.all(workers)
+
       const markdownLines = files
         .map((file, index) => urlPaths[index] !== null ? `![${file.name}](${urlPaths[index]})` : null)
         .filter((line): line is string => line !== null)

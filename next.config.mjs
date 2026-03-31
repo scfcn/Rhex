@@ -7,7 +7,6 @@ const projectRoot = path.dirname(fileURLToPath(import.meta.url))
 const nextConfig = {
   reactStrictMode: true,
   productionBrowserSourceMaps:false,
-  output: "standalone",
   experimental: {
     webpackBuildWorker: true,
     serverSourceMaps:false,

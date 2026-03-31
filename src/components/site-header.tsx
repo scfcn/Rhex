@@ -1,6 +1,6 @@
 import Image from "next/image"
 import Link from "next/link"
-import { Bell, Sparkles } from "lucide-react"
+import { Bell } from "lucide-react"
 
 import { HeaderUserActions } from "@/components/header-user-actions"
 import { MobileHeaderQuickActions } from "@/components/mobile-header-quick-actions"
@@ -29,8 +29,8 @@ function SiteLogoMark({ logoPath }: { logoPath?: string | null }) {
   }
 
   return (
-    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-foreground text-background">
-      <Sparkles className="h-4 w-4" />
+    <div className="flex h-8 w-8 items-center justify-center rounded-md">
+      <Image src="/icon.svg" alt="" width={16} height={16} className="h-8 w-8" />
     </div>
   )
 }
