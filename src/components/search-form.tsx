@@ -75,7 +75,7 @@ export function SearchForm({ defaultValue = "", compact = false, appLinks = [], 
 
   return (
     <form onSubmit={handleSubmit} className={compact ? "w-full" : "w-full max-w-2xl"}>
-      <div className={compact ? "relative" : "flex items-center gap-2 rounded-full border border-border bg-card px-4 py-3 shadow-sm transition-shadow focus-within:shadow-soft"}>
+      <div className={compact ? "relative" : "flex items-center gap-2 rounded-full border border-border bg-background/95 px-4 py-3 text-foreground shadow-sm transition-shadow focus-within:shadow-soft"}>
         {compact ? (
           <>
             {hasDesktopApps ? (
@@ -137,7 +137,7 @@ export function SearchForm({ defaultValue = "", compact = false, appLinks = [], 
             <input
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
-              className="w-full bg-transparent text-sm outline-none"
+              className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
               placeholder="搜索节点、帖子、作者"
               maxLength={50}
             />

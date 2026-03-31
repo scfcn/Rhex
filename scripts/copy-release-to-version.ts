@@ -6,6 +6,7 @@ const versionDirectory = join(resolve(__dirname, "../../"), "version/Rhex")
 
 const includeEntries = [
   "src",
+  "docs",
   "public",
   "prisma",
   "scripts",

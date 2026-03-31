@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation"
 
+import { AdminModuleSearch } from "@/components/admin-module-search"
 import { AdminShell } from "@/components/admin-shell"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -38,11 +39,14 @@ export default async function AdminAppPage({ params }: AdminAppPageProps) {
     return (
       <AdminShell currentTab="/admin/apps" adminName={admin.nickname ?? admin.username}>
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>{app.name} · 应用后台</CardTitle>
-            </CardHeader>
-          </Card>
+          <div className="flex flex-col gap-4 rounded-[24px] border border-border bg-card px-5 py-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">当前模块</p>
+              <h2 className="text-lg font-semibold">{app.name} · 应用后台</h2>
+            </div>
+            <AdminModuleSearch className="md:ml-auto" />
+          </div>
+   
           <AppAdminComponent AppId="gobang" config={config} />
         </div>
       </AdminShell>
@@ -55,6 +59,13 @@ export default async function AdminAppPage({ params }: AdminAppPageProps) {
     return (
       <AdminShell currentTab="/admin/apps" adminName={admin.nickname ?? admin.username}>
         <div className="space-y-6">
+          <div className="flex flex-col gap-4 rounded-[24px] border border-border bg-card px-5 py-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">当前模块</p>
+              <h2 className="text-lg font-semibold">{app.name} · 应用后台</h2>
+            </div>
+            <AdminModuleSearch className="md:ml-auto" />
+          </div>
           <Card>
             <CardHeader>
               <CardTitle>{app.name} · 应用后台</CardTitle>
@@ -72,6 +83,13 @@ export default async function AdminAppPage({ params }: AdminAppPageProps) {
     return (
       <AdminShell currentTab="/admin/apps" adminName={admin.nickname ?? admin.username}>
         <div className="space-y-6">
+          <div className="flex flex-col gap-4 rounded-[24px] border border-border bg-card px-5 py-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">当前模块</p>
+              <h2 className="text-lg font-semibold">{app.name} · 应用后台</h2>
+            </div>
+            <AdminModuleSearch className="md:ml-auto" />
+          </div>
           <Card>
             <CardHeader>
               <CardTitle>{app.name} · 应用后台</CardTitle>

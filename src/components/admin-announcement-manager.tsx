@@ -5,6 +5,7 @@ import { useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
+import { DialogBackdrop, DialogPanel, DialogPortal, DialogPositioner } from "@/components/ui/dialog"
 import { toast } from "@/components/ui/toast"
 import { formatMonthDayTime } from "@/lib/formatters"
 import type { AdminAnnouncementItem } from "@/lib/admin-announcements"
@@ -280,46 +281,49 @@ export function AdminAnnouncementManager({ initialItems }: AdminAnnouncementMana
         </div>
       </section>
 
-      {createOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-3xl rounded-[24px] border border-border bg-background p-5 shadow-2xl">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-semibold">新增公告</h3>
-                <p className="mt-1 text-sm text-muted-foreground">创建后可选择先保存为草稿，或直接发布到前台。</p>
+      <DialogPortal open={createOpen} onClose={() => setCreateOpen(false)} closeOnEscape={!isPending}>
+        <div className="fixed inset-0 z-[120]">
+          <DialogBackdrop onClick={isPending ? undefined : () => setCreateOpen(false)} />
+          <DialogPositioner>
+            <DialogPanel className="max-w-3xl p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold">新增公告</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">创建后可选择先保存为草稿，或直接发布到前台。</p>
+                </div>
+                <Button type="button" variant="ghost" className="h-8 px-2" onClick={() => setCreateOpen(false)} disabled={isPending}>关闭</Button>
               </div>
-              <Button type="button" variant="ghost" className="h-8 px-2" onClick={() => setCreateOpen(false)}>关闭</Button>
-            </div>
-            <form onSubmit={submitCreate} className="mt-5 space-y-4">
-              <Field label="公告标题">
-                <input value={createDraft.title} onChange={(event) => updateCreateDraft("title", event.target.value)} className="h-10 w-full rounded-[16px] border border-border bg-background px-3 text-sm outline-none" placeholder="请输入公告标题" />
-              </Field>
-              <div className="grid gap-3 md:grid-cols-[180px_1fr]">
-                <Field label="公告状态">
-                  <select value={createDraft.status} onChange={(event) => updateCreateDraft("status", event.target.value as DraftStatus)} className="h-10 w-full rounded-[16px] border border-border bg-background px-3 text-sm outline-none">
-                    <option value="DRAFT">草稿</option>
-                    <option value="PUBLISHED">已发布</option>
-                    <option value="OFFLINE">已下线</option>
-                  </select>
+              <form onSubmit={submitCreate} className="mt-5 space-y-4">
+                <Field label="公告标题">
+                  <input value={createDraft.title} onChange={(event) => updateCreateDraft("title", event.target.value)} className="h-10 w-full rounded-[16px] border border-border bg-background px-3 text-sm outline-none" placeholder="请输入公告标题" />
                 </Field>
-                <label className="flex items-center gap-2 rounded-[16px] border border-border bg-background px-3 text-sm">
-                  <input type="checkbox" checked={createDraft.isPinned} onChange={(event) => updateCreateDraft("isPinned", event.target.checked)} className="h-4 w-4" />
-                  设为置顶公告
-                </label>
-              </div>
-              <Field label="公告内容">
-                <textarea value={createDraft.content} onChange={(event) => updateCreateDraft("content", event.target.value)} className="min-h-[220px] w-full rounded-[18px] border border-border bg-background px-3 py-3 text-sm outline-none" placeholder="支持 Markdown，前台公告页会按富文本内容展示。" />
-              </Field>
-              <div className="flex items-center gap-3">
-                <Button disabled={isPending} className="rounded-full">
-                  {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}创建公告
-                </Button>
-                <Button type="button" variant="ghost" disabled={isPending} onClick={() => setCreateOpen(false)}>取消</Button>
-              </div>
-            </form>
-          </div>
+                <div className="grid gap-3 md:grid-cols-[180px_1fr]">
+                  <Field label="公告状态">
+                    <select value={createDraft.status} onChange={(event) => updateCreateDraft("status", event.target.value as DraftStatus)} className="h-10 w-full rounded-[16px] border border-border bg-background px-3 text-sm outline-none">
+                      <option value="DRAFT">草稿</option>
+                      <option value="PUBLISHED">已发布</option>
+                      <option value="OFFLINE">已下线</option>
+                    </select>
+                  </Field>
+                  <label className="flex items-center gap-2 rounded-[16px] border border-border bg-background px-3 text-sm">
+                    <input type="checkbox" checked={createDraft.isPinned} onChange={(event) => updateCreateDraft("isPinned", event.target.checked)} className="h-4 w-4" />
+                    设为置顶公告
+                  </label>
+                </div>
+                <Field label="公告内容">
+                  <textarea value={createDraft.content} onChange={(event) => updateCreateDraft("content", event.target.value)} className="min-h-[220px] w-full rounded-[18px] border border-border bg-background px-3 py-3 text-sm outline-none" placeholder="支持 Markdown，前台公告页会按富文本内容展示。" />
+                </Field>
+                <div className="flex items-center gap-3">
+                  <Button disabled={isPending} className="rounded-full">
+                    {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}创建公告
+                  </Button>
+                  <Button type="button" variant="ghost" disabled={isPending} onClick={() => setCreateOpen(false)}>取消</Button>
+                </div>
+              </form>
+            </DialogPanel>
+          </DialogPositioner>
         </div>
-      ) : null}
+      </DialogPortal>
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { createInviteCodesBatch, findInviteCodeByCode, findInviteCodeForUse, fin
 import { purchaseInviteCodeTransaction } from "@/db/invite-code-write-queries"
 import { apiError } from "@/lib/api-route"
 import { getSiteSettings } from "@/lib/site-settings"
+import { getVipLevel, isVipActive } from "@/lib/vip-status"
 
 
 
@@ -141,7 +142,13 @@ export async function purchaseInviteCode(userId: number) {
     apiError(400, "当前未开启邀请码购买")
   }
 
-  const price = Math.max(0, settings.inviteCodePrice)
+  const price = isVipActive(user)
+    ? getVipLevel(user) >= 3
+      ? Math.max(0, settings.inviteCodeVip3Price)
+      : getVipLevel(user) === 2
+        ? Math.max(0, settings.inviteCodeVip2Price)
+        : Math.max(0, settings.inviteCodeVip1Price)
+    : Math.max(0, settings.inviteCodePrice)
 
   if (price < 1) {
     apiError(400, "邀请码价格未设置")

@@ -10,13 +10,50 @@ import { getCurrentUser } from "@/lib/auth"
 import { formatDateTime } from "@/lib/formatters"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
+function formatPointValue(value: number, pointName: string, suffix: string) {
+  return value > 0 ? `${value} ${pointName}${suffix}` : `免费${suffix}`
+}
 
-
-
-const vipMilestones = (pointName: string) => [
-  { level: 1, title: "VIP 1", requirement: `使用${pointName}购买月卡`, privilege: "可访问 VIP 专属节点与帖子" },
-  { level: 2, title: "VIP 2", requirement: `使用${pointName}购买季卡`, privilege: "可扩展更高等级节点 / 活动资格" },
-  { level: 3, title: "VIP 3", requirement: `使用${pointName}购买年卡`, privilege: "可扩展专属身份样式与高级权益" },
+const vipMilestones = (settings: Awaited<ReturnType<typeof getSiteSettings>>) => [
+  {
+    level: 1,
+    title: "VIP 1",
+    requirement: `使用 ${settings.vipMonthlyPrice} ${settings.pointName} 购买月卡，生效 30 天`,
+    privileges: [
+      "可访问 VIP 专属节点、帖子与回复区域",
+      `签到奖励：${settings.checkInVip1Reward} ${settings.pointName} / 次`,
+      `补签价格：${formatPointValue(settings.checkInVip1MakeUpCardPrice, settings.pointName, " / 次")}`,
+      `修改昵称：${formatPointValue(settings.nicknameChangeVip1PointCost, settings.pointName, " / 次")}`,
+      `购买邀请码：${settings.inviteCodePurchaseEnabled ? formatPointValue(settings.inviteCodeVip1Price, settings.pointName, " / 个") : "未开启"}`,
+      `作者下线帖子：${formatPointValue(settings.postOfflineVip1Price, settings.pointName, " / 次")}`,
+    ],
+  },
+  {
+    level: 2,
+    title: "VIP 2",
+    requirement: `使用 ${settings.vipQuarterlyPrice} ${settings.pointName} 购买季卡，生效 90 天`,
+    privileges: [
+      "包含 VIP1 全部权益，并可进入更高等级权限节点",
+      `签到奖励：${settings.checkInVip2Reward} ${settings.pointName} / 次`,
+      `补签价格：${formatPointValue(settings.checkInVip2MakeUpCardPrice, settings.pointName, " / 次")}`,
+      `修改昵称：${formatPointValue(settings.nicknameChangeVip2PointCost, settings.pointName, " / 次")}`,
+      `购买邀请码：${settings.inviteCodePurchaseEnabled ? formatPointValue(settings.inviteCodeVip2Price, settings.pointName, " / 个") : "未开启"}`,
+      `作者下线帖子：${formatPointValue(settings.postOfflineVip2Price, settings.pointName, " / 次")}`,
+    ],
+  },
+  {
+    level: 3,
+    title: "VIP 3",
+    requirement: `使用 ${settings.vipYearlyPrice} ${settings.pointName} 购买年卡，生效 365 天`,
+    privileges: [
+      "包含 VIP1、VIP2 全部权益，并享受最高档位身份能力",
+      `签到奖励：${settings.checkInVip3Reward} ${settings.pointName} / 次`,
+      `补签价格：${formatPointValue(settings.checkInVip3MakeUpCardPrice, settings.pointName, " / 次")}`,
+      `修改昵称：${formatPointValue(settings.nicknameChangeVip3PointCost, settings.pointName, " / 次")}`,
+      `购买邀请码：${settings.inviteCodePurchaseEnabled ? formatPointValue(settings.inviteCodeVip3Price, settings.pointName, " / 个") : "未开启"}`,
+      `作者下线帖子：${formatPointValue(settings.postOfflineVip3Price, settings.pointName, " / 次")}`,
+    ],
+  },
 ]
 
 
@@ -32,7 +69,7 @@ export default async function VipPage() {
   const profileName = user ? ((user as { nickname?: string | null; username?: string }).nickname ?? (user as { username?: string }).username ?? "用户") : "用户"
   const currentLevel = getVipLevel(vipUser)
   const vipActive = isVipActive(vipUser)
-  const milestones = vipMilestones(settings.pointName)
+  const milestones = vipMilestones(settings)
 
 
 
@@ -120,7 +157,14 @@ export default async function VipPage() {
                   <VipBadge level={item.level} compact />
                 </div>
                 <p className="mt-3 text-sm text-muted-foreground">成长方式：{item.requirement}</p>
-                <p className="mt-2 text-sm text-muted-foreground">权益说明：{item.privilege}</p>
+                <div className="mt-3 rounded-[18px] border border-border bg-secondary/20 px-3 py-3">
+                  <p className="text-xs font-medium text-foreground">权益详情</p>
+                  <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
+                    {item.privileges.map((privilege) => (
+                      <li key={`${item.level}-${privilege}`}>{privilege}</li>
+                    ))}
+                  </ul>
+                </div>
               </CardContent>
             </Card>
           ))}

@@ -1,13 +1,14 @@
-import { VerificationChannel, ChangeType, RelatedType } from "@/db/types"
+import { VerificationChannel, ChangeType } from "@/db/types"
 
 import { prisma } from "@/db/client"
 import { apiError, apiSuccess, createUserRouteHandler, readJsonBody } from "@/lib/api-route"
 
 import { enforceSensitiveText } from "@/lib/content-safety"
-import { getRequestIp } from "@/lib/request-ip"
 import { validateProfilePayload } from "@/lib/validators"
 import { verifyCode } from "@/lib/verification"
 import { logRouteWriteSuccess } from "@/lib/route-metadata"
+import { getSiteSettings } from "@/lib/site-settings"
+import { getVipLevel, isVipActive } from "@/lib/vip-status"
 
 type ProfileUpdateResponse = {
   username: string
@@ -77,13 +78,7 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
         points: true,
       },
     }),
-    prisma.siteSetting.findFirst({
-      orderBy: { createdAt: "asc" },
-      select: {
-        pointName: true,
-        nicknameChangePointCost: true,
-      },
-    }),
+    getSiteSettings(),
   ])
 
   if (!dbUser) {
@@ -95,8 +90,14 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
   const emailChanged = (dbUser.email ?? null) !== nextEmail
   const currentNickname = (dbUser.nickname ?? "").trim()
   const nicknameChanged = currentNickname !== nextNickname
-  const nicknameChangePointCost = Math.max(0, settings?.nicknameChangePointCost ?? 0)
-  const pointName = settings?.pointName?.trim() || "积分"
+  const nicknameChangePointCost = isVipActive(currentUser)
+    ? getVipLevel(currentUser) >= 3
+      ? Math.max(0, settings.nicknameChangeVip3PointCost)
+      : getVipLevel(currentUser) === 2
+        ? Math.max(0, settings.nicknameChangeVip2PointCost)
+        : Math.max(0, settings.nicknameChangeVip1PointCost)
+    : Math.max(0, settings.nicknameChangePointCost)
+  const pointName = settings.pointName?.trim() || "积分"
 
   if (dbUser.emailVerifiedAt && emailChanged) {
     apiError(400, "邮箱已验证，不能再修改邮箱地址")
@@ -157,7 +158,6 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
         avatarPath: avatarPath || undefined,
         email: nextEmail,
         emailVerifiedAt,
-        lastLoginIp: getRequestIp(request),
         ...(nicknameChanged && nicknameChangePointCost > 0 ? { points: { decrement: nicknameChangePointCost } } : {}),
       },
       select: {
@@ -179,8 +179,8 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
           changeType: ChangeType.DECREASE,
           changeValue: nicknameChangePointCost,
           reason: `修改昵称扣除 ${nicknameChangePointCost} ${pointName}`,
-          relatedType: RelatedType.ANNOUNCEMENT,
-          relatedId: String(currentUser.id),
+          relatedType: null,
+          relatedId: null,
         },
       })
     }

@@ -4,6 +4,7 @@ import { apiError, readOptionalNumberField, readOptionalStringField, type JsonOb
 import { normalizeMarkdownEmojiItems, serializeMarkdownEmojiItems } from "@/lib/markdown-emoji"
 import { defaultSiteSettingsCreateInput } from "@/lib/site-settings-defaults"
 import { normalizePostListDisplayMode } from "@/lib/post-list-display"
+import { mergeCheckInMakeUpPriceSettings, mergeCheckInRewardSettings, mergeInviteCodePurchasePriceSettings, mergeNicknameChangePointCostSettings } from "@/lib/site-settings-app-state"
 import { normalizeCaptchaMode, normalizeFooterLinks } from "@/lib/shared/config-parsers"
 import { normalizeHeatColors, normalizeHeatThresholds, normalizePositiveInteger, normalizeTippingAmounts } from "@/lib/shared/normalizers"
 import { createSiteSettingsRecordWithFullData, updateSiteSettingsHeaderApps } from "@/db/site-settings-write-queries"
@@ -30,17 +31,10 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
     const siteLogoText = readOptionalStringField(body, "siteLogoText")
     const siteLogoPath = readOptionalStringField(body, "siteLogoPath")
     const siteSeoKeywords = readOptionalStringField(body, "siteSeoKeywords").split(/[，,\n]+/).map((item) => item.trim()).filter(Boolean).join(",")
-    const pointName = readOptionalStringField(body, "pointName")
     const analyticsCode = readOptionalStringField(body, "analyticsCode")
     const postLinkDisplayMode = readOptionalStringField(body, "postLinkDisplayMode") === "ID" ? "ID" : "SLUG"
     const homeFeedPostListDisplayMode = normalizePostListDisplayMode(body.homeFeedPostListDisplayMode)
     const homeSidebarStatsCardEnabled = body.homeSidebarStatsCardEnabled === undefined ? true : Boolean(body.homeSidebarStatsCardEnabled)
-    const checkInEnabled = Boolean(body.checkInEnabled)
-
-    const checkInReward = Math.max(0, readOptionalNumberField(body, "checkInReward") ?? 0)
-    const checkInMakeUpCardPrice = Math.max(0, readOptionalNumberField(body, "checkInMakeUpCardPrice") ?? 0)
-    const checkInVipMakeUpCardPrice = Math.max(0, readOptionalNumberField(body, "checkInVipMakeUpCardPrice") ?? 0)
-    const nicknameChangePointCost = Math.max(0, readOptionalNumberField(body, "nicknameChangePointCost") ?? 0)
     const postEditableMinutes = Math.max(0, readOptionalNumberField(body, "postEditableMinutes") ?? 10)
     const commentEditableMinutes = Math.max(0, readOptionalNumberField(body, "commentEditableMinutes") ?? 5)
 
@@ -57,16 +51,10 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
         siteLogoText: siteLogoText || siteName,
         siteLogoPath: siteLogoPath || null,
         siteSeoKeywords,
-        pointName: pointName || "积分",
         analyticsCode: analyticsCode || null,
         postLinkDisplayMode,
         homeFeedPostListDisplayMode,
         homeSidebarStatsCardEnabled,
-        checkInEnabled,
-        checkInReward,
-        checkInMakeUpCardPrice,
-        checkInVipMakeUpCardPrice,
-        nicknameChangePointCost,
         postEditableMinutes,
         commentEditableMinutes,
       },
@@ -124,7 +112,6 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
     const registrationRequireInviteCode = Boolean(body.registrationRequireInviteCode)
     const registerInviteCodeEnabled = Boolean(body.registerInviteCodeEnabled)
     const inviteCodePurchaseEnabled = Boolean(body.inviteCodePurchaseEnabled)
-    const inviteCodePrice = Math.max(0, readOptionalNumberField(body, "inviteCodePrice") ?? 0)
     const registerCaptchaMode = normalizeCaptchaMode(body.registerCaptchaMode)
     const loginCaptchaMode = normalizeCaptchaMode(body.loginCaptchaMode)
     const turnstileSiteKey = readOptionalStringField(body, "turnstileSiteKey") || null
@@ -148,10 +135,6 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
     const smtpFrom = readOptionalStringField(body, "smtpFrom") || null
     const smtpSecure = Boolean(body.smtpSecure)
 
-    if (inviteCodePurchaseEnabled && inviteCodePrice < 1) {
-      apiError(400, "开启积分购买邀请码时，价格必须大于 0")
-    }
-
     if (registrationRequireInviteCode && !registerInviteCodeEnabled) {
       apiError(400, "注册要求必须填写邀请码时，不能关闭邀请码输入框显示")
     }
@@ -173,7 +156,6 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
         registrationRequireInviteCode,
         registerInviteCodeEnabled,
         inviteCodePurchaseEnabled,
-        inviteCodePrice,
         registerCaptchaMode,
         loginCaptchaMode,
         turnstileSiteKey: registerCaptchaMode === "TURNSTILE" || loginCaptchaMode === "TURNSTILE" ? turnstileSiteKey : null,
@@ -280,6 +262,26 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
   }
 
   if (section === "vip") {
+    const pointName = readOptionalStringField(body, "pointName")
+    const checkInEnabled = body.checkInEnabled === undefined ? existing.checkInEnabled : Boolean(body.checkInEnabled)
+    const checkInReward = Math.max(0, readOptionalNumberField(body, "checkInReward") ?? existing.checkInReward ?? 0)
+    const checkInVip1Reward = Math.max(0, readOptionalNumberField(body, "checkInVip1Reward") ?? checkInReward)
+    const checkInVip2Reward = Math.max(0, readOptionalNumberField(body, "checkInVip2Reward") ?? checkInReward)
+    const checkInVip3Reward = Math.max(0, readOptionalNumberField(body, "checkInVip3Reward") ?? checkInReward)
+    const checkInMakeUpCardPrice = Math.max(0, readOptionalNumberField(body, "checkInMakeUpCardPrice") ?? existing.checkInMakeUpCardPrice ?? 0)
+    const legacyVipMakeUpCardPrice = Math.max(0, readOptionalNumberField(body, "checkInVipMakeUpCardPrice") ?? existing.checkInVipMakeUpCardPrice ?? 0)
+    const checkInVip1MakeUpCardPrice = Math.max(0, readOptionalNumberField(body, "checkInVip1MakeUpCardPrice") ?? legacyVipMakeUpCardPrice)
+    const checkInVip2MakeUpCardPrice = Math.max(0, readOptionalNumberField(body, "checkInVip2MakeUpCardPrice") ?? legacyVipMakeUpCardPrice)
+    const checkInVip3MakeUpCardPrice = Math.max(0, readOptionalNumberField(body, "checkInVip3MakeUpCardPrice") ?? legacyVipMakeUpCardPrice)
+    const checkInVipMakeUpCardPrice = Math.max(0, readOptionalNumberField(body, "checkInVipMakeUpCardPrice") ?? checkInVip1MakeUpCardPrice)
+    const nicknameChangePointCost = Math.max(0, readOptionalNumberField(body, "nicknameChangePointCost") ?? existing.nicknameChangePointCost ?? 0)
+    const nicknameChangeVip1PointCost = Math.max(0, readOptionalNumberField(body, "nicknameChangeVip1PointCost") ?? nicknameChangePointCost)
+    const nicknameChangeVip2PointCost = Math.max(0, readOptionalNumberField(body, "nicknameChangeVip2PointCost") ?? nicknameChangePointCost)
+    const nicknameChangeVip3PointCost = Math.max(0, readOptionalNumberField(body, "nicknameChangeVip3PointCost") ?? nicknameChangePointCost)
+    const inviteCodePrice = Math.max(0, readOptionalNumberField(body, "inviteCodePrice") ?? existing.inviteCodePrice ?? 0)
+    const inviteCodeVip1Price = Math.max(0, readOptionalNumberField(body, "inviteCodeVip1Price") ?? inviteCodePrice)
+    const inviteCodeVip2Price = Math.max(0, readOptionalNumberField(body, "inviteCodeVip2Price") ?? inviteCodePrice)
+    const inviteCodeVip3Price = Math.max(0, readOptionalNumberField(body, "inviteCodeVip3Price") ?? inviteCodePrice)
     const vipMonthlyPrice = Math.max(0, readOptionalNumberField(body, "vipMonthlyPrice") ?? 0)
     const vipQuarterlyPrice = Math.max(0, readOptionalNumberField(body, "vipQuarterlyPrice") ?? 0)
     const vipYearlyPrice = Math.max(0, readOptionalNumberField(body, "vipYearlyPrice") ?? 0)
@@ -287,10 +289,42 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
     const postOfflineVip1Price = Math.max(0, readOptionalNumberField(body, "postOfflineVip1Price") ?? 0)
     const postOfflineVip2Price = Math.max(0, readOptionalNumberField(body, "postOfflineVip2Price") ?? 0)
     const postOfflineVip3Price = Math.max(0, readOptionalNumberField(body, "postOfflineVip3Price") ?? 0)
+    const appStateWithCheckInRewards = mergeCheckInRewardSettings(existing.appStateJson, {
+      vip1: checkInVip1Reward,
+      vip2: checkInVip2Reward,
+      vip3: checkInVip3Reward,
+    })
+    const appStateWithCheckInPrices = mergeCheckInMakeUpPriceSettings(appStateWithCheckInRewards, {
+      vip1: checkInVip1MakeUpCardPrice,
+      vip2: checkInVip2MakeUpCardPrice,
+      vip3: checkInVip3MakeUpCardPrice,
+    })
+    const appStateWithNicknamePointCosts = mergeNicknameChangePointCostSettings(appStateWithCheckInPrices, {
+      vip1: nicknameChangeVip1PointCost,
+      vip2: nicknameChangeVip2PointCost,
+      vip3: nicknameChangeVip3PointCost,
+    })
+    const appStateJson = mergeInviteCodePurchasePriceSettings(appStateWithNicknamePointCosts, {
+      vip1: inviteCodeVip1Price,
+      vip2: inviteCodeVip2Price,
+      vip3: inviteCodeVip3Price,
+    })
+
+    if (existing.inviteCodePurchaseEnabled && inviteCodePrice < 1) {
+      apiError(400, "开启积分购买邀请码时，普通用户价格必须大于 0")
+    }
 
     const settings = await prisma.siteSetting.update({
       where: { id: existing.id },
       data: {
+        pointName: pointName || "积分",
+        checkInEnabled,
+        checkInReward,
+        checkInMakeUpCardPrice,
+        checkInVipMakeUpCardPrice,
+        nicknameChangePointCost,
+        inviteCodePrice,
+        appStateJson,
         vipMonthlyPrice,
         vipQuarterlyPrice,
         vipYearlyPrice,
@@ -303,7 +337,7 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
 
     invalidateSiteSettingsCache()
 
-    return { settings, message: "VIP设置已保存" }
+    return { settings, message: "积分与VIP设置已保存" }
   }
 
   if (section === "upload") {

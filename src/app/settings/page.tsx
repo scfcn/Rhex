@@ -23,6 +23,7 @@ import { getCurrentUserLevelProgressView } from "@/lib/user-level-view"
 import { getUserBoardFollows, getUserFavoritePosts, getUserLikedPosts, getUserPosts, getUserReplies } from "@/lib/user-panel"
 import { getUserAccountSettings, getUserProfile } from "@/lib/users"
 import { getCurrentUserVerificationData } from "@/lib/verifications"
+import { getVipLevel, isVipActive } from "@/lib/vip-status"
 
 interface SettingsPageProps {
   searchParams?: {
@@ -90,6 +91,34 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
   ])
 
   const invitePath = `/register?invite=${encodeURIComponent(profile.username)}`
+  const inviteCodePrice = isVipActive(currentUser)
+    ? getVipLevel(currentUser) >= 3
+      ? settings.inviteCodeVip3Price
+      : getVipLevel(currentUser) === 2
+        ? settings.inviteCodeVip2Price
+        : settings.inviteCodeVip1Price
+    : settings.inviteCodePrice
+  const inviteCodePriceDescription = isVipActive(currentUser)
+    ? getVipLevel(currentUser) >= 3
+      ? "你当前按 VIP3 价购买邀请码"
+      : getVipLevel(currentUser) === 2
+        ? "你当前按 VIP2 价购买邀请码"
+        : "你当前按 VIP1 价购买邀请码"
+    : "你当前按普通用户价格购买邀请码"
+  const nicknameChangePriceDescription = isVipActive(currentUser)
+    ? getVipLevel(currentUser) >= 3
+      ? "你当前按 VIP3 价结算"
+      : getVipLevel(currentUser) === 2
+        ? "你当前按 VIP2 价结算"
+        : "你当前按 VIP1 价结算"
+    : "你当前按普通用户价格结算"
+  const nicknameChangePointCost = isVipActive(currentUser)
+    ? getVipLevel(currentUser) >= 3
+      ? settings.nicknameChangeVip3PointCost
+      : getVipLevel(currentUser) === 2
+        ? settings.nicknameChangeVip2PointCost
+        : settings.nicknameChangeVip1PointCost
+    : settings.nicknameChangePointCost
 
   return (
     <div className="min-h-screen bg-background">
@@ -110,7 +139,8 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                   initialAvatarPath={profile.avatarPath}
                   initialEmail={dbUser?.email ?? null}
                   initialEmailVerified={Boolean(dbUser?.emailVerifiedAt)}
-                  nicknameChangePointCost={settings.nicknameChangePointCost}
+                  nicknameChangePointCost={nicknameChangePointCost}
+                  nicknameChangePriceDescription={nicknameChangePriceDescription}
                   pointName={settings.pointName}
                   avatarMaxFileSizeMb={settings.uploadAvatarMaxFileSizeMb}
                 />
@@ -146,7 +176,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                   </div>
                   <InviteLinkCopyButton path={invitePath} />
                 </div>
-                <InviteCodePurchaseCard enabled={settings.inviteCodePurchaseEnabled} price={settings.inviteCodePrice} pointName={settings.pointName} />
+                <InviteCodePurchaseCard enabled={settings.inviteCodePurchaseEnabled} price={inviteCodePrice} priceDescription={inviteCodePriceDescription} pointName={settings.pointName} />
               </CardContent>
             </Card>
           ) : null}

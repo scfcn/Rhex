@@ -11,6 +11,14 @@ import { Button } from "@/components/ui/button"
 import { SearchForm } from "@/components/search-form"
 import { getSiteSettings } from "@/lib/site-settings"
 
+function formatUnreadBadge(count: number) {
+  if (count <= 0) {
+    return null
+  }
+
+  return count > 9 ? "9+" : String(count)
+}
+
 function SiteLogoMark({ logoPath }: { logoPath?: string | null }) {
   if (logoPath) {
     return (
@@ -79,7 +87,11 @@ export async function SiteHeader() {
                 <Button variant="ghost" size="icon" className="size-8 rounded-md">
                   <Bell className={unreadNotificationCount > 0 ? "h-4 w-4 text-rose-600" : "h-4 w-4"} />
                 </Button>
-                {unreadNotificationCount > 0 ? <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-rose-500" /> : null}
+                {formatUnreadBadge(unreadNotificationCount) ? (
+                  <span className="absolute right-0.5 top-0.5 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold leading-none text-white">
+                    {formatUnreadBadge(unreadNotificationCount)}
+                  </span>
+                ) : null}
               </Link>
 
               <HeaderUserActions user={headerUser} unreadMessageCount={unreadMessageCount} unreadNotificationCount={unreadNotificationCount} />

@@ -1,5 +1,52 @@
 import { prisma } from "@/db/client"
-import { pinnedPostOrderBy, postListInclude } from "@/db/queries"
+import type { Prisma } from "@/db/types"
+import { pinnedPostOrderBy } from "@/db/queries"
+
+const searchPostListSelect = {
+  id: true,
+  slug: true,
+  title: true,
+  summary: true,
+  content: true,
+  coverPath: true,
+  type: true,
+  status: true,
+  isPinned: true,
+  pinScope: true,
+  isFeatured: true,
+  minViewLevel: true,
+  commentCount: true,
+  likeCount: true,
+  favoriteCount: true,
+  viewCount: true,
+  tipCount: true,
+  tipTotalPoints: true,
+  publishedAt: true,
+  createdAt: true,
+  board: {
+    select: {
+      name: true,
+      slug: true,
+      iconPath: true,
+    },
+  },
+  author: {
+    select: {
+      id: true,
+      username: true,
+      nickname: true,
+      avatarPath: true,
+      status: true,
+      vipLevel: true,
+      vipExpiresAt: true,
+    },
+  },
+  redPacket: {
+    select: {
+      id: true,
+    },
+  },
+} satisfies Prisma.PostSelect
 
 export function buildPostSearchWhere(keyword: string) {
   return {
@@ -27,7 +74,7 @@ export function findSearchPosts(params: {
 
   return prisma.post.findMany({
     where: params.where,
-    include: postListInclude,
+    select: searchPostListSelect,
     orderBy: pinnedPostOrderBy,
     skip: (params.page - 1) * normalizedPageSize,
     take: normalizedPageSize,

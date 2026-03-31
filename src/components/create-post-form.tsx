@@ -1,5 +1,5 @@
 ﻿"use client"
-
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
 
@@ -1193,8 +1193,10 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
             <input value={coverPath} onChange={(event) => setCoverPath(event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none" placeholder="留空则自动使用正文首图，也可以直接填写封面图片地址" />
           </div>
           {coverPath ? (
-            <div className="overflow-hidden rounded-[24px] border border-border bg-card">
-              <img src={coverPath} alt="帖子封面预览" className="aspect-[16/9] w-full object-cover" />
+            <div className="relative overflow-hidden rounded-[24px] border border-border bg-card">
+              <div className="relative aspect-[16/9] w-full">
+                <Image src={coverPath} alt="帖子封面预览" fill sizes="(max-width: 1024px) 100vw, 896px" className="object-cover" unoptimized />
+              </div>
             </div>
           ) : (
             <div className="rounded-[24px] border border-dashed border-border bg-card/60 px-4 py-5 text-sm leading-6 text-muted-foreground">

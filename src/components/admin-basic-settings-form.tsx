@@ -18,26 +18,19 @@ interface AdminBasicSettingsFormProps {
     siteLogoText: string
     siteLogoPath?: string | null
     siteSeoKeywords?: string[]
-    pointName: string
     postLinkDisplayMode: "SLUG" | "ID"
     homeFeedPostListDisplayMode: PostListDisplayMode
     homeSidebarStatsCardEnabled: boolean
     analyticsCode?: string | null
-    checkInEnabled: boolean
-    checkInReward: number
-    checkInMakeUpCardPrice: number
-    checkInVipMakeUpCardPrice: number
     inviteRewardInviter: number
     inviteRewardInvitee: number
     registrationEnabled: boolean
     registrationRequireInviteCode: boolean
     registerInviteCodeEnabled: boolean
     inviteCodePurchaseEnabled: boolean
-    inviteCodePrice: number
     registerCaptchaMode: "OFF" | "TURNSTILE" | "BUILTIN"
     loginCaptchaMode: "OFF" | "TURNSTILE" | "BUILTIN"
     turnstileSiteKey?: string | null
-    nicknameChangePointCost: number
     postEditableMinutes: number
     commentEditableMinutes: number
     tippingEnabled: boolean
@@ -98,16 +91,10 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
   const [siteLogoPath, setSiteLogoPath] = useState(initialSettings.siteLogoPath ?? "")
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
   const [siteSeoKeywords, setSiteSeoKeywords] = useState((initialSettings.siteSeoKeywords ?? []).join(","))
-  const [pointName, setPointName] = useState(initialSettings.pointName)
   const [postLinkDisplayMode, setPostLinkDisplayMode] = useState<"SLUG" | "ID">(initialSettings.postLinkDisplayMode)
   const [homeFeedPostListDisplayMode, setHomeFeedPostListDisplayMode] = useState<PostListDisplayMode>(initialSettings.homeFeedPostListDisplayMode)
   const [homeSidebarStatsCardEnabled, setHomeSidebarStatsCardEnabled] = useState(initialSettings.homeSidebarStatsCardEnabled)
   const [analyticsCode, setAnalyticsCode] = useState(initialSettings.analyticsCode ?? "")
-  const [checkInEnabled, setCheckInEnabled] = useState(initialSettings.checkInEnabled)
-  const [checkInReward, setCheckInReward] = useState(String(initialSettings.checkInReward))
-  const [checkInMakeUpCardPrice, setCheckInMakeUpCardPrice] = useState(String(initialSettings.checkInMakeUpCardPrice))
-  const [checkInVipMakeUpCardPrice, setCheckInVipMakeUpCardPrice] = useState(String(initialSettings.checkInVipMakeUpCardPrice))
-  const [nicknameChangePointCost, setNicknameChangePointCost] = useState(String(initialSettings.nicknameChangePointCost))
   const [postEditableMinutes, setPostEditableMinutes] = useState(String(initialSettings.postEditableMinutes))
   const [commentEditableMinutes, setCommentEditableMinutes] = useState(String(initialSettings.commentEditableMinutes))
   const [inviteRewardInviter, setInviteRewardInviter] = useState(String(initialSettings.inviteRewardInviter))
@@ -116,7 +103,6 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
   const [registrationRequireInviteCode, setRegistrationRequireInviteCode] = useState(initialSettings.registrationRequireInviteCode)
   const [registerInviteCodeEnabled, setRegisterInviteCodeEnabled] = useState(initialSettings.registerInviteCodeEnabled)
   const [inviteCodePurchaseEnabled, setInviteCodePurchaseEnabled] = useState(initialSettings.inviteCodePurchaseEnabled)
-  const [inviteCodePrice, setInviteCodePrice] = useState(String(initialSettings.inviteCodePrice))
   const [registerCaptchaMode, setRegisterCaptchaMode] = useState(initialSettings.registerCaptchaMode)
   const [loginCaptchaMode, setLoginCaptchaMode] = useState(initialSettings.loginCaptchaMode)
   const [turnstileSiteKey, setTurnstileSiteKey] = useState(initialSettings.turnstileSiteKey ?? "")
@@ -227,16 +213,10 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
         siteLogoText,
         siteLogoPath,
         siteSeoKeywords,
-        pointName,
         postLinkDisplayMode,
         homeFeedPostListDisplayMode,
         homeSidebarStatsCardEnabled,
         analyticsCode,
-        checkInEnabled,
-        checkInReward: Number(checkInReward),
-        checkInMakeUpCardPrice: Number(checkInMakeUpCardPrice),
-        checkInVipMakeUpCardPrice: Number(checkInVipMakeUpCardPrice),
-        nicknameChangePointCost: Number(nicknameChangePointCost),
         postEditableMinutes: Number(postEditableMinutes),
         commentEditableMinutes: Number(commentEditableMinutes),
         section: "site-profile",
@@ -251,7 +231,6 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
         registrationRequireInviteCode,
         registerInviteCodeEnabled,
         inviteCodePurchaseEnabled,
-        inviteCodePrice: Number(inviteCodePrice),
         registerCaptchaMode,
         loginCaptchaMode,
         turnstileSiteKey,
@@ -323,24 +302,17 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
         <div className="rounded-[24px] border border-border p-5 space-y-4">
           <div>
             <h3 className="text-sm font-semibold">{title}</h3>
-            <p className="mt-1 text-xs leading-6 text-muted-foreground">站点对外展示的基础品牌信息、签到规则与资料相关基础收费配置。</p>
+            <p className="mt-1 text-xs leading-6 text-muted-foreground">站点对外展示的基础品牌信息、帖子链接形式与基础编辑规则配置。</p>
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <Field label="站点名称" value={siteName} onChange={setSiteName} placeholder="如 兴趣论坛" />
             <Field label="Logo 文案" value={siteLogoText} onChange={setSiteLogoText} placeholder="如 兴趣论坛" />
-            <Field label="积分名称" value={pointName} onChange={setPointName} placeholder="如 积分 / 金币 / 钻石" />
-            <Field label="修改昵称所需积分" value={nicknameChangePointCost} onChange={setNicknameChangePointCost} placeholder="0 表示免费" />
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <Field label="帖子可编辑分钟数" value={postEditableMinutes} onChange={setPostEditableMinutes} placeholder="如 10" />
             <Field label="评论可编辑分钟数" value={commentEditableMinutes} onChange={setCommentEditableMinutes} placeholder="如 5" />
           </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <SwitchField label="签到开关" checked={checkInEnabled} onChange={setCheckInEnabled} />
-            <Field label="签到奖励数量" value={checkInReward} onChange={setCheckInReward} placeholder="如 5" />
-            <Field label="普通用户补签价格" value={checkInMakeUpCardPrice} onChange={setCheckInMakeUpCardPrice} placeholder="如 20" />
-            <Field label="VIP 补签价格" value={checkInVipMakeUpCardPrice} onChange={setCheckInVipMakeUpCardPrice} placeholder="如 10" />
-          </div>
+  
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="space-y-2">
               <p className="text-sm font-medium">帖子链接显示模式</p>
@@ -424,7 +396,6 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
               <SwitchField label="显示邀请码输入框" checked={registerInviteCodeEnabled} onChange={setRegisterInviteCodeEnabled} />
               <SwitchField label="注册必须邀请码" checked={registrationRequireInviteCode} onChange={setRegistrationRequireInviteCode} />
               <SwitchField label="开启积分购买邀请码" checked={inviteCodePurchaseEnabled} onChange={setInviteCodePurchaseEnabled} />
-              <Field label="邀请码购买价格" value={inviteCodePrice} onChange={setInviteCodePrice} placeholder="如 100" />
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="邀请人奖励数量" value={inviteRewardInviter} onChange={setInviteRewardInviter} placeholder="如 10" />

@@ -10,7 +10,6 @@ import { useMarkdownEmojiMap } from "@/components/site-settings-provider"
 
 import MarkdownIt from "markdown-it"
 import markdownItAbbr from "markdown-it-abbr"
-import markdownItAttrs from "markdown-it-attrs"
 import markdownItContainer from "markdown-it-container"
 import markdownItDeflist from "markdown-it-deflist"
 import markdownItFootnote from "markdown-it-footnote"
@@ -244,7 +243,6 @@ function createMarkdownRenderer(emojiItems: MarkdownEmojiItem[]) {
   })
 
   md.use(markdownItAbbr)
-  md.use(markdownItAttrs)
   md.use(markdownItDeflist)
   md.use(markdownItFootnote)
   md.use(markdownItIns)

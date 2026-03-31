@@ -6,6 +6,7 @@ import { formatMonthDayTime } from "@/lib/formatters"
 import { getLevelBadgeData } from "@/lib/level-badge"
 import type { SiteSettingsData } from "@/lib/site-settings"
 import { getUserDisplayName } from "@/lib/users"
+import { getVipLevel, isVipActive } from "@/lib/vip-status"
 
 export async function getHomeSidebarHotTopics(limit = 5) {
   const posts = await findHomeSidebarHotTopics(limit)
@@ -60,6 +61,13 @@ export async function buildSidebarUser(user: SidebarUserSource, stats: SidebarUs
     return null
   }
 
+  const checkInReward = isVipActive(user)
+    ? getVipLevel(user) >= 3
+      ? settings.checkInVip3Reward
+      : getVipLevel(user) === 2
+        ? settings.checkInVip2Reward
+        : settings.checkInVip1Reward
+    : settings.checkInReward
   const level = Math.max(1, user.level ?? 1)
   const levelBadge = await getLevelBadgeData(level)
 
@@ -82,9 +90,12 @@ export async function buildSidebarUser(user: SidebarUserSource, stats: SidebarUs
     points: stats?.points ?? user.points ?? 0,
     pointName: settings.pointName,
     checkInEnabled: settings.checkInEnabled,
-    checkInReward: settings.checkInReward,
+    checkInReward,
     checkInMakeUpCardPrice: settings.checkInMakeUpCardPrice,
     checkInVipMakeUpCardPrice: settings.checkInVipMakeUpCardPrice,
+    checkInVip1MakeUpCardPrice: settings.checkInVip1MakeUpCardPrice,
+    checkInVip2MakeUpCardPrice: settings.checkInVip2MakeUpCardPrice,
+    checkInVip3MakeUpCardPrice: settings.checkInVip3MakeUpCardPrice,
     checkedInToday: stats?.checkedInToday ?? false,
   }
 }
@@ -97,8 +108,6 @@ export async function resolveSidebarUser(user: SidebarUserSource, settings: Site
   const stats = await getSidebarCurrentUserStats(user.username)
   return buildSidebarUser(user, stats, settings)
 }
-
-
 
 
 

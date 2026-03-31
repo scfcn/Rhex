@@ -21,6 +21,28 @@ interface HeaderUserActionsProps {
   unreadNotificationCount: number
 }
 
+function formatUnreadBadge(count: number) {
+  if (count <= 0) {
+    return null
+  }
+
+  return count > 9 ? "9+" : String(count)
+}
+
+function HeaderUnreadBadge({ count, className }: { count: number; className?: string }) {
+  const label = formatUnreadBadge(count)
+
+  if (!label) {
+    return null
+  }
+
+  return (
+    <span className={`absolute flex min-h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold leading-none text-white ${className ?? ""}`}>
+      {label}
+    </span>
+  )
+}
+
 
 export function HeaderUserActions({ user, unreadMessageCount, unreadNotificationCount }: HeaderUserActionsProps) {
 
@@ -101,14 +123,14 @@ export function HeaderUserActions({ user, unreadMessageCount, unreadNotification
           <Button variant="ghost" size="icon" className="size-8 rounded-md">
             <Bell className={unreadNotificationCount > 0 ? "h-4 w-4 text-rose-600" : "h-4 w-4"} />
           </Button>
-          {unreadNotificationCount > 0 ? <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-rose-500" /> : null}
+          <HeaderUnreadBadge count={unreadNotificationCount} className="right-0.5 top-0.5 min-h-4 min-w-4" />
         </Link>
 
         <Link href="/messages" className="relative">
           <Button variant="ghost" size="icon" className="size-8 rounded-md">
             <MessageSquareMore className={unreadMessageCount > 0 ? "h-4 w-4 text-rose-600" : "h-4 w-4"} />
           </Button>
-          {unreadMessageCount > 0 ? <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-rose-500" /> : null}
+          <HeaderUnreadBadge count={unreadMessageCount} className="right-0.5 top-0.5 min-h-4 min-w-4" />
         </Link>
 
         <div ref={mobileMenuRef} className="relative">
@@ -159,7 +181,7 @@ export function HeaderUserActions({ user, unreadMessageCount, unreadNotification
           <Button variant="ghost" className="h-8 rounded-md px-3 gap-1.5">
             <MessageSquareMore className={unreadMessageCount > 0 ? "h-4 w-4 text-rose-600" : "h-4 w-4"} />
           </Button>
-          {unreadMessageCount > 0 ? <span className="absolute right-2 top-1.5 h-2.5 w-2.5 rounded-full bg-rose-500" /> : null}
+          <HeaderUnreadBadge count={unreadMessageCount} className="right-1 top-0.5 min-h-4 min-w-4" />
         </Link>
 
   

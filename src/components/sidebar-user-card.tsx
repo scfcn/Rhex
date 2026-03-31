@@ -31,6 +31,9 @@ interface CheckInCalendarResponse {
   makeUpPrice: number
   vipMakeUpPrice: number
   normalMakeUpPrice: number
+  vip1MakeUpPrice: number
+  vip2MakeUpPrice: number
+  vip3MakeUpPrice: number
   entries: CheckInCalendarEntry[]
 }
 
@@ -56,7 +59,29 @@ export interface SidebarUserCardData {
   checkInReward?: number
   checkInMakeUpCardPrice?: number
   checkInVipMakeUpCardPrice?: number
+  checkInVip1MakeUpCardPrice?: number
+  checkInVip2MakeUpCardPrice?: number
+  checkInVip3MakeUpCardPrice?: number
   checkedInToday?: boolean
+}
+
+function resolveCurrentMakeUpPrice(user: SidebarUserCardData) {
+  const normalPrice = user.checkInMakeUpCardPrice ?? 0
+
+  if (!isVipActive(user)) {
+    return normalPrice
+  }
+
+  const vipLevel = getVipLevel(user)
+  if (vipLevel >= 3) {
+    return user.checkInVip3MakeUpCardPrice ?? user.checkInVipMakeUpCardPrice ?? 0
+  }
+
+  if (vipLevel === 2) {
+    return user.checkInVip2MakeUpCardPrice ?? user.checkInVipMakeUpCardPrice ?? 0
+  }
+
+  return user.checkInVip1MakeUpCardPrice ?? user.checkInVipMakeUpCardPrice ?? 0
 }
 
 function getRoleBadgeConfig(role?: SidebarUserCardData["role"]) {
@@ -259,7 +284,17 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
 
   const roleBadge = getRoleBadgeConfig(safeUser.role)
   const isRestrictedUser = safeUser.status === "BANNED" || safeUser.status === "MUTED"
-  const effectiveMakeUpPrice = vipActive ? (safeUser.checkInVipMakeUpCardPrice ?? 0) : (safeUser.checkInMakeUpCardPrice ?? 0)
+  const effectiveMakeUpPrice = resolveCurrentMakeUpPrice(safeUser)
+  const normalMakeUpPrice = calendarData?.normalMakeUpPrice ?? (safeUser.checkInMakeUpCardPrice ?? 0)
+  const vip1MakeUpPrice = calendarData?.vip1MakeUpPrice ?? (safeUser.checkInVip1MakeUpCardPrice ?? safeUser.checkInVipMakeUpCardPrice ?? 0)
+  const vip2MakeUpPrice = calendarData?.vip2MakeUpPrice ?? (safeUser.checkInVip2MakeUpCardPrice ?? safeUser.checkInVipMakeUpCardPrice ?? 0)
+  const vip3MakeUpPrice = calendarData?.vip3MakeUpPrice ?? (safeUser.checkInVip3MakeUpCardPrice ?? safeUser.checkInVipMakeUpCardPrice ?? 0)
+  const checkInRewardDescription = vipActive
+    ? `当前按 VIP${getVipLevel(safeUser)} 奖励发放`
+    : "当前按普通用户奖励发放"
+  const makeUpPriceDescription = vipActive
+    ? `当前按 VIP${getVipLevel(safeUser)} 价结算，普通 ${normalMakeUpPrice} / VIP1 ${vip1MakeUpPrice} / VIP2 ${vip2MakeUpPrice} / VIP3 ${vip3MakeUpPrice}`
+    : `普通账号价 ${normalMakeUpPrice}，VIP1 ${vip1MakeUpPrice} / VIP2 ${vip2MakeUpPrice} / VIP3 ${vip3MakeUpPrice}`
   const todayKey = getLocalDateKey()
 
   async function handleCheckIn() {
@@ -431,8 +466,8 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
       >
         <div className="space-y-3">
           <div className="grid gap-2.5 md:grid-cols-3">
-            <InfoPanel title="今日签到" value={`${currentUser.checkInReward ?? 0} ${pointName}`} description={checkedInToday ? "今日已完成签到" : "点击下方按钮立即领取"} />
-            <InfoPanel title="补签卡价格" value={`${calendarData?.makeUpPrice ?? effectiveMakeUpPrice} ${pointName}`} description={vipActive ? `VIP 价 · 普通价 ${calendarData?.normalMakeUpPrice ?? (currentUser.checkInMakeUpCardPrice ?? 0)} ${pointName}` : "按当前账号身份结算"} />
+            <InfoPanel title="今日签到" value={`${currentUser.checkInReward ?? 0} ${pointName}`} description={checkedInToday ? `今日已完成签到，${checkInRewardDescription}` : `${checkInRewardDescription}，点击下方按钮立即领取`} />
+            <InfoPanel title="补签卡价格" value={`${calendarData?.makeUpPrice ?? effectiveMakeUpPrice} ${pointName}`} description={makeUpPriceDescription} />
             <InfoPanel title="账户余额" value={`${points} ${pointName}`} description="补签时将自动从余额中扣除" />
           </div>
 

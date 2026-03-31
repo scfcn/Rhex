@@ -18,6 +18,7 @@ interface ProfileEditFormProps {
   initialEmail?: string | null
   initialEmailVerified: boolean
   nicknameChangePointCost: number
+  nicknameChangePriceDescription?: string
   pointName: string
   avatarMaxFileSizeMb: number
 }
@@ -39,6 +40,7 @@ export function ProfileEditForm({
   initialEmail,
   initialEmailVerified,
   nicknameChangePointCost,
+  nicknameChangePriceDescription,
   pointName,
   avatarMaxFileSizeMb,
 }: ProfileEditFormProps) {
@@ -65,9 +67,9 @@ export function ProfileEditForm({
   const nicknameChanged = useMemo(() => nickname.trim() !== initialNickname.trim(), [initialNickname, nickname])
   const nicknameHint = nicknameChangePointCost > 0
     ? nicknameChanged
-      ? `本次修改用户名将扣除 ${nicknameChangePointCost} ${pointName}，且用户名全站唯一。`
-      : `修改用户名需消耗 ${nicknameChangePointCost} ${pointName}，用户名全站唯一。`
-    : "用户名全站唯一，当前修改免费。"
+      ? `本次修改用户名将扣除 ${nicknameChangePointCost} ${pointName}。${nicknameChangePriceDescription ? `${nicknameChangePriceDescription}。` : ""}用户名全站唯一。`
+      : `修改用户名需消耗 ${nicknameChangePointCost} ${pointName}。${nicknameChangePriceDescription ? `${nicknameChangePriceDescription}。` : ""}用户名全站唯一。`
+    : `${nicknameChangePriceDescription ? `${nicknameChangePriceDescription}，` : ""}用户名全站唯一，当前修改免费。`
 
   async function updateProfile(payload: { nickname?: string; bio?: string; gender?: string; avatarPath?: string; email?: string; emailCode?: string }) {
     const response = await fetch("/api/profile/update", {

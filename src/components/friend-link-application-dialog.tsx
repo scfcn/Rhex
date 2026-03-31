@@ -6,6 +6,7 @@ import { Plus } from "lucide-react"
 
 
 import { Button } from "@/components/ui/button"
+import { DialogBackdrop, DialogPanel, DialogPortal, DialogPositioner } from "@/components/ui/dialog"
 import { toast } from "@/components/ui/toast"
 
 interface FriendLinkApplicationDialogProps {
@@ -75,9 +76,11 @@ export function FriendLinkApplicationDialog({ announcement, disabled = false }: 
         <Plus className="mr-2 h-4 w-4" />
         申请友情链接
       </Button>
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-[28px] border border-border bg-background p-6 shadow-2xl">
+      <DialogPortal open={open} onClose={closeDialog} closeOnEscape={!submitting}>
+        <div className="fixed inset-0 z-[120]">
+          <DialogBackdrop onClick={closeDialog} />
+          <DialogPositioner>
+            <DialogPanel className="max-w-2xl p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h3 className="text-xl font-semibold">申请友情链接</h3>
@@ -123,9 +126,10 @@ export function FriendLinkApplicationDialog({ announcement, disabled = false }: 
                 </Button>
               </div>
             </form>
-          </div>
+            </DialogPanel>
+          </DialogPositioner>
         </div>
-      ) : null}
+      </DialogPortal>
     </>
   )
 }

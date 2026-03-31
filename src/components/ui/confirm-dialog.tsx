@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
+import { DialogBackdrop, DialogPanel, DialogPortal, DialogPositioner } from "@/components/ui/dialog"
 
 export interface ConfirmOptions {
   title?: string
@@ -85,28 +86,31 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   return (
     <ConfirmContext.Provider value={contextValue}>
       {children}
-      {current ? (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/45 px-3 py-4">
-          <div className="flex w-full max-w-lg flex-col overflow-hidden rounded-[28px] border border-border bg-background shadow-2xl">
-            <div className="border-b border-border px-5 py-4">
-              <h3 className="text-lg font-semibold">{current.title}</h3>
-              <p className="mt-1 whitespace-pre-line text-sm leading-6 text-muted-foreground">{current.description}</p>
-            </div>
-            <div className="flex justify-end gap-3 px-5 py-4">
-              <Button type="button" variant="ghost" className="min-w-24" onClick={() => settleCurrent(false)}>
-                {current.cancelText}
-              </Button>
-              <Button
-                type="button"
-                className={current.variant === "danger" ? "min-w-24 bg-rose-600 text-white hover:bg-rose-700 dark:bg-rose-500 dark:hover:bg-rose-600" : "min-w-24"}
-                onClick={() => settleCurrent(true)}
-              >
-                {current.confirmText}
-              </Button>
-            </div>
-          </div>
+      <DialogPortal open={Boolean(current)} onClose={() => settleCurrent(false)}>
+        <div className="fixed inset-0 z-[130]">
+          <DialogBackdrop onClick={() => settleCurrent(false)} />
+          <DialogPositioner className="px-3 py-4">
+            <DialogPanel className="flex max-w-lg flex-col">
+              <div className="border-b border-border px-5 py-4">
+                <h3 className="text-lg font-semibold">{current?.title}</h3>
+                <p className="mt-1 whitespace-pre-line text-sm leading-6 text-muted-foreground">{current?.description}</p>
+              </div>
+              <div className="flex justify-end gap-3 px-5 py-4">
+                <Button type="button" variant="ghost" className="min-w-24" onClick={() => settleCurrent(false)}>
+                  {current?.cancelText}
+                </Button>
+                <Button
+                  type="button"
+                  className={current?.variant === "danger" ? "min-w-24 bg-rose-600 text-white hover:bg-rose-700 dark:bg-rose-500 dark:hover:bg-rose-600" : "min-w-24"}
+                  onClick={() => settleCurrent(true)}
+                >
+                  {current?.confirmText}
+                </Button>
+              </div>
+            </DialogPanel>
+          </DialogPositioner>
         </div>
-      ) : null}
+      </DialogPortal>
     </ConfirmContext.Provider>
   )
 }

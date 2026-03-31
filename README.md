@@ -1,231 +1,289 @@
-## Rhex 论坛系统 `v1.0.0`
+# Rhex 论坛系统
 
-> 注意项目正在迭代中，运用到线上需谨慎!
+> 一个面向正式部署、长期维护和二次开发的现代社区系统。
 
-一个面向正式部署与长期维护的现代论坛系统，基于 `Next.js App Router`、`Prisma` 与 `PostgreSQL` 构建。
+`Rhex` 基于 `Next.js App Router`、`Prisma`、`PostgreSQL` 构建，内置论坛、用户成长、通知私信、管理后台、内容审核、邀请与兑换、上传、应用中心等完整能力，适合自建兴趣社区、知识社区、品牌论坛和内部讨论平台。
 
-`Rhex` 提供分区、板块、帖子、评论、等级、徽章、通知、私信、管理员后台等核心能力，并保持清晰的分层结构，便于二次开发与长期演进。
+## 在线演示
 
-### 项目简介
+- 演示站点: [https://rhex.im/](https://rhex.im/)
+- 项目仓库:
+  - GitHub: [https://github.com/lovedevpanda/Rhex](https://github.com/lovedevpanda/Rhex)
+  - Gitee: [https://gitee.com/rhex/Rhex](https://gitee.com/rhex/Rhex)
 
-- **演示站**：[https://rhex.im/](https://rhex.im/)
-- **问题反馈**：当前如发现 Bug，也请直接在演示站内反馈
+## 适用场景
 
-本项目适合以下场景：
+- 搭建垂直兴趣社区、知识论坛、内容沉淀型社区
+- 作为公司内部讨论平台、产品用户社区或会员社区底座
+- 在现有论坛模型上继续扩展积分、会员、应用、活动和运营工具
 
+## 功能预览
 
-- **自建社区**：搭建垂直论坛、兴趣社区、知识讨论站
-- **团队内部讨论平台**：用于组织、项目组或产品用户社区
-- **二次开发底座**：在现有论坛模型上扩展会员、插件、激励体系等能力
+### 1. 首页与社区导航
 
-### 核心特性
+- 论坛首页支持左右栏布局、分区节点导航、帖子列表/画廊模式切换
+- 左侧导航支持折叠收起，画廊模式下会自动适配更高密度布局
 
-- **完整论坛模型**：分区、板块、主题、评论、关注、收藏、点赞、举报、公告
-- **后台管理能力**：支持站点设置、内容管理、结构管理、用户管理、审核与运营
-- **用户成长体系**：默认包含等级、积分、徽章、签到、VIP 等成长能力
-- **站内互动能力**：支持通知、私信、@ 提及、打赏、邀请码等机制
-- **可扩展架构**：遵循分层设计，便于维护、重构与功能扩展
+![首页预览](./docs/preview/home-overview.png)
 
-### 技术栈
+### 2. 画廊模式与帖子卡片
 
-- **前端框架**：`Next.js 14`、`React 18`
-- **样式方案**：`Tailwind CSS`
-- **数据库**：`PostgreSQL`
-- **ORM**：`Prisma`
-- **认证方式**：基于数据库用户与服务端 Session Cookie
-- **运行环境**：`Node.js 20+`
+- 支持封面图卡片流展示
+- 支持悬停查看完整标题
+- 支持封面图懒加载，适合图片较多的社区首页
 
-### 功能概览
+![画廊模式占位](./docs/preview/gallery-mode.png)
 
-当前项目已具备的主要模块包括：
+### 3. 帖子详情页
 
-- **社区结构**：分区、板块、标签、帖子分类
-- **内容系统**：发帖、评论、楼中楼、Markdown 扩展渲染
-- **互动系统**：点赞、收藏、关注、通知、私信、提及
-- **用户系统**：注册、登录、找回密码、个人资料、等级进度
-- **成长系统**：积分、签到、徽章、VIP、邀请码、兑换码
-- **运营系统**：公告、友情链接、举报处理、后台日志
-- **安全与风控**：验证码开关、内容安全校验、权限控制
-- **插件能力**：包含插件注册与构建相关基础设施
+- 支持 Markdown 渲染、代码高亮、KaTeX、Mermaid、任务列表、脚注
+- 支持图片灯箱、帖子内图片懒加载、隐藏内容、最低阅读等级等扩展能力
 
-### 环境要求
+![帖子详情占位](./docs/preview/post-detail.png)
 
-- **Node.js**：`20+`
-- **PostgreSQL**：`14+`
+### 4. 个人主页与成长体系
 
-### 快速开始
+- 支持等级、勋章、认证、VIP、积分、签到、邀请关系等资料展示
+- 支持个人资料编辑、头像上传、昵称修改和积分消耗提示
 
-#### 1. 安装依赖
+![用户主页占位](./docs/preview/profile-center.png)
+
+### 5. 后台总览与管理中心
+
+- 支持用户、帖子、举报、日志、内容安全、站点设置等后台模块
+- 支持后台顶部搜索，快速定位“邀请码”“签到日志”“补签”“上传图片”等配置入口
+
+![后台总览占位](./docs/preview/admin-dashboard.png)
+
+### 6. 站点设置与积分/VIP
+
+- 支持基础信息、注册邀请、互动热度、友情链接、邀请码、兑换码、上传、积分与 VIP 等配置
+- 支持 VIP1 / VIP2 / VIP3 差异化价格策略
+
+![后台设置占位](./docs/preview/admin-settings.png)
+
+### 7. 应用中心与独立应用后台
+
+- 内置应用中心
+- 当前示例应用包括五子棋、阴阳契、自助广告位
+- 每个应用都有独立后台配置页
+
+![应用中心占位](./docs/preview/apps-center.png)
+
+## 核心功能
+
+### 论坛与内容系统
+
+- 分区、节点、标签、帖子分类
+- 普通帖、悬赏帖、投票帖、抽奖帖
+- 帖子封面图、画廊模式、精华、置顶、下线、审核
+- 回复、楼中楼、点赞、收藏、关注、举报
+- 隐藏内容、回复解锁、付费解锁、最低等级可见、红包帖
+- RSS 输出和搜索页
+
+### Markdown 与富文本能力
+
+- Markdown 基础语法
+- 代码高亮
+- KaTeX 数学公式
+- Mermaid 图表
+- Task List、脚注、上下标、缩写、定义列表、标记文本
+- 安全的 Markdown HTML 白名单处理
+- 图片灯箱和媒体嵌入能力
+
+### 用户、成长与会员体系
+
+- 用户注册、登录、找回密码、会话管理
+- 昵称、头像、个人简介、用户主页
+- 等级系统、勋章系统、认证系统
+- 积分系统、签到、补签
+- VIP 购买与续费
+- VIP1 / VIP2 / VIP3 差异化权益与积分价格
+- 邀请码、兑换码、邀请奖励
+
+### 社区互动
+
+- 站内通知
+- 私信
+- `@` 提及
+- 红点未读数量提示
+- 公告、友情链接、帮助页、FAQ
+
+### 后台管理
+
+- 总览仪表盘
+- 用户管理
+- 帖子管理
+- 分区/节点管理
+- 等级系统
+- 勋章系统
+- 认证系统
+- 公告管理
+- 举报中心
+- 日志中心
+- 内容安全与敏感词
+- 站点设置
+- 后台全局搜索
+
+### 站点设置
+
+- 站点名称、描述、Logo、页脚导航
+- 头部应用导航
+- 注册开关、验证码、邮箱/手机号验证、邀请注册
+- 积分、VIP、签到、补签、改昵称、邀请码购买价格
+- 上传方式、本地存储、OSS、格式和大小限制
+- 友情链接、兑换码、邀请码
+- Markdown 表情扩展
+- 首页统计卡片显示开关
+
+### 内置应用中心
+
+- 五子棋: 免费次数、门票积分、AI 难度、获胜奖励
+- 阴阳契: 税率、彩头范围、每日发起/应战限制
+- 自助广告位: 首页广告卡片、价格、插槽、广告订单审核
+
+## 技术栈
+
+- 前端: `Next.js 14`、`React 18`
+- 样式: `Tailwind CSS`
+- 数据库: `PostgreSQL`
+- ORM: `Prisma`
+- 鉴权: 数据库用户 + 服务端 Session Cookie
+- 运行环境: `Node.js 20+`
+
+## 快速开始
+
+### 1. 安装依赖
 
 ```bash
 npm install
 ```
 
-#### 2. 创建环境变量
+### 2. 创建环境变量
 
-在项目根目录创建 `.env` 文件，至少包含以下必填内容：
+在项目根目录创建 `.env`:
 
 ```env
 DATABASE_URL="postgresql://postgres:password@localhost:5432/bbs?schema=public"
 SESSION_SECRET="replace_this_with_a_long_random_secret"
 CAPTCHA_SECRET_KEY="replace_this_with_a_long_random_secret"
+
+SEED_ADMIN_USERNAME="admin"
+SEED_ADMIN_PASSWORD="ChangeMe_123456"
+SEED_ADMIN_EMAIL="admin@rhex.im"
+SEED_ADMIN_NICKNAME="秦始皇"
+
 ```
 
-
-#### 3. 初始化数据库与基础数据
-
-开发环境推荐直接执行：
+### 3. 初始化数据库和基础数据
 
 ```bash
 npm run setup:dev
 ```
 
-该命令会自动完成：
+该命令会自动完成:
 
 - 校验必要环境变量
-- 生成 `Prisma Client`
-- 使用 `prisma db push` 同步数据库结构
-- 探测当前数据库状态
-- 在需要时写入基础业务数据
+- 生成 Prisma Client
+- 同步数据库结构
+- 检测数据库状态
+- 在需要时自动写入基础数据
 
-#### 4. 启动开发服务器
+### 4. 启动开发环境
 
 ```bash
 npm run dev
 ```
 
-启动后默认访问本地开发地址：`http://localhost:3000`
+默认访问:
 
-### 生产环境启动
+- 前台: `http://localhost:3000`
+- 后台: `http://localhost:3000/admin`
+
+## 生产环境启动
 
 ```bash
 npm run build
 npm run start
 ```
 
-或者使用项目内置命令：
+也可以直接使用内置命令:
 
 ```bash
 npm run start:prod
 ```
 
-如果你希望在生产模式下先执行初始化再启动，可使用：
+如果你希望初始化后直接启动生产环境:
 
 ```bash
 npm run setup:start:prod
 ```
 
-### 初始化数据说明
+## 初始化数据说明
 
-默认情况下，`prisma/seed.ts` 会写入以下核心数据：
+首次初始化会默认写入:
 
-- **站点基础配置**：站点名称、SEO、上传策略、注册策略等
-- **论坛基础结构**：默认分区与板块
-- **管理员账号**：用于首次登录后台
-- **等级体系**：默认 9 个等级
-- **徽章体系**：内置基础徽章规则
+- 站点基础配置
+- 默认分区和节点
+- 管理员账号
+- 等级体系
+- 默认勋章规则
+
+默认管理员信息:
+
+- 用户名: `admin`
+- 密码: `ChangeMe_123456`
+
+强烈建议首次部署后立即修改默认管理员密码。
+
+### 邮件相关
+
+- 可在后台开启 SMTP，也可通过环境与后台设置结合使用
 
 
-### 可选环境变量
+## 常用脚本
 
-初始化相关变量：
+- `npm run dev`: 启动开发环境
+- `npm run build`: 构建生产包
+- `npm run start`: 启动生产服务
+- `npm run start:prod`: 构建并启动生产服务
+- `npm run setup:dev`: 开发环境初始化
+- `npm run setup:prod`: 生产环境初始化
+- `npm run setup:start`: 初始化后启动开发服务
+- `npm run setup:start:prod`: 初始化后启动生产服务
+- `npm run prisma:generate`: 生成 Prisma Client
+- `npm run prisma:push`: 同步数据库结构
+- `npm run prisma:seed`: 执行种子脚本
+- `npm run lint`: 运行 ESLint
 
-- `SEED_ADMIN_USERNAME`：初始管理员用户名，默认 `admin`
-- `SEED_ADMIN_PASSWORD`：初始管理员密码，默认 `ChangeMe_123456`
-- `SEED_ADMIN_EMAIL`：初始管理员邮箱
-- `SEED_ADMIN_NICKNAME`：初始管理员昵称，默认 `站长`
-- `SETUP_FORCE_SEED=true`：即使数据库已有核心数据也强制重新执行 seed
+## 项目结构
 
-验证码相关变量：
-
-- `TURNSTILE_SECRET_KEY`：Cloudflare Turnstile 服务端密钥
-- `CAPTCHA_SECRET_KEY`：内置验证码相关密钥（如使用）
-
-数据库缓存相关变量（可选）：
-
-- `DB_CLIENT_CACHE_LOG`
-- `DB_CLIENT_CACHE_TTL_MS`
-- `DB_CLIENT_CACHE_MAX_ENTRIES`
-- `DB_CLIENT_CACHE_MAX_VALUE_BYTES`
-- `DB_CLIENT_CACHE_MAX_HEAP_MB`
-- `DB_CLIENT_CACHE_CLEANUP_INTERVAL_MS`
-
-如果你暂时只是本地开发，通常只配置 `DATABASE_URL` 与 `SESSION_SECRET` 即可启动主流程。
-
-### 演示内容导入
-
-如果你想在本地快速预览一个更完整的社区氛围，可以手动导入演示内容。
-
-在类 Unix 环境中：
-
-```bash
-SEED_WITH_DEMO_CONTENT=true npm run prisma:seed
+```text
+src/
+  app/          页面、路由、API Route
+  components/   组件与交互层
+  db/           数据访问层
+  hooks/        复用 Hook
+  lib/          业务逻辑与领域服务
+  types/        类型声明
+prisma/         数据模型与种子数据
+scripts/        初始化与构建辅助脚本
+plugins/        插件与扩展能力
 ```
 
-在 Windows PowerShell 中：
 
-```powershell
-$env:SEED_WITH_DEMO_CONTENT="true"; npm run prisma:seed
-```
+## 部署建议
+
+首次部署完成后，建议优先处理以下事项:
+
+- 修改默认管理员用户名和密码
+- 配置站点名称、描述、Logo 和 SEO
+- 检查注册、验证码、邮件和邀请策略
+- 检查上传策略、本地存储或 OSS 配置
+- 配置 HTTPS、反向代理、备份和监控
+- 根据业务实际情况补充分区、节点和权限策略
 
 
-### 常用脚本
-
-- `npm run dev`：启动开发环境
-- `npm run build`：构建生产包
-- `npm run start`：启动生产服务
-- `npm run start:prod`：构建并启动生产服务
-- `npm run setup:dev`：开发环境初始化
-- `npm run setup:prod`：生产环境初始化
-- `npm run setup:start`：初始化后启动开发服务
-- `npm run setup:start:prod`：初始化后启动生产服务
-- `npm run prisma:generate`：生成 Prisma Client
-- `npm run prisma:push`：同步数据库结构
-- `npm run prisma:seed`：执行种子数据脚本
-- `npm run version:sync`：同步发布版本内容
-
-### 项目结构
-
-项目遵循相对清晰的职责拆分：
-
-- `src/app`：页面、路由处理器、站点入口
-- `src/components`：通用 UI 组件
-- `src/db`：数据库访问层、查询与持久化逻辑
-- `src/lib`：业务逻辑层与领域服务
-- `prisma`：数据库模型与种子脚本
-- `scripts`：项目初始化与构建辅助脚本
-- `plugins`：插件相关资源与扩展能力
-
-其中：
-
-- **数据库相关代码** 建议统一维护在 `src/db`
-- **业务逻辑相关代码** 建议统一维护在 `src/lib`
-
-这有助于长期保持可维护性与职责边界清晰。
-
-### 首次部署后的建议操作
-
-完成首次部署后，建议优先处理以下事项：
-
-- **立即修改默认管理员密码**
-- **更新站点名称、Logo、SEO 信息**
-- **检查注册、上传、验证码、邮箱等策略配置**
-- **决定是否开放公开注册**
-- **根据实际业务补充分区与板块结构**
-- **配置 HTTPS、反向代理、日志与数据库备份**
-
-### 适合二次开发的方向
-
-如果你准备继续扩展，这个项目比较适合往以下方向演进：
-
-- **会员体系增强**：订阅、付费权限、专属板块
-- **内容策略增强**：审核流、敏感词、推荐算法、热度机制
-- **站内交易或激励系统**：积分商城、任务系统、勋章活动
-- **插件化扩展**：围绕现有插件基础设施做模块化能力封装
-- **运维能力增强**：监控、审计、缓存、异步任务、对象存储
-
-### License
+## License
 
 本项目采用 **MIT License**。
-
-你可以自由使用、修改、分发以及商业化，但需要保留原始版权与许可证声明。

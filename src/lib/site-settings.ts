@@ -12,6 +12,7 @@ import {
 import { defaultSiteSettingsCreateInput } from "@/lib/site-settings-defaults"
 import { parseMarkdownEmojiMapJson } from "@/lib/markdown-emoji"
 import { normalizePostListDisplayMode, type PostListDisplayMode } from "@/lib/post-list-display"
+import { resolveCheckInMakeUpPriceSettings, resolveCheckInRewardSettings, resolveInviteCodePurchasePriceSettings, resolveNicknameChangePointCostSettings } from "@/lib/site-settings-app-state"
 import { normalizePositiveInteger } from "@/lib/shared/normalizers"
 import { normalizeHeaderAppIconName, parseSiteHeaderAppLinks, type SiteHeaderAppLinkItem } from "./site-header-app-links"
 
@@ -39,8 +40,14 @@ export interface SiteSettingsData {
   friendLinkAnnouncement: string
   checkInEnabled: boolean
   checkInReward: number
+  checkInVip1Reward: number
+  checkInVip2Reward: number
+  checkInVip3Reward: number
   checkInMakeUpCardPrice: number
   checkInVipMakeUpCardPrice: number
+  checkInVip1MakeUpCardPrice: number
+  checkInVip2MakeUpCardPrice: number
+  checkInVip3MakeUpCardPrice: number
   postOfflinePrice: number
   postOfflineVip1Price: number
   postOfflineVip2Price: number
@@ -52,10 +59,16 @@ export interface SiteSettingsData {
   registerInviteCodeEnabled: boolean
   inviteCodePurchaseEnabled: boolean
   inviteCodePrice: number
+  inviteCodeVip1Price: number
+  inviteCodeVip2Price: number
+  inviteCodeVip3Price: number
   registerCaptchaMode: "OFF" | "TURNSTILE" | "BUILTIN"
   loginCaptchaMode: "OFF" | "TURNSTILE" | "BUILTIN"
   turnstileSiteKey?: string | null
   nicknameChangePointCost: number
+  nicknameChangeVip1PointCost: number
+  nicknameChangeVip2PointCost: number
+  nicknameChangeVip3PointCost: number
   postEditableMinutes: number
   commentEditableMinutes: number
   tippingEnabled: boolean
@@ -257,6 +270,24 @@ function mapSiteSettings(record: {
   friendLinkApplicationEnabled: boolean
   friendLinkAnnouncement: string
 }): ServerSiteSettingsData {
+  const checkInRewards = resolveCheckInRewardSettings({
+    appStateJson: record.appStateJson,
+    normalReward: record.checkInReward,
+  })
+  const inviteCodePurchasePrices = resolveInviteCodePurchasePriceSettings({
+    appStateJson: record.appStateJson,
+    normalPrice: record.inviteCodePrice,
+  })
+  const checkInMakeUpPrices = resolveCheckInMakeUpPriceSettings({
+    appStateJson: record.appStateJson,
+    normalPrice: record.checkInMakeUpCardPrice,
+    vipFallbackPrice: record.checkInVipMakeUpCardPrice,
+  })
+  const nicknameChangePointCosts = resolveNicknameChangePointCostSettings({
+    appStateJson: record.appStateJson,
+    normalPrice: record.nicknameChangePointCost,
+  })
+
   return {
     siteName: record.siteName,
     siteSlogan: record.siteSlogan,
@@ -276,9 +307,15 @@ function mapSiteSettings(record: {
     friendLinkApplicationEnabled: record.friendLinkApplicationEnabled,
     friendLinkAnnouncement: record.friendLinkAnnouncement,
     checkInEnabled: record.checkInEnabled,
-    checkInReward: record.checkInReward,
-    checkInMakeUpCardPrice: record.checkInMakeUpCardPrice,
-    checkInVipMakeUpCardPrice: record.checkInVipMakeUpCardPrice,
+    checkInReward: checkInRewards.normal,
+    checkInVip1Reward: checkInRewards.vip1,
+    checkInVip2Reward: checkInRewards.vip2,
+    checkInVip3Reward: checkInRewards.vip3,
+    checkInMakeUpCardPrice: checkInMakeUpPrices.normal,
+    checkInVipMakeUpCardPrice: checkInMakeUpPrices.vip1,
+    checkInVip1MakeUpCardPrice: checkInMakeUpPrices.vip1,
+    checkInVip2MakeUpCardPrice: checkInMakeUpPrices.vip2,
+    checkInVip3MakeUpCardPrice: checkInMakeUpPrices.vip3,
     postOfflinePrice: record.postOfflinePrice,
     postOfflineVip1Price: record.postOfflineVip1Price,
     postOfflineVip2Price: record.postOfflineVip2Price,
@@ -289,11 +326,17 @@ function mapSiteSettings(record: {
     registrationRequireInviteCode: record.registrationRequireInviteCode,
     registerInviteCodeEnabled: record.registerInviteCodeEnabled,
     inviteCodePurchaseEnabled: record.inviteCodePurchaseEnabled,
-    inviteCodePrice: record.inviteCodePrice,
+    inviteCodePrice: inviteCodePurchasePrices.normal,
+    inviteCodeVip1Price: inviteCodePurchasePrices.vip1,
+    inviteCodeVip2Price: inviteCodePurchasePrices.vip2,
+    inviteCodeVip3Price: inviteCodePurchasePrices.vip3,
     registerCaptchaMode: normalizeCaptchaMode(record.registerCaptchaMode),
     loginCaptchaMode: normalizeCaptchaMode(record.loginCaptchaMode),
     turnstileSiteKey: record.turnstileSiteKey,
-    nicknameChangePointCost: record.nicknameChangePointCost,
+    nicknameChangePointCost: nicknameChangePointCosts.normal,
+    nicknameChangeVip1PointCost: nicknameChangePointCosts.vip1,
+    nicknameChangeVip2PointCost: nicknameChangePointCosts.vip2,
+    nicknameChangeVip3PointCost: nicknameChangePointCosts.vip3,
     postEditableMinutes: normalizePositiveInteger(record.postEditableMinutes, 10),
     commentEditableMinutes: normalizePositiveInteger(record.commentEditableMinutes, 5),
     tippingEnabled: record.tippingEnabled,

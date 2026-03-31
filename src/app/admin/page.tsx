@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { AdminAnnouncementManager } from "@/components/admin-announcement-manager"
 import { AdminAppsSettingsForm } from "@/components/admin-apps-settings-form"
 import { AdminInviteCodeManager } from "@/components/admin-invite-code-manager"
+import { AdminModuleSearch } from "@/components/admin-module-search"
 import { AdminFooterLinksSettingsForm } from "@/components/admin-footer-links-settings-form"
 import { AdminFriendLinksSettingsForm } from "@/components/admin-friend-links-settings-form"
 import { AdminBadgeManager } from "@/components/admin-badge-manager"
@@ -95,7 +96,7 @@ const tabLabels: Record<string, string> = {
   logs: "日志中心",
   security: "内容安全",
   "site-basic": "站点基础设置",
-  "site-vip": "VIP设置",
+  "site-vip": "积分与VIP",
   "site-upload": "上传设置",
 }
 
@@ -221,14 +222,17 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   return (
     <AdminShell currentTab={tab} adminName={admin.nickname ?? admin.username}>
       <div className="space-y-6">
-        <div className="flex items-center gap-3 rounded-[24px] border border-border bg-card px-5 py-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent text-foreground">
-            <Settings2 className="h-4 w-4" />
+        <div className="flex flex-col gap-4 rounded-[24px] border border-border bg-card px-5 py-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent text-foreground">
+              <Settings2 className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">当前模块</p>
+              <h2 className="text-lg font-semibold">{tabLabels[tab] ?? "总览"}</h2>
+            </div>
           </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">当前模块</p>
-            <h2 className="text-lg font-semibold">{tabLabels[tab] ?? "总览"}</h2>
-          </div>
+          <AdminModuleSearch className="md:ml-auto" />
         </div>
 
         {tab === "overview" ? (

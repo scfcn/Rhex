@@ -46,5 +46,14 @@ export function findUserInviteResolverById(userId: number) {
 }
 
 export function findInvitePurchaseUser(userId: number) {
-  return prisma.user.findUnique({ where: { id: userId }, select: { id: true, points: true, username: true } })
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      points: true,
+      username: true,
+      vipLevel: true,
+      vipExpiresAt: true,
+    },
+  })
 }

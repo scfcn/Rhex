@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 
 import { RefinedRichPostEditor } from "@/components/refined-rich-post-editor"
 import { Button } from "@/components/ui/button"
+import { DialogBackdrop, DialogPanel, DialogPortal, DialogPositioner } from "@/components/ui/dialog"
 
 interface HiddenContentModalProps {
 
@@ -33,10 +34,6 @@ export function HiddenContentModal({ open, title, description, value, onChange, 
     }
   }, [open, value, price])
 
-  if (!open) {
-    return null
-  }
-
   function handleSave() {
     onChange(draftValue)
     onPriceChange?.(draftPrice)
@@ -44,38 +41,43 @@ export function HiddenContentModal({ open, title, description, value, onChange, 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6">
-      <div className="w-full max-w-4xl rounded-[28px] border border-border bg-background shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
-          <div>
-            <h4 className="text-lg font-semibold">{title}</h4>
-            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-          </div>
-          <Button type="button" variant="ghost" onClick={onClose}>关闭</Button>
-        </div>
-
-        <div className="space-y-4 px-6 py-5">
-          {onPriceChange ? (
-            <div className="space-y-2">
-              <p className="text-sm font-medium">{priceLabel ?? "价格"}</p>
-              <input value={draftPrice} onChange={(event) => setDraftPrice(event.target.value)} className="h-11 w-full rounded-full border border-border bg-card px-4 text-sm outline-none" placeholder="输入价格" />
+    <DialogPortal open={open} onClose={onClose}>
+      <div className="fixed inset-0 z-[120]">
+        <DialogBackdrop onClick={onClose} />
+        <DialogPositioner>
+          <DialogPanel className="max-w-4xl">
+            <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
+              <div>
+                <h4 className="text-lg font-semibold">{title}</h4>
+                <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+              </div>
+              <Button type="button" variant="ghost" onClick={onClose}>关闭</Button>
             </div>
-          ) : null}
 
-          <RefinedRichPostEditor
-            value={draftValue}
-            onChange={setDraftValue}
-            placeholder="写下这部分隐藏内容，支持 Markdown、图片和表情。"
-            minHeight={260}
-          />
+            <div className="space-y-4 px-6 py-5">
+              {onPriceChange ? (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">{priceLabel ?? "价格"}</p>
+                  <input value={draftPrice} onChange={(event) => setDraftPrice(event.target.value)} className="h-11 w-full rounded-full border border-border bg-card px-4 text-sm outline-none" placeholder="输入价格" />
+                </div>
+              ) : null}
 
-        </div>
+              <RefinedRichPostEditor
+                value={draftValue}
+                onChange={setDraftValue}
+                placeholder="写下这部分隐藏内容，支持 Markdown、图片和表情。"
+                minHeight={260}
+              />
 
-        <div className="flex items-center justify-end gap-3 border-t border-border px-6 py-4">
-          <Button type="button" variant="ghost" onClick={onClose}>取消</Button>
-          <Button type="button" onClick={handleSave}>保存这段隐藏内容</Button>
-        </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-border px-6 py-4">
+              <Button type="button" variant="ghost" onClick={onClose}>取消</Button>
+              <Button type="button" onClick={handleSave}>保存这段隐藏内容</Button>
+            </div>
+          </DialogPanel>
+        </DialogPositioner>
       </div>
-    </div>
+    </DialogPortal>
   )
 }

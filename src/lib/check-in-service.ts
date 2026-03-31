@@ -5,13 +5,18 @@ import { apiError } from "@/lib/api-route"
 import { getLocalDateKey, getMonthKey } from "@/lib/date-key"
 import { recordUserCheckInGrowth } from "@/lib/level-system"
 import { getSiteSettings } from "@/lib/site-settings"
-import { isVipActive } from "@/lib/vip-status"
+import { getVipLevel, isVipActive } from "@/lib/vip-status"
 
 interface CheckInSettingsSnapshot {
   pointName: string
   checkInReward: number
+  checkInVip1Reward: number
+  checkInVip2Reward: number
+  checkInVip3Reward: number
   checkInMakeUpCardPrice: number
-  checkInVipMakeUpCardPrice: number
+  checkInVip1MakeUpCardPrice: number
+  checkInVip2MakeUpCardPrice: number
+  checkInVip3MakeUpCardPrice: number
 }
 
 interface BuildCheckInCalendarOptions {
@@ -45,9 +50,15 @@ export interface CheckInOverview {
   month: string
   pointName: string
   checkInReward: number
+  vip1CheckInReward: number
+  vip2CheckInReward: number
+  vip3CheckInReward: number
   makeUpPrice: number
   vipMakeUpPrice: number
   normalMakeUpPrice: number
+  vip1MakeUpPrice: number
+  vip2MakeUpPrice: number
+  vip3MakeUpPrice: number
   entries: CheckInCalendarEntry[]
 }
 
@@ -98,10 +109,55 @@ function assertCheckInEnabled(settings: { checkInEnabled: boolean }) {
 function readCheckInSettingsSnapshot(settings: CheckInSettingsSnapshot) {
   return {
     pointName: settings.pointName,
-    reward: Math.max(0, settings.checkInReward),
+    normalReward: Math.max(0, settings.checkInReward),
+    vip1Reward: Math.max(0, settings.checkInVip1Reward),
+    vip2Reward: Math.max(0, settings.checkInVip2Reward),
+    vip3Reward: Math.max(0, settings.checkInVip3Reward),
     normalMakeUpPrice: Math.max(0, settings.checkInMakeUpCardPrice),
-    vipMakeUpPrice: Math.max(0, settings.checkInVipMakeUpCardPrice),
+    vip1MakeUpPrice: Math.max(0, settings.checkInVip1MakeUpCardPrice),
+    vip2MakeUpPrice: Math.max(0, settings.checkInVip2MakeUpCardPrice),
+    vip3MakeUpPrice: Math.max(0, settings.checkInVip3MakeUpCardPrice),
   }
+}
+
+function resolveUserCheckInReward(
+  snapshot: ReturnType<typeof readCheckInSettingsSnapshot>,
+  user: Pick<CurrentUserRecord, "vipLevel" | "vipExpiresAt">,
+) {
+  if (!isVipActive(user)) {
+    return snapshot.normalReward
+  }
+
+  const vipLevel = getVipLevel(user)
+  if (vipLevel >= 3) {
+    return snapshot.vip3Reward
+  }
+
+  if (vipLevel === 2) {
+    return snapshot.vip2Reward
+  }
+
+  return snapshot.vip1Reward
+}
+
+function resolveUserMakeUpPrice(
+  snapshot: ReturnType<typeof readCheckInSettingsSnapshot>,
+  user: Pick<CurrentUserRecord, "vipLevel" | "vipExpiresAt">,
+) {
+  if (!isVipActive(user)) {
+    return snapshot.normalMakeUpPrice
+  }
+
+  const vipLevel = getVipLevel(user)
+  if (vipLevel >= 3) {
+    return snapshot.vip3MakeUpPrice
+  }
+
+  if (vipLevel === 2) {
+    return snapshot.vip2MakeUpPrice
+  }
+
+  return snapshot.vip1MakeUpPrice
 }
 
 async function buildCalendarData(options: BuildCheckInCalendarOptions): Promise<CheckInCalendarEntry[]> {
@@ -158,16 +214,21 @@ export async function getCheckInOverview(user: CurrentUserRecord, month = getMon
   assertCheckInEnabled(settings)
 
   const snapshot = readCheckInSettingsSnapshot(settings)
-  const vipActive = isVipActive(user)
   const entries = await buildCalendarData({ userId: user.id, month })
 
   return {
     month,
     pointName: snapshot.pointName,
-    checkInReward: snapshot.reward,
-    makeUpPrice: vipActive ? snapshot.vipMakeUpPrice : snapshot.normalMakeUpPrice,
-    vipMakeUpPrice: snapshot.vipMakeUpPrice,
+    checkInReward: resolveUserCheckInReward(snapshot, user),
+    vip1CheckInReward: snapshot.vip1Reward,
+    vip2CheckInReward: snapshot.vip2Reward,
+    vip3CheckInReward: snapshot.vip3Reward,
+    makeUpPrice: resolveUserMakeUpPrice(snapshot, user),
+    vipMakeUpPrice: snapshot.vip1MakeUpPrice,
     normalMakeUpPrice: snapshot.normalMakeUpPrice,
+    vip1MakeUpPrice: snapshot.vip1MakeUpPrice,
+    vip2MakeUpPrice: snapshot.vip2MakeUpPrice,
+    vip3MakeUpPrice: snapshot.vip3MakeUpPrice,
     entries,
   }
 }
@@ -179,12 +240,13 @@ export async function submitCheckInAction(user: CurrentUserRecord, body: unknown
   const snapshot = readCheckInSettingsSnapshot(settings)
   const payload = parseCheckInActionPayload(body)
   const todayKey = getLocalDateKey()
+  const reward = resolveUserCheckInReward(snapshot, user)
 
   if (payload.action === "check-in") {
     const result = await executeCheckIn({
       userId: user.id,
       dateKey: todayKey,
-      reward: snapshot.reward,
+      reward,
       pointName: snapshot.pointName,
       makeUpCost: 0,
       isMakeUp: false,
@@ -196,7 +258,7 @@ export async function submitCheckInAction(user: CurrentUserRecord, body: unknown
       date: todayKey,
       message: result.alreadyCheckedIn
         ? "今天已经签到过了"
-        : `签到成功，获得 ${snapshot.reward} ${snapshot.pointName}`,
+        : `签到成功，获得 ${reward} ${snapshot.pointName}`,
     }
   }
 
@@ -210,7 +272,7 @@ export async function submitCheckInAction(user: CurrentUserRecord, body: unknown
     apiError(400, "只能补签今天之前的日期")
   }
 
-  const makeUpCost = isVipActive(user) ? snapshot.vipMakeUpPrice : snapshot.normalMakeUpPrice
+  const makeUpCost = resolveUserMakeUpPrice(snapshot, user)
   if (makeUpCost > 0 && user.points < makeUpCost) {
     apiError(409, `${snapshot.pointName}不足，无法补签`)
   }
@@ -218,7 +280,7 @@ export async function submitCheckInAction(user: CurrentUserRecord, body: unknown
   const result = await executeCheckIn({
     userId: user.id,
     dateKey: targetDateKey,
-    reward: snapshot.reward,
+    reward,
     pointName: snapshot.pointName,
     makeUpCost,
     isMakeUp: true,
@@ -234,7 +296,7 @@ export async function submitCheckInAction(user: CurrentUserRecord, body: unknown
     date: targetDateKey,
     makeUpCost,
     message: makeUpCost > 0
-      ? `补签成功，消耗 ${makeUpCost} ${snapshot.pointName}，获得 ${snapshot.reward} ${snapshot.pointName}`
-      : `补签成功，获得 ${snapshot.reward} ${snapshot.pointName}`,
+      ? `补签成功，消耗 ${makeUpCost} ${snapshot.pointName}，获得 ${reward} ${snapshot.pointName}`
+      : `补签成功，获得 ${reward} ${snapshot.pointName}`,
   }
 }

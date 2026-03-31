@@ -37,6 +37,8 @@ export function ensureJiebaReady() {
 
 const HAN_PATTERN = /[\u4e00-\u9fff]/
 const ENGLISH_PATTERN = /^(?=.*[a-z])[a-z0-9]+$/i
+const MIXED_ALPHANUMERIC_PATTERN = /^(?=.*[a-z])(?=.*\d)[a-z0-9]+$/i
+const HEX_LIKE_PATTERN = /^[a-f0-9]{8,}$/i
 const TAG_SYMBOL_PATTERN = /[^\p{L}\p{N}\u4e00-\u9fff]+/gu
 
 function normalizeWhitespace(value: string) {
@@ -85,6 +87,14 @@ function isValidTagToken(token: string) {
   }
 
   if (ENGLISH_PATTERN.test(token)) {
+    if (HEX_LIKE_PATTERN.test(token)) {
+      return false
+    }
+
+    if (MIXED_ALPHANUMERIC_PATTERN.test(token) && token.length >= 2) {
+      return false
+    }
+
     return token.length > 2 && !STOP_WORDS.has(token)
   }
 

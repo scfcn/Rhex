@@ -4,6 +4,7 @@ import { Check, ChevronDown, Search } from "lucide-react"
 import { useMemo, useState } from "react"
 
 import { Button } from "@/components/ui/button"
+import { DialogBackdrop, DialogPanel, DialogPortal, DialogPositioner } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 
 export interface BoardSelectItem {
@@ -96,13 +97,11 @@ export function BoardSelectField({
         <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
       </button>
 
-      {open ? (
-        <div className="fixed inset-0 z-50 bg-black/45" onClick={closeDialog}>
-          <div className="flex min-h-full items-end justify-center overflow-y-auto px-0 pt-8 sm:items-center sm:px-4 sm:py-6">
-            <div
-              className="flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-[28px] border border-border bg-background p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl sm:max-w-2xl sm:rounded-[28px] sm:p-6"
-              onClick={(event) => event.stopPropagation()}
-            >
+      <DialogPortal open={open} onClose={closeDialog}>
+        <div className="fixed inset-0 z-[120]">
+          <DialogBackdrop onClick={closeDialog} />
+          <DialogPositioner className="items-end overflow-y-auto px-0 pt-8 sm:items-center sm:px-4 sm:py-6">
+            <DialogPanel className="flex max-h-[92dvh] rounded-t-[28px] border border-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:max-w-2xl sm:rounded-[28px] sm:p-6">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-base font-semibold">{title}</h3>
@@ -168,10 +167,10 @@ export function BoardSelectField({
                   </div>
                 )}
               </div>
-            </div>
-          </div>
+            </DialogPanel>
+          </DialogPositioner>
         </div>
-      ) : null}
+      </DialogPortal>
     </>
   )
 }

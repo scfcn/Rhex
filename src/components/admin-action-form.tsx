@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 
 import { Button } from "@/components/ui/button"
+import { DialogBackdrop, DialogPanel, DialogPortal, DialogPositioner } from "@/components/ui/dialog"
 
 interface AdminActionFormProps {
   action: string
@@ -91,9 +92,11 @@ export function AdminActionForm({
       <Button type="button" className={tone === "danger" ? "h-8 rounded-full bg-red-600 px-3 text-white hover:bg-red-500" : "h-8 rounded-full px-3"} variant={tone === "danger" ? "default" : "outline"} onClick={() => setOpen(true)}>
         {buttonText}
       </Button>
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4">
-          <div className="w-full max-w-lg rounded-[28px] bg-background p-6 shadow-2xl">
+      <DialogPortal open={open} onClose={isPending ? undefined : () => setOpen(false)} closeOnEscape={!isPending}>
+        <div className="fixed inset-0 z-[120]">
+          <DialogBackdrop onClick={isPending ? undefined : () => setOpen(false)} />
+          <DialogPositioner className="px-4">
+            <DialogPanel className="max-w-lg p-6">
             <h3 className="text-lg font-semibold">{modalTitle ?? `确认${buttonText}`}</h3>
             {modalDescription ? <p className="mt-2 text-sm text-muted-foreground">{modalDescription}</p> : null}
             {placeholder ? (
@@ -118,9 +121,10 @@ export function AdminActionForm({
                 取消
               </Button>
             </div>
-          </div>
+            </DialogPanel>
+          </DialogPositioner>
         </div>
-      ) : null}
+      </DialogPortal>
     </>
   )
 }

@@ -1,0 +1,223 @@
+"use client"
+
+import Link from "next/link"
+import { Search, X } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
+
+import { cn } from "@/lib/utils"
+
+interface AdminModuleSearchItem {
+  href: string
+  label: string
+  category: string
+  description: string
+  keywords: string[]
+}
+
+const ADMIN_MODULE_SEARCH_ITEMS: AdminModuleSearchItem[] = [
+  { href: "/admin", label: "总览", category: "后台", description: "查看用户、帖子、举报和趋势总览。", keywords: ["首页", "概览", "数据面板", "统计", "趋势", "控制台", "后台首页", "仪表盘"] },
+  { href: "/admin?tab=users", label: "用户管理", category: "模块", description: "查看用户资料、状态、积分和登录记录。", keywords: ["用户", "账号", "昵称", "改昵称", "修改昵称", "昵称修改", "昵称价格", "禁言", "封禁", "积分", "用户积分", "会员用户", "用户状态"] },
+  { href: "/admin?tab=posts", label: "帖子管理", category: "模块", description: "筛选帖子、审核内容、置顶和精华。", keywords: ["帖子", "发帖", "帖子审核", "审核帖子", "精华", "置顶", "下线", "下线帖子", "帖子下线", "离线帖子", "推荐帖子"] },
+  { href: "/admin?tab=structure", label: "版块管理", category: "模块", description: "维护分区、节点和发帖权限。", keywords: ["版块", "分区", "节点", "导航", "发帖权限", "板块", "栏目", "论坛结构"] },
+  { href: "/admin?tab=levels", label: "等级系统", category: "模块", description: "配置等级、经验和升级规则。", keywords: ["等级", "经验", "升级", "level", "成长值", "等级规则"] },
+  { href: "/admin?tab=badges", label: "勋章系统", category: "模块", description: "配置勋章、授予规则和展示。", keywords: ["勋章", "徽章", "badge", "成就", "佩戴勋章"] },
+  { href: "/admin?tab=verifications", label: "认证系统", category: "模块", description: "审核认证类型和用户认证申请。", keywords: ["认证", "实名", "资质", "审核", "认证申请", "实名审核"] },
+  { href: "/admin?tab=announcements", label: "公告管理", category: "模块", description: "管理首页和公告页展示内容。", keywords: ["公告", "通知", "置顶公告", "megaphone", "公告栏"] },
+  { href: "/admin?tab=reports", label: "举报中心", category: "模块", description: "处理帖子、回复和用户举报。", keywords: ["举报", "投诉", "违规", "风控", "举报处理"] },
+  { href: "/admin?tab=logs", label: "日志中心", category: "模块", description: "查看管理员、登录、积分和上传日志。", keywords: ["日志", "操作记录", "登录日志", "积分日志", "上传日志", "审计日志"] },
+  { href: "/admin?tab=logs&logSubTab=admin", label: "管理员日志", category: "日志子页", description: "查看管理员处理举报、审核、封禁、置顶等后台操作记录。", keywords: ["管理员日志", "后台日志", "操作日志", "审核日志", "封禁日志", "禁言日志", "帖子审核日志"] },
+  { href: "/admin?tab=logs&logSubTab=login", label: "用户登录日志", category: "日志子页", description: "查看用户登录时间、账号和 IP 等登录记录。", keywords: ["登录日志", "用户登录日志", "登录记录", "登录ip", "登录 IP", "账号登录"] },
+  { href: "/admin?tab=logs&logSubTab=checkins", label: "签到日志", category: "日志子页", description: "查看正常签到、补签和每日签到记录。", keywords: ["签到日志", "签到记录", "签到", "补签", "补签日志", "每日签到", "补签记录"] },
+  { href: "/admin?tab=logs&logSubTab=points", label: "积分日志", category: "日志子页", description: "查看积分收入、支出和各类积分变动记录。", keywords: ["积分日志", "积分记录", "积分变动", "积分收入", "积分支出", "扣积分", "加积分"] },
+  { href: "/admin?tab=logs&logSubTab=uploads", label: "上传日志", category: "日志子页", description: "查看头像、帖子图片和附件上传记录。", keywords: ["上传日志", "上传记录", "图片上传日志", "头像上传日志", "附件上传日志", "帖子图片上传"] },
+  { href: "/admin?tab=logs&logSubTab=orders", label: "订单日志", category: "日志子页", description: "查看支付、购买和订单状态变化记录。", keywords: ["订单日志", "支付日志", "订单记录", "购买记录", "付款记录"] },
+  { href: "/admin?tab=security", label: "内容安全", category: "模块", description: "维护敏感词和内容审核规则。", keywords: ["敏感词", "内容安全", "审核词", "security", "违禁词", "屏蔽词"] },
+  { href: "/admin/apps", label: "应用中心", category: "模块", description: "查看站点内置应用列表和各应用后台入口。", keywords: ["应用", "应用中心", "小程序", "功能模块", "独立应用", "应用后台", "应用列表"] },
+  { href: "/admin/apps/gobang", label: "五子棋应用后台", category: "应用设置", description: "配置五子棋免费次数、门票积分、AI 难度和获胜奖励。", keywords: ["五子棋", "gobang", "五子棋后台", "五子棋设置", "每日普通免费次数", "每日 VIP 免费次数", "普通用户每日总次数", "VIP 用户每日总次数", "门票积分", "超额门票积分", "AI 难度", "获胜奖励", "前台入口名称"] },
+  { href: "/admin/apps/yinyang-contract", label: "阴阳契应用后台", category: "应用设置", description: "配置阴阳契税率、彩头范围与每日发起应战次数。", keywords: ["阴阳契", "阴阳契后台", "阴阳契设置", "税率", "税率基点", "彩头", "最小彩头", "最大彩头", "每日发起次数", "每日应战次数", "前台入口名称"] },
+  { href: "/admin/apps/self-serve-ads", label: "自助广告位应用后台", category: "应用设置", description: "配置首页广告位价格、布局、插槽，并审核广告订单。", keywords: ["自助广告位", "广告位", "广告位后台", "广告设置", "广告审核", "广告订单", "图片广告", "文字广告", "图片广告价格", "文字广告价格", "图片广告位数量", "文字广告位数量", "首页显示广告卡片", "卡片标题", "占位按钮文案", "侧栏插槽", "侧栏排序值", "广告价格"] },
+  { href: "/admin?tab=settings&section=profile", label: "基础信息", category: "站点设置", description: "站点名称、描述、Logo 和基础展示信息。", keywords: ["站点名称", "站点描述", "logo", "基础设置", "profile", "站点信息", "网站标题", "网站描述"] },
+  { href: "/admin?tab=settings&section=markdown-emoji", label: "Markdown 表情", category: "站点设置", description: "配置 Markdown 短码表情和 SVG 图标。", keywords: ["markdown", "表情", "emoji", "短码", "markdown 表情", "表情短码"] },
+  { href: "/admin?tab=settings&section=footer-links", label: "页脚导航", category: "站点设置", description: "配置页脚链接和外部导航。", keywords: ["页脚", "footer", "链接", "导航", "页脚链接", "底部导航"] },
+  { href: "/admin?tab=settings&section=apps", label: "应用导航", category: "站点设置", description: "配置头部应用入口和图标。", keywords: ["应用导航", "头部导航", "app", "header", "顶部应用", "应用入口"] },
+  { href: "/admin?tab=settings&section=registration", label: "注册与邀请", category: "站点设置", description: "注册开关、邀请码、邮箱手机验证和邀请策略。", keywords: ["注册", "邀请", "邀请码", "邀请注册", "验证码", "邮箱验证", "手机验证", "邮箱验证码", "手机验证码", "注册开关", "邀请奖励", "邀请码购买", "购买邀请码"] },
+  { href: "/admin?tab=settings&section=interaction", label: "互动与热度", category: "站点设置", description: "配置打赏、热度、评论和互动规则。", keywords: ["互动", "热度", "打赏", "评论", "点赞", "回帖", "回复"] },
+  { href: "/admin?tab=settings&section=friend-links", label: "友情链接", category: "站点设置", description: "管理友情链接展示、申请和审核。", keywords: ["友情链接", "友链", "link", "合作站点", "友链审核"] },
+  { href: "/admin?tab=settings&section=invite-codes", label: "邀请码", category: "站点设置", description: "管理邀请码列表、购买和使用。", keywords: ["邀请码", "邀请", "注册码", "invite code", "购买邀请码", "邀请码列表", "邀请码管理"] },
+  { href: "/admin?tab=settings&section=redeem-codes", label: "兑换码", category: "站点设置", description: "管理兑换码生成和兑换。", keywords: ["兑换码", "兑换", "redeem", "礼品码", "卡密"] },
+  { href: "/admin?tab=settings&section=vip", label: "积分与VIP", category: "站点设置", description: "管理积分名称、VIP 价格和会员权益。", keywords: ["积分", "vip", "会员", "vip1", "vip2", "vip3", "会员权益", "vip价格", "积分费用", "积分规则", "补签", "补签价格", "补签费用", "签到", "签到奖励", "签到奖励数量", "签到积分", "改名价格", "改昵称", "修改昵称", "昵称价格", "下线帖子", "帖子下线", "下线费用", "邀请码价格", "购买邀请码价格"] },
+  { href: "/admin?tab=settings&section=upload", label: "上传", category: "站点设置", description: "配置上传方式、格式和大小限制。", keywords: ["上传", "图片", "上传图片", "图片上传", "头像上传", "封面图", "封面上传", "附件", "附件上传", "上传大小", "图片格式", "上传格式", "存储", "oss", "对象存储"] },
+]
+
+interface AdminModuleSearchProps {
+  className?: string
+}
+
+function normalizeText(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ")
+}
+
+function normalizeComparableText(value: string) {
+  return normalizeText(value).replace(/\s+/g, "")
+}
+
+function getSearchScore(item: AdminModuleSearchItem, keyword: string) {
+  const normalizedKeyword = normalizeText(keyword)
+  const compactKeyword = normalizeComparableText(keyword)
+
+  if (!normalizedKeyword) {
+    return 0
+  }
+
+  const normalizedLabel = normalizeText(item.label)
+  const compactLabel = normalizeComparableText(item.label)
+  const normalizedCategory = normalizeText(item.category)
+  const normalizedDescription = normalizeText(item.description)
+  const normalizedKeywords = item.keywords.map((entry) => normalizeText(entry))
+  const compactKeywords = item.keywords.map((entry) => normalizeComparableText(entry))
+  const searchableText = [normalizedLabel, normalizedCategory, normalizedDescription, ...normalizedKeywords].join(" ")
+  const compactSearchableText = [compactLabel, normalizeComparableText(item.category), normalizeComparableText(item.description), ...compactKeywords].join("")
+
+  if (normalizedLabel === normalizedKeyword || compactLabel === compactKeyword) {
+    return 120
+  }
+
+  if (normalizedKeywords.some((entry) => entry === normalizedKeyword) || compactKeywords.some((entry) => entry === compactKeyword)) {
+    return 100
+  }
+
+  if (normalizedLabel.startsWith(normalizedKeyword) || compactLabel.startsWith(compactKeyword)) {
+    return 80
+  }
+
+  if (normalizedKeywords.some((entry) => entry.startsWith(normalizedKeyword)) || compactKeywords.some((entry) => entry.startsWith(compactKeyword))) {
+    return 70
+  }
+
+  if (normalizedLabel.includes(normalizedKeyword) || compactLabel.includes(compactKeyword)) {
+    return 50
+  }
+
+  if (normalizedKeywords.some((entry) => entry.includes(normalizedKeyword)) || compactKeywords.some((entry) => entry.includes(compactKeyword))) {
+    return 40
+  }
+
+  if (normalizedDescription.includes(normalizedKeyword) || normalizedCategory.includes(normalizedKeyword)) {
+    return 20
+  }
+
+  if (searchableText.includes(normalizedKeyword) || compactSearchableText.includes(compactKeyword)) {
+    return 10
+  }
+
+  return 0
+}
+
+export function AdminModuleSearch({ className }: AdminModuleSearchProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const [keyword, setKeyword] = useState("")
+  const [open, setOpen] = useState(false)
+
+  const normalizedKeyword = normalizeText(keyword)
+  const results = useMemo(() => {
+    if (!normalizedKeyword) {
+      return []
+    }
+
+    return ADMIN_MODULE_SEARCH_ITEMS
+      .map((item) => {
+        const score = getSearchScore(item, normalizedKeyword)
+
+        return score > 0 ? { ...item, score } : null
+      })
+      .filter(Boolean)
+      .sort((left, right) => (right?.score ?? 0) - (left?.score ?? 0))
+      .slice(0, 8) as Array<AdminModuleSearchItem & { score: number }>
+  }, [normalizedKeyword])
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node
+      if (!containerRef.current?.contains(target)) {
+        setOpen(false)
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown)
+    document.addEventListener("keydown", handleEscape)
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown)
+      document.removeEventListener("keydown", handleEscape)
+    }
+  }, [open])
+
+  return (
+    <div ref={containerRef} className={cn("relative w-full max-w-md", className)}>
+      <div className="flex items-center gap-2 rounded-[20px] border border-border bg-background/90 px-3 py-2 shadow-sm">
+        <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <input
+          value={keyword}
+          onChange={(event) => {
+            setKeyword(event.target.value)
+            setOpen(true)
+          }}
+          onFocus={() => setOpen(true)}
+          className="h-8 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          placeholder="搜索后台功能，例如：签到日志、邀请码"
+          maxLength={30}
+        />
+        {keyword ? (
+          <button
+            type="button"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            onClick={() => {
+              setKeyword("")
+              setOpen(false)
+            }}
+            aria-label="清空后台搜索"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
+      </div>
+
+      {open && normalizedKeyword ? (
+        <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-full overflow-hidden rounded-[22px] border border-border bg-background shadow-2xl">
+          {results.length > 0 ? (
+            <div className="max-h-[360px] overflow-y-auto p-2">
+              {results.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="block rounded-[16px] px-3 py-3 transition-colors hover:bg-accent"
+                  onClick={() => setOpen(false)}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground">{item.category}</span>
+                    <span className="text-sm font-medium text-foreground">{item.label}</span>
+                  </div>
+                  <p className="mt-1 text-xs leading-6 text-muted-foreground">{item.description}</p>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="px-4 py-5 text-sm text-muted-foreground">
+              没有找到相关后台入口，试试更短的关键词。
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  )
+}
