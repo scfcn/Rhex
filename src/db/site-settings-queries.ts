@@ -14,6 +14,8 @@ export const siteSettingsSelect = {
   pointName: true,
   analyticsCode: true,
   postLinkDisplayMode: true,
+  homeFeedPostListDisplayMode: true,
+  homeSidebarStatsCardEnabled: true,
   friendLinksEnabled: true,
   friendLinkApplicationEnabled: true,
   friendLinkAnnouncement: true,

@@ -34,7 +34,7 @@ export async function createPostFlow(body: unknown) {
     apiError(400, validated.message ?? "参数错误")
   }
 
-  const { title, content, boardSlug, postType, bountyPoints, pollOptions, commentsVisibleToAuthorOnly, replyUnlockContent, replyThreshold, purchaseUnlockContent, purchasePrice, minViewLevel, lotteryConfig } = validated.data
+  const { title, content, coverPath, boardSlug, postType, bountyPoints, pollOptions, commentsVisibleToAuthorOnly, replyUnlockContent, replyThreshold, purchaseUnlockContent, purchasePrice, minViewLevel, lotteryConfig } = validated.data
 
   const rawBody = body as Record<string, unknown>
   const manualTags = normalizeManualTags(Array.isArray(rawBody?.manualTags)
@@ -122,6 +122,7 @@ export async function createPostFlow(body: unknown) {
       title: titleSafety.sanitizedText,
       slug: createPostSlug(titleSafety.sanitizedText),
       content: serializedContent,
+      coverPath,
       summary: summary || titleSafety.sanitizedText,
       boardId: boardContext.board.id,
       authorId: author.id,

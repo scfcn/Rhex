@@ -3,6 +3,7 @@ import { findGlobalPinnedPosts } from "@/db/taxonomy-queries"
 import { formatRelativeTime } from "@/lib/formatters"
 import { extractPinnedPostIds } from "@/lib/pinned-posts"
 
+import { resolvePostCoverImage } from "@/lib/post-cover"
 import { getPostTypeLabel, type LocalPostType } from "@/lib/post-types"
 
 export type FeedSort = "latest" | "new" | "hot" | "weekly"
@@ -12,6 +13,7 @@ export interface ForumFeedItem {
   slug: string
   title: string
   summary: string
+  coverImage?: string | null
   boardName: string
   boardSlug: string
   boardIcon: string
@@ -50,6 +52,8 @@ type FeedPost = {
   slug: string
   title: string
   summary: string | null
+  content: string
+  coverPath: string | null
   commentCount: number
   viewCount: number
   likeCount: number
@@ -85,6 +89,7 @@ function mapFeedPost(post: FeedPostRecord | PinnedFeedPostRecord): ForumFeedItem
     slug: feedPost.slug,
     title: feedPost.title,
     summary: feedPost.summary ?? feedPost.title,
+    coverImage: resolvePostCoverImage(feedPost.content, feedPost.coverPath),
     boardName: feedPost.board.name,
     boardSlug: feedPost.board.slug,
     boardIcon: feedPost.board.iconPath ?? "💬",

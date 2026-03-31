@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/toast"
 import { PickerPopover, PickerTriggerField, normalizeHexColor } from "@/components/admin-picker-popover"
 import { calculatePostHeatScore, resolvePostHeatStyle } from "@/lib/post-heat"
+import { POST_LIST_DISPLAY_MODE_DEFAULT, POST_LIST_DISPLAY_MODE_GALLERY, type PostListDisplayMode } from "@/lib/post-list-display"
 
 interface AdminBasicSettingsFormProps {
   initialSettings: {
@@ -19,6 +20,8 @@ interface AdminBasicSettingsFormProps {
     siteSeoKeywords?: string[]
     pointName: string
     postLinkDisplayMode: "SLUG" | "ID"
+    homeFeedPostListDisplayMode: PostListDisplayMode
+    homeSidebarStatsCardEnabled: boolean
     analyticsCode?: string | null
     checkInEnabled: boolean
     checkInReward: number
@@ -97,6 +100,8 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
   const [siteSeoKeywords, setSiteSeoKeywords] = useState((initialSettings.siteSeoKeywords ?? []).join(","))
   const [pointName, setPointName] = useState(initialSettings.pointName)
   const [postLinkDisplayMode, setPostLinkDisplayMode] = useState<"SLUG" | "ID">(initialSettings.postLinkDisplayMode)
+  const [homeFeedPostListDisplayMode, setHomeFeedPostListDisplayMode] = useState<PostListDisplayMode>(initialSettings.homeFeedPostListDisplayMode)
+  const [homeSidebarStatsCardEnabled, setHomeSidebarStatsCardEnabled] = useState(initialSettings.homeSidebarStatsCardEnabled)
   const [analyticsCode, setAnalyticsCode] = useState(initialSettings.analyticsCode ?? "")
   const [checkInEnabled, setCheckInEnabled] = useState(initialSettings.checkInEnabled)
   const [checkInReward, setCheckInReward] = useState(String(initialSettings.checkInReward))
@@ -224,6 +229,8 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
         siteSeoKeywords,
         pointName,
         postLinkDisplayMode,
+        homeFeedPostListDisplayMode,
+        homeSidebarStatsCardEnabled,
         analyticsCode,
         checkInEnabled,
         checkInReward: Number(checkInReward),
@@ -343,6 +350,15 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
               </select>
               <p className="text-xs leading-6 text-muted-foreground">只影响站内生成给用户看到的帖子链接；旧链接仍保持兼容并会规范跳转到标准地址。</p>
             </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">首页帖子列表形式</p>
+              <select value={homeFeedPostListDisplayMode} onChange={(event) => setHomeFeedPostListDisplayMode(event.target.value === POST_LIST_DISPLAY_MODE_GALLERY ? POST_LIST_DISPLAY_MODE_GALLERY : POST_LIST_DISPLAY_MODE_DEFAULT)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
+                <option value={POST_LIST_DISPLAY_MODE_DEFAULT}>普通列表</option>
+                <option value={POST_LIST_DISPLAY_MODE_GALLERY}>画廊模式</option>
+              </select>
+              <p className="text-xs leading-6 text-muted-foreground">只影响首页 feed 的普通帖子列表；置顶帖始终保持原来的普通列表样式。</p>
+            </div>
+            <SwitchField label="首页右侧统计卡片" checked={homeSidebarStatsCardEnabled} onChange={setHomeSidebarStatsCardEnabled} />
           </div>
           <Field label="站点 Slogan" value={siteSlogan} onChange={setSiteSlogan} placeholder="如 Waste your time on things you love" />
           <div className="space-y-3 rounded-[24px] border border-border p-5">

@@ -30,6 +30,11 @@ export const postListInclude = {
       },
     },
   },
+  redPacket: {
+    select: {
+      id: true,
+    },
+  },
 } satisfies Prisma.PostInclude
 
 

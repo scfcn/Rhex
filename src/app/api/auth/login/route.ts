@@ -90,7 +90,7 @@ export const POST = createRouteHandler(async ({ request }) => {
     })
 
     const response = NextResponse.json(apiSuccess({ username: user.username }, "success"))
-    const sessionToken = await createSessionToken(user.username)
+    const sessionToken = await createSessionToken(user.username, loginIp)
     response.cookies.set(getSessionCookieName(), sessionToken, getSessionCookieOptions())
 
     logRouteWriteSuccess({

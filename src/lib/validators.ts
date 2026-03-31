@@ -118,6 +118,7 @@ export function validateAuthPayload(body: unknown): ValidationResult<{
 export function validatePostPayload(body: unknown): ValidationResult<{
   title: string
   content: string
+  coverPath: string | null
   boardSlug: string
   postType: LocalPostType
   bountyPoints: number | null
@@ -133,6 +134,7 @@ export function validatePostPayload(body: unknown): ValidationResult<{
 
   const title = normalizeString(getField(body, "title"))
   const content = normalizeString(getField(body, "content"))
+  const coverPath = normalizeString(getField(body, "coverPath"))
   const boardSlug = normalizeString(getField(body, "boardSlug"))
   const postType = normalizePostType(getField(body, "postType"))
 
@@ -170,6 +172,10 @@ export function validatePostPayload(body: unknown): ValidationResult<{
 
   if (boardSlug.length > 50) {
     return { success: false, message: "节点标识不合法" }
+  }
+
+  if (coverPath.length > 500) {
+    return { success: false, message: "封面地址不能超过 500 个字符" }
   }
 
   if (replyUnlockContent.length > 20000 || purchaseUnlockContent.length > 20000) {
@@ -222,6 +228,7 @@ export function validatePostPayload(body: unknown): ValidationResult<{
     data: {
       title,
       content,
+      coverPath: coverPath || null,
       boardSlug,
       postType,
       bountyPoints: postType === "BOUNTY" ? rawBountyPoints : null,

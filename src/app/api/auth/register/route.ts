@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 
 import { apiSuccess, createRouteHandler, readJsonBody } from "@/lib/api-route"
 import { createRegisterFlow } from "@/lib/auth-register-service"
+import { getRequestIp } from "@/lib/request-ip"
 import { logRouteWriteSuccess } from "@/lib/route-metadata"
 import { createSessionToken, getSessionCookieName, getSessionCookieOptions } from "@/lib/session"
 
@@ -14,7 +15,7 @@ export const POST = createRouteHandler(async ({ request }) => {
     result.successMessage,
   ))
 
-  const sessionToken = await createSessionToken(result.user.username)
+  const sessionToken = await createSessionToken(result.user.username, getRequestIp(request))
   response.cookies.set(getSessionCookieName(), sessionToken, getSessionCookieOptions())
 
   logRouteWriteSuccess({

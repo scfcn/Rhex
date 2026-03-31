@@ -1,6 +1,5 @@
-import { NotificationType } from "@/db/types"
-
 import { prisma } from "@/db/client"
+import { createSystemNotification as createSystemNotificationEntry } from "@/lib/notification-writes"
 
 import type { SelfServeAdOrderStatus, SelfServeAdSlotType } from "@/lib/self-serve-ads.shared"
 
@@ -75,16 +74,11 @@ export function createSystemNotification(data: {
   title: string
   content: string
 }) {
-  return prisma.notification.create({
-    data: {
-      userId: data.userId,
-      type: NotificationType.SYSTEM,
-      senderId: null,
-      relatedType: "ANNOUNCEMENT",
-      relatedId: data.relatedId,
-      title: data.title,
-      content: data.content,
-    },
+  return createSystemNotificationEntry({
+    userId: data.userId,
+    relatedId: data.relatedId,
+    title: data.title,
+    content: data.content,
   })
 }
 

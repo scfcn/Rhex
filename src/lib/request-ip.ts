@@ -1,4 +1,6 @@
-function normalizeIpCandidate(value: string | null) {
+type HeaderStore = Pick<Headers, "get">
+
+export function normalizeIp(value: string | null) {
   if (!value) {
     return null
   }
@@ -14,27 +16,31 @@ function normalizeIpCandidate(value: string | null) {
     : normalized.replace(/:\d+$/, "")
 
   if (/^[0-9a-fA-F:.]+$/.test(withoutPort)) {
-    return withoutPort
+    return withoutPort.toLowerCase()
   }
 
   return null
 }
 
-export function getRequestIp(request: Request) {
-  const forwarded = request.headers.get("x-forwarded-for")
+export function getRequestIpFromHeaders(headers: HeaderStore) {
+  const forwarded = headers.get("x-forwarded-for")
   if (forwarded) {
     for (const candidate of forwarded.split(",")) {
-      const normalizedForwarded = normalizeIpCandidate(candidate)
+      const normalizedForwarded = normalizeIp(candidate)
       if (normalizedForwarded) {
         return normalizedForwarded
       }
     }
   }
 
-  const realIp = normalizeIpCandidate(request.headers.get("x-real-ip"))
+  const realIp = normalizeIp(headers.get("x-real-ip"))
   if (realIp) {
     return realIp
   }
 
-  return normalizeIpCandidate(request.headers.get("cf-connecting-ip"))
+  return normalizeIp(headers.get("cf-connecting-ip"))
+}
+
+export function getRequestIp(request: Pick<Request, "headers">) {
+  return getRequestIpFromHeaders(request.headers)
 }

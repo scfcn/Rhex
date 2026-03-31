@@ -10,6 +10,7 @@ import { ToastProvider } from "@/components/ui/toast"
 import { getRssFeedUrl } from "@/lib/rss"
 
 import { resolveSiteOrigin } from "@/lib/site-origin"
+import { getSidebarNavigationInitScript } from "@/lib/sidebar-navigation-preference"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getThemeInitScript } from "@/lib/theme"
 
@@ -20,6 +21,7 @@ import { getThemeInitScript } from "@/lib/theme"
 import "./globals.css"
 
 const themeInitScript = getThemeInitScript()
+const sidebarNavigationInitScript = getSidebarNavigationInitScript()
 
 export async function generateMetadata(): Promise<Metadata> {
   const [settings, rssUrl, siteOrigin] = await Promise.all([getSiteSettings(), getRssFeedUrl(), Promise.resolve(resolveSiteOrigin())])
@@ -47,6 +49,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     <html lang="zh-CN" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <script dangerouslySetInnerHTML={{ __html: sidebarNavigationInitScript }} />
       </head>
       <body>
         <SiteSettingsProvider markdownEmojiMap={settings.markdownEmojiMap}>

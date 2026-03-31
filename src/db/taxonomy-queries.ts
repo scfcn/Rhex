@@ -214,6 +214,11 @@ export function findZonePinnedPosts(boardIds: string[], pageSize?: number) {
     include: {
       board: true,
       author: true,
+      redPacket: {
+        select: {
+          id: true,
+        },
+      },
     },
     orderBy: getZonePinnedOrderBy(),
     take: normalizedPageSize,
@@ -234,6 +239,11 @@ export function findZoneNormalPosts(boardIds: string[], excludedPostIds: string[
     include: {
       board: true,
       author: true,
+      redPacket: {
+        select: {
+          id: true,
+        },
+      },
     },
     orderBy: [{ activityAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
     skip: (page - 1) * normalizedPageSize,
@@ -256,6 +266,11 @@ export function findBoardPinnedPosts(boardId: string, zoneBoardIds: string[], pa
     include: {
       board: true,
       author: true,
+      redPacket: {
+        select: {
+          id: true,
+        },
+      },
     },
     orderBy: getZonePinnedOrderBy(),
     take: normalizedPageSize,
@@ -274,6 +289,11 @@ export function findBoardNormalPosts(boardId: string, excludedPostIds: string[],
     include: {
       board: true,
       author: true,
+      redPacket: {
+        select: {
+          id: true,
+        },
+      },
     },
     orderBy: [{ activityAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
     skip: (page - 1) * normalizedPageSize,

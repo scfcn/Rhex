@@ -2,7 +2,9 @@ import Link from "next/link"
 import { Clock3, Flame, Sparkles } from "lucide-react"
 
 import { ForumPostListItem } from "@/components/forum-post-list-item"
+import { PostGalleryGrid } from "@/components/post-gallery-grid"
 import type { FeedSort, ForumFeedItem } from "@/lib/forum-feed"
+import { normalizePostListDisplayMode, type PostListDisplayMode } from "@/lib/post-list-display"
 import { getSiteSettings } from "@/lib/site-settings"
 import { resolvePostHeatStyle } from "@/lib/post-heat"
 import { getVipNameClass, isVipActive } from "@/lib/vip-status"
@@ -10,6 +12,7 @@ import { getVipNameClass, isVipActive } from "@/lib/vip-status"
 interface ForumFeedListProps {
   items: ForumFeedItem[]
   currentSort: FeedSort
+  listDisplayMode?: PostListDisplayMode
   postLinkDisplayMode?: "SLUG" | "ID"
 }
 
@@ -29,8 +32,11 @@ function getFeedPinLabel(pinScope?: string | null) {
   return null
 }
 
-export async function ForumFeedList({ items, currentSort, postLinkDisplayMode = "SLUG" }: ForumFeedListProps) {
+export async function ForumFeedList({ items, currentSort, listDisplayMode, postLinkDisplayMode = "SLUG" }: ForumFeedListProps) {
   const settings = await getSiteSettings()
+  const resolvedListDisplayMode = normalizePostListDisplayMode(listDisplayMode)
+  const pinnedItems = items.filter((item) => item.pinScope === "GLOBAL")
+  const normalItems = items.filter((item) => item.pinScope !== "GLOBAL")
 
   return (
     <div className="overflow-hidden rounded-md bg-background">
@@ -53,7 +59,93 @@ export async function ForumFeedList({ items, currentSort, postLinkDisplayMode = 
       </div>
 
       <div className="lg:pl-4">
-        {items.map((item) => {
+        {pinnedItems.map((item) => {
+          const commentHeat = resolvePostHeatStyle({
+            views: item.viewCount,
+            comments: item.commentCount,
+            likes: item.likeCount,
+            tipCount: item.tipCount,
+            tipPoints: item.tipTotalPoints,
+          }, settings)
+
+          return (
+            <ForumPostListItem
+              key={item.id}
+              item={{
+                id: item.id,
+                slug: item.slug,
+                title: item.title,
+                type: item.type,
+                typeLabel: item.typeLabel,
+                pinScope: item.pinScope,
+                pinLabel: getFeedPinLabel(item.pinScope),
+                hasRedPacket: item.hasRedPacket,
+                minViewLevel: item.minViewLevel ?? undefined,
+                isFeatured: item.isFeatured,
+                boardName: item.boardName,
+                boardSlug: item.boardSlug,
+                boardIcon: item.boardIcon,
+                authorName: item.authorName,
+                authorUsername: item.authorUsername,
+                authorAvatarPath: item.authorAvatarPath,
+                authorStatus: item.authorStatus,
+                authorNameClassName: getVipNameClass(isVipActive({ vipLevel: item.authorVipLevel, vipExpiresAt: item.authorVipExpiresAt }), item.authorVipLevel, { emphasize: true }),
+                metaPrimary: currentSort === "new" ? item.publishedAt : item.lastRepliedAt,
+                metaSecondary: currentSort === "latest" && item.latestReplyAuthorName ? `最新回复 ${item.latestReplyAuthorName}` : null,
+                commentCount: item.commentCount,
+                commentAccentColor: commentHeat.color,
+              }}
+              showBoard
+              postLinkDisplayMode={postLinkDisplayMode}
+            />
+          )
+        })}
+        {pinnedItems.length > 0 && normalItems.length > 0 && resolvedListDisplayMode === "GALLERY" ? (
+          <div className="mb-2 mt-4 flex items-center gap-3 px-3 text-xs text-muted-foreground">
+            <span className="rounded-full border border-border bg-background px-2.5 py-1 font-medium">最新内容</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+        ) : null}
+        {resolvedListDisplayMode === "GALLERY" ? (
+          <PostGalleryGrid
+            items={normalItems.map((item) => {
+              const commentHeat = resolvePostHeatStyle({
+                views: item.viewCount,
+                comments: item.commentCount,
+                likes: item.likeCount,
+                tipCount: item.tipCount,
+                tipPoints: item.tipTotalPoints,
+              }, settings)
+
+              return {
+                id: item.id,
+                slug: item.slug,
+                title: item.title,
+                excerpt: item.summary,
+                coverImage: item.coverImage,
+                type: item.type,
+                typeLabel: item.typeLabel,
+                pinScope: item.pinScope,
+                pinLabel: getFeedPinLabel(item.pinScope),
+                hasRedPacket: item.hasRedPacket,
+                minViewLevel: item.minViewLevel ?? undefined,
+                isFeatured: item.isFeatured,
+                boardName: item.boardName,
+                boardSlug: item.boardSlug,
+                boardIcon: item.boardIcon,
+                authorName: item.authorName,
+                authorUsername: item.authorUsername,
+                authorStatus: item.authorStatus,
+                authorNameClassName: getVipNameClass(isVipActive({ vipLevel: item.authorVipLevel, vipExpiresAt: item.authorVipExpiresAt }), item.authorVipLevel, { emphasize: true }),
+                metaPrimary: currentSort === "new" ? item.publishedAt : item.lastRepliedAt,
+                metaSecondary: currentSort === "latest" && item.latestReplyAuthorName ? `最新回复 ${item.latestReplyAuthorName}` : null,
+                commentCount: item.commentCount,
+                commentAccentColor: commentHeat.color,
+              }
+            })}
+            postLinkDisplayMode={postLinkDisplayMode}
+          />
+        ) : normalItems.map((item) => {
           const commentHeat = resolvePostHeatStyle({
             views: item.viewCount,
             comments: item.commentCount,

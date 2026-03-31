@@ -1,18 +1,12 @@
 import { NextResponse } from "next/server"
 
 import { createRouteHandler } from "@/lib/api-route"
-import { getSessionCookieName } from "@/lib/session"
+import { getSessionClearedCookieOptions, getSessionCookieName } from "@/lib/session"
 
 export const POST = createRouteHandler(async () => {
   const response = NextResponse.json({ code: 0, message: "success" })
 
-  response.cookies.set(getSessionCookieName(), "", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 0,
-  })
+  response.cookies.set(getSessionCookieName(), "", getSessionClearedCookieOptions())
 
   return response
 }, {

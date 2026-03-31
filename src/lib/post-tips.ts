@@ -1,6 +1,6 @@
-import { NotificationType } from "@/db/types"
 import { prisma } from "@/db/client"
 import { getBusinessDayRange } from "@/lib/formatters"
+import { createSystemNotification } from "@/lib/notification-writes"
 import { PublicRouteError } from "@/lib/public-route-error"
 import { getSiteSettings } from "@/lib/site-settings"
 
@@ -274,16 +274,14 @@ export async function tipPost(input: { postId: string; senderId: number; amount:
       ],
     })
 
-    await tx.notification.create({
-      data: {
-        userId: post.authorId,
-        type: NotificationType.SYSTEM,
-        senderId: sender.id,
-        relatedType: "POST",
-        relatedId: post.id,
-        title: "你的帖子收到了打赏",
-        content: `${sender.username} 打赏了你的帖子《${post.title}》，你已收到 ${input.amount} ${settings.pointName}。`,
-      },
+    await createSystemNotification({
+      client: tx,
+      userId: post.authorId,
+      senderId: sender.id,
+      relatedType: "POST",
+      relatedId: post.id,
+      title: "你的帖子收到了打赏",
+      content: `${sender.username} 打赏了你的帖子《${post.title}》，你已收到 ${input.amount} ${settings.pointName}。`,
     })
 
     return {

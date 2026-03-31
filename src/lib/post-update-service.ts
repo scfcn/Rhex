@@ -31,7 +31,7 @@ export async function updatePostFlow(input: {
     apiError(400, validated.message ?? "参数错误")
   }
 
-  const { title, content, replyUnlockContent, replyThreshold, purchaseUnlockContent, purchasePrice, commentsVisibleToAuthorOnly, minViewLevel, } = validated.data
+  const { title, content, coverPath, replyUnlockContent, replyThreshold, purchaseUnlockContent, purchasePrice, commentsVisibleToAuthorOnly, minViewLevel, } = validated.data
   const rawAppendedContent = (input.body as Record<string, unknown> | null)?.appendedContent
   const appendedContent = typeof rawAppendedContent === "string"
     ? rawAppendedContent.trim()
@@ -128,6 +128,7 @@ export async function updatePostFlow(input: {
         data: {
           title: titleSafety.sanitizedText,
           content: nextContent,
+          coverPath,
           summary: nextSummary,
           commentsVisibleToAuthorOnly,
           minViewLevel,

@@ -14,6 +14,7 @@ import {
 import { apiError, readOptionalNumberField, readOptionalStringField, type JsonObject } from "@/lib/api-route"
 
 import { DEFAULT_ALLOWED_POST_TYPES_VALUE, serializePostTypes } from "@/lib/post-types"
+import { normalizeNullablePostListDisplayMode } from "@/lib/post-list-display"
 
 
 function parseNullableNumber(value: unknown) {
@@ -46,6 +47,7 @@ function buildBoardAdvancedPayload(body: Record<string, unknown>) {
     minPostVipLevel: parseNullableNumber(body.minPostVipLevel),
     minReplyVipLevel: parseNullableNumber(body.minReplyVipLevel),
     requirePostReview: body.requirePostReview === undefined ? undefined : parseBoolean(body.requirePostReview),
+    postListDisplayMode: normalizeNullablePostListDisplayMode(body.postListDisplayMode) ?? undefined,
   }
 }
 
@@ -71,6 +73,7 @@ function buildZonePayload(body: Record<string, unknown>, sortOrder: number, name
     minViewVipLevel: parseNullableNumber(body.minViewVipLevel) ?? 0,
     minPostVipLevel: parseNullableNumber(body.minPostVipLevel) ?? 0,
     minReplyVipLevel: parseNullableNumber(body.minReplyVipLevel) ?? 0,
+    postListDisplayMode: normalizeNullablePostListDisplayMode(body.postListDisplayMode) ?? null,
   }
 }
 

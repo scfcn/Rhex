@@ -13,6 +13,8 @@ export const defaultSiteSettingsCreateInput = {
   footerLinksJson: JSON.stringify(DEFAULT_FOOTER_LINKS),
   analyticsCode: null,
   postLinkDisplayMode: "SLUG",
+  homeFeedPostListDisplayMode: "DEFAULT",
+  homeSidebarStatsCardEnabled: true,
   friendLinksEnabled: true,
   friendLinkApplicationEnabled: true,
   friendLinkAnnouncement: "欢迎与本站交换友情链接，请先添加我方链接后再提交申请，我们会在 1-3 个工作日内完成审核。",
@@ -97,4 +99,3 @@ export const defaultSiteSettingsCreateInput = {
   appStateJson: "{}",
 
 } as const
-

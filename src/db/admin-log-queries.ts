@@ -6,6 +6,7 @@ export function countAdminLogTabs() {
   return Promise.all([
     prisma.adminLog.count(),
     prisma.userLoginLog.count(),
+    prisma.userCheckInLog.count(),
     prisma.pointLog.count(),
     prisma.upload.count(),
     prisma.vipOrder.count(),
@@ -48,6 +49,27 @@ export function findUserLoginLogsPage(where: Prisma.UserLoginLogWhereInput, skip
           nickname: true,
           email: true,
           status: true,
+        },
+      },
+    },
+    skip,
+    take,
+  })
+}
+
+export function countUserCheckInLogs(where: Prisma.UserCheckInLogWhereInput) {
+  return prisma.userCheckInLog.count({ where })
+}
+
+export function findUserCheckInLogsPage(where: Prisma.UserCheckInLogWhereInput, skip: number, take: number) {
+  return prisma.userCheckInLog.findMany({
+    where,
+    orderBy: [{ createdAt: "desc" }],
+    include: {
+      user: {
+        select: {
+          username: true,
+          nickname: true,
         },
       },
     },

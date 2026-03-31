@@ -159,6 +159,8 @@ export function CommentThread({ comments, postId, canReply, currentPage, pageSiz
     return editingCommentId === comment.id ? "取消编辑" : "编辑"
   }
 
+  const hideFloatingActionButtons = editingCommentId !== null
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -385,7 +387,7 @@ export function CommentThread({ comments, postId, canReply, currentPage, pageSiz
                           </div>
                         </div>
                       </div>
-                      {replyActions.length > 0 ? (
+                      {!hideFloatingActionButtons && replyActions.length > 0 ? (
                         <div className="pointer-events-none absolute bottom-3 right-4 z-10 opacity-0 transition-opacity duration-200 group-hover:pointer-events-auto group-hover:opacity-100">
                           <div className="flex max-w-[320px] flex-wrap justify-end gap-1.5 rounded-2xl border border-border/70 bg-background/95 p-2 shadow-sm backdrop-blur-sm">
                             {replyActions.map((action) => (
@@ -414,7 +416,7 @@ export function CommentThread({ comments, postId, canReply, currentPage, pageSiz
               </div>
             ) : null}
 
-            {commentActions.length > 0 ? (
+            {!hideFloatingActionButtons && commentActions.length > 0 ? (
               <div className="pointer-events-none absolute bottom-5 right-0 z-10 opacity-0 transition-opacity duration-200 group-hover:pointer-events-auto group-hover:opacity-100">
                 <div className="flex max-w-[360px] flex-wrap justify-end gap-1.5 rounded-2xl p-2">
                   {commentActions.map((action) => (

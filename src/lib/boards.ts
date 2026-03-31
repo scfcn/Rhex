@@ -3,6 +3,7 @@ import { cache } from "react"
 import { findBoardFollow } from "@/db/board-queries"
 import { findBoardNormalPosts, findBoardPinnedPosts, findZoneBoardIdsById } from "@/db/taxonomy-queries"
 import { resolveBoardSettings } from "@/lib/board-settings"
+import { resolvePostListDisplayMode, type PostListDisplayMode } from "@/lib/post-list-display"
 import { dedupeAndMapPinnedPosts, extractPinnedPostIds } from "@/lib/pinned-posts"
 import { prisma } from "@/db/client"
 import { mapListPost } from "@/lib/post-map"
@@ -31,6 +32,7 @@ export interface SiteBoardItem {
 
   minPostVipLevel?: number
   minReplyVipLevel?: number
+  postListDisplayMode: PostListDisplayMode
 }
 
 
@@ -61,6 +63,7 @@ const getCachedBoards = cache(async (): Promise<SiteBoardItem[]> => {
 
       minPostVipLevel: settings.minPostVipLevel,
       minReplyVipLevel: settings.minReplyVipLevel,
+      postListDisplayMode: resolvePostListDisplayMode(board.zone?.postListDisplayMode, board.postListDisplayMode),
     }
   })
 })
@@ -117,6 +120,7 @@ const getCachedBoardBySlug = cache(async (slug: string): Promise<SiteBoardItem |
     minPostVipLevel: settings.minPostVipLevel,
     minReplyVipLevel: settings.minReplyVipLevel,
     requirePostReview: settings.requirePostReview,
+    postListDisplayMode: resolvePostListDisplayMode(board.zone?.postListDisplayMode, board.postListDisplayMode),
   }
 })
 

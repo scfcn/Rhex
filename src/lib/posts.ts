@@ -74,6 +74,7 @@ export interface SitePostItem {
   publishedAt: string
 
   excerpt: string
+  coverImage?: string | null
   content: string[]
   commentsVisibleToAuthorOnly?: boolean
   contentBlocks?: Array<{
@@ -105,6 +106,7 @@ export interface SitePostItem {
   reviewNote?: string | null
   isPinned: boolean
   pinScope?: string | null
+  hasRedPacket?: boolean
   minViewLevel?: number
   isFeatured: boolean
 

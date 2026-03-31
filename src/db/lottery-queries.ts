@@ -1,5 +1,6 @@
 import { prisma } from "@/db/client"
 import { LotteryStatus, NotificationType, type Prisma } from "@/db/types"
+import { createNotifications } from "@/lib/notification-writes"
 
 export function findLotteryEnrollmentContext(input: { postId: string; userId: number; replyCommentId?: string | null }) {
   return Promise.all([
@@ -181,7 +182,7 @@ export async function executeLotteryDrawTransaction(input: {
     }))
 
     if (notifications.length > 0) {
-      await tx.notification.createMany({ data: notifications })
+      await createNotifications({ client: tx, notifications })
     }
 
     return {

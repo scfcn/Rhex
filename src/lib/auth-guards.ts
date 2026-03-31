@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 
+import { getRequestIp } from "@/lib/request-ip"
 import { getSessionCookieName, parseSessionToken } from "@/lib/session"
 
 const PROTECTED_PAGE_PREFIXES = ["/write", "/settings", "/admin"]
@@ -11,7 +12,9 @@ export function isProtectedPath(pathname: string) {
 
 export async function getSessionFromRequest(request: NextRequest) {
   const token = request.cookies.get(getSessionCookieName())?.value
-  return await parseSessionToken(token)
+  return await parseSessionToken(token, {
+    requestIp: getRequestIp(request),
+  })
 }
 
 export function buildUnauthorizedResponse(request: NextRequest) {

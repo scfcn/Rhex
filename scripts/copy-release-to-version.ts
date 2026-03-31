@@ -1,8 +1,8 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs"
 import { basename, join, resolve } from "node:path"
 
-const workspaceRoot = resolve(__dirname, "..")
-const versionDirectory = join(workspaceRoot, "version/Rhex")
+const workspaceRoot = resolve(__dirname, "../")
+const versionDirectory = join(resolve(__dirname, "../../"), "version/Rhex")
 
 const includeEntries = [
   "src",
@@ -35,8 +35,8 @@ function resetVersionDirectory() {
     if (preserveEntries.has(entry)) {
       continue
     }
-    if(entry === '.git'){
-        continue
+    if (entry === '.git') {
+      continue
     }
     rmSync(join(versionDirectory, entry), { recursive: true, force: true })
   }
@@ -50,7 +50,19 @@ function copyEntry(entryName: string) {
   }
 
   const targetPath = join(versionDirectory, basename(entryName))
-  cpSync(sourcePath, targetPath, { recursive: true, force: true })
+
+  if (entryName === "public") {
+    cpSync(sourcePath, targetPath, {
+      recursive: true,
+      force: true,
+      filter: (src) => {
+        const relative = src.replace(sourcePath, "").replace(/\\/g, "/")
+        return !relative.startsWith("/uploads")
+      },
+    })
+  } else {
+    cpSync(sourcePath, targetPath, { recursive: true, force: true })
+  }
 }
 
 function main() {

@@ -1,6 +1,7 @@
-import { NotificationType, RelatedType, ReportStatus, TargetType } from "@/db/types"
+import { RelatedType, ReportStatus, TargetType } from "@/db/types"
 
 import { prisma } from "@/db/client"
+import { createReportResultNotification as createReportResultNotificationEntry } from "@/lib/notification-writes"
 
 export function findReportTargetPost(targetId: string) {
   return prisma.post.findUnique({
@@ -121,16 +122,5 @@ export function createReportResultNotification(data: {
   title: string
   content: string
 }) {
-
-  return prisma.notification.create({
-    data: {
-      userId: data.userId,
-      senderId: data.senderId,
-      type: NotificationType.REPORT_RESULT,
-      relatedType: data.relatedType,
-      relatedId: data.relatedId,
-      title: data.title,
-      content: data.content,
-    },
-  })
+  return createReportResultNotificationEntry(data)
 }

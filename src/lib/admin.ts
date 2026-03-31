@@ -155,6 +155,7 @@ interface AdminDashboardData {
     minPostVipLevel: number
     minReplyVipLevel: number
     requirePostReview: boolean
+    postListDisplayMode: string | null
   }>
   boardStatus: Array<{
     id: string
@@ -186,6 +187,7 @@ interface AdminDashboardData {
     minPostVipLevel: number | null
     minReplyVipLevel: number | null
     requirePostReview: boolean | null
+    postListDisplayMode: string | null
   }>
   recentAnnouncements: Array<{
     id: string
@@ -312,6 +314,7 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
         minPostVipLevel: settings.minPostVipLevel,
         minReplyVipLevel: settings.minReplyVipLevel,
         requirePostReview: settings.requirePostReview,
+        postListDisplayMode: zone.postListDisplayMode ?? null,
       }
     }),
     boardStatus: data.boards.map((board) => ({
@@ -347,6 +350,7 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
       minPostVipLevel: board.minPostVipLevel ?? null,
       minReplyVipLevel: board.minReplyVipLevel ?? null,
       requirePostReview: board.requirePostReview ?? null,
+      postListDisplayMode: board.postListDisplayMode ?? null,
     })),
     recentAnnouncements: data.recentAnnouncements.map((announcement) => ({
 

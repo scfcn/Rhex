@@ -140,6 +140,7 @@ export default async function WritePage({ searchParams }: WritePageProps) {
                   initialValues={{
                     title: editingPost.title,
                     content: publicBlock?.text ?? editingPost.content,
+                    coverPath: editingPost.coverPath,
                     commentsVisibleToAuthorOnly: editingPost.commentsVisibleToAuthorOnly,
                     replyUnlockContent: replyUnlockBlock?.text ?? "",
                     replyThreshold: replyUnlockBlock?.replyThreshold ?? 1,

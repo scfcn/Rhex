@@ -3,6 +3,7 @@ export type PostDraftMode = "create" | "edit"
 export interface LocalPostDraft {
   title: string
   content: string
+  coverPath: string
   boardSlug: string
   postType: string
   bountyPoints: string
@@ -41,6 +42,7 @@ export function createEmptyLocalPostDraft(boardSlug = ""): LocalPostDraft {
   return {
     title: "",
     content: "",
+    coverPath: "",
     boardSlug,
     postType: "NORMAL",
     bountyPoints: "100",

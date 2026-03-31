@@ -107,7 +107,7 @@ function buildCalendarDays(monthKey: string) {
   return cells
 }
 
-export function SidebarUserCard({ user, createPostHref = "/write" }: { user: SidebarUserCardData | null; createPostHref?: string }) {
+export function SidebarUserCard({ user, createPostHref = "/write", siteName = "知识型兴趣社区", siteDescription = "把时间浪费在你真正热爱的事情上。这里更适合持续浏览、慢慢讨论、围绕兴趣沉淀长期内容。" }: { user: SidebarUserCardData | null; createPostHref?: string; siteName?: string; siteDescription?: string }) {
   const router = useRouter()
   const currentUser = user
   const [checkInState, setCheckInState] = useState(() => ({
@@ -208,13 +208,13 @@ export function SidebarUserCard({ user, createPostHref = "/write" }: { user: Sid
               <Sparkles className="h-4.5 w-4.5" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold">知识型兴趣社区</h3>
+              <h3 className="text-sm font-semibold">{siteName}</h3>
               <p className="mt-1 text-[11px] text-muted-foreground">登录后即可签到、查看积分与快捷发帖</p>
             </div>
           </div>
         </div>
         <div className="space-y-3 p-4">
-          <p className="text-sm leading-6 text-muted-foreground">把时间浪费在你真正热爱的事情上。这里更适合持续浏览、慢慢讨论、围绕兴趣沉淀长期内容。</p>
+          <p className="text-sm leading-6 text-muted-foreground">{siteDescription}</p>
           <div className="grid grid-cols-2 gap-2 border-t border-border/80 pt-3">
             <Link href="/login" className="block">
               <Button className="h-9 w-full rounded-lg">登录</Button>

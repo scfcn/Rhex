@@ -1,7 +1,8 @@
-import { ChangeType, NotificationType, PostStatus } from "@/db/types"
+import { ChangeType, PostStatus } from "@/db/types"
 
 import { prisma } from "@/db/client"
 import { apiError, apiSuccess, createUserRouteHandler, readJsonBody, requireStringField } from "@/lib/api-route"
+import { createSystemNotification } from "@/lib/notification-writes"
 import { getSiteSettings } from "@/lib/site-settings"
 
 export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
@@ -97,16 +98,14 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
       })
     }
 
-    await tx.notification.create({
-      data: {
-        userId: comment.userId,
-        type: NotificationType.SYSTEM,
-        senderId: currentUser.id,
-        relatedType: "POST",
-        relatedId: postId,
-        title: "你的回复被采纳为答案",
-        content: `你的回复已被采纳为悬赏帖答案${post.bountyPoints ? `，获得 ${post.bountyPoints} ${settings.pointName}奖励` : ""}。`,
-      },
+    await createSystemNotification({
+      client: tx,
+      userId: comment.userId,
+      senderId: currentUser.id,
+      relatedType: "POST",
+      relatedId: postId,
+      title: "你的回复被采纳为答案",
+      content: `你的回复已被采纳为悬赏帖答案${post.bountyPoints ? `，获得 ${post.bountyPoints} ${settings.pointName}奖励` : ""}。`,
     })
 
     return post.bountyPoints ?? 0

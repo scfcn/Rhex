@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Activity, FileClock, LogIn, Package, ReceiptText, Search, ShieldCheck } from "lucide-react"
+import { Activity, CalendarDays, FileClock, LogIn, Package, ReceiptText, Search, ShieldCheck } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { formatDateTime } from "@/lib/formatters"
@@ -21,6 +21,11 @@ const actionOptions = [
   { value: "post.approve", label: "帖子通过" },
   { value: "post.reject", label: "帖子驳回" },
 ]
+const checkInActionOptions = [
+  { value: "ALL", label: "全部动作" },
+  { value: "check-in", label: "正常签到" },
+  { value: "make-up", label: "补签" },
+]
 const pointTypeOptions = [
   { value: "ALL", label: "全部变动" },
   { value: "INCOME", label: "收入" },
@@ -35,6 +40,7 @@ const bucketTypeOptions = [
 const tabIcons = {
   admin: ShieldCheck,
   login: LogIn,
+  checkins: CalendarDays,
   points: Activity,
   uploads: FileClock,
   orders: ReceiptText,
@@ -49,6 +55,10 @@ const toneClassMap = {
 } as const
 
 export function AdminLogCenter({ data }: AdminLogCenterProps) {
+  const activeActionOptions = data.activeTab === "checkins" ? checkInActionOptions : actionOptions
+  const actionLabel = data.activeTab === "checkins" ? "签到动作" : "管理员动作"
+  const actionDisabled = data.activeTab !== "admin" && data.activeTab !== "checkins"
+
   const baseQuery = new URLSearchParams({
     tab: "logs",
     logSubTab: data.activeTab,
@@ -74,7 +84,7 @@ export function AdminLogCenter({ data }: AdminLogCenterProps) {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         {data.summary.map((card) => {
           const Icon = tabIcons[card.key]
           return (
@@ -117,7 +127,7 @@ export function AdminLogCenter({ data }: AdminLogCenterProps) {
             </div>
           </label>
 
-          <CompactSelect name="logAction" label="管理员动作" value={data.filters.action} options={actionOptions} disabled={data.activeTab !== "admin"} />
+          <CompactSelect name="logAction" label={actionLabel} value={data.filters.action} options={activeActionOptions} disabled={actionDisabled} />
           <CompactSelect name="logChangeType" label="积分类型" value={data.filters.changeType} options={pointTypeOptions} disabled={data.activeTab !== "points"} />
           <CompactSelect name="logBucketType" label="上传目录" value={data.filters.bucketType} options={bucketTypeOptions} disabled={data.activeTab !== "uploads"} />
           <CompactSelect name="logPageSize" label="每页" value={String(data.pagination.pageSize)} options={pageSizeOptions.map((item) => ({ value: String(item), label: `${item} 条` }))} />

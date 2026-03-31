@@ -4,10 +4,10 @@ import { notFound } from "next/navigation"
 
 import { AccessDeniedCard } from "@/components/access-denied-card"
 import { CollapsibleInfoCard } from "@/components/collapsible-info-card"
+import { ForumPageShell } from "@/components/forum-page-shell"
 import { ForumPostStream } from "@/components/forum-post-stream"
 
 import { HomeSidebarPanels } from "@/components/home-sidebar-panels"
-import { SidebarNavigation } from "@/components/sidebar-navigation"
 import { SiteHeader } from "@/components/site-header"
 
 
@@ -84,7 +84,7 @@ export default async function ZonePage({ params, searchParams }: ZonePageProps) 
   const currentPage = Math.max(1, Number(searchParams?.page ?? "1") || 1)
   const [zoneBoards, posts, allBoards, allZones, hotTopics] = await Promise.all([
     getZoneBoards(params.slug),
-    permission.allowed ? getZonePosts(params.slug, currentPage, 10) : Promise.resolve([]),
+    permission.allowed ? getZonePosts(params.slug, currentPage, 20) : Promise.resolve([]),
     getBoards(),
     getZones(),
     getHomeSidebarHotTopics(5),
@@ -99,10 +99,12 @@ export default async function ZonePage({ params, searchParams }: ZonePageProps) 
     <div className="min-h-screen bg-background">
       <SiteHeader />
       <div className="mx-auto max-w-[1200px] px-4">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <SidebarNavigation zones={allZones} boards={allBoards} activeZoneSlug={zone.slug} />
-
-          <main className="pb-12 lg:col-span-7 py-1">
+        <ForumPageShell
+          zones={allZones}
+          boards={allBoards}
+          activeZoneSlug={zone.slug}
+          main={(
+            <main className="pb-12 py-1">
             <div className="space-y-3">
 
               <CollapsibleInfoCard
@@ -139,7 +141,7 @@ export default async function ZonePage({ params, searchParams }: ZonePageProps) 
               ) : (
                 <>
 
-                  <ForumPostStream posts={posts} visiblePinScopes={["GLOBAL", "ZONE"]} showPinnedDivider={currentPage === 1} />
+                  <ForumPostStream posts={posts} listDisplayMode={zone.postListDisplayMode} visiblePinScopes={["GLOBAL", "ZONE"]} showPinnedDivider={currentPage === 1} />
 
                   {posts.length === 0 ? <div className="rounded-md border bg-background p-8 text-sm text-muted-foreground">当前分区下还没有公开内容。</div> : null}
 
@@ -155,14 +157,14 @@ export default async function ZonePage({ params, searchParams }: ZonePageProps) 
                 </>
               )}
             </div>
-          </main>
-
-          <aside className="mt-6 hidden pb-12 lg:col-span-3 lg:block">
-            <HomeSidebarPanels user={sidebarUser} hotTopics={hotTopics} postLinkDisplayMode={settings.postLinkDisplayMode} createPostHref={zoneBoards[0] ? `/write?board=${zoneBoards[0].slug}` : "/write"} />
-
-
-          </aside>
-        </div>
+            </main>
+          )}
+          rightSidebar={(
+            <aside className="mt-6 hidden pb-12 lg:block">
+              <HomeSidebarPanels user={sidebarUser} hotTopics={hotTopics} postLinkDisplayMode={settings.postLinkDisplayMode} createPostHref={zoneBoards[0] ? `/write?board=${zoneBoards[0].slug}` : "/write"} siteName={settings.siteName} siteDescription={settings.siteDescription} />
+            </aside>
+          )}
+        />
       </div>
     </div>
   )

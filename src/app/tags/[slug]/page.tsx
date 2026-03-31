@@ -2,8 +2,8 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { ForumPostStream } from "@/components/forum-post-stream"
+import { ForumPageShell } from "@/components/forum-page-shell"
 import { HomeSidebarPanels } from "@/components/home-sidebar-panels"
-import { SidebarNavigation } from "@/components/sidebar-navigation"
 import { SiteHeader } from "@/components/site-header"
 import { Card, CardContent } from "@/components/ui/card"
 import { getCurrentUser } from "@/lib/auth"
@@ -62,10 +62,11 @@ export default async function TagPage({ params }: TagPageProps) {
     <div className="min-h-screen bg-background">
       <SiteHeader />
       <div className="mx-auto max-w-[1200px] px-4">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <SidebarNavigation zones={zones} boards={boards} />
-
-          <main className="pb-12 lg:col-span-7 py-1">
+        <ForumPageShell
+          zones={zones}
+          boards={boards}
+          main={(
+            <main className="pb-12 py-1">
             <div className="space-y-6">
               <Card className="overflow-hidden border-none bg-gradient-to-r from-[#1f1b16] via-[#2e261f] to-[#382c22] text-white shadow-soft">
                 <CardContent className="p-8">
@@ -78,12 +79,14 @@ export default async function TagPage({ params }: TagPageProps) {
               <ForumPostStream posts={posts} />
               {posts.length === 0 ? <div className="rounded-md border bg-background p-8 text-sm text-muted-foreground">当前标签下还没有内容。</div> : null}
             </div>
-          </main>
-
-          <aside className="mt-6 hidden pb-12 lg:col-span-3 lg:block">
-            <HomeSidebarPanels user={sidebarUser} hotTopics={hotTopics} />
-          </aside>
-        </div>
+            </main>
+          )}
+          rightSidebar={(
+            <aside className="mt-6 hidden pb-12 lg:block">
+              <HomeSidebarPanels user={sidebarUser} hotTopics={hotTopics} siteName={settings.siteName} siteDescription={settings.siteDescription} />
+            </aside>
+          )}
+        />
       </div>
     </div>
   )

@@ -4,9 +4,11 @@ import {
   countAdminLogs,
   countAdminLogTabs,
   countPointLogs,
+  countUserCheckInLogs,
   countUserLoginLogs,
   findAdminLogsPage,
   findPointLogsPage,
+  findUserCheckInLogsPage,
   findUploadLogs,
   findUserLoginLogsPage,
   findVipOrders,
@@ -16,7 +18,7 @@ import { serializeDate, serializeDateTime } from "@/lib/formatters"
 import { normalizePageSize, normalizePositiveInteger } from "@/lib/shared/normalizers"
 
 
-export type AdminLogCenterTab = "admin" | "login" | "points" | "uploads" | "orders"
+export type AdminLogCenterTab = "admin" | "login" | "checkins" | "points" | "uploads" | "orders"
 
 interface GetAdminLogCenterOptions {
   activeTab?: string
@@ -82,6 +84,7 @@ export interface AdminLogCenterResult {
 const LOG_TABS: Array<{ key: AdminLogCenterTab; label: string }> = [
   { key: "admin", label: "管理员日志" },
   { key: "login", label: "用户登录日志" },
+  { key: "checkins", label: "签到日志" },
   { key: "points", label: "积分日志" },
   { key: "uploads", label: "上传日志" },
   { key: "orders", label: "订单日志" },
@@ -144,12 +147,13 @@ export async function getAdminLogCenter(options: GetAdminLogCenterOptions = {}):
   const requestedPage = normalizePositiveInteger(options.page, 1)
   const pageSize = normalizePageSize(options.pageSize)
 
-  const [adminCount, loginCount, pointCount, uploadCount, orderCount] = await countAdminLogTabs()
+  const [adminCount, loginCount, checkInCount, pointCount, uploadCount, orderCount] = await countAdminLogTabs()
 
 
   const summary = [
     { key: "admin" as const, label: "管理员日志", count: adminCount },
     { key: "login" as const, label: "用户登录日志", count: loginCount },
+    { key: "checkins" as const, label: "签到日志", count: checkInCount },
     { key: "points" as const, label: "积分日志", count: pointCount },
     { key: "uploads" as const, label: "上传日志", count: uploadCount },
     { key: "orders" as const, label: "订单日志", count: orderCount },
@@ -236,6 +240,49 @@ export async function getAdminLogCenter(options: GetAdminLogCenterOptions = {}):
         detailPrimary: item.userAgent ?? "未记录 User-Agent",
         detailSecondary: item.ip ? "登录成功" : "登录成功 / IP 缺失",
         tone: "info",
+      })),
+    }
+  }
+
+  if (activeTab === "checkins") {
+    const where: Prisma.UserCheckInLogWhereInput = {
+      ...(action === "check-in" ? { isMakeUp: false } : {}),
+      ...(action === "make-up" ? { isMakeUp: true } : {}),
+      ...(keyword
+        ? {
+            OR: [
+              { checkedInOn: { contains: keyword, mode: "insensitive" } },
+              { user: { username: { contains: keyword, mode: "insensitive" } } },
+              { user: { nickname: { contains: keyword, mode: "insensitive" } } },
+            ],
+          }
+        : {}),
+    }
+
+    const total = await countUserCheckInLogs(where)
+    const pagination = buildPagination(total, requestedPage, pageSize)
+    const rows = await findUserCheckInLogsPage(where, (pagination.page - 1) * pagination.pageSize, pagination.pageSize)
+
+    return {
+      activeTab,
+      tabs: LOG_TABS.map((item) => ({ key: item.key, label: item.label, count: summary.find((summaryItem) => summaryItem.key === item.key)?.count ?? 0 })),
+      summary,
+      filters: { keyword, action, changeType, bucketType },
+      pagination,
+      rows: rows.map((item) => ({
+        id: item.id,
+        occurredAt: serializeDateTime(item.createdAt) ?? item.createdAt.toISOString(),
+        actorPrimary: item.user.nickname ?? item.user.username,
+        actorSecondary: `@${item.user.username}`,
+        typePrimary: item.isMakeUp ? "MAKE_UP" : "CHECK_IN",
+        typeSecondary: item.isMakeUp ? "补签" : "正常签到",
+        targetPrimary: item.checkedInOn,
+        targetSecondary: "签到日期",
+        detailPrimary: item.isMakeUp
+          ? `补签获得 ${item.reward}，消耗 ${item.makeUpCost}`
+          : `签到获得 ${item.reward}`,
+        detailSecondary: item.isMakeUp && item.makeUpCost > 0 ? `补签成本 ${item.makeUpCost}` : "无补签成本",
+        tone: item.isMakeUp ? "warning" : "success",
       })),
     }
   }

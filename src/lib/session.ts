@@ -1,3 +1,5 @@
+import { normalizeIp } from "@/lib/request-ip"
+
 const SESSION_COOKIE_NAME = "bbs_session"
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7
 const SESSION_RENEW_THRESHOLD_SECONDS = 60 * 60 * 24 * 3
@@ -71,14 +73,21 @@ export interface SessionUser {
   username: string
   issuedAt: number
   expiresAt: number
+  ip?: string
 }
 
-export async function createSessionToken(username: string) {
+interface ParseSessionTokenOptions {
+  requestIp?: string | null
+}
+
+export async function createSessionToken(username: string, ip?: string | null) {
   const now = Math.floor(Date.now() / 1000)
+  const normalizedIp = normalizeIp(ip ?? null)
   const payloadObject: SessionUser = {
     username,
     issuedAt: now,
     expiresAt: now + SESSION_TTL_SECONDS,
+    ...(normalizedIp ? { ip: normalizedIp } : {}),
   }
   const payload = encodeBase64Url(JSON.stringify(payloadObject))
   const signature = await sign(payload)
@@ -86,7 +95,7 @@ export async function createSessionToken(username: string) {
   return `${payload}.${signature}`
 }
 
-export async function parseSessionToken(token: string | undefined) {
+export async function parseSessionToken(token: string | undefined, options?: ParseSessionTokenOptions) {
   if (!token) {
     return null
   }
@@ -127,7 +136,22 @@ export async function parseSessionToken(token: string | undefined) {
       return null
     }
 
-    return parsed
+    const sessionIp = typeof parsed.ip === "undefined" ? null : normalizeIp(parsed.ip)
+    if (typeof parsed.ip !== "undefined" && !sessionIp) {
+      return null
+    }
+
+    const requestIp = normalizeIp(options?.requestIp ?? null)
+    if (sessionIp && requestIp && sessionIp !== requestIp) {
+      return null
+    }
+
+    return {
+      username: parsed.username,
+      issuedAt: parsed.issuedAt,
+      expiresAt: parsed.expiresAt,
+      ...(sessionIp ? { ip: sessionIp } : {}),
+    }
   } catch {
     return null
   }
@@ -152,5 +176,15 @@ export function getSessionCookieOptions() {
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: SESSION_TTL_SECONDS,
+  }
+}
+
+export function getSessionClearedCookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
   }
 }

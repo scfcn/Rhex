@@ -24,6 +24,7 @@ export interface ZoneItem {
 
   minPostVipLevel: number
   minReplyVipLevel: number
+  postListDisplayMode: string | null
 }
 
 export interface BoardItem {
@@ -56,6 +57,7 @@ export interface BoardItem {
 
   minPostVipLevel: number | null
   minReplyVipLevel: number | null
+  postListDisplayMode: string | null
 }
 
 export interface StructureManagerData {

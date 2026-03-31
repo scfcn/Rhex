@@ -6,6 +6,7 @@ import { notFound } from "next/navigation"
 
 import { AccessDeniedCard } from "@/components/access-denied-card"
 import { CommentThread } from "@/components/comment-thread"
+import { ForumPageShell } from "@/components/forum-page-shell"
 import { LevelIcon } from "@/components/level-icon"
 import { MarkdownContent } from "@/components/markdown-content"
 
@@ -14,7 +15,6 @@ import { PostEditPanel } from "@/components/post-edit-panel"
 import { PostEngagementBar } from "@/components/post-engagement-bar"
 import { PostSidebarPanels } from "@/components/post-sidebar-panels"
 import { RestrictedPostBlock } from "@/components/restricted-post-block"
-import { SidebarNavigation } from "@/components/sidebar-navigation"
 import { BountyPanel, LotteryPanel, PollPanel } from "@/components/post-type-panels"
 
 import { SiteHeader } from "@/components/site-header"
@@ -243,10 +243,12 @@ export default async function PostPage({ params, searchParams }: PostPageProps) 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <main className="mx-auto max-w-[1200px] px-4">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <SidebarNavigation zones={zones} boards={boards} activeBoardSlug={displayPost.boardSlug} />
-
-          <article className="space-y-6 lg:col-span-7 mt-6 mb-4">
+        <ForumPageShell
+          zones={zones}
+          boards={boards}
+          activeBoardSlug={displayPost.boardSlug}
+          main={(
+            <article className="mt-6 mb-4 space-y-6">
             {displayPost.status === "PENDING" ? (
               <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
                 当前帖子处于<strong>待审核</strong>状态，仅作者和管理员可查看。{displayPost.reviewNote ? `审核备注：${displayPost.reviewNote}` : "管理员审核通过后才会对其他用户可见。"}
@@ -494,17 +496,16 @@ export default async function PostPage({ params, searchParams }: PostPageProps) 
                 </Card>
               </>
             )}
-          </article>
-
-          <aside className="mt-6 hidden pb-12 lg:col-span-3 lg:block">
-            <PostSidebarPanels currentUser={sidebarUser} relatedTopics={sidebarData.relatedTopics} tags={sidebarData.tags} postLinkDisplayMode={settings.postLinkDisplayMode} />
-
-          </aside>
-        </div>
+            </article>
+          )}
+          rightSidebar={(
+            <aside className="mt-6 hidden pb-12 lg:block">
+              <PostSidebarPanels currentUser={sidebarUser} relatedTopics={sidebarData.relatedTopics} tags={sidebarData.tags} postLinkDisplayMode={settings.postLinkDisplayMode} siteName={settings.siteName} siteDescription={settings.siteDescription} />
+            </aside>
+          )}
+        />
       </main>
     </div>
   )
 }
-
-
 

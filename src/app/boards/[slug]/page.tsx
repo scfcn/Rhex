@@ -5,12 +5,12 @@ import { notFound } from "next/navigation"
 import { AccessDeniedCard } from "@/components/access-denied-card"
 import { BoardFollowButton } from "@/components/board-follow-button"
 import { CollapsibleInfoCard } from "@/components/collapsible-info-card"
+import { ForumPageShell } from "@/components/forum-page-shell"
 import { ForumPostStream } from "@/components/forum-post-stream"
 import { RssSubscribeButton } from "@/components/rss-subscribe-button"
 
 import { HomeSidebarPanels } from "@/components/home-sidebar-panels"
 
-import { SidebarNavigation } from "@/components/sidebar-navigation"
 import { SiteHeader } from "@/components/site-header"
 
 
@@ -93,7 +93,7 @@ export default async function BoardPage({ params, searchParams }: BoardPageProps
 
   const currentPage = Number(searchParams?.page ?? "1") || 1
   const [posts, boards, zones, hotTopics] = await Promise.all([
-    permission.allowed ? getBoardPosts(params.slug, currentPage, 10) : Promise.resolve([]),
+    permission.allowed ? getBoardPosts(params.slug, currentPage, 20) : Promise.resolve([]),
     getBoards(),
     getZones(),
     getHomeSidebarHotTopics(5),
@@ -116,10 +116,12 @@ export default async function BoardPage({ params, searchParams }: BoardPageProps
     <div className="min-h-screen bg-background">
       <SiteHeader />
       <div className="mx-auto max-w-[1200px] px-4">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <SidebarNavigation zones={zones} boards={boards} activeBoardSlug={board.slug} />
-
-          <main className="pb-12 lg:col-span-7 py-1">
+        <ForumPageShell
+          zones={zones}
+          boards={boards}
+          activeBoardSlug={board.slug}
+          main={(
+            <main className="pb-12 py-1">
             <div className="space-y-3">
 
               <CollapsibleInfoCard
@@ -157,7 +159,7 @@ export default async function BoardPage({ params, searchParams }: BoardPageProps
                 <>
          
 
-                  <ForumPostStream posts={posts} showBoard={false} showPinnedDivider={currentPage === 1} />
+                  <ForumPostStream posts={posts} listDisplayMode={board.postListDisplayMode} showBoard={false} showPinnedDivider={currentPage === 1} />
 
 
 
@@ -175,14 +177,14 @@ export default async function BoardPage({ params, searchParams }: BoardPageProps
                 </>
               )}
             </div>
-          </main>
-
-          <aside className="mt-6 hidden pb-12 lg:col-span-3 lg:block">
-            <HomeSidebarPanels user={sidebarUser} hotTopics={hotTopics} postLinkDisplayMode={settings.postLinkDisplayMode} createPostHref={`/write?board=${board.slug}`} />
-
-
-          </aside>
-        </div>
+            </main>
+          )}
+          rightSidebar={(
+            <aside className="mt-6 hidden pb-12 lg:block">
+              <HomeSidebarPanels user={sidebarUser} hotTopics={hotTopics} postLinkDisplayMode={settings.postLinkDisplayMode} createPostHref={`/write?board=${board.slug}`} siteName={settings.siteName} siteDescription={settings.siteDescription} />
+            </aside>
+          )}
+        />
       </div>
     </div>
   )

@@ -3,6 +3,7 @@ import { cache } from "react"
 import { findAllZonesWithBoards, findGlobalPinnedPosts, findZoneBoardIdsBySlug, findZoneBoardListBySlug, findZoneNormalPosts, findZonePinnedPosts, findZoneWithBoardsBySlug } from "@/db/taxonomy-queries"
 import { dedupeAndMapPinnedPosts, extractPinnedPostIds } from "@/lib/pinned-posts"
 import { mapListPost } from "@/lib/post-map"
+import { normalizePostListDisplayMode, type PostListDisplayMode } from "@/lib/post-list-display"
 
 import type { SitePostItem } from "@/lib/posts"
 
@@ -19,6 +20,7 @@ export interface SiteZoneItem {
   minViewPoints?: number
   minViewLevel?: number
   minViewVipLevel?: number
+  postListDisplayMode: PostListDisplayMode
 }
 
 
@@ -39,6 +41,7 @@ const getCachedZones = cache(async (): Promise<SiteZoneItem[]> => {
     minViewPoints: (zone as { minViewPoints?: number | null }).minViewPoints ?? 0,
     minViewLevel: (zone as { minViewLevel?: number | null }).minViewLevel ?? 0,
     minViewVipLevel: zone.minViewVipLevel ?? 0,
+    postListDisplayMode: normalizePostListDisplayMode(zone.postListDisplayMode),
   }))
 
 
@@ -67,6 +70,7 @@ const getCachedZoneBySlug = cache(async (slug: string) => {
     minViewPoints: (zone as { minViewPoints?: number | null }).minViewPoints ?? 0,
     minViewLevel: (zone as { minViewLevel?: number | null }).minViewLevel ?? 0,
     minViewVipLevel: zone.minViewVipLevel ?? 0,
+    postListDisplayMode: normalizePostListDisplayMode(zone.postListDisplayMode),
   }
 
 

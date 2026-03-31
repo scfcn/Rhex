@@ -98,7 +98,7 @@ function normalizeManualTags(tags: string[]) {
     .slice(0, MAX_MANUAL_TAGS)
 }
 
-import { ChevronDown, Info, MessageSquareLock, Sparkles } from "lucide-react"
+import { ChevronDown, ImageIcon, Info, Loader2, MessageSquareLock, Sparkles, Upload } from "lucide-react"
 
 import { AdminModal } from "@/components/admin-modal"
 import { BoardSelectField } from "@/components/board-select-field"
@@ -146,6 +146,7 @@ interface CreatePostFormProps {
   initialValues?: {
     title: string
     content: string
+    coverPath?: string | null
     boardSlug: string
     postType: LocalPostType
     bountyPoints?: number | null
@@ -224,6 +225,7 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
   const router = useRouter()
   const [title, setTitle] = useState(initialValues?.title ?? "")
   const [content, setContent] = useState(initialValues?.content ?? "")
+  const [coverPath, setCoverPath] = useState(initialValues?.coverPath ?? "")
   const [commentsVisibleToAuthorOnly, setCommentsVisibleToAuthorOnly] = useState(Boolean(initialValues?.commentsVisibleToAuthorOnly))
   const [replyUnlockContent, setReplyUnlockContent] = useState(initialValues?.replyUnlockContent ?? "")
   const [purchaseUnlockContent, setPurchaseUnlockContent] = useState(initialValues?.purchaseUnlockContent ?? "")
@@ -243,6 +245,7 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
   const [manualTags, setManualTags] = useState(() => normalizeManualTags(initialValues?.tags ?? []))
   const [tagInput, setTagInput] = useState("")
   const [tagModalOpen, setTagModalOpen] = useState(false)
+  const [coverModalOpen, setCoverModalOpen] = useState(false)
   const [tagEditingIndex, setTagEditingIndex] = useState<number | null>(null)
   const [tagEditingValue, setTagEditingValue] = useState("")
   const [lotteryStartsAt, setLotteryStartsAt] = useState(initialValues?.lotteryConfig?.startsAt ?? "")
@@ -259,6 +262,7 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
   const [draftRestored, setDraftRestored] = useState(false)
   const [lastSavedDraftAt, setLastSavedDraftAt] = useState<string | null>(null)
   const hasPromptedDraftRef = useRef(false)
+  const [coverUploading, setCoverUploading] = useState(false)
 
   const normalizedPollOptions = useMemo(() => pollOptions.map((item) => item.trim()).filter(Boolean), [pollOptions])
   const normalizedRedPacketUnitPoints = useMemo(() => parsePositiveSafeInteger(redPacketUnitPoints), [redPacketUnitPoints])
@@ -280,6 +284,7 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
       return {
         title: initialValues.title,
         content: initialValues.content,
+        coverPath: initialValues.coverPath ?? "",
         boardSlug: initialValues.boardSlug,
         postType: initialValues.postType,
         bountyPoints: String(initialValues.bountyPoints ?? 100),
@@ -315,6 +320,7 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
   const draftData = useMemo<LocalPostDraft>(() => ({
     title,
     content,
+    coverPath,
     boardSlug,
     postType,
     bountyPoints,
@@ -342,6 +348,7 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
     bountyPoints,
     commentsVisibleToAuthorOnly,
     content,
+    coverPath,
     lotteryConditions,
     lotteryEndsAt,
     lotteryParticipantGoal,
@@ -434,6 +441,7 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
   function restoreDraft(draft: LocalPostDraft) {
     setTitle(draft.title)
     setContent(draft.content)
+    setCoverPath(draft.coverPath)
     setBoardSlug(draft.boardSlug)
     setPostType(draft.postType as LocalPostType)
     setBountyPoints(draft.bountyPoints)
@@ -654,6 +662,45 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
     setLotteryConditions((current) => (current.length <= 1 ? current : current.filter((_, currentIndex) => currentIndex !== index)))
   }
 
+  async function handleCoverUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) {
+      return
+    }
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("请选择图片文件后再上传", "封面上传失败")
+      event.target.value = ""
+      return
+    }
+
+    setCoverUploading(true)
+
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("folder", "post-covers")
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      })
+      const result = await response.json()
+
+      if (!response.ok || result.code !== 0) {
+        throw new Error(result.message ?? "封面上传失败")
+      }
+
+      setCoverPath(String(result.data?.urlPath ?? ""))
+      toast.success("封面上传成功", "封面上传成功")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "封面上传失败", "封面上传失败")
+    } finally {
+      setCoverUploading(false)
+      event.target.value = ""
+    }
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setLoading(true)
@@ -687,6 +734,7 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
           postId,
           title,
           content,
+          coverPath: coverPath.trim() || undefined,
           commentsVisibleToAuthorOnly,
           replyUnlockContent,
           replyThreshold: replyUnlockContent.trim() ? 1 : undefined,
@@ -703,6 +751,7 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
       : {
           title,
           content,
+          coverPath: coverPath.trim() || undefined,
           commentsVisibleToAuthorOnly,
           replyUnlockContent,
           replyThreshold: replyUnlockContent.trim() ? 1 : undefined,
@@ -763,7 +812,7 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
             <p className="text-sm font-medium">选择节点</p>
             <BoardSelectField value={boardSlug} onChange={setBoardSlug} boardOptions={boardOptions} disabled={mode === "edit"} />
             <p className="text-xs leading-6 text-muted-foreground">
-              {mode === "edit" ? "编辑模式下暂不允许切换节点，避免跨节点权限和审核状态不一致。" : "你只能选择具体节点发帖，不能直接发到分区；现在支持搜索分区、节点名和 slug，节点变多后也能快速找到。"}
+              {mode === "edit" ? "编辑模式下暂不允许切换节点，避免跨节点权限和审核状态不一致。" : "现在支持搜索分区、节点名和 slug，节点变多后也能快速找到。"}
             </p>
           </div>
 
@@ -976,6 +1025,14 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
               标签提取
               <span className={finalTags.length > 0 ? "ml-2 rounded-full bg-foreground px-2 py-0.5 text-[11px] text-background" : "ml-2 rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground"}>{finalTags.length > 0 ? finalTags.length : autoExtractedTags.length}</span>
             </Button>
+                        <HiddenConfigChip
+              icon={coverUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+              title="封面图"
+              active={Boolean(coverPath.trim())}
+              summary={coverUploading ? "上传中..." : coverPath.trim() ? "已设置" : "自动提取"}
+              onClick={() => setCoverModalOpen(true)}
+              onClear={() => setCoverPath("")}
+            />
             <label className={commentsVisibleToAuthorOnly ? "inline-flex items-center gap-2 rounded-full border border-foreground bg-accent px-3 py-2 text-sm" : "inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-sm text-muted-foreground"}>
               <input
                 type="checkbox"
@@ -986,6 +1043,7 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
               <span>评论仅楼主可见</span>
               <HoverTip text="开启后，其他用户发表的评论仅帖子作者和管理员可见。" />
             </label>
+
 
 
 
@@ -1105,6 +1163,46 @@ export function CreatePostForm({ boardOptions, pointName, postRedPacketEnabled =
           </div>
         </div>
       </form>
+
+      <AdminModal
+        open={coverModalOpen}
+        onClose={() => setCoverModalOpen(false)}
+        title="设置封面图"
+        description="画廊模式默认提取正文第一张图片，也可以在这里手动上传或填写封面地址。"
+        size="lg"
+        footer={(
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">留空时，帖子列表会自动提取正文中的第一张图片作为封面。</p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="ghost" disabled={!coverPath || coverUploading} onClick={() => setCoverPath("")}>清空封面</Button>
+              <Button type="button" variant="outline" onClick={() => setCoverModalOpen(false)}>完成</Button>
+            </div>
+          </div>
+        )}
+      >
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className={coverUploading ? "inline-flex cursor-not-allowed items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm text-muted-foreground" : "inline-flex cursor-pointer items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm transition-colors hover:bg-accent"}>
+              {coverUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              <span>{coverUploading ? "上传中..." : "上传封面"}</span>
+              <input type="file" accept="image/*" className="hidden" disabled={coverUploading} onChange={handleCoverUpload} />
+            </label>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium">封面地址</p>
+            <input value={coverPath} onChange={(event) => setCoverPath(event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none" placeholder="留空则自动使用正文首图，也可以直接填写封面图片地址" />
+          </div>
+          {coverPath ? (
+            <div className="overflow-hidden rounded-[24px] border border-border bg-card">
+              <img src={coverPath} alt="帖子封面预览" className="aspect-[16/9] w-full object-cover" />
+            </div>
+          ) : (
+            <div className="rounded-[24px] border border-dashed border-border bg-card/60 px-4 py-5 text-sm leading-6 text-muted-foreground">
+              当前未手动设置封面图，发布后会自动提取正文中的第一张图片作为封面。
+            </div>
+          )}
+        </div>
+      </AdminModal>
 
       <AdminModal
         open={tagModalOpen}

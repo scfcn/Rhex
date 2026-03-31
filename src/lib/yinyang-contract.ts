@@ -6,6 +6,7 @@ export { YinYangContractPage } from "@/components/yinyang-contract-page"
 export { YinYangContractAdminPage } from "@/components/yinyang-contract-admin-page"
 
 import { prisma } from "@/db/client"
+import { createSystemNotification } from "@/lib/notification-writes"
 import {
   countUserAcceptedChallengesInRange,
   countUserCreatedChallengesInRange,
@@ -617,16 +618,13 @@ export async function acceptYinYangChallenge(user: CurrentUser, input: AcceptCha
 
 
 
-  await prisma.notification.create({
-    data: {
-      userId: challenge.creatorId,
-      type: "SYSTEM",
-      senderId: user.id,
-      relatedType: "YINYANG_CHALLENGE",
-      relatedId: challenge.id,
-      title: resultTitle,
-      content: resultContent,
-    },
+  await createSystemNotification({
+    userId: challenge.creatorId,
+    senderId: user.id,
+    relatedType: "YINYANG_CHALLENGE",
+    relatedId: challenge.id,
+    title: resultTitle,
+    content: resultContent,
   })
 
   const refreshedUser = await prisma.user.findUnique({

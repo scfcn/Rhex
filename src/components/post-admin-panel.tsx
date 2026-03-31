@@ -71,7 +71,7 @@ export function PostAdminPanel({
     setFeedback("")
 
     startTransition(async () => {
-      const response = await fetch("/a​pi/admin/actions", {
+      const response = await fetch("/api/admin/actions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, targetId, ...extra }),

@@ -3,6 +3,7 @@ import { LotteryStatus, LotteryTriggerMode } from "@/db/types"
 import { formatRelativeTime } from "@/lib/formatters"
 
 import { getPublicPostContentText } from "@/lib/post-content"
+import { resolvePostCoverImage } from "@/lib/post-cover"
 import { getPostStatusLabel, getPostTypeLabel, type LocalPostType } from "@/lib/post-types"
 import { getUserDisplayName, type PublicUserStatus } from "@/lib/users"
 import { getVipLevel, isVipActive, type VipStateSource } from "@/lib/vip-status"
@@ -53,6 +54,7 @@ interface ListPostSource {
   title: string
   summary?: string | null
   content: string
+  coverPath?: string | null
   type: string
   status: string
   reviewNote?: string | null
@@ -72,6 +74,7 @@ interface ListPostSource {
 
   acceptedCommentId?: string | null
 
+  redPacket?: { id: string } | null
   commentCount: number
   likeCount: number
   favoriteCount: number
@@ -125,6 +128,7 @@ export function mapListPost(post: ListPostSource) {
     publishedAt: formatRelativeTime(post.publishedAt ?? post.createdAt),
 
     excerpt: post.summary ?? publicContent.slice(0, 120),
+    coverImage: resolvePostCoverImage(post.content, post.coverPath),
     content: publicContent.split("\n\n").filter(Boolean),
     type: (post.type as LocalPostType) ?? "NORMAL",
     typeLabel: getPostTypeLabel((post.type as LocalPostType) ?? "NORMAL"),
@@ -134,6 +138,7 @@ export function mapListPost(post: ListPostSource) {
     reviewNote: post.reviewNote,
     isPinned: post.isPinned,
     pinScope: post.pinScope ?? (post.isPinned ? "BOARD" : "NONE"),
+    hasRedPacket: Boolean(post.redPacket),
     minViewLevel: post.minViewLevel ?? 0,
     isFeatured: post.isFeatured,
 

@@ -356,7 +356,7 @@ function renderMarkdown(input: string, emojiItems: MarkdownEmojiItem[]) {
     .replace(/<h4 id="([^"]+)">/g, '<h4 id="$1" class="group mt-4 scroll-mt-24 text-lg font-semibold leading-snug text-foreground">')
     .replace(/<h5 id="([^"]+)">/g, '<h5 id="$1" class="group mt-3 scroll-mt-24 text-base font-semibold leading-snug text-foreground">')
     .replace(/<h6 id="([^"]+)">/g, '<h6 id="$1" class="group mt-3 scroll-mt-24 text-sm font-semibold leading-snug text-foreground">')
-    .replace(/<img /g, '<img class="my-4 max-w-full rounded-2xl border border-border" loading="lazy" ')
+    .replace(/<img /g, '<img class="my-4 max-w-full rounded-2xl border border-border" loading="lazy" decoding="async" fetchpriority="low" ')
     .replace(/<dl>/g, '<dl class="my-4 space-y-2">')
     .replace(/<dt>/g, '<dt class="font-semibold text-foreground">')
     .replace(/<dd>/g, '<dd class="ml-0 border-l-2 border-border pl-4 text-muted-foreground">')

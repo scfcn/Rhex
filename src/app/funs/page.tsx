@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 
+import { ForumPageShell } from "@/components/forum-page-shell"
 import { HomeSidebarPanels } from "@/components/home-sidebar-panels"
-import { SidebarNavigation } from "@/components/sidebar-navigation"
 import { SiteHeader } from "@/components/site-header"
 import { LevelIcon } from "@/components/level-icon"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -38,10 +38,11 @@ export default async function FunsPage() {
     <div className="min-h-screen bg-background">
       <SiteHeader />
       <div className="mx-auto max-w-[1200px] px-4">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <SidebarNavigation zones={zones} boards={boards} />
-
-          <main className="pb-12 lg:col-span-7 py-1">
+        <ForumPageShell
+          zones={zones}
+          boards={boards}
+          main={(
+            <main className="pb-12 py-1">
             <Card>
               <CardHeader>
                 <CardTitle>全部节点</CardTitle>
@@ -62,12 +63,14 @@ export default async function FunsPage() {
                 ))}
               </CardContent>
             </Card>
-          </main>
-
-          <aside className="mt-6 hidden pb-12 lg:col-span-3 lg:block">
-            <HomeSidebarPanels user={sidebarUser} hotTopics={hotTopics} />
-          </aside>
-        </div>
+            </main>
+          )}
+          rightSidebar={(
+            <aside className="mt-6 hidden pb-12 lg:block">
+              <HomeSidebarPanels user={sidebarUser} hotTopics={hotTopics} siteName={settings.siteName} siteDescription={settings.siteDescription} />
+            </aside>
+          )}
+        />
       </div>
     </div>
   )

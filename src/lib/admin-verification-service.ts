@@ -1,6 +1,7 @@
 import { prisma } from "@/db/client"
 import { apiError, type JsonObject } from "@/lib/api-route"
 import { getRequestIp, type requireAdminUser, writeAdminLog } from "@/lib/admin"
+import { createSystemNotification } from "@/lib/notification-writes"
 
 function normalizeText(value: unknown, fallback = "") {
   return String(value ?? fallback).trim()
@@ -16,6 +17,25 @@ function normalizeNumber(value: unknown, fallback = 0) {
 }
 
 type AdminActor = NonNullable<Awaited<ReturnType<typeof requireAdminUser>>>
+
+function buildVerificationReviewNotification(params: {
+  typeName: string
+  status: "APPROVED" | "REJECTED"
+  note: string
+  rejectReason: string
+}) {
+  if (params.status === "APPROVED") {
+    return {
+      title: `你的${params.typeName}认证申请已通过`,
+      content: `你提交的${params.typeName}认证申请已通过审核。${params.note ? ` 审核备注：${params.note}` : ""}`,
+    }
+  }
+
+  return {
+    title: `你的${params.typeName}认证申请未通过`,
+    content: `你提交的${params.typeName}认证申请未通过审核。驳回原因：${params.rejectReason}${params.note ? `。审核备注：${params.note}` : ""}`,
+  }
+}
 
 export async function getVerificationAdminData() {
   const [types, applications] = await Promise.all([
@@ -178,6 +198,13 @@ export async function updateVerificationTypeOrReview(params: {
         })
       }
 
+      const notification = buildVerificationReviewNotification({
+        typeName: application.type.name,
+        status,
+        note,
+        rejectReason,
+      })
+
       await tx.userVerification.update({
         where: { id: applicationId },
         data: {
@@ -187,6 +214,16 @@ export async function updateVerificationTypeOrReview(params: {
           reviewedAt: new Date(),
           reviewerId: params.admin.id,
         },
+      })
+
+      await createSystemNotification({
+        client: tx,
+        userId: application.userId,
+        senderId: params.admin.id,
+        relatedType: "ANNOUNCEMENT",
+        relatedId: applicationId,
+        title: notification.title,
+        content: notification.content,
       })
     })
 

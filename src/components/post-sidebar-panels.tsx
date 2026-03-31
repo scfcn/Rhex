@@ -21,12 +21,14 @@ interface PostSidebarPanelsProps {
   relatedTopics: RelatedTopic[]
   tags: TopicTag[]
   postLinkDisplayMode?: "SLUG" | "ID"
+  siteName?: string
+  siteDescription?: string
 }
 
-export function PostSidebarPanels({ currentUser, relatedTopics, tags, postLinkDisplayMode = "SLUG" }: PostSidebarPanelsProps) {
+export function PostSidebarPanels({ currentUser, relatedTopics, tags, postLinkDisplayMode = "SLUG", siteName, siteDescription }: PostSidebarPanelsProps) {
   return (
-    <div className="space-y-4">
-      <SidebarUserCard user={currentUser} />
+    <div className="min-w-0 w-full max-w-full space-y-4">
+      <SidebarUserCard user={currentUser} siteName={siteName} siteDescription={siteDescription} />
 
       <div className="rounded-[24px] border border-border bg-card p-4 shadow-sm shadow-black/5 dark:shadow-black/30">
         <div className="mb-4 border-b border-border/80 pb-4">

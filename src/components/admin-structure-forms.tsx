@@ -17,6 +17,7 @@ import { toast } from "@/components/ui/toast"
 
 
 import type { BoardItem, ZoneItem } from "@/lib/admin-structure-management"
+import { POST_LIST_DISPLAY_MODE_DEFAULT, POST_LIST_DISPLAY_MODE_GALLERY } from "@/lib/post-list-display"
 import { DEFAULT_ALLOWED_POST_TYPES, normalizePostTypes } from "@/lib/post-types"
 
 interface StructureManagerProps {
@@ -288,6 +289,7 @@ function BoardRow({ board, onEdit }: { board: BoardItem; onEdit: () => void }) {
         <span className="rounded-full bg-secondary/50 px-2 py-1 text-center">回复 {board.replyPointDelta ?? "继承"}</span>
         <span className="rounded-full bg-secondary/50 px-2 py-1 text-center">间隔 {board.postIntervalSeconds ?? "继承"}</span>
         <span className="rounded-full bg-secondary/50 px-2 py-1 text-center">VIP {board.minPostVipLevel ?? 0}</span>
+        <span className="rounded-full bg-secondary/50 px-2 py-1 text-center md:col-span-2">列表 {board.postListDisplayMode === POST_LIST_DISPLAY_MODE_GALLERY ? "画廊" : board.postListDisplayMode === POST_LIST_DISPLAY_MODE_DEFAULT ? "普通" : "继承分区"}</span>
       </div>
 
       <div className="flex flex-wrap justify-end gap-1.5">
@@ -356,6 +358,7 @@ function StructureModal({ modal, zones, onClose }: { modal: ModalMode; zones: Zo
   const [minPostVipLevel, setMinPostVipLevel] = useState("0")
   const [minReplyVipLevel, setMinReplyVipLevel] = useState("0")
   const [requirePostReview, setRequirePostReview] = useState(false)
+  const [postListDisplayMode, setPostListDisplayMode] = useState("")
 
   const [feedback, setFeedback] = useState("")
   const [feedbackTone, setFeedbackTone] = useState<"error" | "success">("success")
@@ -403,6 +406,7 @@ function StructureModal({ modal, zones, onClose }: { modal: ModalMode; zones: Zo
       setMinPostVipLevel("0")
       setMinReplyVipLevel("0")
       setRequirePostReview(false)
+      setPostListDisplayMode("")
 
       setFeedback("")
       setFeedbackTone("success")
@@ -431,6 +435,7 @@ function StructureModal({ modal, zones, onClose }: { modal: ModalMode; zones: Zo
       setMinPostVipLevel("")
       setMinReplyVipLevel("")
       setRequirePostReview(false)
+      setPostListDisplayMode("")
 
       setFeedback("")
       setFeedbackTone("success")
@@ -457,6 +462,7 @@ function StructureModal({ modal, zones, onClose }: { modal: ModalMode; zones: Zo
       setMinPostVipLevel(String(modal.item.minPostVipLevel))
       setMinReplyVipLevel(String(modal.item.minReplyVipLevel))
       setRequirePostReview(modal.item.requirePostReview)
+      setPostListDisplayMode(modal.item.postListDisplayMode ?? "")
 
       setFeedback("")
       setFeedbackTone("success")
@@ -485,6 +491,7 @@ function StructureModal({ modal, zones, onClose }: { modal: ModalMode; zones: Zo
       setMinPostVipLevel(modal.item.minPostVipLevel == null ? "" : String(modal.item.minPostVipLevel))
       setMinReplyVipLevel(modal.item.minReplyVipLevel == null ? "" : String(modal.item.minReplyVipLevel))
       setRequirePostReview(Boolean(modal.item.requirePostReview))
+      setPostListDisplayMode(modal.item.postListDisplayMode ?? "")
 
       setFeedback("")
       setFeedbackTone("success")
@@ -532,6 +539,7 @@ function StructureModal({ modal, zones, onClose }: { modal: ModalMode; zones: Zo
       minPostVipLevel: minPostVipLevel === "" ? undefined : Number(minPostVipLevel),
       minReplyVipLevel: minReplyVipLevel === "" ? undefined : Number(minReplyVipLevel),
       requirePostReview,
+      postListDisplayMode,
 
     }
 
@@ -635,6 +643,15 @@ function StructureModal({ modal, zones, onClose }: { modal: ModalMode; zones: Zo
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Toggle label="开启发帖审核" checked={requirePostReview} onChange={setRequirePostReview} />
+          <div className="space-y-2 md:col-span-1 xl:col-span-2">
+            <p className="text-sm font-medium">帖子列表形式</p>
+            <select value={postListDisplayMode} onChange={(event) => setPostListDisplayMode(event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
+              {isBoard ? <option value="">继承分区</option> : <option value="">默认列表</option>}
+              <option value={POST_LIST_DISPLAY_MODE_DEFAULT}>普通列表</option>
+              <option value={POST_LIST_DISPLAY_MODE_GALLERY}>画廊模式</option>
+            </select>
+            <p className="text-xs leading-6 text-muted-foreground">{isBoard ? "留空时自动继承分区；显式设置后优先使用节点自己的列表形式。" : "留空时使用站点默认普通列表；设置后该分区下未覆盖的节点会继承这里。"}</p>
+          </div>
         </div>
 
 

@@ -2,6 +2,7 @@ import { cache } from "react"
 
 import { prisma } from "@/db/client"
 import type { Prisma } from "@/db/types"
+import { getRequestIpFromHeaders } from "@/lib/request-ip"
 import { getSessionCookieName, parseSessionToken } from "@/lib/session"
 
 export const sessionActorSelect = {
@@ -20,10 +21,12 @@ export const sessionActorSelect = {
 export type SessionActor = Prisma.UserGetPayload<{ select: typeof sessionActorSelect }>
 
 export const getCurrentSessionActor = cache(async (): Promise<SessionActor | null> => {
-  const { cookies } = await import("next/headers")
-  const cookieStore = await cookies()
+  const { cookies, headers } = await import("next/headers")
+  const [cookieStore, headerStore] = await Promise.all([cookies(), headers()])
   const token = cookieStore.get(getSessionCookieName())?.value
-  const session = await parseSessionToken(token)
+  const session = await parseSessionToken(token, {
+    requestIp: getRequestIpFromHeaders(headerStore),
+  })
 
   if (!session) {
     return null

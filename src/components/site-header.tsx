@@ -57,7 +57,7 @@ export async function SiteHeader() {
           <div className="flex h-14 items-center justify-between gap-3 lg:col-span-10">
             <Link href="/" className="flex items-center gap-2 text-base font-bold leading-none lg:hidden">
               <SiteLogoMark logoPath={settings.siteLogoPath} />
-              <span>{settings.siteLogoText}</span>
+              <span className="sr-only">{settings.siteLogoText}</span>
             </Link>
 
             <div className="hidden flex-1 md:block">

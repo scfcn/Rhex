@@ -13,7 +13,6 @@
     "setup:start": "npm run setup:dev && npm run dev",
     "setup:start:prod": "npm run setup:prod && npm run start:prod",
     "lint": "eslint . --ext .ts,.tsx",
-    "plugins:generate": "tsx scripts/generate-plugin-bundles.ts",
     "version:sync": "tsx scripts/copy-release-to-version.ts",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",

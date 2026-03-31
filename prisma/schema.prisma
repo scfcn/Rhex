@@ -460,6 +460,7 @@ model Zone {
   minViewVipLevel      Int      @default(0)
   minPostVipLevel      Int      @default(0)
   minReplyVipLevel     Int      @default(0)
+  postListDisplayMode  String?
   createdAt            DateTime   @db.Timestamptz(3)    @default(now())
   updatedAt            DateTime   @db.Timestamptz(3)    @updatedAt
   boards               Board[]
@@ -494,6 +495,7 @@ model Board {
   minViewVipLevel      Int?
   minPostVipLevel      Int?
   minReplyVipLevel     Int?
+  postListDisplayMode  String?
   postCount            Int           @default(0)
   followerCount        Int           @default(0)
   createdAt            DateTime   @db.Timestamptz(3)         @default(now())
@@ -1095,6 +1097,8 @@ model SiteSetting {
   pointName                     String   @default("积分")
   analyticsCode                 String?
   postLinkDisplayMode           String   @default("SLUG")
+  homeFeedPostListDisplayMode   String   @default("DEFAULT")
+  homeSidebarStatsCardEnabled   Boolean  @default(true)
   friendLinksEnabled            Boolean  @default(true)
   friendLinkApplicationEnabled  Boolean  @default(true)
   friendLinkAnnouncement        String   @default("欢迎与本站交换友情链接，请先添加我方链接后再提交申请，我们会在 1-3 个工作日内完成审核。")

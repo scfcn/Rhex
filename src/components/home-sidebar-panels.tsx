@@ -2,11 +2,13 @@ import Link from "next/link"
 import { Flame, Link2 } from "lucide-react"
 
 import { HomeAnnouncementPanel } from "@/components/home-announcement-panel"
+import { HomeSiteStatsCard } from "@/components/home-site-stats-card"
 import { SidebarUserCard, type SidebarUserCardData } from "@/components/sidebar-user-card"
 import { UserAvatar } from "@/components/user-avatar"
 import type { AnnouncementItem } from "@/lib/announcements"
 import type { FriendLinkItem } from "@/lib/friend-links"
 import type { HomeSidebarPanelItem } from "@/lib/home-sidebar-layout"
+import type { HomeSidebarStatsData } from "@/lib/home-sidebar-stats"
 import { getPostPath } from "@/lib/post-links"
 
 interface HotTopicItem {
@@ -30,12 +32,15 @@ interface HomeSidebarPanelsProps {
   topPanels?: HomeSidebarPanelItem[]
   middlePanels?: HomeSidebarPanelItem[]
   bottomPanels?: HomeSidebarPanelItem[]
+  stats?: HomeSidebarStatsData | null
+  siteName?: string
+  siteDescription?: string
 }
 
-export function HomeSidebarPanels({ user, hotTopics, postLinkDisplayMode = "SLUG", announcements = [], friendLinks = [], friendLinksEnabled = false, createPostHref, topPanels = [], middlePanels = [], bottomPanels = [] }: HomeSidebarPanelsProps) {
+export function HomeSidebarPanels({ user, hotTopics, postLinkDisplayMode = "SLUG", announcements = [], friendLinks = [], friendLinksEnabled = false, createPostHref, topPanels = [], middlePanels = [], bottomPanels = [], stats = null, siteName, siteDescription }: HomeSidebarPanelsProps) {
   return (
-    <div className="sticky top-20 space-y-4">
-      <SidebarUserCard user={user} createPostHref={createPostHref} />
+    <div className="sticky top-20 min-w-0 w-full max-w-full space-y-4">
+      <SidebarUserCard user={user} createPostHref={createPostHref} siteName={siteName} siteDescription={siteDescription} />
 
       {topPanels.map((panel) => <div key={panel.id}>{panel.content}</div>)}
 
@@ -91,6 +96,8 @@ export function HomeSidebarPanels({ user, hotTopics, postLinkDisplayMode = "SLUG
       ) : null}
 
       {bottomPanels.map((panel) => <div key={panel.id}>{panel.content}</div>)}
+
+      {stats ? <HomeSiteStatsCard stats={stats} /> : null}
     </div>
   )
 }

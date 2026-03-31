@@ -1,5 +1,6 @@
 import { Prisma, NotificationType, TargetType } from "@/db/types"
 import { prisma } from "@/db/client"
+import { createNotification } from "@/lib/notification-writes"
 
 
 
@@ -69,16 +70,15 @@ export async function toggleCommentLike(params: {
     await tx.comment.update({ where: { id: params.commentId }, data: { likeCount: { increment: 1 } } })
 
     if (comment && comment.userId !== params.userId) {
-      await tx.notification.create({
-        data: {
-          userId: comment.userId,
-          type: NotificationType.LIKE,
-          senderId: params.userId,
-          relatedType: "COMMENT",
-          relatedId: comment.id,
-          title: "你的评论收到了赞",
-          content: `${params.senderName} 赞了你的评论：${comment.content.slice(0, 80)}`,
-        },
+      await createNotification({
+        client: tx,
+        userId: comment.userId,
+        type: NotificationType.LIKE,
+        senderId: params.userId,
+        relatedType: "COMMENT",
+        relatedId: comment.id,
+        title: "你的评论收到了赞",
+        content: `${params.senderName} 赞了你的评论：${comment.content.slice(0, 80)}`,
       })
     }
   })
@@ -154,16 +154,15 @@ export async function togglePostLike(params: {
     await tx.post.update({ where: { id: params.postId }, data: { likeCount: { increment: 1 } } })
 
     if (post && post.authorId !== params.userId) {
-      await tx.notification.create({
-        data: {
-          userId: post.authorId,
-          type: NotificationType.LIKE,
-          senderId: params.userId,
-          relatedType: "POST",
-          relatedId: post.id,
-          title: "你的帖子收到了赞",
-          content: `${params.senderName} 赞了你的帖子：${post.title}`,
-        },
+      await createNotification({
+        client: tx,
+        userId: post.authorId,
+        type: NotificationType.LIKE,
+        senderId: params.userId,
+        relatedType: "POST",
+        relatedId: post.id,
+        title: "你的帖子收到了赞",
+        content: `${params.senderName} 赞了你的帖子：${post.title}`,
       })
     }
   })

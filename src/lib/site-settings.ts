@@ -11,6 +11,7 @@ import {
 } from "@/lib/shared/config-parsers"
 import { defaultSiteSettingsCreateInput } from "@/lib/site-settings-defaults"
 import { parseMarkdownEmojiMapJson } from "@/lib/markdown-emoji"
+import { normalizePostListDisplayMode, type PostListDisplayMode } from "@/lib/post-list-display"
 import { normalizePositiveInteger } from "@/lib/shared/normalizers"
 import { normalizeHeaderAppIconName, parseSiteHeaderAppLinks, type SiteHeaderAppLinkItem } from "./site-header-app-links"
 
@@ -27,6 +28,8 @@ export interface SiteSettingsData {
   siteSeoKeywords: string[]
   pointName: string
   postLinkDisplayMode: PostLinkDisplayMode
+  homeFeedPostListDisplayMode: PostListDisplayMode
+  homeSidebarStatsCardEnabled: boolean
   footerLinks: FooterLinkItem[]
   headerAppLinks: SiteHeaderAppLinkItem[]
   headerAppIconName: string
@@ -176,6 +179,8 @@ function mapSiteSettings(record: {
   siteSeoKeywords?: string | null
   pointName: string
   postLinkDisplayMode?: "SLUG" | "ID" | string | null
+  homeFeedPostListDisplayMode?: string | null
+  homeSidebarStatsCardEnabled: boolean
   footerLinksJson?: string | null
   headerAppLinksJson?: string | null
   headerAppIconName?: string | null
@@ -261,6 +266,8 @@ function mapSiteSettings(record: {
     siteSeoKeywords: String(record.siteSeoKeywords || "").split(/[，,\n]+/).map((item) => item.trim()).filter(Boolean),
     pointName: record.pointName,
     postLinkDisplayMode: record.postLinkDisplayMode === "ID" ? "ID" : "SLUG",
+    homeFeedPostListDisplayMode: normalizePostListDisplayMode(record.homeFeedPostListDisplayMode),
+    homeSidebarStatsCardEnabled: record.homeSidebarStatsCardEnabled,
     footerLinks: parseFooterLinks(record.footerLinksJson),
     headerAppLinks: parseSiteHeaderAppLinks(record.headerAppLinksJson),
     headerAppIconName: normalizeHeaderAppIconName(record.headerAppIconName),

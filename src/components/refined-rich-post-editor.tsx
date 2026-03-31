@@ -62,6 +62,7 @@ function useFloatingPanel() {
 
 const EDITOR_LINE_HEIGHT_REM = 1.75
 const EDITOR_LINE_NUMBER_GUTTER_WIDTH_CLASS = "w-7"
+const EDITOR_FALLBACK_LINE_HEIGHT_PX = 28
 
 const VIDEO_EXTENSIONS = [".mp4", ".webm", ".ogg", ".mov", ".m3u8"]
 
@@ -410,6 +411,8 @@ export function RefinedRichPostEditor({
   const tableButtonRef = useRef<HTMLDivElement | null>(null)
   const linkButtonRef = useRef<HTMLDivElement | null>(null)
   const imageButtonRef = useRef<HTMLDivElement | null>(null)
+  const lineMeasureContainerRef = useRef<HTMLDivElement | null>(null)
+  const lineMeasureRefs = useRef<Array<HTMLDivElement | null>>([])
   const selectionRef = useRef({ start: 0, end: 0 })
 
   const [activeTab, setActiveTab] = useState<"write" | "preview">("write")
@@ -427,6 +430,7 @@ export function RefinedRichPostEditor({
   const [isClient, setIsClient] = useState(false)
   const [editorScrollTop, setEditorScrollTop] = useState(0)
   const [activeLineNumber, setActiveLineNumber] = useState(1)
+  const [lineHeights, setLineHeights] = useState<number[]>([EDITOR_FALLBACK_LINE_HEIGHT_PX])
   const [tableHoverSize, setTableHoverSize] = useState({ rows: 0, columns: 0 })
   const markdownEmojiMap = useMarkdownEmojiMap(externalMarkdownEmojiMap)
   const { uploading, uploadResults, uploadImageFiles, clearUploadResults } = useImageUpload({
@@ -435,14 +439,8 @@ export function RefinedRichPostEditor({
   })
 
   const contentMinHeight = isFullscreen ? "calc(100vh - 220px)" : minHeight
-  const lineCount = useMemo(() => {
-
-    if (!value) {
-      return 1
-    }
-
-    return value.split("\n").length
-  }, [value])
+  const logicalLines = useMemo(() => value.split("\n"), [value])
+  const lineCount = logicalLines.length
   const lineNumbers = useMemo(() => Array.from({ length: lineCount }, (_, index) => index + 1), [lineCount])
 
 
@@ -456,6 +454,67 @@ export function RefinedRichPostEditor({
     const caretPosition = element.selectionStart ?? 0
     setActiveLineNumber(value.slice(0, caretPosition).split("\n").length)
   }, [value])
+
+  const measureLineHeights = useCallback(() => {
+    const textarea = textareaRef.current
+    const measureContainer = lineMeasureContainerRef.current
+    if (!textarea || !measureContainer) {
+      return
+    }
+
+    const textareaStyle = window.getComputedStyle(textarea)
+    const nextFallbackLineHeight = Number.parseFloat(textareaStyle.lineHeight) || EDITOR_FALLBACK_LINE_HEIGHT_PX
+
+    measureContainer.style.width = `${textarea.clientWidth}px`
+    measureContainer.style.paddingTop = textareaStyle.paddingTop
+    measureContainer.style.paddingRight = textareaStyle.paddingRight
+    measureContainer.style.paddingBottom = textareaStyle.paddingBottom
+    measureContainer.style.paddingLeft = textareaStyle.paddingLeft
+    measureContainer.style.fontFamily = textareaStyle.fontFamily
+    measureContainer.style.fontSize = textareaStyle.fontSize
+    measureContainer.style.fontWeight = textareaStyle.fontWeight
+    measureContainer.style.fontStyle = textareaStyle.fontStyle
+    measureContainer.style.lineHeight = textareaStyle.lineHeight
+    measureContainer.style.letterSpacing = textareaStyle.letterSpacing
+    measureContainer.style.tabSize = textareaStyle.tabSize
+    measureContainer.style.textTransform = textareaStyle.textTransform
+    measureContainer.style.textIndent = textareaStyle.textIndent
+
+    const nextLineHeights = logicalLines.map((_, index) => {
+      const measuredLine = lineMeasureRefs.current[index]
+      return Math.max(measuredLine?.getBoundingClientRect().height ?? nextFallbackLineHeight, nextFallbackLineHeight)
+    })
+
+    setLineHeights((current) => {
+      if (
+        current.length === nextLineHeights.length
+        && current.every((height, index) => Math.abs(height - nextLineHeights[index]) < 0.5)
+      ) {
+        return current
+      }
+
+      return nextLineHeights
+    })
+  }, [logicalLines])
+
+  useLayoutEffect(() => {
+    measureLineHeights()
+  }, [measureLineHeights])
+
+  useEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea || typeof ResizeObserver === "undefined") {
+      return
+    }
+
+    const observer = new ResizeObserver(() => {
+      measureLineHeights()
+    })
+    observer.observe(textarea)
+    return () => {
+      observer.disconnect()
+    }
+  }, [measureLineHeights])
 
   const mediaHint = useMemo(() => {
     if (!mediaUrl.trim()) {
@@ -1027,7 +1086,7 @@ export function RefinedRichPostEditor({
 
             {activeTab === "write" ? (
               <div
-                className="flex overflow-hidden rounded-xl bg-transparent"
+                className="relative flex overflow-hidden rounded-xl bg-transparent"
                 style={{ minHeight: contentMinHeight, maxHeight: contentMinHeight }}
               >
                 <div
@@ -1042,7 +1101,7 @@ export function RefinedRichPostEditor({
                       <div
                         key={lineNumber}
                         className={lineNumber === activeLineNumber ? "leading-7 text-foreground/85" : "leading-7 text-muted-foreground/45"}
-                        style={{ height: `${EDITOR_LINE_HEIGHT_REM}rem` }}
+                        style={{ height: lineHeights[lineNumber - 1] ?? `${EDITOR_LINE_HEIGHT_REM}rem` }}
                       >
                         {lineNumber}
                       </div>
@@ -1063,6 +1122,27 @@ export function RefinedRichPostEditor({
                   placeholder={placeholder}
                   style={{ minHeight: contentMinHeight, maxHeight: contentMinHeight }}
                 />
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-0 top-0 -z-10 overflow-hidden opacity-0"
+                >
+                  <div
+                    ref={lineMeasureContainerRef}
+                    className="box-border whitespace-pre-wrap break-words"
+                  >
+                    {logicalLines.map((line, index) => (
+                      <div
+                        key={`line-measure-${index}`}
+                        ref={(node) => {
+                          lineMeasureRefs.current[index] = node
+                        }}
+                        style={{ minHeight: `${EDITOR_LINE_HEIGHT_REM}rem` }}
+                      >
+                        {line.length > 0 ? line : " "}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="min-w-0 overflow-y-auto" style={{ minHeight: contentMinHeight, maxHeight: contentMinHeight }}>

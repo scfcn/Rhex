@@ -3,6 +3,7 @@ import { apiError, readOptionalNumberField, readOptionalStringField, type JsonOb
 
 import { normalizeMarkdownEmojiItems, serializeMarkdownEmojiItems } from "@/lib/markdown-emoji"
 import { defaultSiteSettingsCreateInput } from "@/lib/site-settings-defaults"
+import { normalizePostListDisplayMode } from "@/lib/post-list-display"
 import { normalizeCaptchaMode, normalizeFooterLinks } from "@/lib/shared/config-parsers"
 import { normalizeHeatColors, normalizeHeatThresholds, normalizePositiveInteger, normalizeTippingAmounts } from "@/lib/shared/normalizers"
 import { createSiteSettingsRecordWithFullData, updateSiteSettingsHeaderApps } from "@/db/site-settings-write-queries"
@@ -32,6 +33,8 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
     const pointName = readOptionalStringField(body, "pointName")
     const analyticsCode = readOptionalStringField(body, "analyticsCode")
     const postLinkDisplayMode = readOptionalStringField(body, "postLinkDisplayMode") === "ID" ? "ID" : "SLUG"
+    const homeFeedPostListDisplayMode = normalizePostListDisplayMode(body.homeFeedPostListDisplayMode)
+    const homeSidebarStatsCardEnabled = body.homeSidebarStatsCardEnabled === undefined ? true : Boolean(body.homeSidebarStatsCardEnabled)
     const checkInEnabled = Boolean(body.checkInEnabled)
 
     const checkInReward = Math.max(0, readOptionalNumberField(body, "checkInReward") ?? 0)
@@ -57,6 +60,8 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
         pointName: pointName || "积分",
         analyticsCode: analyticsCode || null,
         postLinkDisplayMode,
+        homeFeedPostListDisplayMode,
+        homeSidebarStatsCardEnabled,
         checkInEnabled,
         checkInReward,
         checkInMakeUpCardPrice,

@@ -192,6 +192,85 @@ html.dark .sidebar-user-card-header {
   background: transparent;
 }
 
+@media (min-width: 1024px) {
+  .forum-page-shell {
+    grid-template-columns: 175px minmax(0, 1fr) 274px;
+  }
+
+  html[data-sidebar-collapsed="true"] .forum-page-shell {
+    grid-template-columns: 52px minmax(0, 1fr) 274px;
+    column-gap: 0.2rem;
+  }
+
+  .forum-page-right-sidebar {
+    width: 274px;
+    max-width: 274px;
+  }
+
+  .forum-page-right-sidebar > * {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  html[data-sidebar-collapsed="true"] .forum-page-sidebar {
+    width: 52px;
+  }
+
+  html[data-sidebar-collapsed="false"] .forum-page-sidebar {
+    width: 220px;
+  }
+
+  html[data-sidebar-collapsed="true"] .forum-page-sidebar-inner {
+    padding-right: 0;
+  }
+
+  html[data-sidebar-collapsed="true"] .forum-page-sidebar-home-row {
+    justify-content: center;
+  }
+
+  html[data-sidebar-collapsed="true"] .forum-page-home-link {
+    display: none;
+  }
+
+  html[data-sidebar-collapsed="true"] .forum-page-sidebar-toggle {
+    height: 2.25rem;
+    width: 2.25rem;
+  }
+
+  html[data-sidebar-collapsed="true"] .forum-page-sidebar-toggle-icon {
+    transform: rotate(180deg);
+  }
+
+  html[data-sidebar-collapsed="true"] .forum-page-sidebar-item {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  html[data-sidebar-collapsed="true"] .forum-page-sidebar-item-label {
+    display: none;
+  }
+
+  html[data-sidebar-collapsed="true"] .forum-page-sidebar-section-header {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  html[data-sidebar-collapsed="true"] .forum-page-sidebar-section-title,
+  html[data-sidebar-collapsed="true"] .forum-page-sidebar-section-link {
+    display: none;
+  }
+
+  html[data-sidebar-collapsed="true"] .forum-page-sidebar-section-divider {
+    display: block;
+  }
+
+  html[data-sidebar-collapsed="true"] .forum-page-main .post-gallery-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @keyframes toast-in {
   from {
     opacity: 0;

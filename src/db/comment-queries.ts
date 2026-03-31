@@ -1,6 +1,7 @@
 import type { Prisma } from "@/db/types"
 import { ChangeType, NotificationType } from "@/db/types"
 import { prisma } from "@/db/client"
+import { createNotifications } from "@/lib/notification-writes"
 
 
 const commentViewerLikeSelect = {
@@ -266,8 +267,8 @@ export function createCommentMentionNotifications(params: {
     return Promise.resolve({ count: 0 })
   }
 
-  return prisma.notification.createMany({
-    data: notificationTargets.map((userId) => ({
+  return createNotifications({
+    notifications: notificationTargets.map((userId) => ({
       userId,
       type: NotificationType.MENTION,
       senderId: params.senderId,
@@ -404,8 +405,9 @@ export async function createCommentWithRelations(params: {
     )
 
     if (notifications.length > 0) {
-      await tx.notification.createMany({
-        data: notifications,
+      await createNotifications({
+        client: tx,
+        notifications,
       })
     }
 

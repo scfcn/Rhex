@@ -2,6 +2,7 @@ import { NotificationType, type Prisma } from "@/db/types"
 
 import { extractSummaryFromContent } from "@/lib/content"
 import { extractMentionTexts, findMentionUsers, renderUserLinkTokens, resolveMentionsInText, stripUserLinkTokens } from "@/lib/mentions"
+import { createNotifications } from "@/lib/notification-writes"
 import { getAllPostContentText, parsePostContentDocument, serializePostContentDocument, type PostContentDocument } from "@/lib/post-content"
 
 function mapPostContentDocument(document: PostContentDocument, transform: (content: string) => string) {
@@ -69,8 +70,9 @@ export async function createPostMentionNotifications(params: {
 
   const summary = extractSummaryFromContent(getAllPostContentText(stripPostContentUserLinks(resolved.content)), 80)
 
-  await params.tx.notification.createMany({
-    data: notificationTargets.map((user) => ({
+  await createNotifications({
+    client: params.tx,
+    notifications: notificationTargets.map((user) => ({
       userId: user.id,
       type: NotificationType.MENTION,
       senderId: params.senderId,
