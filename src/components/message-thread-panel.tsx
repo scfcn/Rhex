@@ -24,6 +24,63 @@ interface MessageThreadPanelProps {
 }
 
 export function MessageThreadPanel({ conversation, currentUserId, usingDemoData, onMessageSent, onLoadHistory, loadingHistory, historyError, onBack }: MessageThreadPanelProps) {
+  const recipient = useMemo(() => resolveRecipient(conversation, currentUserId), [conversation, currentUserId])
+
+  const recipientProfileHref = recipient ? `/users/${recipient.username}` : null
+
+  if (!conversation || !recipient) {
+    return (
+      <div className="flex min-h-[calc(100vh-164px)] items-center justify-center rounded-[28px] border border-dashed border-border bg-card px-6 text-center shadow-soft max-sm:min-h-[calc(100dvh-56px)] max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0 max-sm:shadow-none">
+        <div>
+          <MessageSquareMore className="mx-auto h-10 w-10 text-muted-foreground" />
+          <p className="mt-4 text-sm uppercase tracking-[0.28em] text-muted-foreground">Chat Thread</p>
+          <h2 className="mt-3 text-2xl font-semibold">还没有私信会话</h2>
+          <p className="mt-3 text-sm leading-7 text-muted-foreground">去用户主页点击“发私信”，或从现有会话列表中选择一个联系人，系统会直接创建真实数据库会话。</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <MessageThreadPanelContent
+      key={conversation.id}
+      conversation={conversation}
+      recipient={recipient}
+      recipientProfileHref={recipientProfileHref}
+      usingDemoData={usingDemoData}
+      currentUserId={currentUserId}
+      onMessageSent={onMessageSent}
+      onLoadHistory={onLoadHistory}
+      loadingHistory={loadingHistory}
+      historyError={historyError}
+      onBack={onBack}
+    />
+  )
+}
+
+function MessageThreadPanelContent({
+  conversation,
+  recipient,
+  recipientProfileHref,
+  currentUserId,
+  usingDemoData,
+  onMessageSent,
+  onLoadHistory,
+  loadingHistory,
+  historyError,
+  onBack,
+}: {
+  conversation: MessageConversationDetail
+  recipient: NonNullable<ReturnType<typeof resolveRecipient>>
+  recipientProfileHref: string | null
+  currentUserId: number
+  usingDemoData: boolean
+  onMessageSent: (message: MessageBubbleItem) => void
+  onLoadHistory: () => void
+  loadingHistory: boolean
+  historyError: string
+  onBack?: () => void
+}) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const threadRef = useRef<HTMLDivElement | null>(null)
   const shouldStickToBottomRef = useRef(true)
@@ -33,19 +90,8 @@ export function MessageThreadPanel({ conversation, currentUserId, usingDemoData,
   const [isPending, startTransition] = useTransition()
 
   useEffect(() => {
-    setDraft("")
-    setError("")
-    setShowEmojiPanel(false)
-    shouldStickToBottomRef.current = true
-  }, [conversation?.id])
-
-  useEffect(() => {
-    if (!conversation?.id) {
-      return
-    }
-
     textareaRef.current?.focus()
-  }, [conversation?.id])
+  }, [])
 
   useEffect(() => {
     const container = threadRef.current
@@ -55,16 +101,6 @@ export function MessageThreadPanel({ conversation, currentUserId, usingDemoData,
 
     container.scrollTop = container.scrollHeight
   }, [conversation?.messages])
-
-  const recipient = useMemo(() => {
-    if (conversation?.recipientId) {
-      return conversation.participants.find((item) => item.id === conversation.recipientId)
-    }
-
-    return conversation?.participants.find((item) => item.id !== currentUserId)
-  }, [conversation, currentUserId])
-
-  const recipientProfileHref = recipient ? `/users/${recipient.username}` : null
 
   function insertEmoji(emoji: string) {
     const element = textareaRef.current
@@ -90,10 +126,6 @@ export function MessageThreadPanel({ conversation, currentUserId, usingDemoData,
   }
 
   async function handleSend() {
-    if (!conversation || !recipient) {
-      return
-    }
-
     const content = draft.trim()
     if (!content) {
       setError("请输入消息内容")
@@ -166,19 +198,6 @@ export function MessageThreadPanel({ conversation, currentUserId, usingDemoData,
     if (!isPending) {
       void handleSend()
     }
-  }
-
-  if (!conversation || !recipient) {
-    return (
-      <div className="flex min-h-[calc(100vh-164px)] items-center justify-center rounded-[28px] border border-dashed border-border bg-card px-6 text-center shadow-soft max-sm:min-h-[calc(100dvh-56px)] max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0 max-sm:shadow-none">
-        <div>
-          <MessageSquareMore className="mx-auto h-10 w-10 text-muted-foreground" />
-          <p className="mt-4 text-sm uppercase tracking-[0.28em] text-muted-foreground">Chat Thread</p>
-          <h2 className="mt-3 text-2xl font-semibold">还没有私信会话</h2>
-          <p className="mt-3 text-sm leading-7 text-muted-foreground">去用户主页点击“发私信”，或从现有会话列表中选择一个联系人，系统会直接创建真实数据库会话。</p>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -315,4 +334,12 @@ export function MessageThreadPanel({ conversation, currentUserId, usingDemoData,
       </div>
     </div>
   )
+}
+
+function resolveRecipient(conversation: MessageConversationDetail | null, currentUserId: number) {
+  if (conversation?.recipientId) {
+    return conversation.participants.find((item) => item.id === conversation.recipientId)
+  }
+
+  return conversation?.participants.find((item) => item.id !== currentUserId)
 }

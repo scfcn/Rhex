@@ -1,10 +1,13 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { useMemo, useState, useTransition } from "react"
 
 import { AdminIconPickerField } from "@/components/admin-icon-picker-field"
 import { LevelIcon } from "@/components/level-icon"
 import { Button } from "@/components/ui/button"
+import { TextField } from "@/components/ui/text-field"
+import { saveAdminSiteSettings } from "@/lib/admin-site-settings-client"
 import { HEADER_APP_ICON_OPTIONS, type SiteHeaderAppLinkItem } from "@/lib/site-header-app-links"
 
 
@@ -24,6 +27,7 @@ function createEmptyAppLink(index: number): SiteHeaderAppLinkItem {
 
 
 export function AdminAppsSettingsForm({ initialLinks, initialIconName }: AdminAppsSettingsFormProps) {
+  const router = useRouter()
   const [headerAppIconName, setHeaderAppIconName] = useState(initialIconName)
   const [links, setLinks] = useState<SiteHeaderAppLinkItem[]>(initialLinks.length > 0 ? initialLinks : [createEmptyAppLink(0)])
   const [feedback, setFeedback] = useState("")
@@ -57,17 +61,15 @@ export function AdminAppsSettingsForm({ initialLinks, initialIconName }: AdminAp
         event.preventDefault()
         setFeedback("")
         startTransition(async () => {
-          const response = await fetch("/api/admin/site-settings", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              section: "site-apps",
-              headerAppIconName,
-              headerAppLinks: links,
-            }),
+          const result = await saveAdminSiteSettings({
+            section: "site-apps",
+            headerAppIconName,
+            headerAppLinks: links,
           })
-          const result = await response.json()
-          setFeedback(result.message ?? (response.ok ? "保存成功" : "保存失败"))
+          setFeedback(result.message)
+          if (result.ok) {
+            router.refresh()
+          }
         })
       }}
     >
@@ -104,8 +106,8 @@ export function AdminAppsSettingsForm({ initialLinks, initialIconName }: AdminAp
                     description="支持 emoji、符号，或粘贴完整 SVG。前台应用菜单会直接复用这里的图标。"
                   />
                 </div>
-                <Field label="显示名称" value={item.name} onChange={(value) => updateLink(index, "name", value)} placeholder="如 帮助中心" />
-                <Field label="跳转地址" value={item.href} onChange={(value) => updateLink(index, "href", value)} placeholder="如 /help 或 https://example.com/help" />
+                <TextField label="显示名称" value={item.name} onChange={(value) => updateLink(index, "name", value)} placeholder="如 帮助中心" />
+                <TextField label="跳转地址" value={item.href} onChange={(value) => updateLink(index, "href", value)} placeholder="如 /help 或 https://example.com/help" />
                 <div className="flex items-end justify-between gap-3 xl:block xl:pt-7">
                   <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-background text-foreground/80">
                     <LevelIcon icon={item.icon} className="h-5 w-5 text-base" emojiClassName="text-inherit" svgClassName="[&>svg]:block" title={item.name || "应用图标预览"} />
@@ -146,14 +148,5 @@ export function AdminAppsSettingsForm({ initialLinks, initialIconName }: AdminAp
         {feedback ? <span className="text-sm text-muted-foreground">{feedback}</span> : null}
       </div>
     </form>
-  )
-}
-
-function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {
-  return (
-    <label className="space-y-2">
-      <span className="text-sm font-medium">{label}</span>
-      <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none" />
-    </label>
   )
 }

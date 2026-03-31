@@ -125,12 +125,6 @@ export interface ServerSiteSettingsData extends SiteSettingsData {
   smtpSecure: boolean
 }
 
-const SITE_SETTINGS_CACHE_TTL_MS = 60_000
-
-let cachedServerSiteSettings: ServerSiteSettingsData | null = null
-let siteSettingsCacheExpiry = 0
-let siteSettingsCachePromise: Promise<ServerSiteSettingsData> | null = null
-
 function getDefaultServerSiteSettings(): ServerSiteSettingsData {
   return mapSiteSettings({
     ...defaultSiteSettingsCreateInput,
@@ -141,11 +135,6 @@ function getDefaultServerSiteSettings(): ServerSiteSettingsData {
     postOfflineVip2Price: 0,
     postOfflineVip3Price: 0,
   })
-}
-
-function setSiteSettingsCache(data: ServerSiteSettingsData) {
-  cachedServerSiteSettings = data
-  siteSettingsCacheExpiry = Date.now() + SITE_SETTINGS_CACHE_TTL_MS
 }
 
 async function readSiteSettingsFromDB(): Promise<ServerSiteSettingsData> {
@@ -159,28 +148,8 @@ async function readSiteSettingsFromDB(): Promise<ServerSiteSettingsData> {
 }
 
 export function invalidateSiteSettingsCache() {
-  cachedServerSiteSettings = null
-  siteSettingsCacheExpiry = 0
-  siteSettingsCachePromise = null
-}
-
-async function getMemoryCachedSiteSettings(): Promise<ServerSiteSettingsData> {
-  if (cachedServerSiteSettings && Date.now() < siteSettingsCacheExpiry) {
-    return cachedServerSiteSettings
-  }
-
-  if (!siteSettingsCachePromise) {
-    siteSettingsCachePromise = readSiteSettingsFromDB()
-      .then((data) => {
-        setSiteSettingsCache(data)
-        return data
-      })
-      .finally(() => {
-        siteSettingsCachePromise = null
-      })
-  }
-
-  return siteSettingsCachePromise
+  // No-op: site settings are read fresh on each request.
+  // React cache below only deduplicates reads inside a single render pass.
 }
 
 function mapSiteSettings(record: {
@@ -415,7 +384,7 @@ function toPublicSiteSettings(data: ServerSiteSettingsData): SiteSettingsData {
 }
 
 const getCachedSiteSettings = cache(async (): Promise<ServerSiteSettingsData> => {
-  return getMemoryCachedSiteSettings()
+  return readSiteSettingsFromDB()
 })
 
 export async function getSiteSettings(): Promise<SiteSettingsData> {

@@ -1,7 +1,5 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-
 import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/toast"
 
@@ -11,20 +9,7 @@ interface InviteLinkCopyButtonProps {
 }
 
 export function InviteLinkCopyButton({ path }: InviteLinkCopyButtonProps) {
-  const [origin, setOrigin] = useState("")
-
-
-  useEffect(() => {
-    setOrigin(window.location.origin)
-  }, [])
-
-  const link = useMemo(() => {
-    if (!origin) {
-      return path
-    }
-
-    return `${origin}${path}`
-  }, [origin, path])
+  const link = typeof window === "undefined" ? path : `${window.location.origin}${path}`
 
   async function handleCopy() {
     try {

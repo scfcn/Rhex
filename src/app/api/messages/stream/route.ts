@@ -1,17 +1,58 @@
 import { prisma } from "@/db/client"
 import { createUserRouteHandler } from "@/lib/api-route"
-
-export const dynamic = "force-dynamic"
 import {
+  buildCursorPayload,
   buildHeartbeatPayload,
   buildMessageEventPayload,
-  formatMessageStreamCursor,
+  compareMessageStreamCursor,
+  createMessageStreamCursor,
+  getMessageStreamCursorFromEvent,
+  isMessageStreamCursorAfter,
+  messageEventBus,
   parseMessageStreamCursor,
+  type MessageStreamEvent,
   type MessageStreamCursor,
 } from "@/lib/message-event-bus"
 
-const POLL_INTERVAL_MS = 3_000
+export const dynamic = "force-dynamic"
+export const runtime = "nodejs"
+
 const HEARTBEAT_INTERVAL_MS = 15_000
+const MESSAGE_CATCH_UP_BATCH_SIZE = 50
+
+interface MessageStreamEventEnvelope {
+  cursor: MessageStreamCursor
+  event: MessageStreamEvent
+}
+
+function mapMessageRowToEnvelope(
+  userId: number,
+  message: {
+    id: string
+    createdAt: Date
+    senderId: number
+    conversationId: string
+    conversation: {
+      participants: Array<{
+        userId: number
+      }>
+    }
+  },
+): MessageStreamEventEnvelope {
+  const cursor = createMessageStreamCursor(message.id, message.createdAt)
+
+  return {
+    cursor,
+    event: {
+      type: "message.created",
+      conversationId: message.conversationId,
+      messageId: message.id,
+      senderId: message.senderId,
+      recipientId: message.conversation.participants[0]?.userId ?? userId,
+      occurredAt: cursor.createdAt,
+    },
+  }
+}
 
 async function findLatestCursor(userId: number): Promise<MessageStreamCursor | null> {
   const latest = await prisma.directMessage.findFirst({
@@ -33,14 +74,11 @@ async function findLatestCursor(userId: number): Promise<MessageStreamCursor | n
     return null
   }
 
-  return {
-    id: latest.id,
-    createdAt: latest.createdAt.toISOString(),
-  }
+  return createMessageStreamCursor(latest.id, latest.createdAt)
 }
 
-async function findNextCursor(userId: number, cursor: MessageStreamCursor | null) {
-  const latest = await prisma.directMessage.findFirst({
+async function findMessageEventsAfterCursor(userId: number, cursor: MessageStreamCursor | null) {
+  const messages = await prisma.directMessage.findMany({
     where: {
       conversation: {
         participants: {
@@ -60,6 +98,7 @@ async function findNextCursor(userId: number, cursor: MessageStreamCursor | null
         : {}),
     },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    take: MESSAGE_CATCH_UP_BATCH_SIZE,
     select: {
       id: true,
       createdAt: true,
@@ -83,29 +122,14 @@ async function findNextCursor(userId: number, cursor: MessageStreamCursor | null
     },
   })
 
-  if (!latest) {
-    return null
-  }
-
-  return {
-    cursor: {
-      id: latest.id,
-      createdAt: latest.createdAt.toISOString(),
-    },
-    event: {
-      type: "message.created" as const,
-      conversationId: latest.conversationId,
-      messageId: latest.id,
-      senderId: latest.senderId,
-      recipientId: latest.conversation.participants[0]?.userId ?? userId,
-      occurredAt: latest.createdAt.toISOString(),
-    },
-  }
+  return messages.map((message) => mapMessageRowToEnvelope(userId, message))
 }
 
 export const GET = createUserRouteHandler(async ({ request, currentUser }) => {
-  const cursorParam = new URL(request.url).searchParams.get("cursor")
-  const requestedCursor = parseMessageStreamCursor(cursorParam)
+  const requestUrl = new URL(request.url)
+  const cursorParam = requestUrl.searchParams.get("cursor")
+  const lastEventId = request.headers.get("last-event-id")
+  const requestedCursor = parseMessageStreamCursor(cursorParam) ?? parseMessageStreamCursor(lastEventId)
   const initialCursor = requestedCursor ?? await findLatestCursor(currentUser.id)
   const encoder = new TextEncoder()
 
@@ -113,11 +137,46 @@ export const GET = createUserRouteHandler(async ({ request, currentUser }) => {
     start(controller) {
       let closed = false
       let cursor = initialCursor
-      let pollingPromise: Promise<void> | null = null
+      let unsubscribe: (() => void) | null = null
+      let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+      let catchUpReady = false
+      const bufferedEvents: MessageStreamEventEnvelope[] = []
 
       const push = (payload: string) => {
         if (!closed) {
           controller.enqueue(encoder.encode(payload))
+        }
+      }
+
+      const pushCursor = (nextCursor: MessageStreamCursor) => {
+        push(buildCursorPayload(nextCursor))
+      }
+
+      const deliverEnvelope = (envelope: MessageStreamEventEnvelope) => {
+        if (!isMessageStreamCursorAfter(envelope.cursor, cursor)) {
+          return
+        }
+
+        cursor = envelope.cursor
+        push(buildMessageEventPayload(envelope.event))
+        pushCursor(cursor)
+      }
+
+      const flushBufferedEvents = () => {
+        if (bufferedEvents.length === 0) {
+          return
+        }
+
+        const pendingEvents = bufferedEvents
+          .splice(0, bufferedEvents.length)
+          .sort((left, right) => compareMessageStreamCursor(left.cursor, right.cursor))
+
+        for (const envelope of pendingEvents) {
+          if (closed) {
+            return
+          }
+
+          deliverEnvelope(envelope)
         }
       }
 
@@ -127,47 +186,84 @@ export const GET = createUserRouteHandler(async ({ request, currentUser }) => {
         }
 
         closed = true
-        clearInterval(heartbeatTimer)
-        clearInterval(pollingTimer)
-        void pollingPromise?.catch(() => undefined)
+        request.signal.removeEventListener("abort", close)
+        if (heartbeatTimer) {
+          clearInterval(heartbeatTimer)
+        }
+        unsubscribe?.()
         controller.close()
       }
 
-      const poll = async () => {
-        const next = await findNextCursor(currentUser.id, cursor)
-        if (!next || closed) {
+      const handleStreamFailure = (error: unknown) => {
+        console.error("[api/messages/stream] stream failed", error)
+
+        if (!closed) {
+          push(`event: error\ndata: ${JSON.stringify({ message: "消息流暂时不可用" })}\n\n`)
+        }
+
+        close()
+      }
+
+      const drainCatchUp = async () => {
+        let hasMore = true
+
+        while (!closed && hasMore) {
+          const events = await findMessageEventsAfterCursor(currentUser.id, cursor)
+
+          if (events.length === 0) {
+            hasMore = false
+            continue
+          }
+
+          for (const envelope of events) {
+            if (closed) {
+              return
+            }
+
+            deliverEnvelope(envelope)
+          }
+
+          hasMore = events.length === MESSAGE_CATCH_UP_BATCH_SIZE
+        }
+      }
+
+      unsubscribe = messageEventBus.subscribe(currentUser.id, (event) => {
+        const nextCursor = getMessageStreamCursorFromEvent(event)
+        if (!nextCursor || !isMessageStreamCursorAfter(nextCursor, cursor)) {
           return
         }
 
-        cursor = next.cursor
-        push(buildMessageEventPayload(next.event))
-      }
+        const envelope = {
+          cursor: nextCursor,
+          event,
+        }
 
-      const safePoll = () => {
-        pollingPromise = poll().catch((error) => {
-          console.error("[api/messages/stream] poll failed", error)
-          if (!closed) {
-            push(`event: error\ndata: ${JSON.stringify({ message: "消息流暂时不可用" })}\n\n`)
-          }
-        })
-      }
+        if (!catchUpReady) {
+          bufferedEvents.push(envelope)
+          return
+        }
+
+        deliverEnvelope(envelope)
+      })
 
       push(buildHeartbeatPayload())
       if (cursor) {
-        push(`event: cursor\ndata: ${JSON.stringify({ cursor: formatMessageStreamCursor(cursor) })}\n\n`)
+        pushCursor(cursor)
       }
 
-      safePoll()
-
-      const heartbeatTimer = setInterval(() => {
+      heartbeatTimer = setInterval(() => {
         push(buildHeartbeatPayload())
       }, HEARTBEAT_INTERVAL_MS)
 
-      const pollingTimer = setInterval(() => {
-        safePoll()
-      }, POLL_INTERVAL_MS)
-
       request.signal.addEventListener("abort", close)
+
+      void drainCatchUp()
+        .then(() => {
+          flushBufferedEvents()
+          catchUpReady = true
+          flushBufferedEvents()
+        })
+        .catch(handleStreamFailure)
     },
     cancel() {
       return

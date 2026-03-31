@@ -9,16 +9,9 @@ import { getBoards, type SiteBoardItem } from "@/lib/boards"
 import { parsePostContentDocument } from "@/lib/post-content"
 import { getEditablePostBySlug } from "@/lib/posts"
 import { DEFAULT_ALLOWED_POST_TYPES } from "@/lib/post-types"
+import { readSearchParam } from "@/lib/search-params"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getZones, type SiteZoneItem } from "@/lib/zones"
-
-interface WritePageProps {
-  searchParams?: {
-    mode?: string
-    post?: string
-    board?: string
-  }
-}
 
 interface BoardOptionItem {
   value: string
@@ -47,11 +40,16 @@ function mapBoardOption(board: SiteBoardItem): BoardOptionItem {
   }
 }
 
-export default async function WritePage({ searchParams }: WritePageProps) {
+function isPostStillEditable(createdAt: Date | string, editableMinutes: number) {
+  return new Date(createdAt).getTime() + Math.max(0, editableMinutes) * 60 * 1000 > Date.now()
+}
+
+export default async function WritePage(props: PageProps<"/write">) {
+  const searchParams = await props.searchParams;
   const [user, zones, boards, settings] = await Promise.all([getCurrentUser(), getZones(), getBoards(), getSiteSettings()])
-  const mode = searchParams?.mode === "edit" ? "edit" : "create"
-  const editingSlug = searchParams?.post
-  const preferredBoardSlug = searchParams?.board ?? ""
+  const mode = readSearchParam(searchParams?.mode) === "edit" ? "edit" : "create"
+  const editingSlug = readSearchParam(searchParams?.post)
+  const preferredBoardSlug = readSearchParam(searchParams?.board) ?? ""
 
   const groupedBoardOptions: BoardOptionGroup[] = zones
     .map((zone: SiteZoneItem) => ({
@@ -103,7 +101,7 @@ export default async function WritePage({ searchParams }: WritePageProps) {
 
   const isAdmin = user.role === "ADMIN" || user.role === "MODERATOR"
   const canEditThisPost = Boolean(editingPost && (editingPost.authorId === user.id || isAdmin))
-  const isStillEditable = Boolean(editingPost && (new Date(editingPost.createdAt).getTime() + Math.max(0, settings.postEditableMinutes) * 60 * 1000 > Date.now())) || isAdmin
+  const isStillEditable = Boolean(editingPost && isPostStillEditable(editingPost.createdAt, settings.postEditableMinutes)) || isAdmin
 
   return (
     <div className="min-h-screen ">

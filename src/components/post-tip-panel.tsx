@@ -2,7 +2,7 @@
 
 import { Gift, Zap } from "lucide-react"
 import Link from "next/link"
-import { useEffect, useMemo, useState, useTransition } from "react"
+import { useMemo, useState, useTransition } from "react"
 
 import { UserAvatar } from "@/components/user-avatar"
 import { Button } from "@/components/ui/button"
@@ -63,13 +63,8 @@ export function PostTipPanel({ postId, enabled, pointName, currentUserPoints, al
   const [message, setMessage] = useState("")
   const [isPending, startTransition] = useTransition()
 
-
-
-  useEffect(() => {
-    setSelectedAmount((current) => (allowedAmounts.includes(current) ? current : (allowedAmounts[0] ?? 0)))
-  }, [allowedAmounts])
-
-  const canTip = enabled && selectedAmount > 0 && todayUsed < dailyLimit && postUsed < perPostLimit && points >= selectedAmount
+  const effectiveSelectedAmount = allowedAmounts.includes(selectedAmount) ? selectedAmount : (allowedAmounts[0] ?? 0)
+  const canTip = enabled && effectiveSelectedAmount > 0 && todayUsed < dailyLimit && postUsed < perPostLimit && points >= effectiveSelectedAmount
   const helperText = useMemo(() => {
     if (!enabled) {
       return "当前未开启帖子打赏"
@@ -107,7 +102,7 @@ export function PostTipPanel({ postId, enabled, pointName, currentUserPoints, al
         const response = await fetch("/api/posts/tip", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ postId, amount: selectedAmount }),
+          body: JSON.stringify({ postId, amount: effectiveSelectedAmount }),
         })
         const result = await response.json()
 
@@ -122,7 +117,7 @@ export function PostTipPanel({ postId, enabled, pointName, currentUserPoints, al
           syncSummary(result.data)
         }
 
-        const successMessage = result.message ?? `已成功打赏 ${selectedAmount} ${pointName}`
+        const successMessage = result.message ?? `已成功打赏 ${effectiveSelectedAmount} ${pointName}`
         setMessage(successMessage)
         toast.success(successMessage, "打赏成功")
       } catch {
@@ -168,12 +163,12 @@ export function PostTipPanel({ postId, enabled, pointName, currentUserPoints, al
               {allowedAmounts.map((amount) => (
                 <button
                   key={amount}
-                  type="button"
-                  className={cn(
-                    "rounded-2xl border px-3 py-3 text-sm font-medium transition-colors",
-                    selectedAmount === amount ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:bg-accent/60",
-                  )}
-                  onClick={() => setSelectedAmount(amount)}
+                    type="button"
+                    className={cn(
+                      "rounded-2xl border px-3 py-3 text-sm font-medium transition-colors",
+                      effectiveSelectedAmount === amount ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:bg-accent/60",
+                    )}
+                    onClick={() => setSelectedAmount(amount)}
                 >
                   {amount}
                 </button>
@@ -189,7 +184,7 @@ export function PostTipPanel({ postId, enabled, pointName, currentUserPoints, al
 
             <div className="mt-4 flex items-center justify-between gap-3">
               <Button type="button" onClick={handleTip} disabled={!canTip || isPending} className="h-10 rounded-xl px-5">
-                {isPending ? "打赏中..." : selectedAmount > 0 ? `打赏 ${selectedAmount} ${pointName}` : "选择金额"}
+                {isPending ? "打赏中..." : effectiveSelectedAmount > 0 ? `打赏 ${effectiveSelectedAmount} ${pointName}` : "选择金额"}
               </Button>
               {points <= 0 ? (
                 <Link href="/points" className="text-sm text-primary hover:opacity-80">

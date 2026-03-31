@@ -8,19 +8,13 @@ import { Card, CardContent } from "@/components/ui/card"
 import { getCurrentUser } from "@/lib/auth"
 import { getBoards } from "@/lib/boards"
 import { getHomeSidebarHotTopics, resolveSidebarUser } from "@/lib/home-sidebar"
+import { readSearchParam } from "@/lib/search-params"
 import { getSiteSettings } from "@/lib/site-settings"
 import { type TagListSort, getTagListPage } from "@/lib/tags"
 import { cn } from "@/lib/utils"
 import { getZones } from "@/lib/zones"
 
 export const dynamic = "force-dynamic"
-
-interface TagsPageProps {
-  searchParams?: {
-    page?: string
-    sort?: string
-  }
-}
 
 function normalizeSort(sort?: string): TagListSort {
   return sort === "new" ? "new" : "hot"
@@ -48,9 +42,10 @@ function sortTabClassName(active: boolean) {
   )
 }
 
-export async function generateMetadata({ searchParams }: TagsPageProps): Promise<Metadata> {
+export async function generateMetadata(props: PageProps<"/tags">): Promise<Metadata> {
+  const searchParams = await props.searchParams;
   const settings = await getSiteSettings()
-  const currentSort = normalizeSort(searchParams?.sort)
+  const currentSort = normalizeSort(readSearchParam(searchParams?.sort))
   const sortLabel = currentSort === "hot" ? "热门标签" : "新标签"
 
   return {
@@ -62,9 +57,10 @@ export async function generateMetadata({ searchParams }: TagsPageProps): Promise
   }
 }
 
-export default async function TagsPage({ searchParams }: TagsPageProps) {
-  const currentPage = Math.max(1, Number(searchParams?.page ?? "1") || 1)
-  const currentSort = normalizeSort(searchParams?.sort)
+export default async function TagsPage(props: PageProps<"/tags">) {
+  const searchParams = await props.searchParams;
+  const currentPage = Math.max(1, Number(readSearchParam(searchParams?.page) ?? "1") || 1)
+  const currentSort = normalizeSort(readSearchParam(searchParams?.sort))
 
   const [tagPage, boards, zones, currentUser, hotTopics, settings] = await Promise.all([
     getTagListPage(currentPage, 24, currentSort),

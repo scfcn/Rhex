@@ -40,6 +40,7 @@ import { getPostOfflineActionMeta } from "@/lib/post-offline"
 import { getPurchasedPostBlockIds } from "@/lib/post-unlock"
 
 import { buildArticleJsonLd, buildMetadataKeywords } from "@/lib/seo"
+import { readSearchParam } from "@/lib/search-params"
 import { getSiteSettings } from "@/lib/site-settings"
 
 import { formatRelativeTime } from "@/lib/formatters"
@@ -49,17 +50,8 @@ import { getZones } from "@/lib/zones"
 import { getVipNameClass } from "@/lib/vip-status"
 import { getCanonicalPostPath } from "@/lib/post-links"
 
-interface PostPageProps {
-  params: {
-    slug: string
-  }
-  searchParams?: {
-    sort?: string
-    page?: string
-  }
-}
-
-export async function generateMetadata({ params }: PostPageProps): Promise<Metadata> {
+export async function generateMetadata(props: PageProps<"/posts/[slug]">): Promise<Metadata> {
+  const params = await props.params;
   const [post, settings] = await Promise.all([getPostSeoBySlug(params.slug), getSiteSettings()])
 
   if (!post) {
@@ -90,15 +82,17 @@ export async function generateMetadata({ params }: PostPageProps): Promise<Metad
 
 
 
-export default async function PostPage({ params, searchParams }: PostPageProps) {
-  const currentSort = searchParams?.sort === "newest" ? "newest" : "oldest"
-  const currentPage = Math.max(1, Number(searchParams?.page ?? "1") || 1)
+export default async function PostPage(props: PageProps<"/posts/[slug]">) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
+  const currentSort = readSearchParam(searchParams?.sort) === "newest" ? "newest" : "oldest"
+  const currentPage = Math.max(1, Number(readSearchParam(searchParams?.page) ?? "1") || 1)
 
 
-    const [currentUser, settings] = await Promise.all([
-    getCurrentUser(),
-    getSiteSettings(),
-  ])
+  const [currentUser, settings] = await Promise.all([
+  getCurrentUser(),
+  getSiteSettings(),
+])
 
   const sidebarUserPromise = resolveSidebarUser(currentUser, settings)
   const basePost = await getPostDetailBySlug(params.slug, currentUser?.id)

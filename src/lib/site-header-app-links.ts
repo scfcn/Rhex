@@ -48,6 +48,7 @@ export const HEADER_APP_ICON_OPTIONS = [
 ] as const
 
 export type HeaderAppIconName = (typeof HEADER_APP_ICON_OPTIONS)[number]["value"]
+export type SiteHeaderAppIconItem = (typeof HEADER_APP_ICON_OPTIONS)[number]
 
 const HEADER_APP_ICON_MAP: Record<HeaderAppIconName, LucideIcon> = {
   grid: Grid2x2,

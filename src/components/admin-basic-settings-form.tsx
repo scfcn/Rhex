@@ -1,10 +1,12 @@
 "use client"
 
 import Image from "next/image"
+import { useRouter } from "next/navigation"
 import { useMemo, useState, useTransition } from "react"
 import { Loader2, Upload } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { TextField } from "@/components/ui/text-field"
 import { toast } from "@/components/ui/toast"
 import { PickerPopover, PickerTriggerField, normalizeHexColor } from "@/components/admin-picker-popover"
 import { calculatePostHeatScore, resolvePostHeatStyle } from "@/lib/post-heat"
@@ -84,6 +86,7 @@ function normalizeHeatThresholdsInput(raw: string) {
 }
 
 export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: AdminBasicSettingsFormProps) {
+  const router = useRouter()
   const [siteName, setSiteName] = useState(initialSettings.siteName)
   const [siteSlogan, setSiteSlogan] = useState(initialSettings.siteSlogan)
   const [siteDescription, setSiteDescription] = useState(initialSettings.siteDescription)
@@ -295,6 +298,7 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
             return
           }
           toast.success(result.message ?? "保存成功", "保存成功")
+          router.refresh()
         })
       }}
     >
@@ -305,12 +309,12 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
             <p className="mt-1 text-xs leading-6 text-muted-foreground">站点对外展示的基础品牌信息、帖子链接形式与基础编辑规则配置。</p>
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Field label="站点名称" value={siteName} onChange={setSiteName} placeholder="如 兴趣论坛" />
-            <Field label="Logo 文案" value={siteLogoText} onChange={setSiteLogoText} placeholder="如 兴趣论坛" />
+            <TextField label="站点名称" value={siteName} onChange={setSiteName} placeholder="如 兴趣论坛" />
+            <TextField label="Logo 文案" value={siteLogoText} onChange={setSiteLogoText} placeholder="如 兴趣论坛" />
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Field label="帖子可编辑分钟数" value={postEditableMinutes} onChange={setPostEditableMinutes} placeholder="如 10" />
-            <Field label="评论可编辑分钟数" value={commentEditableMinutes} onChange={setCommentEditableMinutes} placeholder="如 5" />
+            <TextField label="帖子可编辑分钟数" value={postEditableMinutes} onChange={setPostEditableMinutes} placeholder="如 10" />
+            <TextField label="评论可编辑分钟数" value={commentEditableMinutes} onChange={setCommentEditableMinutes} placeholder="如 5" />
           </div>
   
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -332,7 +336,7 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
             </div>
             <SwitchField label="首页右侧统计卡片" checked={homeSidebarStatsCardEnabled} onChange={setHomeSidebarStatsCardEnabled} />
           </div>
-          <Field label="站点 Slogan" value={siteSlogan} onChange={setSiteSlogan} placeholder="如 Waste your time on things you love" />
+          <TextField label="站点 Slogan" value={siteSlogan} onChange={setSiteSlogan} placeholder="如 Waste your time on things you love" />
           <div className="space-y-3 rounded-[24px] border border-border p-5">
             <div>
               <h4 className="text-sm font-semibold">站点 Logo</h4>
@@ -398,8 +402,8 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
               <SwitchField label="开启积分购买邀请码" checked={inviteCodePurchaseEnabled} onChange={setInviteCodePurchaseEnabled} />
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="邀请人奖励数量" value={inviteRewardInviter} onChange={setInviteRewardInviter} placeholder="如 10" />
-              <Field label="被邀请人奖励数量" value={inviteRewardInvitee} onChange={setInviteRewardInvitee} placeholder="如 5" />
+              <TextField label="邀请人奖励数量" value={inviteRewardInviter} onChange={setInviteRewardInviter} placeholder="如 10" />
+              <TextField label="被邀请人奖励数量" value={inviteRewardInvitee} onChange={setInviteRewardInvitee} placeholder="如 5" />
             </div>
           </div>
 
@@ -411,7 +415,7 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <CaptchaModeField label="注册验证码模式" value={registerCaptchaMode} onChange={setRegisterCaptchaMode} />
               <CaptchaModeField label="登录验证码模式" value={loginCaptchaMode} onChange={setLoginCaptchaMode} />
-              <Field label="Turnstile Site Key" value={turnstileSiteKey} onChange={setTurnstileSiteKey} placeholder="填写 Cloudflare Turnstile 公钥" />
+              <TextField label="Turnstile Site Key" value={turnstileSiteKey} onChange={setTurnstileSiteKey} placeholder="填写 Cloudflare Turnstile 公钥" />
             </div>
             <p className="text-xs leading-6 text-muted-foreground">当模式为 `TURNSTILE` 时，需要同时配置环境变量 `TURNSTILE_SECRET_KEY`；当模式为 `BUILTIN` 时，系统会使用站点自建图形验证码，并通过签名 token 校验。</p>
           </div>
@@ -450,11 +454,11 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <SwitchField label="启用 SMTP" checked={smtpEnabled} onChange={setSmtpEnabled} />
               <SwitchField label="启用 SSL/TLS" checked={smtpSecure} onChange={setSmtpSecure} />
-              <Field label="SMTP 主机" value={smtpHost} onChange={setSmtpHost} placeholder="如 smtp.qq.com" />
-              <Field label="SMTP 端口" value={smtpPort} onChange={setSmtpPort} placeholder="如 465 / 587" />
-              <Field label="SMTP 账号" value={smtpUser} onChange={setSmtpUser} placeholder="邮箱账号" />
-              <PasswordField label="SMTP 密码 / 授权码" value={smtpPass} onChange={setSmtpPass} placeholder="请输入密码或授权码" />
-              <Field label="发件人地址" value={smtpFrom} onChange={setSmtpFrom} placeholder="如 Forum <no-reply@example.com>" />
+              <TextField label="SMTP 主机" value={smtpHost} onChange={setSmtpHost} placeholder="如 smtp.qq.com" />
+              <TextField label="SMTP 端口" value={smtpPort} onChange={setSmtpPort} placeholder="如 465 / 587" />
+              <TextField label="SMTP 账号" value={smtpUser} onChange={setSmtpUser} placeholder="邮箱账号" />
+              <TextField label="SMTP 密码 / 授权码" type="password" value={smtpPass} onChange={setSmtpPass} placeholder="请输入密码或授权码" />
+              <TextField label="发件人地址" value={smtpFrom} onChange={setSmtpFrom} placeholder="如 Forum <no-reply@example.com>" />
             </div>
           </div>
         </>
@@ -469,9 +473,9 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <SwitchField label="开启帖子打赏" checked={tippingEnabled} onChange={setTippingEnabled} />
-              <Field label="每日可打赏次数" value={tippingDailyLimit} onChange={setTippingDailyLimit} placeholder="如 3" />
-              <Field label="单帖可打赏次数" value={tippingPerPostLimit} onChange={setTippingPerPostLimit} placeholder="如 1" />
-              <Field label="固定打赏金额" value={tippingAmounts} onChange={setTippingAmounts} placeholder="如 10,30,50,100" />
+              <TextField label="每日可打赏次数" value={tippingDailyLimit} onChange={setTippingDailyLimit} placeholder="如 3" />
+              <TextField label="单帖可打赏次数" value={tippingPerPostLimit} onChange={setTippingPerPostLimit} placeholder="如 1" />
+              <TextField label="固定打赏金额" value={tippingAmounts} onChange={setTippingAmounts} placeholder="如 10,30,50,100" />
             </div>
           </div>
 
@@ -482,8 +486,8 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <SwitchField label="开启帖子红包" checked={postRedPacketEnabled} onChange={setPostRedPacketEnabled} />
-              <Field label="单个红包最大积分" value={postRedPacketMaxPoints} onChange={setPostRedPacketMaxPoints} placeholder="如 100" />
-              <Field label="每日发红包积分上限" value={postRedPacketDailyLimit} onChange={setPostRedPacketDailyLimit} placeholder="如 300" />
+              <TextField label="单个红包最大积分" value={postRedPacketMaxPoints} onChange={setPostRedPacketMaxPoints} placeholder="如 100" />
+              <TextField label="每日发红包积分上限" value={postRedPacketDailyLimit} onChange={setPostRedPacketDailyLimit} placeholder="如 300" />
             </div>
           </div>
 
@@ -493,13 +497,13 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
               <p className="mt-1 text-xs leading-6 text-muted-foreground">统一配置热度分数计算权重与颜色阶段。</p>
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-              <Field label="浏览权重" value={heatViewWeight} onChange={setHeatViewWeight} placeholder="如 1" />
-              <Field label="回复权重" value={heatCommentWeight} onChange={setHeatCommentWeight} placeholder="如 8" />
-              <Field label="点赞权重" value={heatLikeWeight} onChange={setHeatLikeWeight} placeholder="如 6" />
-              <Field label="打赏次数权重" value={heatTipCountWeight} onChange={setHeatTipCountWeight} placeholder="如 10" />
-              <Field label="打赏积分权重" value={heatTipPointsWeight} onChange={setHeatTipPointsWeight} placeholder="如 1" />
+              <TextField label="浏览权重" value={heatViewWeight} onChange={setHeatViewWeight} placeholder="如 1" />
+              <TextField label="回复权重" value={heatCommentWeight} onChange={setHeatCommentWeight} placeholder="如 8" />
+              <TextField label="点赞权重" value={heatLikeWeight} onChange={setHeatLikeWeight} placeholder="如 6" />
+              <TextField label="打赏次数权重" value={heatTipCountWeight} onChange={setHeatTipCountWeight} placeholder="如 10" />
+              <TextField label="打赏积分权重" value={heatTipPointsWeight} onChange={setHeatTipPointsWeight} placeholder="如 1" />
             </div>
-            <Field label="9 段热度阈值" value={heatStageThresholds} onChange={setHeatStageThresholds} placeholder="如 0,80,180,320,520,780,1100,1500,2000" />
+            <TextField label="9 段热度阈值" value={heatStageThresholds} onChange={setHeatStageThresholds} placeholder="如 0,80,180,320,520,780,1100,1500,2000" />
             <div className="space-y-2">
               <p className="text-sm font-medium">9 段颜色色板</p>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -544,11 +548,11 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
               <p className="mt-1 text-xs leading-6 text-muted-foreground">调整参数后，实时预览热度分数与颜色表现。</p>
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-              <Field label="浏览数" value={previewViews} onChange={setPreviewViews} placeholder="如 120" />
-              <Field label="回复数" value={previewComments} onChange={setPreviewComments} placeholder="如 18" />
-              <Field label="点赞数" value={previewLikes} onChange={setPreviewLikes} placeholder="如 12" />
-              <Field label="打赏次数" value={previewTipCount} onChange={setPreviewTipCount} placeholder="如 4" />
-              <Field label="打赏积分" value={previewTipPoints} onChange={setPreviewTipPoints} placeholder="如 160" />
+              <TextField label="浏览数" value={previewViews} onChange={setPreviewViews} placeholder="如 120" />
+              <TextField label="回复数" value={previewComments} onChange={setPreviewComments} placeholder="如 18" />
+              <TextField label="点赞数" value={previewLikes} onChange={setPreviewLikes} placeholder="如 12" />
+              <TextField label="打赏次数" value={previewTipCount} onChange={setPreviewTipCount} placeholder="如 4" />
+              <TextField label="打赏积分" value={previewTipPoints} onChange={setPreviewTipPoints} placeholder="如 160" />
             </div>
             <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
               <div className="rounded-[20px] border border-border bg-card px-4 py-4">
@@ -577,23 +581,6 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
   )
 }
 
-function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {
-  return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium">{label}</p>
-      <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none" />
-    </div>
-  )
-}
-
-function PasswordField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {
-  return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium">{label}</p>
-      <input type="password" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none" />
-    </div>
-  )
-}
 
 function SwitchField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
   return (

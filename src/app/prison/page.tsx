@@ -5,7 +5,7 @@ import { UserStatus } from "@/db/types"
 import { SiteHeader } from "@/components/site-header"
 import { prisma } from "@/db/client"
 import { formatDateTime, serializeDate } from "@/lib/formatters"
-
+import { readSearchParam } from "@/lib/search-params"
 
 export const metadata: Metadata = {
   title: "小黑屋",
@@ -20,12 +20,6 @@ const statusTabs = [
 
 type PrisonStatusFilter = (typeof statusTabs)[number]["key"]
 
-interface PrisonPageProps {
-  searchParams?: {
-    status?: string
-  }
-}
-
 function normalizeStatusFilter(value?: string): PrisonStatusFilter {
   if (value === "BANNED" || value === "MUTED") {
     return value
@@ -34,8 +28,9 @@ function normalizeStatusFilter(value?: string): PrisonStatusFilter {
   return "ALL"
 }
 
-export default async function PrisonPage({ searchParams }: PrisonPageProps) {
-  const activeStatus = normalizeStatusFilter(searchParams?.status)
+export default async function PrisonPage(props: PageProps<"/prison">) {
+  const searchParams = await props.searchParams;
+  const activeStatus = normalizeStatusFilter(readSearchParam(searchParams?.status))
   const where = activeStatus === "ALL"
     ? { status: { in: [UserStatus.BANNED, UserStatus.MUTED] } }
     : { status: activeStatus === "BANNED" ? UserStatus.BANNED : UserStatus.MUTED }

@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 
 import { LevelIcon } from "@/components/level-icon"
-import { resolveHeaderAppTriggerIcon, type SiteHeaderAppLinkItem } from "@/lib/site-header-app-links"
+import { normalizeHeaderAppIconName, type SiteHeaderAppIconItem, type SiteHeaderAppLinkItem, HEADER_APP_ICON_OPTIONS } from "@/lib/site-header-app-links"
 
 
 
@@ -17,6 +17,13 @@ interface SearchFormProps {
   appIconName?: string
 }
 
+function HeaderAppTriggerIcon({ name, className }: { name: string; className?: string }) {
+  const normalizedName = normalizeHeaderAppIconName(name)
+  const matchedOption = HEADER_APP_ICON_OPTIONS.find((item: SiteHeaderAppIconItem) => item.value === normalizedName)
+  const Icon = matchedOption?.icon ?? HEADER_APP_ICON_OPTIONS[0]!.icon
+  return <Icon className={className} />
+}
+
 export function SearchForm({ defaultValue = "", compact = false, appLinks = [], appIconName = "grid" }: SearchFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -24,7 +31,6 @@ export function SearchForm({ defaultValue = "", compact = false, appLinks = [], 
   const [keyword, setKeyword] = useState(defaultValue)
   const [desktopAppsMenuOpen, setDesktopAppsMenuOpen] = useState(false)
   const hasDesktopApps = compact && appLinks.length > 0
-  const HeaderAppTriggerIcon = resolveHeaderAppTriggerIcon(appIconName)
 
 
   useEffect(() => {
@@ -88,7 +94,7 @@ export function SearchForm({ defaultValue = "", compact = false, appLinks = [], 
                   aria-haspopup="menu"
                   aria-label="打开应用菜单"
                 >
-                  <HeaderAppTriggerIcon className="h-4 w-4" />
+                  <HeaderAppTriggerIcon name={appIconName} className="h-4 w-4" />
                 </button>
                 {desktopAppsMenuOpen ? (
                   <div className="absolute left-0 top-[calc(100%+10px)] w-64 rounded-2xl border border-border bg-background p-2 shadow-2xl">

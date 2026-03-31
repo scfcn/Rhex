@@ -57,14 +57,14 @@ export async function readJsonBody<TBody extends JsonObject = JsonObject>(reques
   const contentType = request.headers.get("content-type") ?? ""
 
   if (!contentType.toLowerCase().includes("application/json")) {
-    apiError(415, "璇锋眰浣撳繀椤讳负 JSON")
+    apiError(415, "请求体必须为 JSON")
   }
 
   try {
     const body = await request.json()
 
     if (!body || typeof body !== "object" || Array.isArray(body)) {
-      apiError(400, "璇锋眰浣撴牸寮忎笉姝ｇ‘")
+      apiError(400, "请求体格式不正确")
     }
 
     return body as TBody
@@ -73,7 +73,7 @@ export async function readJsonBody<TBody extends JsonObject = JsonObject>(reques
       throw error
     }
 
-    apiError(400, "璇锋眰浣撴牸寮忎笉姝ｇ‘")
+    apiError(400, "请求体格式不正确")
   }
 }
 
@@ -170,7 +170,7 @@ export function createRouteHandler<T = unknown, C extends ApiRouteContext = ApiR
       const result = await handler(context)
       return toResponse(result)
     } catch (error) {
-      const normalized = normalizeError(error, options?.errorMessage ?? "璇锋眰澶勭悊澶辫触")
+      const normalized = normalizeError(error, options?.errorMessage ?? "请求处理失败")
 
       if (normalized.status >= 500) {
         console.error(options?.logPrefix ?? "[api] unexpected error", error)
@@ -199,24 +199,24 @@ export function createUserRouteHandler<T = unknown>(
 
 
       if (!currentUser) {
-        apiError(401, options?.unauthorizedMessage ?? "璇峰厛鐧诲綍")
+        apiError(401, options?.unauthorizedMessage ?? "请先登录")
       }
 
       const allowStatuses = options?.allowStatuses ?? ["ACTIVE"]
       if (!allowStatuses.includes(currentUser.status)) {
         if (currentUser.status === "MUTED") {
-          apiError(403, options?.forbiddenMessages?.MUTED ?? "褰撳墠璐﹀彿鐘舵€佷笉鍙墽琛岃鎿嶄綔")
+          apiError(403, options?.forbiddenMessages?.MUTED ?? "当前账号状态不可执行该操作")
         }
 
         if (currentUser.status === "BANNED") {
-          apiError(403, options?.forbiddenMessages?.BANNED ?? "褰撳墠璐﹀彿鐘舵€佷笉鍙墽琛岃鎿嶄綔")
+          apiError(403, options?.forbiddenMessages?.BANNED ?? "当前账号状态不可执行该操作")
         }
 
         if (currentUser.status === "INACTIVE") {
-          apiError(403, options?.forbiddenMessages?.INACTIVE ?? "褰撳墠璐﹀彿鐘舵€佷笉鍙墽琛岃鎿嶄綔")
+          apiError(403, options?.forbiddenMessages?.INACTIVE ?? "当前账号状态不可执行该操作")
         }
 
-        apiError(403, "褰撳墠璐﹀彿鐘舵€佷笉鍙墽琛岃鎿嶄綔")
+        apiError(403, "当前账号状态不可执行该操作")
       }
 
       return { request, currentUser }
@@ -235,7 +235,7 @@ export function createAdminRouteHandler<T = unknown>(
       const adminUser = await requireAdminUser()
 
       if (!adminUser || (adminUser.role !== UserRole.ADMIN && adminUser.role !== UserRole.MODERATOR)) {
-        apiError(403, options?.unauthorizedMessage ?? "鏃犳潈鎿嶄綔")
+        apiError(403, options?.unauthorizedMessage ?? "无权操作")
       }
 
       return { request, adminUser }

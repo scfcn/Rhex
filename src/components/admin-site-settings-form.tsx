@@ -6,6 +6,8 @@ import { Loader2, Upload } from "lucide-react"
 
 
 import { Button } from "@/components/ui/button"
+import { TextField } from "@/components/ui/text-field"
+import { saveAdminSiteSettings } from "@/lib/admin-site-settings-client"
 
 interface AdminSiteSettingsFormProps {
   initialSettings: {
@@ -96,41 +98,35 @@ export function AdminSiteSettingsForm({ initialSettings }: AdminSiteSettingsForm
         event.preventDefault()
         setFeedback("")
         startTransition(async () => {
-          const response = await fetch("/api/admin/site-settings", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              siteName,
-              siteSlogan,
-              siteDescription,
-              siteLogoText,
-              siteLogoPath,
-              vipMonthlyPrice: Number(vipMonthlyPrice),
-              vipQuarterlyPrice: Number(vipQuarterlyPrice),
-              vipYearlyPrice: Number(vipYearlyPrice),
-              postOfflinePrice: Number(postOfflinePrice),
-              postOfflineVip1Price: Number(postOfflineVip1Price),
-              postOfflineVip2Price: Number(postOfflineVip2Price),
-              postOfflineVip3Price: Number(postOfflineVip3Price),
-              uploadProvider,
-
-              uploadLocalPath,
-              uploadBaseUrl,
-              uploadOssBucket,
-              uploadOssRegion,
-              uploadOssEndpoint,
-            }),
+          const result = await saveAdminSiteSettings({
+            siteName,
+            siteSlogan,
+            siteDescription,
+            siteLogoText,
+            siteLogoPath,
+            vipMonthlyPrice: Number(vipMonthlyPrice),
+            vipQuarterlyPrice: Number(vipQuarterlyPrice),
+            vipYearlyPrice: Number(vipYearlyPrice),
+            postOfflinePrice: Number(postOfflinePrice),
+            postOfflineVip1Price: Number(postOfflineVip1Price),
+            postOfflineVip2Price: Number(postOfflineVip2Price),
+            postOfflineVip3Price: Number(postOfflineVip3Price),
+            uploadProvider,
+            uploadLocalPath,
+            uploadBaseUrl,
+            uploadOssBucket,
+            uploadOssRegion,
+            uploadOssEndpoint,
           })
-          const result = await response.json()
-          setFeedback(result.message ?? (response.ok ? "保存成功" : "保存失败"))
+          setFeedback(result.message)
         })
       }}
     >
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="站点名称" value={siteName} onChange={setSiteName} placeholder="如 兴趣论坛" />
-        <Field label="Logo 文案" value={siteLogoText} onChange={setSiteLogoText} placeholder="如 兴趣论坛" />
+        <TextField label="站点名称" value={siteName} onChange={setSiteName} placeholder="如 兴趣论坛" />
+        <TextField label="Logo 文案" value={siteLogoText} onChange={setSiteLogoText} placeholder="如 兴趣论坛" />
       </div>
-      <Field label="站点 Slogan" value={siteSlogan} onChange={setSiteSlogan} placeholder="如 Waste your time on things you love" />
+      <TextField label="站点 Slogan" value={siteSlogan} onChange={setSiteSlogan} placeholder="如 Waste your time on things you love" />
       <div className="space-y-2">
         <p className="text-sm font-medium">站点描述</p>
         <textarea value={siteDescription} onChange={(event) => setSiteDescription(event.target.value)} className="min-h-[140px] w-full rounded-[24px] border border-border bg-background px-4 py-3 text-sm outline-none" />
@@ -174,19 +170,19 @@ export function AdminSiteSettingsForm({ initialSettings }: AdminSiteSettingsForm
         <div>
           <h3 className="text-sm font-semibold">VIP 套餐价格</h3>
           <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <Field label="月卡积分价格（VIP1）" value={vipMonthlyPrice} onChange={setVipMonthlyPrice} placeholder="如 3000" />
-            <Field label="季卡积分价格（VIP2）" value={vipQuarterlyPrice} onChange={setVipQuarterlyPrice} placeholder="如 8000" />
-            <Field label="年卡积分价格（VIP3）" value={vipYearlyPrice} onChange={setVipYearlyPrice} placeholder="如 30000" />
+            <TextField label="月卡积分价格（VIP1）" value={vipMonthlyPrice} onChange={setVipMonthlyPrice} placeholder="如 3000" />
+            <TextField label="季卡积分价格（VIP2）" value={vipQuarterlyPrice} onChange={setVipQuarterlyPrice} placeholder="如 8000" />
+            <TextField label="年卡积分价格（VIP3）" value={vipYearlyPrice} onChange={setVipYearlyPrice} placeholder="如 30000" />
           </div>
         </div>
         <div>
           <h3 className="text-sm font-semibold">作者下线帖子价格</h3>
           <p className="mt-1 text-xs text-muted-foreground">0 表示免费；普通用户与 VIP1 / VIP2 / VIP3 按当前身份分别结算。</p>
           <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Field label="普通用户积分价格" value={postOfflinePrice} onChange={setPostOfflinePrice} placeholder="如 50" />
-            <Field label="VIP1 积分价格" value={postOfflineVip1Price} onChange={setPostOfflineVip1Price} placeholder="如 30" />
-            <Field label="VIP2 积分价格" value={postOfflineVip2Price} onChange={setPostOfflineVip2Price} placeholder="如 20" />
-            <Field label="VIP3 积分价格" value={postOfflineVip3Price} onChange={setPostOfflineVip3Price} placeholder="如 0" />
+            <TextField label="普通用户积分价格" value={postOfflinePrice} onChange={setPostOfflinePrice} placeholder="如 50" />
+            <TextField label="VIP1 积分价格" value={postOfflineVip1Price} onChange={setPostOfflineVip1Price} placeholder="如 30" />
+            <TextField label="VIP2 积分价格" value={postOfflineVip2Price} onChange={setPostOfflineVip2Price} placeholder="如 20" />
+            <TextField label="VIP3 积分价格" value={postOfflineVip3Price} onChange={setPostOfflineVip3Price} placeholder="如 0" />
           </div>
         </div>
       </div>
@@ -202,11 +198,11 @@ export function AdminSiteSettingsForm({ initialSettings }: AdminSiteSettingsForm
           </select>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="本地上传目录" value={uploadLocalPath} onChange={setUploadLocalPath} placeholder="如 uploads" />
-          <Field label="资源访问基础 URL" value={uploadBaseUrl} onChange={setUploadBaseUrl} placeholder="留空则自动使用 /uploads" />
-          <Field label="OSS Bucket" value={uploadOssBucket} onChange={setUploadOssBucket} placeholder="如 my-bucket" />
-          <Field label="OSS Region" value={uploadOssRegion} onChange={setUploadOssRegion} placeholder="如 ap-guangzhou" />
-          <Field label="OSS Endpoint" value={uploadOssEndpoint} onChange={setUploadOssEndpoint} placeholder="如 https://oss.example.com" />
+          <TextField label="本地上传目录" value={uploadLocalPath} onChange={setUploadLocalPath} placeholder="如 uploads" />
+          <TextField label="资源访问基础 URL" value={uploadBaseUrl} onChange={setUploadBaseUrl} placeholder="留空则自动使用 /uploads" />
+          <TextField label="OSS Bucket" value={uploadOssBucket} onChange={setUploadOssBucket} placeholder="如 my-bucket" />
+          <TextField label="OSS Region" value={uploadOssRegion} onChange={setUploadOssRegion} placeholder="如 ap-guangzhou" />
+          <TextField label="OSS Endpoint" value={uploadOssEndpoint} onChange={setUploadOssEndpoint} placeholder="如 https://oss.example.com" />
         </div>
         <p className="text-xs leading-6 text-muted-foreground">当前先完整支持本地上传，OSS 配置项先保留在后台设置中，后续可继续接入真实云存储实现。</p>
       </div>
@@ -218,11 +214,3 @@ export function AdminSiteSettingsForm({ initialSettings }: AdminSiteSettingsForm
   )
 }
 
-function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {
-  return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium">{label}</p>
-      <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none" />
-    </div>
-  )
-}

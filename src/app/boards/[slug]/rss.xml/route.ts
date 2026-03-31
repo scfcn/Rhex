@@ -5,13 +5,8 @@ import { getBoardBySlug } from "@/lib/boards"
 
 export const dynamic = "force-dynamic"
 
-interface BoardRssRouteProps {
-  params: {
-    slug: string
-  }
-}
-
-export async function GET(_request: Request, { params }: BoardRssRouteProps) {
+export async function GET(_request: Request, props: RouteContext<"/boards/[slug]/rss.xml">) {
+  const params = await props.params;
   const board = await getBoardBySlug(params.slug)
 
   if (!board) {

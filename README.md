@@ -144,7 +144,7 @@
 
 ## 技术栈
 
-- 前端: `Next.js 14`、`React 18`
+- 前端: `Next.js 16`、`React 19`
 - 样式: `Tailwind CSS`
 - 数据库: `PostgreSQL`
 - ORM: `Prisma`

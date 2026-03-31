@@ -97,8 +97,8 @@ export function LotteryPanel({ postId, isOwnerOrAdmin, lottery }: LotteryPanelPr
   const router = useRouter()
   const [message, setMessage] = useState("")
   const [loading, setLoading] = useState(false)
+  const [now] = useState(() => Date.now())
 
-  const now = Date.now()
   const startsAtTime = lottery.startsAt ? new Date(lottery.startsAt).getTime() : null
   const endsAtTime = lottery.endsAt ? new Date(lottery.endsAt).getTime() : null
   const hasNotStarted = startsAtTime !== null && startsAtTime > now

@@ -1,5 +1,6 @@
 import { createHash } from "crypto"
 import { mkdir, writeFile } from "fs/promises"
+import { fileURLToPath } from "url"
 import path from "path"
 
 import { getSiteSettings } from "@/lib/site-settings"
@@ -14,6 +15,12 @@ export interface SavedUploadFile {
   fileHash: string
 }
 
+export interface PreparedUploadFile {
+  buffer: Buffer
+  fileHash: string
+  detectedMime: string
+}
+
 const IMAGE_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -21,6 +28,9 @@ const IMAGE_MIME_TYPES = new Set([
   "image/webp",
   "image/avif",
 ])
+
+const uploadLibFilePath = fileURLToPath(import.meta.url)
+const publicRoot = path.resolve(path.dirname(uploadLibFilePath), "../../public")
 
 /**
  * 通过文件头魔数（magic bytes）检测真实 MIME 类型。
@@ -46,10 +56,22 @@ function detectMimeTypeFromBytes(bytes: Uint8Array): string | null {
   return null
 }
 
-/** 计算文件内容的 SHA-256 十六进制摘要 */
-export async function computeFileHash(file: File): Promise<string> {
-  const bytes = await file.arrayBuffer()
-  return createHash("sha256").update(Buffer.from(bytes)).digest("hex")
+/**
+ * 单次读取整文件，复用同一块 Buffer 完成哈希计算、类型检测和后续写盘。
+ */
+export async function prepareUploadedFile(file: File): Promise<PreparedUploadFile> {
+  const buffer = Buffer.from(await file.arrayBuffer())
+  const detectedMime = detectMimeTypeFromBytes(buffer.subarray(0, 12))
+
+  if (!detectedMime || !IMAGE_MIME_TYPES.has(detectedMime)) {
+    throw new Error("仅支持上传常见图片格式文件")
+  }
+
+  return {
+    buffer,
+    fileHash: createHash("sha256").update(buffer).digest("hex"),
+    detectedMime,
+  }
 }
 
 /**
@@ -58,21 +80,18 @@ export async function computeFileHash(file: File): Promise<string> {
  */
 async function saveToLocal(
   file: File,
+  preparedFile: PreparedUploadFile,
   folder: string,
   localPath: string,
   baseUrl: string | null | undefined,
-  fileHash: string,
-  detectedMime: string,
 ): Promise<SavedUploadFile> {
-  const bytes = await file.arrayBuffer()
-  const buffer = Buffer.from(bytes)
   const ext = path.extname(file.name) || ".bin"
-  const shortHash = fileHash.slice(0, 16)
+  const shortHash = preparedFile.fileHash.slice(0, 16)
   const fileName = `${folder}-${shortHash}${ext}`
-  const uploadRoot = path.join(process.cwd(), "public", localPath || "uploads", folder)
+  const uploadRoot = path.join(publicRoot, localPath || "uploads", folder)
 
   await mkdir(uploadRoot, { recursive: true })
-  await writeFile(path.join(uploadRoot, fileName), buffer)
+  await writeFile(path.join(uploadRoot, fileName), preparedFile.buffer)
 
   const resolvedBaseUrl = baseUrl?.trim() || `/${localPath || "uploads"}`
   const urlPath = `${resolvedBaseUrl}/${folder}/${fileName}`.replace(/\\/g, "/")
@@ -82,9 +101,9 @@ async function saveToLocal(
     storagePath: path.join(uploadRoot, fileName),
     urlPath,
     fileExt: ext,
-    fileSize: buffer.byteLength,
-    mimeType: detectedMime,
-    fileHash,
+    fileSize: preparedFile.buffer.byteLength,
+    mimeType: preparedFile.detectedMime,
+    fileHash: preparedFile.fileHash,
   }
 }
 
@@ -96,34 +115,26 @@ function validateOssSettings(settings: Awaited<ReturnType<typeof getSiteSettings
 
 async function saveToOss(
   file: File,
+  preparedFile: PreparedUploadFile,
   folder: string,
   settings: Awaited<ReturnType<typeof getSiteSettings>>,
-  fileHash: string,
 ): Promise<SavedUploadFile> {
   validateOssSettings(settings)
   void file
+  void preparedFile
   void folder
-  void fileHash
   throw new Error("当前版本已支持 OSS 配置校验，但尚未集成具体云厂商 SDK，请先使用本地上传或明确目标 OSS 服务后继续接入")
 }
 
-export async function saveUploadedFile(file: File, folder = "avatars", fileHash: string): Promise<SavedUploadFile> {
+export async function saveUploadedFile(file: File, preparedFile: PreparedUploadFile, folder = "avatars"): Promise<SavedUploadFile> {
   const settings = await getSiteSettings()
 
-  // 读取文件头以检测真实 MIME 类型，不信任客户端传入的 file.type
-  const headerBytes = new Uint8Array(await file.slice(0, 12).arrayBuffer())
-  const detectedMime = detectMimeTypeFromBytes(headerBytes)
-
-  if (!detectedMime || !IMAGE_MIME_TYPES.has(detectedMime)) {
-    throw new Error("仅支持上传常见图片格式文件")
-  }
-
   if (settings.uploadProvider === "local") {
-    return saveToLocal(file, folder, settings.uploadLocalPath || "uploads", settings.uploadBaseUrl, fileHash, detectedMime)
+    return saveToLocal(file, preparedFile, folder, settings.uploadLocalPath || "uploads", settings.uploadBaseUrl)
   }
 
   if (settings.uploadProvider === "oss") {
-    return saveToOss(file, folder, settings, fileHash)
+    return saveToOss(file, preparedFile, folder, settings)
   }
 
   throw new Error(`不支持的上传策略：${settings.uploadProvider}`)

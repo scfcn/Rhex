@@ -40,48 +40,9 @@ import { getLevelDefinitions } from "@/lib/level-system"
 import { getRedeemCodeList } from "@/lib/redeem-codes"
 import { getAdminReports } from "@/lib/reports"
 import { getAdminFriendLinkPageData } from "@/lib/friend-links"
+import { readSearchParam } from "@/lib/search-params"
 import { getSensitiveWordPage, getServerSiteSettings } from "@/lib/site-settings"
 import { prisma } from "@/db/client"
-
-interface AdminPageProps {
-  searchParams?: {
-    tab?: string
-    section?: string
-    type?: string
-    status?: string
-    board?: string
-    keyword?: string
-    sort?: string
-    pin?: string
-    featured?: string
-    review?: string
-    postPage?: string
-    postPageSize?: string
-    reportPage?: string
-    reportPageSize?: string
-    securityPage?: string
-    securityPageSize?: string
-    structureKeyword?: string
-    structureZoneId?: string
-    structureBoardStatus?: string
-    structurePosting?: string
-    userKeyword?: string
-    userRole?: string
-    userStatus?: string
-    userVip?: string
-    userActivity?: string
-    userSort?: string
-    userPage?: string
-    userPageSize?: string
-    logSubTab?: string
-    logKeyword?: string
-    logAction?: string
-    logChangeType?: string
-    logBucketType?: string
-    logPage?: string
-    logPageSize?: string
-  }
-}
 
 const tabLabels: Record<string, string> = {
   overview: "总览",
@@ -100,49 +61,51 @@ const tabLabels: Record<string, string> = {
   "site-upload": "上传设置",
 }
 
-export default async function AdminPage({ searchParams }: AdminPageProps) {
+export default async function AdminPage(props: PageProps<"/admin">) {
+  const searchParams = await props.searchParams;
   const admin = await requireAdminUser()
 
   if (!admin) {
     redirect("/login?redirect=/admin")
   }
 
-  const tab = searchParams?.tab ?? "overview"
-  const currentSettingsSection = searchParams?.section ?? "profile"
-  const currentPostType = isLocalPostType(searchParams?.type) ? searchParams.type : "ALL"
-
-  const currentPostStatus = searchParams?.status === "PENDING" || searchParams?.status === "NORMAL" || searchParams?.status === "OFFLINE" ? searchParams.status : "ALL"
-  const currentBoardSlug = searchParams?.board ?? ""
-  const currentKeyword = searchParams?.keyword ?? ""
-  const currentPostSort = searchParams?.sort ?? "newest"
-  const currentPostPin = searchParams?.pin ?? "ALL"
-  const currentPostFeatured = searchParams?.featured ?? "ALL"
-  const currentPostReview = searchParams?.review ?? "ALL"
-  const currentPostPage = searchParams?.postPage ?? "1"
-  const currentPostPageSize = searchParams?.postPageSize ?? "20"
-  const currentReportPage = searchParams?.reportPage ?? "1"
-  const currentReportPageSize = searchParams?.reportPageSize ?? "20"
-  const currentSecurityPage = searchParams?.securityPage ?? "1"
-  const currentSecurityPageSize = searchParams?.securityPageSize ?? "20"
-  const currentStructureKeyword = searchParams?.structureKeyword ?? ""
-  const currentStructureZoneId = searchParams?.structureZoneId ?? ""
-  const currentStructureBoardStatus = searchParams?.structureBoardStatus ?? "ALL"
-  const currentStructurePosting = searchParams?.structurePosting ?? "ALL"
-  const currentUserKeyword = searchParams?.userKeyword ?? ""
-  const currentUserRole = searchParams?.userRole ?? "ALL"
-  const currentUserStatus = searchParams?.userStatus ?? "ALL"
-  const currentUserVip = searchParams?.userVip ?? "ALL"
-  const currentUserActivity = searchParams?.userActivity ?? "ALL"
-  const currentUserSort = searchParams?.userSort ?? "newest"
-  const currentUserPage = searchParams?.userPage ?? "1"
-  const currentUserPageSize = searchParams?.userPageSize ?? "20"
-  const currentLogSubTab = searchParams?.logSubTab ?? "admin"
-  const currentLogKeyword = searchParams?.logKeyword ?? ""
-  const currentLogAction = searchParams?.logAction ?? "ALL"
-  const currentLogChangeType = searchParams?.logChangeType ?? "ALL"
-  const currentLogBucketType = searchParams?.logBucketType ?? "ALL"
-  const currentLogPage = searchParams?.logPage ?? "1"
-  const currentLogPageSize = searchParams?.logPageSize ?? "20"
+  const tab = readSearchParam(searchParams?.tab) ?? "overview"
+  const currentSettingsSection = readSearchParam(searchParams?.section) ?? "profile"
+  const currentPostTypeValue = readSearchParam(searchParams?.type)
+  const currentPostType = isLocalPostType(currentPostTypeValue) ? currentPostTypeValue : "ALL"
+  const currentPostStatusValue = readSearchParam(searchParams?.status)
+  const currentPostStatus = currentPostStatusValue === "PENDING" || currentPostStatusValue === "NORMAL" || currentPostStatusValue === "OFFLINE" ? currentPostStatusValue : "ALL"
+  const currentBoardSlug = readSearchParam(searchParams?.board) ?? ""
+  const currentKeyword = readSearchParam(searchParams?.keyword) ?? ""
+  const currentPostSort = readSearchParam(searchParams?.sort) ?? "newest"
+  const currentPostPin = readSearchParam(searchParams?.pin) ?? "ALL"
+  const currentPostFeatured = readSearchParam(searchParams?.featured) ?? "ALL"
+  const currentPostReview = readSearchParam(searchParams?.review) ?? "ALL"
+  const currentPostPage = readSearchParam(searchParams?.postPage) ?? "1"
+  const currentPostPageSize = readSearchParam(searchParams?.postPageSize) ?? "20"
+  const currentReportPage = readSearchParam(searchParams?.reportPage) ?? "1"
+  const currentReportPageSize = readSearchParam(searchParams?.reportPageSize) ?? "20"
+  const currentSecurityPage = readSearchParam(searchParams?.securityPage) ?? "1"
+  const currentSecurityPageSize = readSearchParam(searchParams?.securityPageSize) ?? "20"
+  const currentStructureKeyword = readSearchParam(searchParams?.structureKeyword) ?? ""
+  const currentStructureZoneId = readSearchParam(searchParams?.structureZoneId) ?? ""
+  const currentStructureBoardStatus = readSearchParam(searchParams?.structureBoardStatus) ?? "ALL"
+  const currentStructurePosting = readSearchParam(searchParams?.structurePosting) ?? "ALL"
+  const currentUserKeyword = readSearchParam(searchParams?.userKeyword) ?? ""
+  const currentUserRole = readSearchParam(searchParams?.userRole) ?? "ALL"
+  const currentUserStatus = readSearchParam(searchParams?.userStatus) ?? "ALL"
+  const currentUserVip = readSearchParam(searchParams?.userVip) ?? "ALL"
+  const currentUserActivity = readSearchParam(searchParams?.userActivity) ?? "ALL"
+  const currentUserSort = readSearchParam(searchParams?.userSort) ?? "newest"
+  const currentUserPage = readSearchParam(searchParams?.userPage) ?? "1"
+  const currentUserPageSize = readSearchParam(searchParams?.userPageSize) ?? "20"
+  const currentLogSubTab = readSearchParam(searchParams?.logSubTab) ?? "admin"
+  const currentLogKeyword = readSearchParam(searchParams?.logKeyword) ?? ""
+  const currentLogAction = readSearchParam(searchParams?.logAction) ?? "ALL"
+  const currentLogChangeType = readSearchParam(searchParams?.logChangeType) ?? "ALL"
+  const currentLogBucketType = readSearchParam(searchParams?.logBucketType) ?? "ALL"
+  const currentLogPage = readSearchParam(searchParams?.logPage) ?? "1"
+  const currentLogPageSize = readSearchParam(searchParams?.logPageSize) ?? "20"
 
   const [data, siteSettings, adminUsers, filteredPosts, levelDefinitions, badges, announcements, inviteCodes, redeemCodes, reports, sensitiveWordResult, logCenter, friendLinks, verificationTypes, verificationApplications] = await Promise.all([
     getAdminDashboardData(),

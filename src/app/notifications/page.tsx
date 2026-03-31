@@ -25,11 +25,12 @@ function buildPageHref(page: number) {
   return page <= 1 ? "/notifications" : `/notifications?page=${page}`
 }
 
-export default async function NotificationsPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ page?: string | string[] }>
-}) {
+export default async function NotificationsPage(
+  props: {
+    searchParams?: Promise<{ page?: string | string[] }>
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await getCurrentUser()
 
   if (!user) {

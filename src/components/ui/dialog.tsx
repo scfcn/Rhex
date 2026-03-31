@@ -1,6 +1,6 @@
 "use client"
 
-import { type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode, useEffect, useState } from "react"
+import { type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode, useEffect, useSyncExternalStore } from "react"
 import { createPortal } from "react-dom"
 
 import { cn } from "@/lib/utils"
@@ -14,11 +14,11 @@ interface DialogPortalProps {
 }
 
 export function DialogPortal({ open, children, onClose, closeOnEscape = true, lockBodyScroll = true }: DialogPortalProps) {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const mounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  )
 
   useEffect(() => {
     if (!mounted || !open) {

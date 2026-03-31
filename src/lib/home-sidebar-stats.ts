@@ -9,17 +9,6 @@ export interface HomeSidebarStatsData {
   userCount: number
 }
 
-const HOME_SIDEBAR_STATS_CACHE_TTL_MS = 300_000
-
-let cachedHomeSidebarStats: HomeSidebarStatsData | null = null
-let homeSidebarStatsCacheExpiry = 0
-let homeSidebarStatsPromise: Promise<HomeSidebarStatsData> | null = null
-
-function setHomeSidebarStatsCache(data: HomeSidebarStatsData) {
-  cachedHomeSidebarStats = data
-  homeSidebarStatsCacheExpiry = Date.now() + HOME_SIDEBAR_STATS_CACHE_TTL_MS
-}
-
 async function readHomeSidebarStatsFromDB(): Promise<HomeSidebarStatsData> {
   const [postCount, replyCount, userCount] = await Promise.all([
     prisma.post.count({
@@ -46,27 +35,8 @@ async function readHomeSidebarStatsFromDB(): Promise<HomeSidebarStatsData> {
   }
 }
 
-async function getMemoryCachedHomeSidebarStats(): Promise<HomeSidebarStatsData> {
-  if (cachedHomeSidebarStats && Date.now() < homeSidebarStatsCacheExpiry) {
-    return cachedHomeSidebarStats
-  }
-
-  if (!homeSidebarStatsPromise) {
-    homeSidebarStatsPromise = readHomeSidebarStatsFromDB()
-      .then((data) => {
-        setHomeSidebarStatsCache(data)
-        return data
-      })
-      .finally(() => {
-        homeSidebarStatsPromise = null
-      })
-  }
-
-  return homeSidebarStatsPromise
-}
-
 const getCachedHomeSidebarStats = cache(async (): Promise<HomeSidebarStatsData> => {
-  return getMemoryCachedHomeSidebarStats()
+  return readHomeSidebarStatsFromDB()
 })
 
 export async function getHomeSidebarStats(): Promise<HomeSidebarStatsData> {

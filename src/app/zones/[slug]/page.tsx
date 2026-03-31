@@ -17,27 +17,20 @@ import { getBoards } from "@/lib/boards"
 import { getHomeSidebarHotTopics, resolveSidebarUser } from "@/lib/home-sidebar"
 
 import { DEFAULT_ALLOWED_POST_TYPES } from "@/lib/post-types"
+import { readSearchParam } from "@/lib/search-params"
 import { buildMetadataKeywords } from "@/lib/seo"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getZoneBoards, getZoneBySlug, getZonePosts, getZones } from "@/lib/zones"
 import { RssSubscribeButton } from "@/components/rss-subscribe-button"
 
 
-interface ZonePageProps {
-  params: {
-    slug: string
-  }
-  searchParams?: {
-    page?: string
-  }
-}
-
 export async function generateStaticParams() {
   const zones = await getZones()
   return zones.map((zone) => ({ slug: zone.slug }))
 }
 
-export async function generateMetadata({ params }: ZonePageProps): Promise<Metadata> {
+export async function generateMetadata(props: PageProps<"/zones/[slug]">): Promise<Metadata> {
+  const params = await props.params;
   const [zone, settings] = await Promise.all([getZoneBySlug(params.slug), getSiteSettings()])
 
   if (!zone) {
@@ -55,7 +48,9 @@ export async function generateMetadata({ params }: ZonePageProps): Promise<Metad
 }
 
 
-export default async function ZonePage({ params, searchParams }: ZonePageProps) {
+export default async function ZonePage(props: PageProps<"/zones/[slug]">) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const [zone, currentUser, settings] = await Promise.all([getZoneBySlug(params.slug), getCurrentUser(), getSiteSettings()])
 
   if (!zone) {
@@ -81,7 +76,7 @@ export default async function ZonePage({ params, searchParams }: ZonePageProps) 
     requirePostReview: zone.requirePostReview ?? false,
   }, "view")
 
-  const currentPage = Math.max(1, Number(searchParams?.page ?? "1") || 1)
+  const currentPage = Math.max(1, Number(readSearchParam(searchParams?.page) ?? "1") || 1)
   const [zoneBoards, posts, allBoards, allZones, hotTopics] = await Promise.all([
     getZoneBoards(params.slug),
     permission.allowed ? getZonePosts(params.slug, currentPage, 20) : Promise.resolve([]),

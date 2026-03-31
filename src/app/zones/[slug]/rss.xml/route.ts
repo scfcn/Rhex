@@ -5,13 +5,8 @@ import { getZoneBySlug } from "@/lib/zones"
 
 export const dynamic = "force-dynamic"
 
-interface ZoneRssRouteProps {
-  params: {
-    slug: string
-  }
-}
-
-export async function GET(_request: Request, { params }: ZoneRssRouteProps) {
+export async function GET(_request: Request, props: RouteContext<"/zones/[slug]/rss.xml">) {
+  const params = await props.params;
   const zone = await getZoneBySlug(params.slug)
 
   if (!zone) {

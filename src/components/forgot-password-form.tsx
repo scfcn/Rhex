@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
+import { TextField } from "@/components/ui/text-field"
 import { toast } from "@/components/ui/toast"
 
 const SEND_INTERVAL_SECONDS = 60
@@ -119,17 +120,17 @@ export function ForgotPasswordForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <Field label="邮箱" value={email} onChange={setEmail} placeholder="输入注册时绑定的邮箱" type="email" required />
+      <TextField label="邮箱" value={email} onChange={setEmail} placeholder="输入注册时绑定的邮箱" type="email" required background="card" />
 
       <div className="space-y-3 rounded-[24px] border border-border p-4">
-        <Field label="邮箱验证码" value={code} onChange={setCode} placeholder="输入 6 位验证码" required />
+        <TextField label="邮箱验证码" value={code} onChange={setCode} placeholder="输入 6 位验证码" required background="card" />
         <Button type="button" variant="outline" onClick={() => void handleSendCode()} disabled={sending || countdown > 0} className="w-full sm:w-auto">
           {sending ? "发送中..." : countdown > 0 ? `${countdown}s 后重发` : "发送验证码"}
         </Button>
       </div>
 
-      <Field label="新密码" value={password} onChange={setPassword} placeholder="输入新的登录密码" type="password" required />
-      <Field label="确认新密码" value={confirmPassword} onChange={setConfirmPassword} placeholder="再次输入新密码" type="password" required />
+      <TextField label="新密码" value={password} onChange={setPassword} placeholder="输入新的登录密码" type="password" required background="card" />
+      <TextField label="确认新密码" value={confirmPassword} onChange={setConfirmPassword} placeholder="再次输入新密码" type="password" required background="card" />
 
       <Button className="w-full" disabled={submitting}>
         {submitting ? "提交中..." : "重置密码"}
@@ -144,18 +145,3 @@ export function ForgotPasswordForm() {
   )
 }
 
-function Field({ label, value, onChange, placeholder, required = false, type = "text" }: { label: string; value: string; onChange: (value: string) => void; placeholder: string; required?: boolean; type?: string }) {
-  return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium">{label}{required ? " *" : ""}</p>
-      <input
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-11 w-full rounded-full border border-border bg-card px-4 text-sm outline-none"
-        placeholder={placeholder}
-        required={required}
-      />
-    </div>
-  )
-}

@@ -1,9 +1,13 @@
 "use client"
 
-import { useEffect, useState, type ReactNode } from "react"
+import { useSyncExternalStore, type ReactNode } from "react"
 
 import { SidebarNavigation } from "@/components/sidebar-navigation"
-import { SIDEBAR_COLLAPSED_STORAGE_KEY } from "@/lib/sidebar-navigation-preference"
+import {
+  readSidebarNavigationCollapsedSnapshot,
+  setSidebarNavigationCollapsedPreference,
+  subscribeSidebarNavigationPreference,
+} from "@/lib/sidebar-navigation-preference"
 
 interface ForumPageShellZoneItem {
   id: string
@@ -37,19 +41,10 @@ interface ForumPageShellProps {
 }
 
 export function ForumPageShell({ zones, boards, activeZoneSlug, activeBoardSlug, main, rightSidebar }: ForumPageShellProps) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-
-  useEffect(() => {
-    setSidebarCollapsed(document.documentElement.dataset.sidebarCollapsed === "true")
-  }, [])
+  const sidebarCollapsed = useSyncExternalStore(subscribeSidebarNavigationPreference, readSidebarNavigationCollapsedSnapshot, () => false)
 
   function handleToggleSidebar() {
-    setSidebarCollapsed((current) => {
-      const next = !current
-      window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, next ? "1" : "0")
-      document.documentElement.dataset.sidebarCollapsed = next ? "true" : "false"
-      return next
-    })
+    setSidebarNavigationCollapsedPreference(!sidebarCollapsed)
   }
 
   return (

@@ -29,6 +29,7 @@ import { UserStatus } from "@/db/types"
 
 import { apiError } from "@/lib/api-route"
 import { formatMonthDayTime } from "@/lib/formatters"
+import { messageEventBus } from "@/lib/message-event-bus"
 import type {
 
 
@@ -455,6 +456,16 @@ export async function sendDirectMessage(senderId: number, recipientId: number, b
   const conversation = await getOrCreateConversation(senderId, recipientId)
 
   const message = await createDirectMessageInTransaction(conversation.id, senderId, recipientId, content)
+  const occurredAt = message.createdAt.toISOString()
+
+  messageEventBus.publish({
+    type: "message.created",
+    conversationId: conversation.id,
+    messageId: message.id,
+    senderId,
+    recipientId,
+    occurredAt,
+  })
 
 
   return {
@@ -462,7 +473,7 @@ export async function sendDirectMessage(senderId: number, recipientId: number, b
     conversationId: conversation.id,
     content: message.body,
     createdAt: formatMonthDayTime(message.createdAt),
-    occurredAt: message.createdAt.toISOString(),
+    occurredAt,
   }
 }
 

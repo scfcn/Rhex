@@ -5,17 +5,11 @@ import { RegisterForm } from "@/components/register-form"
 import { SiteHeader } from "@/components/site-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getCurrentUser } from "@/lib/auth"
+import { readSearchParam } from "@/lib/search-params"
 import { getSiteSettings } from "@/lib/site-settings"
 
-interface RegisterPageProps {
-  searchParams?: {
-    invite?: string
-    inviter?: string
-    code?: string
-  }
-}
-
-export default async function RegisterPage({ searchParams }: RegisterPageProps) {
+export default async function RegisterPage(props: PageProps<"/register">) {
+  const searchParams = await props.searchParams;
   const [user, settings] = await Promise.all([getCurrentUser(), getSiteSettings()])
 
   if (user) {
@@ -43,8 +37,8 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
     )
   }
 
-  const inviterUsername = searchParams?.invite ?? searchParams?.inviter ?? ""
-  const inviteCode = searchParams?.code ?? ""
+  const inviterUsername = readSearchParam(searchParams?.invite) ?? readSearchParam(searchParams?.inviter) ?? ""
+  const inviteCode = readSearchParam(searchParams?.code) ?? ""
 
   return (
     <div className="min-h-screen ">

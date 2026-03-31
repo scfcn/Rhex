@@ -435,15 +435,13 @@ function WinnerLeaderboardModal({ open, items, onClose }: { open: boolean; items
 }
 
 function EarnerLeaderboardModal({ open, items, onClose }: { open: boolean; items: YinYangLeaderboardUser[]; onClose: () => void }) {
-  const [activeTab, setActiveTab] = useState<EarnerTab>("today-profit")
-
-  useEffect(() => {
-    if (!open) {
-      setActiveTab("today-profit")
-    }
-  }, [open])
-
   if (!open) return null
+
+  return <EarnerLeaderboardModalBody items={items} onClose={onClose} />
+}
+
+function EarnerLeaderboardModalBody({ items, onClose }: { items: YinYangLeaderboardUser[]; onClose: () => void }) {
+  const [activeTab, setActiveTab] = useState<EarnerTab>("today-profit")
 
   const tabConfig: Array<{ id: EarnerTab; label: string }> = [
     { id: "today-profit", label: "今日盈利" },

@@ -5,21 +5,17 @@ import { SiteHeader } from "@/components/site-header"
 import { SelfServeAdsPurchasePage } from "@/components/self-serve-ads-purchase-page"
 import { getSelfServeAdsAppConfig } from "@/lib/self-serve-ads"
 import { buildSelfServeAdPriceMap, toSelfServeAdConfig } from "@/lib/self-serve-ads.shared"
+import { readSearchParam } from "@/lib/search-params"
 import { getSiteSettings } from "@/lib/site-settings"
 
 
 
 
-interface SelfServeAdsPurchaseRouteProps {
-  searchParams?: {
-    slotType?: string
-    slotIndex?: string
-  }
-}
-
-export default async function SelfServeAdsPurchaseRoute({ searchParams }: SelfServeAdsPurchaseRouteProps) {
-  const slotType = searchParams?.slotType === "IMAGE" ? "IMAGE" : searchParams?.slotType === "TEXT" ? "TEXT" : null
-  const slotIndex = Math.max(0, Number(searchParams?.slotIndex ?? 0) || 0)
+export default async function SelfServeAdsPurchaseRoute(props: PageProps<"/funs/self-serve-ads/purchase">) {
+  const searchParams = await props.searchParams;
+  const slotTypeValue = readSearchParam(searchParams?.slotType)
+  const slotType = slotTypeValue === "IMAGE" ? "IMAGE" : slotTypeValue === "TEXT" ? "TEXT" : null
+  const slotIndex = Math.max(0, Number(readSearchParam(searchParams?.slotIndex) ?? 0) || 0)
 
   if (!slotType) {
     notFound()

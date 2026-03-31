@@ -24,7 +24,7 @@ const themeInitScript = getThemeInitScript()
 const sidebarNavigationInitScript = getSidebarNavigationInitScript()
 
 export async function generateMetadata(): Promise<Metadata> {
-  const [settings, rssUrl, siteOrigin] = await Promise.all([getSiteSettings(), getRssFeedUrl(), Promise.resolve(resolveSiteOrigin())])
+  const [settings, rssUrl, siteOrigin] = await Promise.all([getSiteSettings(), getRssFeedUrl(), resolveSiteOrigin()])
 
   return {
     metadataBase: new URL(siteOrigin),

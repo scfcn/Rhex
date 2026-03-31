@@ -34,7 +34,7 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
     const analyticsCode = readOptionalStringField(body, "analyticsCode")
     const postLinkDisplayMode = readOptionalStringField(body, "postLinkDisplayMode") === "ID" ? "ID" : "SLUG"
     const homeFeedPostListDisplayMode = normalizePostListDisplayMode(body.homeFeedPostListDisplayMode)
-    const homeSidebarStatsCardEnabled = body.homeSidebarStatsCardEnabled === undefined ? true : Boolean(body.homeSidebarStatsCardEnabled)
+    const homeSidebarStatsCardEnabled = body.homeSidebarStatsCardEnabled === undefined ? existing.homeSidebarStatsCardEnabled : Boolean(body.homeSidebarStatsCardEnabled)
     const postEditableMinutes = Math.max(0, readOptionalNumberField(body, "postEditableMinutes") ?? 10)
     const commentEditableMinutes = Math.max(0, readOptionalNumberField(body, "commentEditableMinutes") ?? 5)
 

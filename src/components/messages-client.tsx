@@ -9,7 +9,7 @@ import { MessageConversationSidebar } from "@/components/message-conversation-si
 import { MessageThreadPanel } from "@/components/message-thread-panel"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import type { MessageBubbleItem, MessageCenterData, MessageConversationDetail, MessageHistoryResult, MessageStreamEvent } from "@/lib/message-types"
+import type { MessageBubbleItem, MessageCenterData, MessageHistoryResult, MessageStreamEvent } from "@/lib/message-types"
 
 interface MessagesClientProps {
   currentUser: {
@@ -23,21 +23,31 @@ export function MessagesClient({ currentUser, initialData, conversationId }: Mes
   const router = useRouter()
   const pathname = usePathname()
   const reconnectTimerRef = useRef<number | null>(null)
+  const reconnectAttemptRef = useRef(0)
   const connectionStateRef = useRef<"connecting" | "connected" | "closed">("connecting")
+  const streamCursorRef = useRef<string | null>(null)
+  const activeConversationIdRef = useRef<string | undefined>(undefined)
+  const selectedConversationIdRef = useRef<string | undefined>(conversationId)
   const messagePromptAudioRef = useRef<HTMLAudioElement | null>(null)
   const previousUnreadConversationCountRef = useRef(0)
   const unreadTitleCountRef = useRef(0)
   const originalTitleRef = useRef("")
   const [deletingConversationId, setDeletingConversationId] = useState("")
-  const [loadingHistory, setLoadingHistory] = useState(false)
-  const [historyError, setHistoryError] = useState("")
-  const [data, setData] = useState(initialData)
+  const [deletedConversationIds, setDeletedConversationIds] = useState<string[]>([])
+  const [historyLoadingConversationId, setHistoryLoadingConversationId] = useState("")
+  const [historyErrors, setHistoryErrors] = useState<Record<string, string>>({})
+  const [historyHasMoreByConversation, setHistoryHasMoreByConversation] = useState<Record<string, boolean>>({})
+  const [historyMessagesByConversation, setHistoryMessagesByConversation] = useState<Record<string, MessageBubbleItem[]>>({})
+  const [optimisticMessagesByConversation, setOptimisticMessagesByConversation] = useState<Record<string, MessageBubbleItem[]>>({})
 
-  useEffect(() => {
-    setData(initialData)
-    setHistoryError("")
-    setLoadingHistory(false)
-  }, [initialData])
+  const data = useMemo(() => buildMessageCenterView(initialData, {
+    deletedConversationIds,
+    historyHasMoreByConversation,
+    historyMessagesByConversation,
+    optimisticMessagesByConversation,
+  }), [deletedConversationIds, historyHasMoreByConversation, historyMessagesByConversation, initialData, optimisticMessagesByConversation])
+  const currentUserId = currentUser?.id
+  const shouldConnectMessageStream = Boolean(currentUserId && data && !data.usingDemoData)
 
   const activeConversationId = useMemo(() => {
     if (!data?.activeConversation) {
@@ -46,6 +56,14 @@ export function MessagesClient({ currentUser, initialData, conversationId }: Mes
 
     return data.activeConversation.id
   }, [data])
+
+  const loadingHistory = historyLoadingConversationId !== "" && historyLoadingConversationId === activeConversationId
+  const historyError = activeConversationId ? (historyErrors[activeConversationId] ?? "") : ""
+
+  useEffect(() => {
+    activeConversationIdRef.current = activeConversationId
+    selectedConversationIdRef.current = conversationId
+  }, [activeConversationId, conversationId])
 
   function resetWindowAttention() {
     unreadTitleCountRef.current = 0
@@ -69,49 +87,30 @@ export function MessagesClient({ currentUser, initialData, conversationId }: Mes
   }
 
   function handleLocalMessageSent(message: MessageBubbleItem) {
-    setData((current) => {
-      if (!current?.activeConversation) {
-        return current
-      }
+    const conversationKey = data?.activeConversation?.id
+    if (!conversationKey) {
+      return
+    }
 
-      const activeConversation: MessageConversationDetail = {
-        ...current.activeConversation,
-        subtitle: "实时会话",
-        updatedAt: message.createdAt,
-        messages: [...current.activeConversation.messages, message],
-      }
-
-      const conversations = current.conversations.map((conversation) => {
-        if (conversation.id !== activeConversation.id) {
-          return conversation
-        }
-
-        return {
-          ...conversation,
-          preview: message.body,
-          updatedAt: message.createdAt,
-          unreadCount: 0,
-        }
-      })
-
-      return {
-        ...current,
-        conversations,
-        activeConversation,
-      }
-    })
+    setOptimisticMessagesByConversation((current) => ({
+      ...current,
+      [conversationKey]: mergeMessages(current[conversationKey] ?? [], [message]),
+    }))
   }
 
   async function handleLoadHistory() {
     const currentConversation = data?.activeConversation
     const oldestMessageId = currentConversation?.messages[0]?.id
 
-    if (!currentConversation || !oldestMessageId || loadingHistory || !currentConversation.hasMoreHistory) {
+    if (!currentConversation || !oldestMessageId || historyLoadingConversationId === currentConversation.id || !currentConversation.hasMoreHistory) {
       return
     }
 
-    setLoadingHistory(true)
-    setHistoryError("")
+    setHistoryLoadingConversationId(currentConversation.id)
+    setHistoryErrors((current) => ({
+      ...current,
+      [currentConversation.id]: "",
+    }))
 
     const response = await fetch("/api/messages/history", {
       method: "POST",
@@ -127,34 +126,30 @@ export function MessagesClient({ currentUser, initialData, conversationId }: Mes
     const payload = await response.json().catch(() => null)
 
     if (!response.ok || payload?.code !== 0) {
-      setHistoryError(payload?.message ?? "加载历史消息失败")
-      setLoadingHistory(false)
+      setHistoryErrors((current) => ({
+        ...current,
+        [currentConversation.id]: payload?.message ?? "加载历史消息失败",
+      }))
+      setHistoryLoadingConversationId("")
       return
     }
 
     const result = payload?.data as MessageHistoryResult | undefined
 
     if (!result) {
-      setLoadingHistory(false)
+      setHistoryLoadingConversationId("")
       return
     }
 
-    setData((current) => {
-      if (!current?.activeConversation || current.activeConversation.id !== currentConversation.id) {
-        return current
-      }
-
-      return {
-        ...current,
-        activeConversation: {
-          ...current.activeConversation,
-          messages: [...result.messages, ...current.activeConversation.messages],
-          hasMoreHistory: result.hasMoreHistory,
-        },
-      }
-    })
-
-    setLoadingHistory(false)
+    setHistoryMessagesByConversation((current) => ({
+      ...current,
+      [currentConversation.id]: mergeMessages(result.messages, current[currentConversation.id] ?? []),
+    }))
+    setHistoryHasMoreByConversation((current) => ({
+      ...current,
+      [currentConversation.id]: result.hasMoreHistory,
+    }))
+    setHistoryLoadingConversationId("")
   }
 
   async function handleDeleteConversation(conversationIdToDelete: string) {
@@ -178,20 +173,7 @@ export function MessagesClient({ currentUser, initialData, conversationId }: Mes
     const nextConversations = data?.conversations.filter((conversation) => conversation.id !== conversationIdToDelete) ?? []
     const nextConversationId = nextConversations[0]?.id
 
-    setData((current) => {
-      if (!current) {
-        return current
-      }
-
-      const conversations = current.conversations.filter((conversation) => conversation.id !== conversationIdToDelete)
-      const isDeletingActive = current.activeConversation?.id === conversationIdToDelete
-
-      return {
-        ...current,
-        conversations,
-        activeConversation: isDeletingActive ? null : current.activeConversation,
-      }
-    })
+    setDeletedConversationIds((current) => current.includes(conversationIdToDelete) ? current : [...current, conversationIdToDelete])
 
     setDeletingConversationId("")
 
@@ -290,25 +272,54 @@ export function MessagesClient({ currentUser, initialData, conversationId }: Mes
   }, [])
 
   useEffect(() => {
-    if (!currentUser || !data || data.usingDemoData) {
+    if (!shouldConnectMessageStream || !currentUserId) {
       connectionStateRef.current = "closed"
+      reconnectAttemptRef.current = 0
+      streamCursorRef.current = null
       return
     }
 
-    const eventSource = new EventSource("/api/messages/stream")
+    let closed = false
+    let eventSource: EventSource | null = null
 
-    eventSource.onopen = () => {
-      connectionStateRef.current = "connected"
+    const clearReconnectTimer = () => {
+      if (reconnectTimerRef.current) {
+        window.clearTimeout(reconnectTimerRef.current)
+        reconnectTimerRef.current = null
+      }
     }
 
-    eventSource.onmessage = (event) => {
-      const payload = JSON.parse(event.data) as MessageStreamEvent
-
-      if (payload.type === "heartbeat" || payload.senderId === currentUser.id) {
+    const scheduleReconnect = () => {
+      if (closed || reconnectTimerRef.current) {
         return
       }
 
-      const shouldRefresh = !conversationId || payload.conversationId === activeConversationId || payload.recipientId === currentUser.id
+      connectionStateRef.current = "connecting"
+      const delay = Math.min(30_000, 1_000 * 2 ** reconnectAttemptRef.current)
+      reconnectAttemptRef.current += 1
+
+      reconnectTimerRef.current = window.setTimeout(() => {
+        reconnectTimerRef.current = null
+        connect()
+      }, delay)
+    }
+
+    const handleMessage = (event: MessageEvent<string>) => {
+      let payload: MessageStreamEvent
+
+      try {
+        payload = JSON.parse(event.data) as MessageStreamEvent
+      } catch {
+        return
+      }
+
+      if (payload.type === "heartbeat" || payload.senderId === currentUserId) {
+        return
+      }
+
+      const selectedConversation = selectedConversationIdRef.current
+      const activeConversation = activeConversationIdRef.current
+      const shouldRefresh = !selectedConversation || payload.conversationId === activeConversation || payload.recipientId === currentUserId
 
       if (!document.hasFocus() || document.visibilityState !== "visible") {
         bumpWindowAttention()
@@ -319,28 +330,62 @@ export function MessagesClient({ currentUser, initialData, conversationId }: Mes
       }
     }
 
-    eventSource.onerror = () => {
-      connectionStateRef.current = "connecting"
-      eventSource.close()
+    const handleCursor = (event: Event) => {
+      let payload: { cursor?: string }
 
-      if (reconnectTimerRef.current) {
-        window.clearTimeout(reconnectTimerRef.current)
+      try {
+        payload = JSON.parse((event as MessageEvent<string>).data) as { cursor?: string }
+      } catch {
+        return
       }
 
-      reconnectTimerRef.current = window.setTimeout(() => {
-        router.refresh()
-      }, 1200)
+      if (typeof payload.cursor === "string" && payload.cursor) {
+        streamCursorRef.current = payload.cursor
+      }
     }
+
+    const connect = () => {
+      if (closed) {
+        return
+      }
+
+      clearReconnectTimer()
+      connectionStateRef.current = "connecting"
+
+      const streamUrl = new URL("/api/messages/stream", window.location.origin)
+      if (streamCursorRef.current) {
+        streamUrl.searchParams.set("cursor", streamCursorRef.current)
+      }
+
+      eventSource = new EventSource(streamUrl)
+
+      eventSource.onopen = () => {
+        reconnectAttemptRef.current = 0
+        connectionStateRef.current = "connected"
+      }
+
+      eventSource.onmessage = handleMessage
+      eventSource.addEventListener("cursor", handleCursor as EventListener)
+      eventSource.onerror = () => {
+        if (eventSource) {
+          eventSource.close()
+          eventSource = null
+        }
+
+        scheduleReconnect()
+      }
+    }
+
+    connect()
 
     return () => {
-      if (reconnectTimerRef.current) {
-        window.clearTimeout(reconnectTimerRef.current)
-      }
-
+      closed = true
+      clearReconnectTimer()
+      reconnectAttemptRef.current = 0
       connectionStateRef.current = "closed"
-      eventSource.close()
+      eventSource?.close()
     }
-  }, [activeConversationId, conversationId, currentUser, data, router])
+  }, [currentUserId, router, shouldConnectMessageStream])
 
   const isMobileThreadVisible = Boolean(data?.activeConversation)
 
@@ -394,4 +439,77 @@ export function MessagesClient({ currentUser, initialData, conversationId }: Mes
       )}
     </main>
   )
+}
+
+function buildMessageCenterView(initialData: MessageCenterData | null, patches: {
+  deletedConversationIds: string[]
+  historyHasMoreByConversation: Record<string, boolean>
+  historyMessagesByConversation: Record<string, MessageBubbleItem[]>
+  optimisticMessagesByConversation: Record<string, MessageBubbleItem[]>
+}): MessageCenterData | null {
+  if (!initialData) {
+    return null
+  }
+
+  const deletedConversationIdSet = new Set(patches.deletedConversationIds)
+  const conversations = initialData.conversations
+    .filter((conversation) => !deletedConversationIdSet.has(conversation.id))
+    .map((conversation) => {
+      const optimisticMessages = patches.optimisticMessagesByConversation[conversation.id] ?? []
+      const latestOptimisticMessage = optimisticMessages.at(-1)
+
+      if (!latestOptimisticMessage) {
+        return conversation
+      }
+
+      return {
+        ...conversation,
+        preview: latestOptimisticMessage.body,
+        updatedAt: latestOptimisticMessage.createdAt,
+        unreadCount: 0,
+      }
+    })
+
+  if (!initialData.activeConversation || deletedConversationIdSet.has(initialData.activeConversation.id)) {
+    return {
+      ...initialData,
+      conversations,
+      activeConversation: null,
+    }
+  }
+
+  const activeConversationId = initialData.activeConversation.id
+  const historyMessages = patches.historyMessagesByConversation[activeConversationId] ?? []
+  const optimisticMessages = patches.optimisticMessagesByConversation[activeConversationId] ?? []
+  const messages = mergeMessages(historyMessages, initialData.activeConversation.messages, optimisticMessages)
+
+  return {
+    ...initialData,
+    conversations,
+    activeConversation: {
+      ...initialData.activeConversation,
+      subtitle: optimisticMessages.length > 0 ? "实时会话" : initialData.activeConversation.subtitle,
+      updatedAt: optimisticMessages.at(-1)?.createdAt ?? initialData.activeConversation.updatedAt,
+      messages,
+      hasMoreHistory: patches.historyHasMoreByConversation[activeConversationId] ?? initialData.activeConversation.hasMoreHistory,
+    },
+  }
+}
+
+function mergeMessages(...messageGroups: MessageBubbleItem[][]) {
+  const seenMessageIds = new Set<string>()
+  const mergedMessages: MessageBubbleItem[] = []
+
+  for (const group of messageGroups) {
+    for (const message of group) {
+      if (seenMessageIds.has(message.id)) {
+        continue
+      }
+
+      seenMessageIds.add(message.id)
+      mergedMessages.push(message)
+    }
+  }
+
+  return mergedMessages
 }

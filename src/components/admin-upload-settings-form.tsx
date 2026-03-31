@@ -1,8 +1,11 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 
 import { Button } from "@/components/ui/button"
+import { TextField } from "@/components/ui/text-field"
+import { saveAdminSiteSettings } from "@/lib/admin-site-settings-client"
 
 interface AdminUploadSettingsFormProps {
   initialSettings: {
@@ -20,6 +23,7 @@ interface AdminUploadSettingsFormProps {
 }
 
 export function AdminUploadSettingsForm({ initialSettings }: AdminUploadSettingsFormProps) {
+  const router = useRouter()
   const [uploadProvider, setUploadProvider] = useState(initialSettings.uploadProvider)
   const [uploadLocalPath, setUploadLocalPath] = useState(initialSettings.uploadLocalPath)
   const [uploadBaseUrl, setUploadBaseUrl] = useState(initialSettings.uploadBaseUrl ?? "")
@@ -40,25 +44,23 @@ export function AdminUploadSettingsForm({ initialSettings }: AdminUploadSettings
         event.preventDefault()
         setFeedback("")
         startTransition(async () => {
-          const response = await fetch("/api/admin/site-settings", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              uploadProvider,
-              uploadLocalPath,
-              uploadBaseUrl,
-              uploadOssBucket,
-              uploadOssRegion,
-              uploadOssEndpoint,
-              uploadRequireLogin,
-              uploadAllowedImageTypes,
-              uploadMaxFileSizeMb: Number(uploadMaxFileSizeMb),
-              uploadAvatarMaxFileSizeMb: Number(uploadAvatarMaxFileSizeMb),
-              section: "upload",
-            }),
+          const result = await saveAdminSiteSettings({
+            uploadProvider,
+            uploadLocalPath,
+            uploadBaseUrl,
+            uploadOssBucket,
+            uploadOssRegion,
+            uploadOssEndpoint,
+            uploadRequireLogin,
+            uploadAllowedImageTypes,
+            uploadMaxFileSizeMb: Number(uploadMaxFileSizeMb),
+            uploadAvatarMaxFileSizeMb: Number(uploadAvatarMaxFileSizeMb),
+            section: "upload",
           })
-          const result = await response.json()
-          setFeedback(result.message ?? (response.ok ? "保存成功" : "保存失败"))
+          setFeedback(result.message)
+          if (result.ok) {
+            router.refresh()
+          }
         })
       }}
     >
@@ -69,13 +71,13 @@ export function AdminUploadSettingsForm({ initialSettings }: AdminUploadSettings
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <SelectField label="存储策略" value={uploadProvider} onChange={setUploadProvider} options={[{ value: "local", label: "本地存储" }, { value: "oss", label: "OSS（预留）" }]} />
-          <Field label="本地上传目录" value={uploadLocalPath} onChange={setUploadLocalPath} placeholder="如 uploads" />
-          <Field label="资源访问基础 URL" value={uploadBaseUrl} onChange={setUploadBaseUrl} placeholder="留空则自动使用 /uploads" />
-          <Field label="OSS Bucket" value={uploadOssBucket} onChange={setUploadOssBucket} placeholder="如 my-bucket" />
-          <Field label="OSS Region" value={uploadOssRegion} onChange={setUploadOssRegion} placeholder="如 ap-guangzhou" />
-          <Field label="OSS Endpoint" value={uploadOssEndpoint} onChange={setUploadOssEndpoint} placeholder="如 https://oss.example.com" />
+          <TextField label="本地上传目录" value={uploadLocalPath} onChange={setUploadLocalPath} placeholder="如 uploads" />
+          <TextField label="资源访问基础 URL" value={uploadBaseUrl} onChange={setUploadBaseUrl} placeholder="留空则自动使用 /uploads" />
+          <TextField label="OSS Bucket" value={uploadOssBucket} onChange={setUploadOssBucket} placeholder="如 my-bucket" />
+          <TextField label="OSS Region" value={uploadOssRegion} onChange={setUploadOssRegion} placeholder="如 ap-guangzhou" />
+          <TextField label="OSS Endpoint" value={uploadOssEndpoint} onChange={setUploadOssEndpoint} placeholder="如 https://oss.example.com" />
           <SwitchField label="必须登录后上传" checked={uploadRequireLogin} onChange={setUploadRequireLogin} description="关闭后游客也能调用上传接口，但当前上传记录仍依赖用户归属，通常建议保持开启。" />
-          <Field label="允许图片格式" value={uploadAllowedImageTypes} onChange={setUploadAllowedImageTypes} placeholder="如 jpg, jpeg, png, gif, webp" />
+          <TextField label="允许图片格式" value={uploadAllowedImageTypes} onChange={setUploadAllowedImageTypes} placeholder="如 jpg, jpeg, png, gif, webp" />
           <NumberField label="通用图片大小上限（MB）" value={uploadMaxFileSizeMb} onChange={setUploadMaxFileSizeMb} min={1} />
           <NumberField label="头像大小上限（MB）" value={uploadAvatarMaxFileSizeMb} onChange={setUploadAvatarMaxFileSizeMb} min={1} />
         </div>
@@ -86,15 +88,6 @@ export function AdminUploadSettingsForm({ initialSettings }: AdminUploadSettings
         </div>
       </div>
     </form>
-  )
-}
-
-function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {
-  return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium">{label}</p>
-      <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none" />
-    </div>
   )
 }
 

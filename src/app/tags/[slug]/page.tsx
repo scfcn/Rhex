@@ -16,13 +16,8 @@ import { getZones } from "@/lib/zones"
 
 export const dynamic = "force-dynamic"
 
-interface TagPageProps {
-  params: {
-    slug: string
-  }
-}
-
-export async function generateMetadata({ params }: TagPageProps): Promise<Metadata> {
+export async function generateMetadata(props: PageProps<"/tags/[slug]">): Promise<Metadata> {
+  const params = await props.params;
   const [tag, settings] = await Promise.all([getTagBySlug(params.slug), getSiteSettings()])
 
   if (!tag) {
@@ -38,7 +33,8 @@ export async function generateMetadata({ params }: TagPageProps): Promise<Metada
   }
 }
 
-export default async function TagPage({ params }: TagPageProps) {
+export default async function TagPage(props: PageProps<"/tags/[slug]">) {
+  const params = await props.params;
   const tag = await getTagBySlug(params.slug)
 
   if (!tag) {

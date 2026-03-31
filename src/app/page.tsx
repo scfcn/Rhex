@@ -14,6 +14,7 @@ import { getHomeSidebarHotTopics, resolveSidebarUser } from "@/lib/home-sidebar"
 import { getHomeSidebarStats } from "@/lib/home-sidebar-stats"
 import { SelfServeAdsSidebar } from "@/components/self-serve-ads-sidebar"
 import { groupHomeSidebarPanels } from "@/lib/home-sidebar-layout"
+import { readSearchParam } from "@/lib/search-params"
 import { getSiteSettings } from "@/lib/site-settings"
 
 import { getSelfServeAdsAppConfig, getSelfServeAdsPanelData } from "@/lib/self-serve-ads"
@@ -24,13 +25,6 @@ import { getZones } from "@/lib/zones"
 
 
 
-
-interface HomePageProps {
-  searchParams?: {
-    page?: string
-    sort?: string
-  }
-}
 
 function normalizeSort(sort?: string): FeedSort {
   if (sort === "new" || sort === "hot") {
@@ -54,9 +48,10 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-export default async function HomePage({ searchParams }: HomePageProps) {
-  const currentPage = Number(searchParams?.page ?? "1") || 1
-  const currentSort = normalizeSort(searchParams?.sort)
+export default async function HomePage(props: PageProps<"/">) {
+  const searchParams = await props.searchParams;
+  const currentPage = Number(readSearchParam(searchParams?.page) ?? "1") || 1
+  const currentSort = normalizeSort(readSearchParam(searchParams?.sort))
   const [feed, boards, zones, currentUser, hotTopics, announcements, settings, friendLinks, selfServeAdsConfig, selfServeAdsPanelData] = await Promise.all([
     getLatestFeed(currentPage, 35, currentSort),
     getBoards(),

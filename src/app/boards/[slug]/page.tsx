@@ -19,6 +19,7 @@ import { checkBoardPermission } from "@/lib/board-access"
 import { getBoardBySlug, getBoardPosts, getBoards, isUserFollowingBoard } from "@/lib/boards"
 import { getHomeSidebarHotTopics, resolveSidebarUser } from "@/lib/home-sidebar"
 import { DEFAULT_ALLOWED_POST_TYPES, normalizePostTypes } from "@/lib/post-types"
+import { readSearchParam } from "@/lib/search-params"
 import { buildMetadataKeywords } from "@/lib/seo"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getZones } from "@/lib/zones"
@@ -26,21 +27,13 @@ import { getZones } from "@/lib/zones"
 
 
 
-interface BoardPageProps {
-  params: {
-    slug: string
-  }
-  searchParams?: {
-    page?: string
-  }
-}
-
 export async function generateStaticParams() {
   const boards = await getBoards()
   return boards.map((board) => ({ slug: board.slug }))
 }
 
-export async function generateMetadata({ params }: BoardPageProps): Promise<Metadata> {
+export async function generateMetadata(props: PageProps<"/boards/[slug]">): Promise<Metadata> {
+  const params = await props.params;
   const [board, settings] = await Promise.all([getBoardBySlug(params.slug), getSiteSettings()])
 
   if (!board) {
@@ -65,7 +58,9 @@ export async function generateMetadata({ params }: BoardPageProps): Promise<Meta
 }
 
 
-export default async function BoardPage({ params, searchParams }: BoardPageProps) {
+export default async function BoardPage(props: PageProps<"/boards/[slug]">) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const [board, currentUser, settings] = await Promise.all([getBoardBySlug(params.slug), getCurrentUser(), getSiteSettings()])
 
   if (!board) {
@@ -91,7 +86,7 @@ export default async function BoardPage({ params, searchParams }: BoardPageProps
     requirePostReview: board.requirePostReview ?? false,
   }, "view")
 
-  const currentPage = Number(searchParams?.page ?? "1") || 1
+  const currentPage = Number(readSearchParam(searchParams?.page) ?? "1") || 1
   const [posts, boards, zones, hotTopics] = await Promise.all([
     permission.allowed ? getBoardPosts(params.slug, currentPage, 20) : Promise.resolve([]),
     getBoards(),

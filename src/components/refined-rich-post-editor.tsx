@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
 
 
 import { createPortal } from "react-dom"
@@ -53,11 +53,7 @@ function useFloatingPanel() {
   const [isReady, setIsReady] = useState(false)
   const ref = useRef<HTMLDivElement | null>(null)
 
-  const panelRef = useRef({ position, setPosition, isReady, setIsReady, ref })
-  panelRef.current.position = position
-  panelRef.current.isReady = isReady
-
-  return panelRef.current
+  return [position, setPosition, isReady, setIsReady, ref] as const
 }
 
 const EDITOR_LINE_HEIGHT_REM = 1.75
@@ -401,11 +397,11 @@ export function RefinedRichPostEditor({
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const mediaPanel = useFloatingPanel()
-  const emojiPanel = useFloatingPanel()
-  const tablePanel = useFloatingPanel()
-  const linkPanel = useFloatingPanel()
-  const uploadPanel = useFloatingPanel()
+  const [mediaPanelPosition, setMediaPanelPosition, mediaPanelReady, setMediaPanelReady, mediaPanelRef] = useFloatingPanel()
+  const [emojiPanelPosition, setEmojiPanelPosition, emojiPanelReady, setEmojiPanelReady, emojiPanelRef] = useFloatingPanel()
+  const [tablePanelPosition, setTablePanelPosition, tablePanelReady, setTablePanelReady, tablePanelRef] = useFloatingPanel()
+  const [linkPanelPosition, setLinkPanelPosition, linkPanelReady, setLinkPanelReady, linkPanelRef] = useFloatingPanel()
+  const [uploadPanelPosition, setUploadPanelPosition, uploadPanelReady, setUploadPanelReady, uploadPanelRef] = useFloatingPanel()
   const mediaButtonRef = useRef<HTMLDivElement | null>(null)
   const emojiButtonRef = useRef<HTMLDivElement | null>(null)
   const tableButtonRef = useRef<HTMLDivElement | null>(null)
@@ -427,11 +423,15 @@ export function RefinedRichPostEditor({
   const [linkText, setLinkText] = useState("")
   const [linkUrl, setLinkUrl] = useState("")
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [isClient, setIsClient] = useState(false)
   const [editorScrollTop, setEditorScrollTop] = useState(0)
   const [activeLineNumber, setActiveLineNumber] = useState(1)
   const [lineHeights, setLineHeights] = useState<number[]>([EDITOR_FALLBACK_LINE_HEIGHT_PX])
   const [tableHoverSize, setTableHoverSize] = useState({ rows: 0, columns: 0 })
+  const isClient = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  )
   const markdownEmojiMap = useMarkdownEmojiMap(externalMarkdownEmojiMap)
   const { uploading, uploadResults, uploadImageFiles, clearUploadResults } = useImageUpload({
     uploadFolder,
@@ -446,13 +446,16 @@ export function RefinedRichPostEditor({
 
   useEffect(() => {
     const element = textareaRef.current
-    if (!element) {
-      setActiveLineNumber(1)
-      return
-    }
+    const nextLineNumber = !element
+      ? 1
+      : value.slice(0, element.selectionStart ?? 0).split("\n").length
+    const frameId = window.requestAnimationFrame(() => {
+      setActiveLineNumber(nextLineNumber)
+    })
 
-    const caretPosition = element.selectionStart ?? 0
-    setActiveLineNumber(value.slice(0, caretPosition).split("\n").length)
+    return () => {
+      window.cancelAnimationFrame(frameId)
+    }
   }, [value])
 
   const measureLineHeights = useCallback(() => {
@@ -542,15 +545,6 @@ export function RefinedRichPostEditor({
   }, [tableHoverSize.columns, tableHoverSize.rows])
 
   useEffect(() => {
-    setIsClient(true)
-  }, [])
-
-
-
-
-
-
-  useEffect(() => {
     if (!isFullscreen) {
       return
     }
@@ -604,25 +598,32 @@ export function RefinedRichPostEditor({
   }, [])
 
 
-  const syncFloatingPanel = useCallback((panel: ReturnType<typeof useFloatingPanel>, show: boolean, anchor: HTMLDivElement | null, width: number) => {
+  const syncFloatingPanel = useCallback((
+    show: boolean,
+    anchor: HTMLDivElement | null,
+    width: number,
+    panelRef: React.MutableRefObject<HTMLDivElement | null>,
+    setPanelPosition: React.Dispatch<React.SetStateAction<FloatingPanelPosition | null>>,
+    setPanelReady: React.Dispatch<React.SetStateAction<boolean>>,
+  ) => {
     if (!show) {
-      panel.setPosition(null)
-      panel.setIsReady(false)
+      setPanelPosition(null)
+      setPanelReady(false)
       return
     }
 
-    const nextPosition = updateFloatingPanelPosition(anchor, panel.ref.current, width)
-    panel.setPosition(nextPosition)
-    panel.setIsReady(Boolean(nextPosition && panel.ref.current?.offsetHeight))
+    const nextPosition = updateFloatingPanelPosition(anchor, panelRef.current, width)
+    setPanelPosition(nextPosition)
+    setPanelReady(Boolean(nextPosition && panelRef.current?.offsetHeight))
   }, [updateFloatingPanelPosition])
 
   const syncFloatingPanels = useCallback(() => {
-    syncFloatingPanel(mediaPanel, showMediaPanel, mediaButtonRef.current, 320)
-    syncFloatingPanel(emojiPanel, showEmojiPanel, emojiButtonRef.current, 260)
-    syncFloatingPanel(tablePanel, showTablePanel, tableButtonRef.current, 292)
-    syncFloatingPanel(linkPanel, showLinkPanel, linkButtonRef.current, 320)
-    syncFloatingPanel(uploadPanel, showUploadPanel, imageButtonRef.current, 320)
-  }, [emojiPanel, linkPanel, mediaPanel, showEmojiPanel, showLinkPanel, showMediaPanel, showTablePanel, showUploadPanel, syncFloatingPanel, tablePanel, uploadPanel])
+    syncFloatingPanel(showMediaPanel, mediaButtonRef.current, 320, mediaPanelRef, setMediaPanelPosition, setMediaPanelReady)
+    syncFloatingPanel(showEmojiPanel, emojiButtonRef.current, 260, emojiPanelRef, setEmojiPanelPosition, setEmojiPanelReady)
+    syncFloatingPanel(showTablePanel, tableButtonRef.current, 292, tablePanelRef, setTablePanelPosition, setTablePanelReady)
+    syncFloatingPanel(showLinkPanel, linkButtonRef.current, 320, linkPanelRef, setLinkPanelPosition, setLinkPanelReady)
+    syncFloatingPanel(showUploadPanel, imageButtonRef.current, 320, uploadPanelRef, setUploadPanelPosition, setUploadPanelReady)
+  }, [emojiPanelRef, linkPanelRef, mediaPanelRef, setEmojiPanelPosition, setEmojiPanelReady, setLinkPanelPosition, setLinkPanelReady, setMediaPanelPosition, setMediaPanelReady, setTablePanelPosition, setTablePanelReady, setUploadPanelPosition, setUploadPanelReady, showEmojiPanel, showLinkPanel, showMediaPanel, showTablePanel, showUploadPanel, syncFloatingPanel, tablePanelRef, uploadPanelRef])
 
   useLayoutEffect(() => {
     if (!showMediaPanel && !showEmojiPanel && !showTablePanel && !showLinkPanel && !showUploadPanel) {
@@ -638,7 +639,7 @@ export function RefinedRichPostEditor({
     return () => {
       window.cancelAnimationFrame(frameId)
     }
-  }, [emojiPanel.ref, linkPanel.ref, mediaPanel.ref, showEmojiPanel, showLinkPanel, showMediaPanel, showTablePanel, showUploadPanel, syncFloatingPanels, tablePanel.ref, uploadPanel.ref])
+  }, [emojiPanelRef, linkPanelRef, mediaPanelRef, showEmojiPanel, showLinkPanel, showMediaPanel, showTablePanel, showUploadPanel, syncFloatingPanels, tablePanelRef, uploadPanelRef])
 
 
 
@@ -651,7 +652,7 @@ export function RefinedRichPostEditor({
       const target = event.target as Node
       if (showMediaPanel) {
         const clickedMediaButton = mediaButtonRef.current?.contains(target)
-        const clickedMediaPanel = mediaPanel.ref.current?.contains(target)
+        const clickedMediaPanel = mediaPanelRef.current?.contains(target)
         if (!clickedMediaButton && !clickedMediaPanel) {
           setShowMediaPanel(false)
         }
@@ -659,7 +660,7 @@ export function RefinedRichPostEditor({
 
       if (showEmojiPanel) {
         const clickedEmojiButton = emojiButtonRef.current?.contains(target)
-        const clickedEmojiPanel = emojiPanel.ref.current?.contains(target)
+        const clickedEmojiPanel = emojiPanelRef.current?.contains(target)
         if (!clickedEmojiButton && !clickedEmojiPanel) {
           setShowEmojiPanel(false)
         }
@@ -667,7 +668,7 @@ export function RefinedRichPostEditor({
 
       if (showTablePanel) {
         const clickedTableButton = tableButtonRef.current?.contains(target)
-        const clickedTablePanel = tablePanel.ref.current?.contains(target)
+        const clickedTablePanel = tablePanelRef.current?.contains(target)
         if (!clickedTableButton && !clickedTablePanel) {
           setShowTablePanel(false)
           setTableHoverSize({ rows: 0, columns: 0 })
@@ -676,7 +677,7 @@ export function RefinedRichPostEditor({
 
       if (showLinkPanel) {
         const clickedLinkButton = linkButtonRef.current?.contains(target)
-        const clickedLinkPanel = linkPanel.ref.current?.contains(target)
+        const clickedLinkPanel = linkPanelRef.current?.contains(target)
         if (!clickedLinkButton && !clickedLinkPanel) {
           setShowLinkPanel(false)
         }
@@ -684,7 +685,7 @@ export function RefinedRichPostEditor({
 
       if (showUploadPanel) {
         const clickedImageButton = imageButtonRef.current?.contains(target)
-        const clickedUploadPanel = uploadPanel.ref.current?.contains(target)
+        const clickedUploadPanel = uploadPanelRef.current?.contains(target)
         if (!clickedImageButton && !clickedUploadPanel) {
           setShowUploadPanel(false)
         }
@@ -703,7 +704,7 @@ export function RefinedRichPostEditor({
       window.removeEventListener("scroll", handleViewportChange, true)
       document.removeEventListener("mousedown", handlePointerDown)
     }
-  }, [emojiPanel.ref, linkPanel.ref, mediaPanel.ref, showEmojiPanel, showLinkPanel, showMediaPanel, showTablePanel, showUploadPanel, syncFloatingPanels, tablePanel.ref, uploadPanel.ref])
+  }, [emojiPanelRef, linkPanelRef, mediaPanelRef, showEmojiPanel, showLinkPanel, showMediaPanel, showTablePanel, showUploadPanel, syncFloatingPanels, tablePanelRef, uploadPanelRef])
 
 
   const syncSelection = useCallback(() => {
@@ -1251,19 +1252,19 @@ export function RefinedRichPostEditor({
           </div>
         </div>
       </div>
-      {isClient && showMediaPanel && mediaPanel.position && !disabled ? createPortal(
+      {isClient && showMediaPanel && mediaPanelPosition && !disabled ? createPortal(
         <div
-          ref={mediaPanel.ref}
+          ref={mediaPanelRef}
           className="fixed z-[90] overflow-y-auto rounded-2xl border border-border bg-background p-4 shadow-2xl"
           style={{
-            left: mediaPanel.position.left,
-            top: mediaPanel.position.top,
-            width: mediaPanel.position.width,
-            maxHeight: mediaPanel.position.maxHeight,
-            opacity: mediaPanel.isReady ? 1 : 0,
-            pointerEvents: mediaPanel.isReady ? "auto" : "none",
+            left: mediaPanelPosition.left,
+            top: mediaPanelPosition.top,
+            width: mediaPanelPosition.width,
+            maxHeight: mediaPanelPosition.maxHeight,
+            opacity: mediaPanelReady ? 1 : 0,
+            pointerEvents: mediaPanelReady ? "auto" : "none",
           }}
-          aria-hidden={!mediaPanel.isReady}
+          aria-hidden={!mediaPanelReady}
         >
 
 
@@ -1302,19 +1303,19 @@ export function RefinedRichPostEditor({
         </div>,
         document.body,
       ) : null}
-      {isClient && showLinkPanel && linkPanel.position && !disabled ? createPortal(
+      {isClient && showLinkPanel && linkPanelPosition && !disabled ? createPortal(
         <div
-          ref={linkPanel.ref}
+          ref={linkPanelRef}
           className="fixed z-[90] overflow-y-auto rounded-2xl border border-border bg-background p-4 shadow-2xl"
           style={{
-            left: linkPanel.position.left,
-            top: linkPanel.position.top,
-            width: linkPanel.position.width,
-            maxHeight: linkPanel.position.maxHeight,
-            opacity: linkPanel.isReady ? 1 : 0,
-            pointerEvents: linkPanel.isReady ? "auto" : "none",
+            left: linkPanelPosition.left,
+            top: linkPanelPosition.top,
+            width: linkPanelPosition.width,
+            maxHeight: linkPanelPosition.maxHeight,
+            opacity: linkPanelReady ? 1 : 0,
+            pointerEvents: linkPanelReady ? "auto" : "none",
           }}
-          aria-hidden={!linkPanel.isReady}
+          aria-hidden={!linkPanelReady}
         >
           <div className="mb-3 space-y-1">
             <div className="text-sm font-medium text-foreground">插入链接</div>
@@ -1361,19 +1362,19 @@ export function RefinedRichPostEditor({
         </div>,
         document.body,
       ) : null}
-      {isClient && showTablePanel && tablePanel.position && !disabled ? createPortal(
+      {isClient && showTablePanel && tablePanelPosition && !disabled ? createPortal(
         <div
-          ref={tablePanel.ref}
+          ref={tablePanelRef}
           className="fixed z-[90] overflow-y-auto rounded-2xl border border-border bg-background p-4 shadow-2xl"
           style={{
-            left: tablePanel.position.left,
-            top: tablePanel.position.top,
-            width: tablePanel.position.width,
-            maxHeight: tablePanel.position.maxHeight,
-            opacity: tablePanel.isReady ? 1 : 0,
-            pointerEvents: tablePanel.isReady ? "auto" : "none",
+            left: tablePanelPosition.left,
+            top: tablePanelPosition.top,
+            width: tablePanelPosition.width,
+            maxHeight: tablePanelPosition.maxHeight,
+            opacity: tablePanelReady ? 1 : 0,
+            pointerEvents: tablePanelReady ? "auto" : "none",
           }}
-          aria-hidden={!tablePanel.isReady}
+          aria-hidden={!tablePanelReady}
         >
           <div className="mb-3 space-y-1">
             <div className="text-sm font-medium text-foreground">插入表格</div>
@@ -1418,19 +1419,19 @@ export function RefinedRichPostEditor({
         </div>,
         document.body,
       ) : null}
-      {isClient && showEmojiPanel && emojiPanel.position && !disabled ? createPortal(
+      {isClient && showEmojiPanel && emojiPanelPosition && !disabled ? createPortal(
         <div
-          ref={emojiPanel.ref}
+          ref={emojiPanelRef}
           className="fixed z-[90] overflow-y-auto rounded-2xl border border-border bg-background p-3 shadow-2xl"
           style={{
-            left: emojiPanel.position.left,
-            top: emojiPanel.position.top,
-            width: emojiPanel.position.width,
-            maxHeight: emojiPanel.position.maxHeight,
-            opacity: emojiPanel.isReady ? 1 : 0,
-            pointerEvents: emojiPanel.isReady ? "auto" : "none",
+            left: emojiPanelPosition.left,
+            top: emojiPanelPosition.top,
+            width: emojiPanelPosition.width,
+            maxHeight: emojiPanelPosition.maxHeight,
+            opacity: emojiPanelReady ? 1 : 0,
+            pointerEvents: emojiPanelReady ? "auto" : "none",
           }}
-          aria-hidden={!emojiPanel.isReady}
+          aria-hidden={!emojiPanelReady}
         >
 
 
@@ -1450,19 +1451,19 @@ export function RefinedRichPostEditor({
         </div>,
         document.body,
       ) : null}
-      {isClient && showUploadPanel && uploadPanel.position ? createPortal(
+      {isClient && showUploadPanel && uploadPanelPosition ? createPortal(
         <div
-          ref={uploadPanel.ref}
+          ref={uploadPanelRef}
           className="fixed z-[90] overflow-y-auto rounded-2xl border border-border bg-background p-4 shadow-2xl"
           style={{
-            left: uploadPanel.position.left,
-            top: uploadPanel.position.top,
-            width: uploadPanel.position.width,
-            maxHeight: uploadPanel.position.maxHeight,
-            opacity: uploadPanel.isReady ? 1 : 0,
-            pointerEvents: uploadPanel.isReady ? "auto" : "none",
+            left: uploadPanelPosition.left,
+            top: uploadPanelPosition.top,
+            width: uploadPanelPosition.width,
+            maxHeight: uploadPanelPosition.maxHeight,
+            opacity: uploadPanelReady ? 1 : 0,
+            pointerEvents: uploadPanelReady ? "auto" : "none",
           }}
-          aria-hidden={!uploadPanel.isReady}
+          aria-hidden={!uploadPanelReady}
         >
           <div className="mb-3 space-y-1">
             <div className="text-sm font-medium text-foreground">图片上传</div>

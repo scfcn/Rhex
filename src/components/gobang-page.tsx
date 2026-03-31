@@ -228,7 +228,7 @@ export function GobangPage({ config, initialMatches, initialSummary }: GobangPag
   const [rulesCollapsed, setRulesCollapsed] = useState(false)
   const [showNoRegret, setShowNoRegret] = useState(false)
   const [showPreviousResult, setShowPreviousResult] = useState(false)
-  const [selectedHistoryMatchId, setSelectedHistoryMatchId] = useState<string | null>(null)
+  const [preferredHistoryMatchId, setPreferredHistoryMatchId] = useState<string | null>(null)
   const [historyFilter] = useState<"all" | "win" | "lose">("all")
   const [isPending, startTransition] = useTransition()
 
@@ -236,6 +236,7 @@ export function GobangPage({ config, initialMatches, initialSummary }: GobangPag
   const aiMoveAudioRef = useRef<HTMLAudioElement | null>(null)
   const noRegretAudioRef = useRef<HTMLAudioElement | null>(null)
   const noRegretTimerRef = useRef<number | null>(null)
+  const hasInitializedRef = useRef(false)
 
   const activeMatch = useMemo(() => matches.find((item) => item.id === activeMatchId) ?? matches.find((item) => item.status === "ONGOING") ?? matches[0] ?? null, [activeMatchId, matches])
   const latestMove = activeMatch?.moves.at(-1) ? { r: activeMatch.moves.at(-1)!.y, c: activeMatch.moves.at(-1)!.x } : null
@@ -244,12 +245,13 @@ export function GobangPage({ config, initialMatches, initialSummary }: GobangPag
     .filter((item) => item.status === "FINISHED")
     .sort((left, right) => new Date(right.finishedAt || right.updatedAt || right.createdAt).getTime() - new Date(left.finishedAt || left.updatedAt || left.createdAt).getTime()), [matches])
   const filteredHistoryMatches = useMemo(() => historyFilter === "all" ? historyMatches : historyFilter === "win" ? historyMatches.filter((item) => item.winnerId !== 0) : historyMatches.filter((item) => item.winnerId === 0), [historyFilter, historyMatches])
+  const selectedHistoryMatchId = useMemo(() => preferredHistoryMatchId && filteredHistoryMatches.some((item) => item.id === preferredHistoryMatchId) ? preferredHistoryMatchId : filteredHistoryMatches[0]?.id ?? null, [filteredHistoryMatches, preferredHistoryMatchId])
   const selectedHistoryMatch = useMemo(() => filteredHistoryMatches.find((item) => item.id === selectedHistoryMatchId) ?? filteredHistoryMatches[0] ?? null, [filteredHistoryMatches, selectedHistoryMatchId])
   const selectedHistoryWinningLine = useMemo(() => selectedHistoryMatch ? resolveWinningLine(selectedHistoryMatch.board, selectedHistoryMatch.winnerId) : null, [selectedHistoryMatch])
   const selectedHistoryMessage = useMemo(() => !selectedHistoryMatch ? "" : selectedHistoryMatch.winnerId === 0 ? "本局结果：AI 获胜" : selectedHistoryMatch.winnerId === null ? "本局结果：本局平局" : "本局结果：你赢了", [selectedHistoryMatch])
-  const selectedHistoryIndex = useMemo(() => selectedHistoryMatch ? historyMatches.findIndex((item) => item.id === selectedHistoryMatch.id) : -1, [historyMatches, selectedHistoryMatch])
+  const selectedHistoryIndex = useMemo(() => selectedHistoryMatch ? filteredHistoryMatches.findIndex((item) => item.id === selectedHistoryMatch.id) : -1, [filteredHistoryMatches, selectedHistoryMatch])
   const canSelectPreviousHistory = selectedHistoryIndex > 0
-  const canSelectNextHistory = selectedHistoryIndex >= 0 && selectedHistoryIndex < historyMatches.length - 1
+  const canSelectNextHistory = selectedHistoryIndex >= 0 && selectedHistoryIndex < filteredHistoryMatches.length - 1
 
   useEffect(() => {
     userMoveAudioRef.current = new Audio(userMoveAudioUrl)
@@ -279,14 +281,6 @@ export function GobangPage({ config, initialMatches, initialSummary }: GobangPag
       noRegretTimerRef.current = null
     }, NO_REGRET_DURATION)
   }, [playMoveSound])
-
-  useEffect(() => {
-    if (!filteredHistoryMatches.length) {
-      setSelectedHistoryMatchId(null)
-      return
-    }
-    setSelectedHistoryMatchId((current) => current && filteredHistoryMatches.some((item) => item.id === current) ? current : filteredHistoryMatches[0]!.id)
-  }, [filteredHistoryMatches])
 
   const currentBoard = activeMatch?.board ?? emptyBoard
   const boardDisabled = showNoRegret || !activeMatch || activeMatch.status === "FINISHED" || activeMatch.currentSide !== "PLAYER" || isPending || gameState.isLoadingAI
@@ -339,7 +333,14 @@ export function GobangPage({ config, initialMatches, initialSummary }: GobangPag
     syncFromMatches(result.data.matches, result.data.summary)
   }, [syncFromMatches])
 
-  useEffect(() => { void refreshMatches() }, [refreshMatches])
+  const handleMount = useCallback((node: HTMLDivElement | null) => {
+    if (!node || hasInitializedRef.current) {
+      return
+    }
+
+    hasInitializedRef.current = true
+    void refreshMatches()
+  }, [refreshMatches])
 
   const handleStartGame = useCallback(() => {
     startTransition(async () => {
@@ -379,15 +380,15 @@ export function GobangPage({ config, initialMatches, initialSummary }: GobangPag
   }, [activeMatch, boardDisabled, gameState.freeCount, gameState.freeTotal, gameState.freeUsed, gameState.paidRemain, gameState.paidTotal, gameState.paidUsed, gameState.pointName, gameState.points, matches, playMoveSound, startTransition, syncFromMatches])
 
   const handleSwitchHistory = useCallback((direction: "prev" | "next") => {
-    if (!historyMatches.length || selectedHistoryIndex < 0) return
+    if (!filteredHistoryMatches.length || selectedHistoryIndex < 0) return
     const targetIndex = direction === "prev" ? selectedHistoryIndex - 1 : selectedHistoryIndex + 1
-    const targetMatch = historyMatches[targetIndex]
+    const targetMatch = filteredHistoryMatches[targetIndex]
     if (!targetMatch) return
-    setSelectedHistoryMatchId(targetMatch.id)
-  }, [historyMatches, selectedHistoryIndex])
+    setPreferredHistoryMatchId(targetMatch.id)
+  }, [filteredHistoryMatches, selectedHistoryIndex])
 
   return (
-    <div className="flex min-h-screen items-start justify-center bg-background px-4 pt-2 pb-6">
+    <div ref={handleMount} className="flex min-h-screen items-start justify-center bg-background px-4 pt-2 pb-6">
       <div className="gobang-layout">
         <div className="gobang-rules">
           <div className="gobang-rules-header"><p className="gobang-rules-title">规则说明</p><button type="button" className="gobang-rules-toggle" onClick={() => setRulesCollapsed((value) => !value)} aria-expanded={!rulesCollapsed}>{rulesCollapsed ? "展开" : "收起"}</button></div>

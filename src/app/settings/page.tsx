@@ -18,20 +18,13 @@ import { describeBadgeRule, getBadgeCenterData } from "@/lib/badges"
 import { getCurrentUser } from "@/lib/auth"
 import { getPostPath } from "@/lib/post-links"
 import { getUserPointLogs } from "@/lib/points"
+import { readSearchParam } from "@/lib/search-params"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getCurrentUserLevelProgressView } from "@/lib/user-level-view"
 import { getUserBoardFollows, getUserFavoritePosts, getUserLikedPosts, getUserPosts, getUserReplies } from "@/lib/user-panel"
 import { getUserAccountSettings, getUserProfile } from "@/lib/users"
 import { getCurrentUserVerificationData } from "@/lib/verifications"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
-
-interface SettingsPageProps {
-  searchParams?: {
-    tab?: string
-    page?: string
-    postTab?: string
-  }
-}
 
 type SettingsTabKey = "profile" | "invite" | "post-management" | "level" | "badges" | "verifications" | "points" | "follows"
 type PostManagementTabKey = "posts" | "replies" | "favorites" | "likes"
@@ -44,7 +37,8 @@ const postManagementTabs: Array<{ key: PostManagementTabKey; label: string }> = 
   { key: "likes", label: "我的点赞" },
 ]
 
-export default async function SettingsPage({ searchParams }: SettingsPageProps) {
+export default async function SettingsPage(props: PageProps<"/settings">) {
+  const searchParams = await props.searchParams;
   const [currentUser, settings] = await Promise.all([getCurrentUser(), getSiteSettings()])
 
   if (!currentUser) {
@@ -60,13 +54,15 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
     redirect("/")
   }
 
-  const currentTab: SettingsTabKey = tabs.includes((searchParams?.tab as SettingsTabKey) ?? "profile")
-    ? ((searchParams?.tab as SettingsTabKey) ?? "profile")
+  const currentTabValue = readSearchParam(searchParams?.tab)
+  const currentPostTabValue = readSearchParam(searchParams?.postTab)
+  const currentTab: SettingsTabKey = tabs.includes((currentTabValue as SettingsTabKey) ?? "profile")
+    ? ((currentTabValue as SettingsTabKey) ?? "profile")
     : "profile"
-  const currentPostTab: PostManagementTabKey = postManagementTabs.some((tab) => tab.key === searchParams?.postTab)
-    ? (searchParams?.postTab as PostManagementTabKey)
+  const currentPostTab: PostManagementTabKey = postManagementTabs.some((tab) => tab.key === currentPostTabValue)
+    ? (currentPostTabValue as PostManagementTabKey)
     : "posts"
-  const currentPage = Math.max(1, Number(searchParams?.page ?? "1") || 1)
+  const currentPage = Math.max(1, Number(readSearchParam(searchParams?.page) ?? "1") || 1)
 
   const [userPosts, replies, favoritePosts, likedPosts, followedBoards, levelView, badges, verificationData, pointLogs] = await Promise.all([
     currentTab === "post-management" && currentPostTab === "posts"

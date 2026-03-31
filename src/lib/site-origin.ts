@@ -1,7 +1,7 @@
-import { headers } from "next/headers"
+import { headers } from "next/headers";
 
 function normalizeOrigin(value: string) {
-  return value.trim().replace(/\/$/, "")
+  return value.trim().replace(/\/$/, "");
 }
 
 export function getConfiguredSiteOrigin() {
@@ -9,13 +9,13 @@ export function getConfiguredSiteOrigin() {
   return envOrigin ? normalizeOrigin(envOrigin) : null
 }
 
-export function resolveSiteOrigin() {
+export async function resolveSiteOrigin() {
   const configuredOrigin = getConfiguredSiteOrigin()
   if (configuredOrigin) {
     return configuredOrigin
   }
 
-  const headerStore = headers()
+  const headerStore = await headers()
   const proto = headerStore.get("x-forwarded-proto") ?? "https"
   const forwardedHost = headerStore.get("x-forwarded-host")
   const host = forwardedHost?.split(",")[0]?.trim() || headerStore.get("host")?.trim()
@@ -27,6 +27,6 @@ export function resolveSiteOrigin() {
   return normalizeOrigin(`${proto}://${host}`)
 }
 
-export function toAbsoluteSiteUrl(path = "/") {
-  return new URL(path, `${resolveSiteOrigin()}/`).toString()
+export async function toAbsoluteSiteUrl(path = "/") {
+  return new URL(path, `${await resolveSiteOrigin()}/`).toString()
 }

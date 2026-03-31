@@ -1,8 +1,11 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { useMemo, useState, useTransition } from "react"
 
 import { Button } from "@/components/ui/button"
+import { TextField } from "@/components/ui/text-field"
+import { saveAdminSiteSettings } from "@/lib/admin-site-settings-client"
 import type { FooterLinkItem } from "@/lib/site-settings"
 
 interface AdminFooterLinksSettingsFormProps {
@@ -14,6 +17,7 @@ function createEmptyLink(): FooterLinkItem {
 }
 
 export function AdminFooterLinksSettingsForm({ initialLinks }: AdminFooterLinksSettingsFormProps) {
+  const router = useRouter()
   const [links, setLinks] = useState<FooterLinkItem[]>(initialLinks.length > 0 ? initialLinks : [createEmptyLink()])
   const [feedback, setFeedback] = useState("")
   const [isPending, startTransition] = useTransition()
@@ -45,16 +49,14 @@ export function AdminFooterLinksSettingsForm({ initialLinks }: AdminFooterLinksS
         event.preventDefault()
         setFeedback("")
         startTransition(async () => {
-          const response = await fetch("/api/admin/site-settings", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              section: "site-footer-links",
-              footerLinks: links,
-            }),
+          const result = await saveAdminSiteSettings({
+            section: "site-footer-links",
+            footerLinks: links,
           })
-          const result = await response.json()
-          setFeedback(result.message ?? (response.ok ? "保存成功" : "保存失败"))
+          setFeedback(result.message)
+          if (result.ok) {
+            router.refresh()
+          }
         })
       }}
     >
@@ -67,8 +69,8 @@ export function AdminFooterLinksSettingsForm({ initialLinks }: AdminFooterLinksS
         <div className="space-y-3">
           {links.map((item, index) => (
             <div key={`${index}-${item.label}-${item.href}`} className="grid gap-3 rounded-[20px] border border-border p-4 md:grid-cols-[1fr_1.4fr_auto] md:items-end">
-              <Field label="显示名称" value={item.label} onChange={(value) => updateLink(index, "label", value)} placeholder="如 关于我们" />
-              <Field label="跳转地址" value={item.href} onChange={(value) => updateLink(index, "href", value)} placeholder="如 /about 或 https://example.com/about" />
+              <TextField label="显示名称" value={item.label} onChange={(value) => updateLink(index, "label", value)} placeholder="如 关于我们" />
+              <TextField label="跳转地址" value={item.href} onChange={(value) => updateLink(index, "href", value)} placeholder="如 /about 或 https://example.com/about" />
               <Button type="button" variant="outline" onClick={() => removeLink(index)} className="rounded-full">删除</Button>
             </div>
           ))}
@@ -93,14 +95,5 @@ export function AdminFooterLinksSettingsForm({ initialLinks }: AdminFooterLinksS
         {feedback ? <span className="text-sm text-muted-foreground">{feedback}</span> : null}
       </div>
     </form>
-  )
-}
-
-function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {
-  return (
-    <label className="space-y-2">
-      <span className="text-sm font-medium">{label}</span>
-      <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none" />
-    </label>
   )
 }

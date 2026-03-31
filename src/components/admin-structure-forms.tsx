@@ -2,7 +2,7 @@
 
 import { AlertCircle, Building2, EyeOff, FolderTree, Plus, Search, ShieldCheck, Slash, Trash2 } from "lucide-react"
 
-import { useEffect, useMemo, useState, useTransition } from "react"
+import { useMemo, useState, useTransition } from "react"
 
 import { useRouter } from "next/navigation"
 
@@ -37,6 +37,33 @@ type ModalMode =
   | { kind: "edit-zone"; item: ZoneItem }
   | { kind: "edit-board"; item: BoardItem }
   | null
+
+interface StructureFormState {
+  name: string
+  slug: string
+  description: string
+  icon: string
+  sortOrder: string
+  zoneId: string
+  postPointDelta: string
+  replyPointDelta: string
+  postIntervalSeconds: string
+  replyIntervalSeconds: string
+  allowedPostTypes: string[]
+  minViewPoints: string
+  minViewLevel: string
+  minPostPoints: string
+  minPostLevel: string
+  minReplyPoints: string
+  minReplyLevel: string
+  minViewVipLevel: string
+  minPostVipLevel: string
+  minReplyVipLevel: string
+  requirePostReview: boolean
+  postListDisplayMode: string
+  feedback: string
+  feedbackTone: "error" | "success"
+}
 
 const postTypeOptions = [
   { value: "NORMAL", label: "普通帖" },
@@ -335,185 +362,69 @@ function CompactSelect({ name, label, value, options }: { name: string; label: s
 }
 
 function StructureModal({ modal, zones, onClose }: { modal: ModalMode; zones: ZoneItem[]; onClose: () => void }) {
-  const router = useRouter()
-  const [name, setName] = useState("")
-  const [slug, setSlug] = useState("")
-  const [description, setDescription] = useState("")
-  const [icon, setIcon] = useState("📚")
-  const [sortOrder, setSortOrder] = useState("0")
-  const [zoneId, setZoneId] = useState(zones[0]?.id ?? "")
-  const [postPointDelta, setPostPointDelta] = useState("0")
-  const [replyPointDelta, setReplyPointDelta] = useState("0")
-  const [postIntervalSeconds, setPostIntervalSeconds] = useState("120")
-  const [replyIntervalSeconds, setReplyIntervalSeconds] = useState("3")
-  const [allowedPostTypes, setAllowedPostTypes] = useState<string[]>(DEFAULT_ALLOWED_POST_TYPES)
-
-  const [minViewPoints, setMinViewPoints] = useState("0")
-  const [minViewLevel, setMinViewLevel] = useState("0")
-  const [minPostPoints, setMinPostPoints] = useState("0")
-  const [minPostLevel, setMinPostLevel] = useState("0")
-  const [minReplyPoints, setMinReplyPoints] = useState("0")
-  const [minReplyLevel, setMinReplyLevel] = useState("0")
-  const [minViewVipLevel, setMinViewVipLevel] = useState("0")
-  const [minPostVipLevel, setMinPostVipLevel] = useState("0")
-  const [minReplyVipLevel, setMinReplyVipLevel] = useState("0")
-  const [requirePostReview, setRequirePostReview] = useState(false)
-  const [postListDisplayMode, setPostListDisplayMode] = useState("")
-
-  const [feedback, setFeedback] = useState("")
-  const [feedbackTone, setFeedbackTone] = useState<"error" | "success">("success")
-  const [isPending, startTransition] = useTransition()
-
-
-  const title = useMemo(() => {
-    if (!modal) return ""
-    switch (modal.kind) {
-      case "create-zone":
-        return "新建分区"
-      case "create-board":
-        return "新建节点"
-      case "edit-zone":
-        return "编辑分区"
-      case "edit-board":
-        return "编辑节点"
-    }
-  }, [modal])
-
-  useEffect(() => {
-    if (!modal) {
-      return
-    }
-    if (modal.kind === "create-zone") {
-      setName("")
-      setSlug("")
-      setDescription("")
-      setIcon("📚")
-      setSortOrder(String(zones.length + 1))
-      setZoneId(zones[0]?.id ?? "")
-      setPostPointDelta("0")
-      setReplyPointDelta("0")
-      setPostIntervalSeconds("120")
-      setReplyIntervalSeconds("3")
-      setAllowedPostTypes(DEFAULT_ALLOWED_POST_TYPES)
-
-      setMinViewPoints("0")
-      setMinViewLevel("0")
-      setMinPostPoints("0")
-      setMinPostLevel("0")
-      setMinReplyPoints("0")
-      setMinReplyLevel("0")
-      setMinViewVipLevel("0")
-      setMinPostVipLevel("0")
-      setMinReplyVipLevel("0")
-      setRequirePostReview(false)
-      setPostListDisplayMode("")
-
-      setFeedback("")
-      setFeedbackTone("success")
-      return
-    }
-    if (modal.kind === "create-board") {
-      setName("")
-      setSlug("")
-      setDescription("")
-      setIcon("💬")
-      setSortOrder("0")
-      setZoneId(modal.zoneId ?? zones[0]?.id ?? "")
-      setPostPointDelta("")
-      setReplyPointDelta("")
-      setPostIntervalSeconds("")
-      setReplyIntervalSeconds("")
-      setAllowedPostTypes(DEFAULT_ALLOWED_POST_TYPES)
-
-      setMinViewPoints("")
-      setMinViewLevel("")
-      setMinPostPoints("")
-      setMinPostLevel("")
-      setMinReplyPoints("")
-      setMinReplyLevel("")
-      setMinViewVipLevel("")
-      setMinPostVipLevel("")
-      setMinReplyVipLevel("")
-      setRequirePostReview(false)
-      setPostListDisplayMode("")
-
-      setFeedback("")
-      setFeedbackTone("success")
-      return
-    }
-    if (modal.kind === "edit-zone") {
-      setName(modal.item.name)
-      setSlug(modal.item.slug)
-      setDescription(modal.item.description)
-      setIcon(modal.item.icon)
-      setSortOrder(String(modal.item.sortOrder))
-      setPostPointDelta(String(modal.item.postPointDelta))
-      setReplyPointDelta(String(modal.item.replyPointDelta))
-      setPostIntervalSeconds(String(modal.item.postIntervalSeconds))
-      setReplyIntervalSeconds(String(modal.item.replyIntervalSeconds))
-      setAllowedPostTypes(normalizePostTypes(modal.item.allowedPostTypes))
-      setMinViewPoints(String(modal.item.minViewPoints))
-      setMinViewLevel(String(modal.item.minViewLevel))
-      setMinPostPoints(String(modal.item.minPostPoints))
-      setMinPostLevel(String(modal.item.minPostLevel))
-      setMinReplyPoints(String(modal.item.minReplyPoints))
-      setMinReplyLevel(String(modal.item.minReplyLevel))
-      setMinViewVipLevel(String(modal.item.minViewVipLevel))
-      setMinPostVipLevel(String(modal.item.minPostVipLevel))
-      setMinReplyVipLevel(String(modal.item.minReplyVipLevel))
-      setRequirePostReview(modal.item.requirePostReview)
-      setPostListDisplayMode(modal.item.postListDisplayMode ?? "")
-
-      setFeedback("")
-      setFeedbackTone("success")
-      return
-    }
-    if (modal.kind === "edit-board") {
-      setName(modal.item.name)
-      setSlug(modal.item.slug)
-      setDescription(modal.item.description ?? "")
-      setIcon(modal.item.icon ?? "💬")
-      setSortOrder(String(modal.item.sortOrder ?? 0))
-      setZoneId(modal.item.zoneId ?? zones[0]?.id ?? "")
-      setPostPointDelta(modal.item.postPointDelta == null ? "" : String(modal.item.postPointDelta))
-      setReplyPointDelta(modal.item.replyPointDelta == null ? "" : String(modal.item.replyPointDelta))
-      setPostIntervalSeconds(modal.item.postIntervalSeconds == null ? "" : String(modal.item.postIntervalSeconds))
-      setReplyIntervalSeconds(modal.item.replyIntervalSeconds == null ? "" : String(modal.item.replyIntervalSeconds))
-      setAllowedPostTypes(normalizePostTypes(modal.item.allowedPostTypes))
-
-      setMinViewPoints(modal.item.minViewPoints == null ? "" : String(modal.item.minViewPoints))
-      setMinViewLevel(modal.item.minViewLevel == null ? "" : String(modal.item.minViewLevel))
-      setMinPostPoints(modal.item.minPostPoints == null ? "" : String(modal.item.minPostPoints))
-      setMinPostLevel(modal.item.minPostLevel == null ? "" : String(modal.item.minPostLevel))
-      setMinReplyPoints(modal.item.minReplyPoints == null ? "" : String(modal.item.minReplyPoints))
-      setMinReplyLevel(modal.item.minReplyLevel == null ? "" : String(modal.item.minReplyLevel))
-      setMinViewVipLevel(modal.item.minViewVipLevel == null ? "" : String(modal.item.minViewVipLevel))
-      setMinPostVipLevel(modal.item.minPostVipLevel == null ? "" : String(modal.item.minPostVipLevel))
-      setMinReplyVipLevel(modal.item.minReplyVipLevel == null ? "" : String(modal.item.minReplyVipLevel))
-      setRequirePostReview(Boolean(modal.item.requirePostReview))
-      setPostListDisplayMode(modal.item.postListDisplayMode ?? "")
-
-      setFeedback("")
-      setFeedbackTone("success")
-    }
-  }, [modal, zones])
-
-
   if (!modal) {
     return null
   }
+
+  return <StructureModalForm key={getStructureModalKey(modal)} modal={modal} zones={zones} onClose={onClose} />
+}
+
+function StructureModalForm({ modal, zones, onClose }: { modal: Exclude<ModalMode, null>; zones: ZoneItem[]; onClose: () => void }) {
+  const router = useRouter()
+  const [form, setForm] = useState<StructureFormState>(() => getInitialStructureFormState(modal, zones))
+  const [isPending, startTransition] = useTransition()
+  const title = getStructureModalTitle(modal)
 
   const isBoard = modal.kind === "create-board" || modal.kind === "edit-board"
   const isEdit = modal.kind === "edit-zone" || modal.kind === "edit-board"
   const editingItemId = modal.kind === "edit-zone" || modal.kind === "edit-board" ? modal.item.id : undefined
 
+  const {
+    name,
+    slug,
+    description,
+    icon,
+    sortOrder,
+    zoneId,
+    postPointDelta,
+    replyPointDelta,
+    postIntervalSeconds,
+    replyIntervalSeconds,
+    allowedPostTypes,
+    minViewPoints,
+    minViewLevel,
+    minPostPoints,
+    minPostLevel,
+    minReplyPoints,
+    minReplyLevel,
+    minViewVipLevel,
+    minPostVipLevel,
+    minReplyVipLevel,
+    requirePostReview,
+    postListDisplayMode,
+    feedback,
+    feedbackTone,
+  } = form
+
+  function updateField<K extends keyof StructureFormState>(field: K, value: StructureFormState[K]) {
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+    }))
+  }
+
   function togglePostType(type: string) {
-    setAllowedPostTypes((current) => current.includes(type) ? current.filter((item) => item !== type) : [...current, type])
+    setForm((current) => ({
+      ...current,
+      allowedPostTypes: current.allowedPostTypes.includes(type)
+        ? current.allowedPostTypes.filter((item) => item !== type)
+        : [...current.allowedPostTypes, type],
+    }))
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setFeedback("")
+    updateField("feedback", "")
 
     const payload: Record<string, unknown> = {
       type: isBoard ? "board" : "zone",
@@ -553,16 +464,22 @@ function StructureModal({ modal, zones, onClose }: { modal: ModalMode; zones: Zo
         const result = (await response.json().catch(() => null)) as { message?: string } | null
         const message = result?.message ?? (response.ok ? "保存成功" : "保存失败，请稍后重试")
 
-        setFeedback(message)
-        setFeedbackTone(response.ok ? "success" : "error")
+        setForm((current) => ({
+          ...current,
+          feedback: message,
+          feedbackTone: response.ok ? "success" : "error",
+        }))
 
         if (response.ok) {
           router.refresh()
           onClose()
         }
       } catch {
-        setFeedback("网络异常，请稍后重试")
-        setFeedbackTone("error")
+        setForm((current) => ({
+          ...current,
+          feedback: "网络异常，请稍后重试",
+          feedbackTone: "error",
+        }))
       }
     })
 
@@ -572,12 +489,12 @@ function StructureModal({ modal, zones, onClose }: { modal: ModalMode; zones: Zo
     <AdminModal open={Boolean(modal)} onClose={onClose} size="xl" title={title} description="统一维护分区默认策略与节点覆盖策略。">
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label={isBoard ? "节点名称" : "分区名称"} value={name} onChange={setName} placeholder={isBoard ? "如 摄影" : "如 生活方式"} />
-          <Field label="标识 slug" value={slug} onChange={setSlug} placeholder={isBoard ? "如 camera" : "如 lifestyle"} />
+          <Field label={isBoard ? "节点名称" : "分区名称"} value={name} onChange={(value) => updateField("name", value)} placeholder={isBoard ? "如 摄影" : "如 生活方式"} />
+          <Field label="标识 slug" value={slug} onChange={(value) => updateField("slug", value)} placeholder={isBoard ? "如 camera" : "如 lifestyle"} />
           <AdminIconPickerField
             label="图标"
             value={icon}
-            onChange={setIcon}
+            onChange={(value) => updateField("icon", value)}
             popoverTitle={isBoard ? "选择节点图标" : "选择分区图标"}
             containerClassName="space-y-2 md:col-span-2"
             triggerClassName="flex h-11 w-full items-center gap-3 rounded-full border border-border bg-background px-4 text-left text-sm transition-colors hover:bg-accent"
@@ -585,13 +502,13 @@ function StructureModal({ modal, zones, onClose }: { modal: ModalMode; zones: Zo
           />
 
 
-          <Field label="排序" value={sortOrder} onChange={setSortOrder} placeholder="数字越小越靠前" />
+          <Field label="排序" value={sortOrder} onChange={(value) => updateField("sortOrder", value)} placeholder="数字越小越靠前" />
         </div>
 
         {isBoard ? (
           <div className="space-y-2">
             <p className="text-sm font-medium">所属分区</p>
-            <select value={zoneId} onChange={(event) => setZoneId(event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
+            <select value={zoneId} onChange={(event) => updateField("zoneId", event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
               {zones.map((zone) => (
                 <option key={zone.id} value={zone.id}>{zone.name}</option>
               ))}
@@ -601,16 +518,16 @@ function StructureModal({ modal, zones, onClose }: { modal: ModalMode; zones: Zo
 
         <div className="space-y-2">
           <p className="text-sm font-medium">描述</p>
-          <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="填写结构描述，帮助用户理解这个分区或节点的定位" className="min-h-[120px] w-full rounded-[24px] border border-border bg-background px-4 py-3 text-sm outline-none" />
+          <textarea value={description} onChange={(event) => updateField("description", event.target.value)} placeholder="填写结构描述，帮助用户理解这个分区或节点的定位" className="min-h-[120px] w-full rounded-[24px] border border-border bg-background px-4 py-3 text-sm outline-none" />
         </div>
 
         <div className="rounded-[24px] border border-border p-5">
           <h4 className="text-sm font-semibold">积分与频率设置</h4>
           <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Field label="发帖积分" value={postPointDelta} onChange={setPostPointDelta} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
-            <Field label="回复积分" value={replyPointDelta} onChange={setReplyPointDelta} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
-            <Field label="发帖间隔(秒)" value={postIntervalSeconds} onChange={setPostIntervalSeconds} placeholder={isBoard ? "留空继承分区" : "默认 120"} />
-            <Field label="回复间隔(秒)" value={replyIntervalSeconds} onChange={setReplyIntervalSeconds} placeholder={isBoard ? "留空继承分区" : "默认 3"} />
+            <Field label="发帖积分" value={postPointDelta} onChange={(value) => updateField("postPointDelta", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+            <Field label="回复积分" value={replyPointDelta} onChange={(value) => updateField("replyPointDelta", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+            <Field label="发帖间隔(秒)" value={postIntervalSeconds} onChange={(value) => updateField("postIntervalSeconds", value)} placeholder={isBoard ? "留空继承分区" : "默认 120"} />
+            <Field label="回复间隔(秒)" value={replyIntervalSeconds} onChange={(value) => updateField("replyIntervalSeconds", value)} placeholder={isBoard ? "留空继承分区" : "默认 3"} />
           </div>
         </div>
 
@@ -629,23 +546,23 @@ function StructureModal({ modal, zones, onClose }: { modal: ModalMode; zones: Zo
         <div className="rounded-[24px] border border-border p-5">
           <h4 className="text-sm font-semibold">浏览 / 发帖 / 回复权限</h4>
           <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <Field label="浏览最低积分" value={minViewPoints} onChange={setMinViewPoints} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
-            <Field label="浏览最低等级" value={minViewLevel} onChange={setMinViewLevel} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
-            <Field label="浏览最低 VIP 等级" value={minViewVipLevel} onChange={setMinViewVipLevel} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
-            <Field label="发帖最低积分" value={minPostPoints} onChange={setMinPostPoints} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
-            <Field label="发帖最低等级" value={minPostLevel} onChange={setMinPostLevel} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
-            <Field label="发帖最低 VIP 等级" value={minPostVipLevel} onChange={setMinPostVipLevel} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
-            <Field label="回复最低积分" value={minReplyPoints} onChange={setMinReplyPoints} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
-            <Field label="回复最低等级" value={minReplyLevel} onChange={setMinReplyLevel} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
-            <Field label="回复最低 VIP 等级" value={minReplyVipLevel} onChange={setMinReplyVipLevel} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+            <Field label="浏览最低积分" value={minViewPoints} onChange={(value) => updateField("minViewPoints", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+            <Field label="浏览最低等级" value={minViewLevel} onChange={(value) => updateField("minViewLevel", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+            <Field label="浏览最低 VIP 等级" value={minViewVipLevel} onChange={(value) => updateField("minViewVipLevel", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+            <Field label="发帖最低积分" value={minPostPoints} onChange={(value) => updateField("minPostPoints", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+            <Field label="发帖最低等级" value={minPostLevel} onChange={(value) => updateField("minPostLevel", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+            <Field label="发帖最低 VIP 等级" value={minPostVipLevel} onChange={(value) => updateField("minPostVipLevel", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+            <Field label="回复最低积分" value={minReplyPoints} onChange={(value) => updateField("minReplyPoints", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+            <Field label="回复最低等级" value={minReplyLevel} onChange={(value) => updateField("minReplyLevel", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+            <Field label="回复最低 VIP 等级" value={minReplyVipLevel} onChange={(value) => updateField("minReplyVipLevel", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
           </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Toggle label="开启发帖审核" checked={requirePostReview} onChange={setRequirePostReview} />
+          <Toggle label="开启发帖审核" checked={requirePostReview} onChange={(value) => updateField("requirePostReview", value)} />
           <div className="space-y-2 md:col-span-1 xl:col-span-2">
             <p className="text-sm font-medium">帖子列表形式</p>
-            <select value={postListDisplayMode} onChange={(event) => setPostListDisplayMode(event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
+            <select value={postListDisplayMode} onChange={(event) => updateField("postListDisplayMode", event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
               {isBoard ? <option value="">继承分区</option> : <option value="">默认列表</option>}
               <option value={POST_LIST_DISPLAY_MODE_DEFAULT}>普通列表</option>
               <option value={POST_LIST_DISPLAY_MODE_GALLERY}>画廊模式</option>
@@ -671,6 +588,138 @@ function StructureModal({ modal, zones, onClose }: { modal: ModalMode; zones: Zo
       </form>
     </AdminModal>
   )
+}
+
+function getInitialStructureFormState(modal: Exclude<ModalMode, null>, zones: ZoneItem[]): StructureFormState {
+  const defaultZoneId = zones[0]?.id ?? ""
+
+  if (modal.kind === "create-zone") {
+    return {
+      name: "",
+      slug: "",
+      description: "",
+      icon: "📚",
+      sortOrder: String(zones.length + 1),
+      zoneId: defaultZoneId,
+      postPointDelta: "0",
+      replyPointDelta: "0",
+      postIntervalSeconds: "120",
+      replyIntervalSeconds: "3",
+      allowedPostTypes: DEFAULT_ALLOWED_POST_TYPES,
+      minViewPoints: "0",
+      minViewLevel: "0",
+      minPostPoints: "0",
+      minPostLevel: "0",
+      minReplyPoints: "0",
+      minReplyLevel: "0",
+      minViewVipLevel: "0",
+      minPostVipLevel: "0",
+      minReplyVipLevel: "0",
+      requirePostReview: false,
+      postListDisplayMode: "",
+      feedback: "",
+      feedbackTone: "success",
+    }
+  }
+
+  if (modal.kind === "create-board") {
+    return {
+      name: "",
+      slug: "",
+      description: "",
+      icon: "💬",
+      sortOrder: "0",
+      zoneId: modal.zoneId ?? defaultZoneId,
+      postPointDelta: "",
+      replyPointDelta: "",
+      postIntervalSeconds: "",
+      replyIntervalSeconds: "",
+      allowedPostTypes: DEFAULT_ALLOWED_POST_TYPES,
+      minViewPoints: "",
+      minViewLevel: "",
+      minPostPoints: "",
+      minPostLevel: "",
+      minReplyPoints: "",
+      minReplyLevel: "",
+      minViewVipLevel: "",
+      minPostVipLevel: "",
+      minReplyVipLevel: "",
+      requirePostReview: false,
+      postListDisplayMode: "",
+      feedback: "",
+      feedbackTone: "success",
+    }
+  }
+
+  if (modal.kind === "edit-zone") {
+    return {
+      name: modal.item.name,
+      slug: modal.item.slug,
+      description: modal.item.description,
+      icon: modal.item.icon,
+      sortOrder: String(modal.item.sortOrder),
+      zoneId: defaultZoneId,
+      postPointDelta: String(modal.item.postPointDelta),
+      replyPointDelta: String(modal.item.replyPointDelta),
+      postIntervalSeconds: String(modal.item.postIntervalSeconds),
+      replyIntervalSeconds: String(modal.item.replyIntervalSeconds),
+      allowedPostTypes: normalizePostTypes(modal.item.allowedPostTypes),
+      minViewPoints: String(modal.item.minViewPoints),
+      minViewLevel: String(modal.item.minViewLevel),
+      minPostPoints: String(modal.item.minPostPoints),
+      minPostLevel: String(modal.item.minPostLevel),
+      minReplyPoints: String(modal.item.minReplyPoints),
+      minReplyLevel: String(modal.item.minReplyLevel),
+      minViewVipLevel: String(modal.item.minViewVipLevel),
+      minPostVipLevel: String(modal.item.minPostVipLevel),
+      minReplyVipLevel: String(modal.item.minReplyVipLevel),
+      requirePostReview: modal.item.requirePostReview,
+      postListDisplayMode: modal.item.postListDisplayMode ?? "",
+      feedback: "",
+      feedbackTone: "success",
+    }
+  }
+
+  return {
+    name: modal.item.name,
+    slug: modal.item.slug,
+    description: modal.item.description ?? "",
+    icon: modal.item.icon ?? "💬",
+    sortOrder: String(modal.item.sortOrder ?? 0),
+    zoneId: modal.item.zoneId ?? defaultZoneId,
+    postPointDelta: modal.item.postPointDelta == null ? "" : String(modal.item.postPointDelta),
+    replyPointDelta: modal.item.replyPointDelta == null ? "" : String(modal.item.replyPointDelta),
+    postIntervalSeconds: modal.item.postIntervalSeconds == null ? "" : String(modal.item.postIntervalSeconds),
+    replyIntervalSeconds: modal.item.replyIntervalSeconds == null ? "" : String(modal.item.replyIntervalSeconds),
+    allowedPostTypes: normalizePostTypes(modal.item.allowedPostTypes),
+    minViewPoints: modal.item.minViewPoints == null ? "" : String(modal.item.minViewPoints),
+    minViewLevel: modal.item.minViewLevel == null ? "" : String(modal.item.minViewLevel),
+    minPostPoints: modal.item.minPostPoints == null ? "" : String(modal.item.minPostPoints),
+    minPostLevel: modal.item.minPostLevel == null ? "" : String(modal.item.minPostLevel),
+    minReplyPoints: modal.item.minReplyPoints == null ? "" : String(modal.item.minReplyPoints),
+    minReplyLevel: modal.item.minReplyLevel == null ? "" : String(modal.item.minReplyLevel),
+    minViewVipLevel: modal.item.minViewVipLevel == null ? "" : String(modal.item.minViewVipLevel),
+    minPostVipLevel: modal.item.minPostVipLevel == null ? "" : String(modal.item.minPostVipLevel),
+    minReplyVipLevel: modal.item.minReplyVipLevel == null ? "" : String(modal.item.minReplyVipLevel),
+    requirePostReview: Boolean(modal.item.requirePostReview),
+    postListDisplayMode: modal.item.postListDisplayMode ?? "",
+    feedback: "",
+    feedbackTone: "success",
+  }
+}
+
+function getStructureModalKey(modal: Exclude<ModalMode, null>) {
+  if (modal.kind === "create-zone") return "create-zone"
+  if (modal.kind === "create-board") return `create-board:${modal.zoneId ?? "default"}`
+  if (modal.kind === "edit-zone") return `edit-zone:${modal.item.id}`
+  return `edit-board:${modal.item.id}`
+}
+
+function getStructureModalTitle(modal: Exclude<ModalMode, null>) {
+  if (modal.kind === "create-zone") return "新建分区"
+  if (modal.kind === "create-board") return "新建节点"
+  if (modal.kind === "edit-zone") return "编辑分区"
+  return "编辑节点"
 }
 
 function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {

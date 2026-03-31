@@ -4,15 +4,9 @@ import { ForumPostStream } from "@/components/forum-post-stream"
 import { SearchForm } from "@/components/search-form"
 import { SiteHeader } from "@/components/site-header"
 import { Card, CardContent } from "@/components/ui/card"
+import { readSearchParam } from "@/lib/search-params"
 import { searchPosts } from "@/lib/search"
 import { getSiteSettings } from "@/lib/site-settings"
-
-interface SearchPageProps {
-  searchParams?: {
-    q?: string
-    page?: string
-  }
-}
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettings()
@@ -23,9 +17,10 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-export default async function SearchPage({ searchParams }: SearchPageProps) {
-  const keyword = searchParams?.q?.trim() ?? ""
-  const currentPage = Math.max(1, Number(searchParams?.page ?? "1") || 1)
+export default async function SearchPage(props: PageProps<"/search">) {
+  const searchParams = await props.searchParams;
+  const keyword = readSearchParam(searchParams?.q)?.trim() ?? ""
+  const currentPage = Math.max(1, Number(readSearchParam(searchParams?.page) ?? "1") || 1)
   const results = await searchPosts(keyword, currentPage, 10)
   const hasPrevPage = currentPage > 1
   const hasNextPage = currentPage * 10 < results.total

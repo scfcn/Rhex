@@ -4,6 +4,7 @@ import { useState, useTransition } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { TextField } from "@/components/ui/text-field"
 
 interface GobangAdminPageProps {
   AppId: string
@@ -63,14 +64,14 @@ export function GobangAdminPage({ AppId, config }: GobangAdminPageProps) {
           <CardTitle>基础配置</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <Field label="每日普通免费次数" value={dailyFreeGames} onChange={setDailyFreeGames} />
-          <Field label="每日 VIP 免费次数" value={dailyVipFreeGames} onChange={setDailyVipFreeGames} />
-          <Field label="普通用户每日总次数" value={dailyNormalGameLimit} onChange={setDailyNormalGameLimit} />
-          <Field label="VIP 用户每日总次数" value={dailyVipGameLimit} onChange={setDailyVipGameLimit} />
-          <Field label="超额门票积分" value={ticketCost} onChange={setTicketCost} />
-          <Field label="AI 难度等级" value={aiLevel} onChange={setAiLevel} />
-          <Field label="获胜奖励积分" value={winReward} onChange={setWinReward} />
-          <Field label="前台入口名称" value={matchLabel} onChange={setMatchLabel} className="md:col-span-2 xl:col-span-3" />
+          <TextField label="每日普通免费次数" value={dailyFreeGames} onChange={setDailyFreeGames} />
+          <TextField label="每日 VIP 免费次数" value={dailyVipFreeGames} onChange={setDailyVipFreeGames} />
+          <TextField label="普通用户每日总次数" value={dailyNormalGameLimit} onChange={setDailyNormalGameLimit} />
+          <TextField label="VIP 用户每日总次数" value={dailyVipGameLimit} onChange={setDailyVipGameLimit} />
+          <TextField label="超额门票积分" value={ticketCost} onChange={setTicketCost} />
+          <TextField label="AI 难度等级" value={aiLevel} onChange={setAiLevel} />
+          <TextField label="获胜奖励积分" value={winReward} onChange={setWinReward} />
+          <TextField label="前台入口名称" value={matchLabel} onChange={setMatchLabel} containerClassName="md:col-span-2 xl:col-span-3" />
         </CardContent>
       </Card>
 
@@ -78,15 +79,6 @@ export function GobangAdminPage({ AppId, config }: GobangAdminPageProps) {
         <Button type="button" disabled={isPending} onClick={saveConfig}>{isPending ? "保存中..." : "保存配置"}</Button>
         {feedback ? <span className="text-sm text-muted-foreground">{feedback}</span> : null}
       </div>
-    </div>
-  )
-}
-
-function Field({ label, value, onChange, className = "" }: { label: string; value: string; onChange: (value: string) => void; className?: string }) {
-  return (
-    <div className={`space-y-2 ${className}`.trim()}>
-      <p className="text-sm font-medium text-foreground">{label}</p>
-      <input value={value} onChange={(event) => onChange(event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none" />
     </div>
   )
 }

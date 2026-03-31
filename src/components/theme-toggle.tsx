@@ -1,7 +1,7 @@
 "use client"
 
 import { Monitor, Moon, Sun } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useSyncExternalStore } from "react"
 
 import { Button } from "@/components/ui/button"
 import { THEME_STORAGE_KEY, type ThemePreference, applyTheme, resolveStoredThemePreference } from "@/lib/theme"
@@ -27,18 +27,24 @@ const themeMeta: Record<ThemePreference, { label: string; description: string; i
 const themeOptions: ThemePreference[] = ["light", "dark", "system"]
 
 export function ThemeToggle() {
-  const [themePreference, setThemePreference] = useState<ThemePreference>("light")
-  const [mounted, setMounted] = useState(false)
+  const [themePreference, setThemePreference] = useState<ThemePreference>(() => {
+    if (typeof window === "undefined") {
+      return "light"
+    }
+
+    return resolveStoredThemePreference(window.localStorage.getItem(THEME_STORAGE_KEY))
+  })
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const mounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  )
 
   useEffect(() => {
-    const nextThemePreference = resolveStoredThemePreference(window.localStorage.getItem(THEME_STORAGE_KEY))
-
-    applyTheme(nextThemePreference)
-    setThemePreference(nextThemePreference)
-    setMounted(true)
-  }, [])
+    applyTheme(themePreference)
+  }, [themePreference])
 
   useEffect(() => {
     if (!mounted || themePreference !== "system") {

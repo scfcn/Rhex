@@ -5,13 +5,8 @@ import { getUserProfile } from "@/lib/users"
 
 export const dynamic = "force-dynamic"
 
-interface UserRssRouteProps {
-  params: {
-    username: string
-  }
-}
-
-export async function GET(_request: Request, { params }: UserRssRouteProps) {
+export async function GET(_request: Request, props: RouteContext<"/users/[username]/rss.xml">) {
+  const params = await props.params;
   const user = await getUserProfile(params.username)
 
   if (!user) {

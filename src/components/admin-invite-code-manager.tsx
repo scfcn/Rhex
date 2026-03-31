@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react"
 
 import { Button } from "@/components/ui/button"
+import { TextField } from "@/components/ui/text-field"
 
 interface AdminInviteCodeManagerProps {
   initialInviteCodes: {
@@ -67,8 +68,8 @@ export function AdminInviteCodeManager({ initialInviteCodes }: AdminInviteCodeMa
           <p className="mt-1 text-xs text-muted-foreground">运营活动、人审发放、邀新链路都统一收口到这里。</p>
         </div>
         <div className="grid gap-3 xl:grid-cols-[160px_minmax(0,1fr)_auto]">
-          <Field label="生成数量" value={count} onChange={setCount} placeholder="1-100" />
-          <Field label="备注" value={note} onChange={setNote} placeholder="如 活动赠送 / 人工发放" />
+          <TextField label="生成数量" value={count} onChange={setCount} placeholder="1-100" inputClassName="h-10" />
+          <TextField label="备注" value={note} onChange={setNote} placeholder="如 活动赠送 / 人工发放" inputClassName="h-10" />
           <div className="flex items-end">
             <Button disabled={isPending} className="h-10 rounded-full px-4 text-xs">{isPending ? "生成中..." : "生成邀请码"}</Button>
           </div>
@@ -106,14 +107,5 @@ function Stat({ title, value }: { title: string; value: number }) {
       <p className="text-xs text-muted-foreground">{title}</p>
       <p className="mt-2 text-2xl font-semibold">{value}</p>
     </div>
-  )
-}
-
-function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {
-  return (
-    <label className="space-y-2 block">
-      <span className="text-sm font-medium">{label}</span>
-      <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-10 w-full rounded-full border border-border bg-background px-4 text-sm outline-none" />
-    </label>
   )
 }

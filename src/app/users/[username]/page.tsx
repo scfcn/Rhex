@@ -21,13 +21,8 @@ import { cn } from "@/lib/utils"
 import { getUserProfile, getUserPosts } from "@/lib/users"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
 
-interface UserPageProps {
-  params: {
-    username: string
-  }
-}
-
-export async function generateMetadata({ params }: UserPageProps): Promise<Metadata> {
+export async function generateMetadata(props: PageProps<"/users/[username]">): Promise<Metadata> {
+  const params = await props.params;
   const [user, settings] = await Promise.all([getUserProfile(params.username), getSiteSettings()])
 
   if (!user) {
@@ -43,7 +38,8 @@ export async function generateMetadata({ params }: UserPageProps): Promise<Metad
   }
 }
 
-export default async function UserPage({ params }: UserPageProps) {
+export default async function UserPage(props: PageProps<"/users/[username]">) {
+  const params = await props.params;
   const [user, settings, currentUser] = await Promise.all([getUserProfile(params.username), getSiteSettings(), getCurrentUser()])
 
   if (!user) {

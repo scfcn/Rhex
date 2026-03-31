@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import { buildUnauthorizedResponse, getSessionFromRequest, isProtectedPath } from "@/lib/auth-guards"
 import { getSessionClearedCookieOptions, getSessionCookieName } from "@/lib/session"
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const token = request.cookies.get(getSessionCookieName())?.value
   const protectedPath = isProtectedPath(request.nextUrl.pathname)
 

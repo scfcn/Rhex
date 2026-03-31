@@ -16,13 +16,8 @@ import { YinYangContractAdminPage } from "@/components/yinyang-contract-admin-pa
 
 
 
-interface AdminAppPageProps {
-  params: {
-    app: string
-  }
-}
-
-export default async function AdminAppPage({ params }: AdminAppPageProps) {
+export default async function AdminAppPage(props: PageProps<"/admin/apps/[app]">) {
+  const params = await props.params;
   const admin = await requireAdminUser()
   if (!admin) {
     redirect(`/login?redirect=/admin/apps/${params.app}`)

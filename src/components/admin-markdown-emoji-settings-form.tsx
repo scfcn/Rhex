@@ -1,10 +1,13 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 
 import { AdminIconPickerField } from "@/components/admin-icon-picker-field"
 import { Button } from "@/components/ui/button"
+import { TextField } from "@/components/ui/text-field"
 import { toast } from "@/components/ui/toast"
+import { saveAdminSiteSettings } from "@/lib/admin-site-settings-client"
 import { cn } from "@/lib/utils"
 import { DEFAULT_MARKDOWN_EMOJI_ITEMS, type MarkdownEmojiItem, isMarkdownEmojiSvg, normalizeMarkdownEmojiItems } from "@/lib/markdown-emoji"
 
@@ -13,6 +16,7 @@ interface AdminMarkdownEmojiSettingsFormProps {
 }
 
 export function AdminMarkdownEmojiSettingsForm({ initialItems }: AdminMarkdownEmojiSettingsFormProps) {
+  const router = useRouter()
   const [items, setItems] = useState<MarkdownEmojiItem[]>(normalizeMarkdownEmojiItems(initialItems))
   const [isPending, startTransition] = useTransition()
 
@@ -22,20 +26,16 @@ export function AdminMarkdownEmojiSettingsForm({ initialItems }: AdminMarkdownEm
       onSubmit={(event) => {
         event.preventDefault()
         startTransition(async () => {
-          const response = await fetch("/api/admin/site-settings", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              markdownEmojiMap: items,
-              section: "site-markdown-emoji",
-            }),
+          const result = await saveAdminSiteSettings({
+            markdownEmojiMap: items,
+            section: "site-markdown-emoji",
           })
-          const result = await response.json()
-          if (!response.ok) {
-            toast.error(result.message ?? "保存失败", "保存失败")
+          if (!result.ok) {
+            toast.error(result.message, "保存失败")
             return
           }
-          toast.success(result.message ?? "保存成功", "保存成功")
+          toast.success(result.message, "保存成功")
+          router.refresh()
         })
       }}
     >
@@ -48,14 +48,14 @@ export function AdminMarkdownEmojiSettingsForm({ initialItems }: AdminMarkdownEm
           {items.map((item, index) => (
             <div key={`${item.shortcode}-${index}`} className="rounded-[20px] border border-border bg-card/60 p-4">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[180px_minmax(0,1fr)_auto] xl:items-start">
-                <Field
+                <TextField
                   label="短码"
                   value={item.shortcode}
                   onChange={(value) => setItems((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, shortcode: value.replace(/[^a-zA-Z0-9_-]/g, "").toLowerCase() } : row))}
                   placeholder="如 smile"
                 />
                 <div className="space-y-2">
-                  <Field
+                  <TextField
                     label="显示名称"
                     value={item.label}
                     onChange={(value) => setItems((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, label: value } : row))}
@@ -101,15 +101,6 @@ export function AdminMarkdownEmojiSettingsForm({ initialItems }: AdminMarkdownEm
         <Button disabled={isPending}>{isPending ? "保存中..." : "保存 Markdown 表情"}</Button>
       </div>
     </form>
-  )
-}
-
-function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {
-  return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium">{label}</p>
-      <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none" />
-    </div>
   )
 }
 

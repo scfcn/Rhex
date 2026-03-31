@@ -63,10 +63,10 @@ function formatRssDate(value: Date | string) {
   return new Date(value).toUTCString()
 }
 
-function buildRssItems(posts: RssPostRecord[]): RssFeedItem[] {
-  return posts.map((post) => {
+async function buildRssItems(posts: RssPostRecord[]): Promise<RssFeedItem[]> {
+  return Promise.all(posts.map(async (post) => {
     const author = getUserDisplayName(post.author)
-    const link = toAbsoluteSiteUrl(getCanonicalPostPath(post))
+    const link = await toAbsoluteSiteUrl(getCanonicalPostPath(post))
     const publishedAt = post.publishedAt ?? post.createdAt
 
     return {
@@ -78,7 +78,7 @@ function buildRssItems(posts: RssPostRecord[]): RssFeedItem[] {
       category: normalizeText(post.board.name),
       pubDate: formatRssDate(publishedAt),
     }
-  })
+  }))
 }
 
 async function buildDefaultChannel(): Promise<RssFeedChannel> {
@@ -86,7 +86,7 @@ async function buildDefaultChannel(): Promise<RssFeedChannel> {
 
   return {
     title: normalizeText(settings.siteName),
-    link: toAbsoluteSiteUrl("/"),
+    link: await toAbsoluteSiteUrl("/"),
     description: normalizeText(settings.siteDescription || settings.siteSlogan || settings.siteName),
     feedPath: "/rss.xml",
   }
@@ -97,10 +97,10 @@ export async function getRssFeedUrl() {
 }
 
 async function generateRssXmlBySource(sourcePromise: Promise<RssFeedSource>) {
-  resolveSiteOrigin()
+  await resolveSiteOrigin()
   const source = await sourcePromise
-  const items = buildRssItems(source.posts)
-  const feedUrl = toAbsoluteSiteUrl(source.channel.feedPath)
+  const items = await buildRssItems(source.posts)
+  const feedUrl = await toAbsoluteSiteUrl(source.channel.feedPath)
   const lastBuildDate = items[0]?.pubDate ?? new Date().toUTCString()
 
   const itemXml = items
@@ -159,7 +159,7 @@ export async function generateZoneRssXml(zone: { slug: string; name: string; des
     return {
       channel: {
         title: `${normalizeText(zone.name)} - ${normalizeText(settings.siteName)}`,
-        link: toAbsoluteSiteUrl(`/zones/${encodeURIComponent(zone.slug)}`),
+        link: await toAbsoluteSiteUrl(`/zones/${encodeURIComponent(zone.slug)}`),
         description: normalizeText(zone.description || `${zone.name} 分区最新帖子订阅`),
         feedPath: `/zones/${encodeURIComponent(zone.slug)}/rss.xml`,
       },
@@ -178,7 +178,7 @@ export async function generateBoardRssXml(board: { slug: string; name: string; d
     return {
       channel: {
         title: `${normalizeText(board.name)} - ${normalizeText(settings.siteName)}`,
-        link: toAbsoluteSiteUrl(`/boards/${encodeURIComponent(board.slug)}`),
+        link: await toAbsoluteSiteUrl(`/boards/${encodeURIComponent(board.slug)}`),
         description: normalizeText(board.description || `${board.name} 节点最新帖子订阅`),
         feedPath: `/boards/${encodeURIComponent(board.slug)}/rss.xml`,
       },
@@ -198,7 +198,7 @@ export async function generateUserRssXml(user: { username: string; displayName?:
     return {
       channel: {
         title: `${displayName} - ${normalizeText(settings.siteName)}`,
-        link: toAbsoluteSiteUrl(`/users/${encodeURIComponent(user.username)}`),
+        link: await toAbsoluteSiteUrl(`/users/${encodeURIComponent(user.username)}`),
         description: normalizeText(user.bio || `${displayName} 发布的最新帖子订阅`),
         feedPath: `/users/${encodeURIComponent(user.username)}/rss.xml`,
       },

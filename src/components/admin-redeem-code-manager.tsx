@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react"
 
 import { Button } from "@/components/ui/button"
+import { TextField } from "@/components/ui/text-field"
 
 interface AdminRedeemCodeManagerProps {
   initialRedeemCodes: {
@@ -110,11 +111,11 @@ export function AdminRedeemCodeManager({ initialRedeemCodes }: AdminRedeemCodeMa
           <p className="mt-1 text-xs text-muted-foreground">积分活动、补偿发放与运营投放统一从这里生成和导出，并支持按分类控制单个用户可兑换次数。</p>
         </div>
         <div className="grid gap-3 xl:grid-cols-[100px_120px_140px_160px_minmax(0,1fr)_200px_auto]">
-          <Field label="数量" value={count} onChange={setCount} placeholder="1-100" />
-          <Field label="积分" value={points} onChange={setPoints} placeholder="如 100" />
-          <Field label="分类" value={codeCategory} onChange={setCodeCategory} placeholder="如 a / b / c" />
-          <Field label="分类限额" value={categoryUserLimit} onChange={setCategoryUserLimit} placeholder="留空=不限" />
-          <Field label="备注" value={note} onChange={setNote} placeholder="如 活动发放 / 补偿" />
+          <TextField label="数量" value={count} onChange={setCount} placeholder="1-100" inputClassName="h-10" />
+          <TextField label="积分" value={points} onChange={setPoints} placeholder="如 100" inputClassName="h-10" />
+          <TextField label="分类" value={codeCategory} onChange={setCodeCategory} placeholder="如 a / b / c" inputClassName="h-10" />
+          <TextField label="分类限额" value={categoryUserLimit} onChange={setCategoryUserLimit} placeholder="留空=不限" inputClassName="h-10" />
+          <TextField label="备注" value={note} onChange={setNote} placeholder="如 活动发放 / 补偿" inputClassName="h-10" />
           <DateTimeField label="过期时间" value={expiresAt} onChange={setExpiresAt} />
           <div className="flex items-end">
             <Button disabled={isPending} className="h-10 rounded-full px-4 text-xs">{isPending ? "生成中..." : "生成兑换码"}</Button>
@@ -166,15 +167,6 @@ function Stat({ title, value }: { title: string; value: number }) {
       <p className="text-xs text-muted-foreground">{title}</p>
       <p className="mt-2 text-2xl font-semibold">{value}</p>
     </div>
-  )
-}
-
-function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {
-  return (
-    <label className="space-y-2 block">
-      <span className="text-sm font-medium">{label}</span>
-      <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-10 w-full rounded-full border border-border bg-background px-4 text-sm outline-none" />
-    </label>
   )
 }
 

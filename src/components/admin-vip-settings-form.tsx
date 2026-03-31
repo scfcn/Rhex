@@ -1,8 +1,11 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 
 import { Button } from "@/components/ui/button"
+import { TextField } from "@/components/ui/text-field"
+import { saveAdminSiteSettings } from "@/lib/admin-site-settings-client"
 
 interface AdminVipSettingsFormProps {
   initialSettings: {
@@ -35,6 +38,7 @@ interface AdminVipSettingsFormProps {
 }
 
 export function AdminVipSettingsForm({ initialSettings }: AdminVipSettingsFormProps) {
+  const router = useRouter()
   const [pointName, setPointName] = useState(initialSettings.pointName)
   const [checkInEnabled, setCheckInEnabled] = useState(initialSettings.checkInEnabled)
   const [checkInReward, setCheckInReward] = useState(String(initialSettings.checkInReward))
@@ -71,41 +75,39 @@ export function AdminVipSettingsForm({ initialSettings }: AdminVipSettingsFormPr
         event.preventDefault()
         setFeedback("")
         startTransition(async () => {
-          const response = await fetch("/api/admin/site-settings", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              pointName,
-              checkInEnabled,
-              checkInReward: Number(checkInReward),
-              checkInVip1Reward: Number(checkInVip1Reward),
-              checkInVip2Reward: Number(checkInVip2Reward),
-              checkInVip3Reward: Number(checkInVip3Reward),
-              checkInMakeUpCardPrice: Number(checkInMakeUpCardPrice),
-              checkInVipMakeUpCardPrice: Number(checkInVip1MakeUpCardPrice),
-              checkInVip1MakeUpCardPrice: Number(checkInVip1MakeUpCardPrice),
-              checkInVip2MakeUpCardPrice: Number(checkInVip2MakeUpCardPrice),
-              checkInVip3MakeUpCardPrice: Number(checkInVip3MakeUpCardPrice),
-              nicknameChangePointCost: Number(nicknameChangePointCost),
-              nicknameChangeVip1PointCost: Number(nicknameChangeVip1PointCost),
-              nicknameChangeVip2PointCost: Number(nicknameChangeVip2PointCost),
-              nicknameChangeVip3PointCost: Number(nicknameChangeVip3PointCost),
-              inviteCodePrice: Number(inviteCodePrice),
-              inviteCodeVip1Price: Number(inviteCodeVip1Price),
-              inviteCodeVip2Price: Number(inviteCodeVip2Price),
-              inviteCodeVip3Price: Number(inviteCodeVip3Price),
-              vipMonthlyPrice: Number(vipMonthlyPrice),
-              vipQuarterlyPrice: Number(vipQuarterlyPrice),
-              vipYearlyPrice: Number(vipYearlyPrice),
-              postOfflinePrice: Number(postOfflinePrice),
-              postOfflineVip1Price: Number(postOfflineVip1Price),
-              postOfflineVip2Price: Number(postOfflineVip2Price),
-              postOfflineVip3Price: Number(postOfflineVip3Price),
-              section: "vip",
-            }),
+          const result = await saveAdminSiteSettings({
+            pointName,
+            checkInEnabled,
+            checkInReward: Number(checkInReward),
+            checkInVip1Reward: Number(checkInVip1Reward),
+            checkInVip2Reward: Number(checkInVip2Reward),
+            checkInVip3Reward: Number(checkInVip3Reward),
+            checkInMakeUpCardPrice: Number(checkInMakeUpCardPrice),
+            checkInVipMakeUpCardPrice: Number(checkInVip1MakeUpCardPrice),
+            checkInVip1MakeUpCardPrice: Number(checkInVip1MakeUpCardPrice),
+            checkInVip2MakeUpCardPrice: Number(checkInVip2MakeUpCardPrice),
+            checkInVip3MakeUpCardPrice: Number(checkInVip3MakeUpCardPrice),
+            nicknameChangePointCost: Number(nicknameChangePointCost),
+            nicknameChangeVip1PointCost: Number(nicknameChangeVip1PointCost),
+            nicknameChangeVip2PointCost: Number(nicknameChangeVip2PointCost),
+            nicknameChangeVip3PointCost: Number(nicknameChangeVip3PointCost),
+            inviteCodePrice: Number(inviteCodePrice),
+            inviteCodeVip1Price: Number(inviteCodeVip1Price),
+            inviteCodeVip2Price: Number(inviteCodeVip2Price),
+            inviteCodeVip3Price: Number(inviteCodeVip3Price),
+            vipMonthlyPrice: Number(vipMonthlyPrice),
+            vipQuarterlyPrice: Number(vipQuarterlyPrice),
+            vipYearlyPrice: Number(vipYearlyPrice),
+            postOfflinePrice: Number(postOfflinePrice),
+            postOfflineVip1Price: Number(postOfflineVip1Price),
+            postOfflineVip2Price: Number(postOfflineVip2Price),
+            postOfflineVip3Price: Number(postOfflineVip3Price),
+            section: "vip",
           })
-          const result = await response.json()
-          setFeedback(result.message ?? (response.ok ? "保存成功" : "保存失败"))
+          setFeedback(result.message)
+          if (result.ok) {
+            router.refresh()
+          }
         })
       }}
     >
@@ -122,32 +124,32 @@ export function AdminVipSettingsForm({ initialSettings }: AdminVipSettingsFormPr
           <p className="mt-1 text-xs text-muted-foreground">统一配置积分名称、签到奖励、补签价格与修改昵称扣费规则。</p>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Field label="积分名称" value={pointName} onChange={setPointName} placeholder="如 积分 / 金币 / 钻石" />
+          <TextField label="积分名称" value={pointName} onChange={setPointName} placeholder="如 积分 / 金币 / 钻石" />
           <SwitchField label="签到开关" checked={checkInEnabled} onChange={setCheckInEnabled} />
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Field label="普通用户改昵称积分" value={nicknameChangePointCost} onChange={setNicknameChangePointCost} placeholder="0 表示免费" />
-          <Field label="VIP1 改昵称积分" value={nicknameChangeVip1PointCost} onChange={setNicknameChangeVip1PointCost} placeholder="0 表示免费" />
-          <Field label="VIP2 改昵称积分" value={nicknameChangeVip2PointCost} onChange={setNicknameChangeVip2PointCost} placeholder="0 表示免费" />
-          <Field label="VIP3 改昵称积分" value={nicknameChangeVip3PointCost} onChange={setNicknameChangeVip3PointCost} placeholder="0 表示免费" />
+          <TextField label="普通用户改昵称积分" value={nicknameChangePointCost} onChange={setNicknameChangePointCost} placeholder="0 表示免费" />
+          <TextField label="VIP1 改昵称积分" value={nicknameChangeVip1PointCost} onChange={setNicknameChangeVip1PointCost} placeholder="0 表示免费" />
+          <TextField label="VIP2 改昵称积分" value={nicknameChangeVip2PointCost} onChange={setNicknameChangeVip2PointCost} placeholder="0 表示免费" />
+          <TextField label="VIP3 改昵称积分" value={nicknameChangeVip3PointCost} onChange={setNicknameChangeVip3PointCost} placeholder="0 表示免费" />
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Field label="普通用户签到奖励" value={checkInReward} onChange={setCheckInReward} placeholder="如 5" />
-          <Field label="VIP1 签到奖励" value={checkInVip1Reward} onChange={setCheckInVip1Reward} placeholder="如 8" />
-          <Field label="VIP2 签到奖励" value={checkInVip2Reward} onChange={setCheckInVip2Reward} placeholder="如 10" />
-          <Field label="VIP3 签到奖励" value={checkInVip3Reward} onChange={setCheckInVip3Reward} placeholder="如 12" />
+          <TextField label="普通用户签到奖励" value={checkInReward} onChange={setCheckInReward} placeholder="如 5" />
+          <TextField label="VIP1 签到奖励" value={checkInVip1Reward} onChange={setCheckInVip1Reward} placeholder="如 8" />
+          <TextField label="VIP2 签到奖励" value={checkInVip2Reward} onChange={setCheckInVip2Reward} placeholder="如 10" />
+          <TextField label="VIP3 签到奖励" value={checkInVip3Reward} onChange={setCheckInVip3Reward} placeholder="如 12" />
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Field label="普通用户补签价格" value={checkInMakeUpCardPrice} onChange={setCheckInMakeUpCardPrice} placeholder="如 20" />
-          <Field label="VIP1 补签价格" value={checkInVip1MakeUpCardPrice} onChange={setCheckInVip1MakeUpCardPrice} placeholder="如 10" />
-          <Field label="VIP2 补签价格" value={checkInVip2MakeUpCardPrice} onChange={setCheckInVip2MakeUpCardPrice} placeholder="如 8" />
-          <Field label="VIP3 补签价格" value={checkInVip3MakeUpCardPrice} onChange={setCheckInVip3MakeUpCardPrice} placeholder="如 5" />
+          <TextField label="普通用户补签价格" value={checkInMakeUpCardPrice} onChange={setCheckInMakeUpCardPrice} placeholder="如 20" />
+          <TextField label="VIP1 补签价格" value={checkInVip1MakeUpCardPrice} onChange={setCheckInVip1MakeUpCardPrice} placeholder="如 10" />
+          <TextField label="VIP2 补签价格" value={checkInVip2MakeUpCardPrice} onChange={setCheckInVip2MakeUpCardPrice} placeholder="如 8" />
+          <TextField label="VIP3 补签价格" value={checkInVip3MakeUpCardPrice} onChange={setCheckInVip3MakeUpCardPrice} placeholder="如 5" />
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Field label="普通用户邀请码价格" value={inviteCodePrice} onChange={setInviteCodePrice} placeholder="如 100" />
-          <Field label="VIP1 邀请码价格" value={inviteCodeVip1Price} onChange={setInviteCodeVip1Price} placeholder="如 80" />
-          <Field label="VIP2 邀请码价格" value={inviteCodeVip2Price} onChange={setInviteCodeVip2Price} placeholder="如 60" />
-          <Field label="VIP3 邀请码价格" value={inviteCodeVip3Price} onChange={setInviteCodeVip3Price} placeholder="如 50" />
+          <TextField label="普通用户邀请码价格" value={inviteCodePrice} onChange={setInviteCodePrice} placeholder="如 100" />
+          <TextField label="VIP1 邀请码价格" value={inviteCodeVip1Price} onChange={setInviteCodeVip1Price} placeholder="如 80" />
+          <TextField label="VIP2 邀请码价格" value={inviteCodeVip2Price} onChange={setInviteCodeVip2Price} placeholder="如 60" />
+          <TextField label="VIP3 邀请码价格" value={inviteCodeVip3Price} onChange={setInviteCodeVip3Price} placeholder="如 50" />
         </div>
       </div>
 
@@ -157,19 +159,19 @@ export function AdminVipSettingsForm({ initialSettings }: AdminVipSettingsFormPr
           <p className="mt-1 text-xs text-muted-foreground">统一配置前台可售 VIP 套餐对应的积分价格。</p>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <Field label="月卡积分价格（VIP1）" value={vipMonthlyPrice} onChange={setVipMonthlyPrice} placeholder="如 3000" />
-          <Field label="季卡积分价格（VIP2）" value={vipQuarterlyPrice} onChange={setVipQuarterlyPrice} placeholder="如 8000" />
-          <Field label="年卡积分价格（VIP3）" value={vipYearlyPrice} onChange={setVipYearlyPrice} placeholder="如 30000" />
+          <TextField label="月卡积分价格（VIP1）" value={vipMonthlyPrice} onChange={setVipMonthlyPrice} placeholder="如 3000" />
+          <TextField label="季卡积分价格（VIP2）" value={vipQuarterlyPrice} onChange={setVipQuarterlyPrice} placeholder="如 8000" />
+          <TextField label="年卡积分价格（VIP3）" value={vipYearlyPrice} onChange={setVipYearlyPrice} placeholder="如 30000" />
         </div>
         <div>
           <h3 className="text-sm font-semibold">作者下线帖子价格</h3>
           <p className="mt-1 text-xs text-muted-foreground">0 表示免费；普通用户与 VIP1 / VIP2 / VIP3 按当前身份分别扣除积分。</p>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Field label="普通用户积分价格" value={postOfflinePrice} onChange={setPostOfflinePrice} placeholder="如 50" />
-          <Field label="VIP1 积分价格" value={postOfflineVip1Price} onChange={setPostOfflineVip1Price} placeholder="如 30" />
-          <Field label="VIP2 积分价格" value={postOfflineVip2Price} onChange={setPostOfflineVip2Price} placeholder="如 20" />
-          <Field label="VIP3 积分价格" value={postOfflineVip3Price} onChange={setPostOfflineVip3Price} placeholder="如 0" />
+          <TextField label="普通用户积分价格" value={postOfflinePrice} onChange={setPostOfflinePrice} placeholder="如 50" />
+          <TextField label="VIP1 积分价格" value={postOfflineVip1Price} onChange={setPostOfflineVip1Price} placeholder="如 30" />
+          <TextField label="VIP2 积分价格" value={postOfflineVip2Price} onChange={setPostOfflineVip2Price} placeholder="如 20" />
+          <TextField label="VIP3 积分价格" value={postOfflineVip3Price} onChange={setPostOfflineVip3Price} placeholder="如 0" />
         </div>
         <div className="flex items-center gap-3">
           <Button disabled={isPending} className="h-10 rounded-full px-4 text-xs">{isPending ? "保存中..." : "保存积分与VIP设置"}</Button>
@@ -185,15 +187,6 @@ function Stat({ title, value, valueText }: { title: string; value?: number; valu
     <div className="rounded-[18px] border border-border bg-card px-4 py-3">
       <p className="text-xs text-muted-foreground">{title}</p>
       <p className="mt-2 text-2xl font-semibold">{valueText ?? value ?? 0}</p>
-    </div>
-  )
-}
-
-function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {
-  return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium">{label}</p>
-      <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none" />
     </div>
   )
 }

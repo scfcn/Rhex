@@ -26,10 +26,6 @@ function base64UrlDecode(input: string) {
   return Buffer.from(input, "base64url").toString("utf8")
 }
 
-export function signCaptchaText(text: string) {
-  return crypto.createHmac("sha256", resolveSecret()).update(text).digest("hex")
-}
-
 export function createBuiltinCaptchaToken(text: string, expiresAt: number) {
   const payload = JSON.stringify({ text, expiresAt, nonce: crypto.randomUUID() })
   const encodedPayload = base64UrlEncode(payload)
