@@ -62,8 +62,8 @@ export interface SiteSettingsData {
   inviteCodeVip1Price: number
   inviteCodeVip2Price: number
   inviteCodeVip3Price: number
-  registerCaptchaMode: "OFF" | "TURNSTILE" | "BUILTIN"
-  loginCaptchaMode: "OFF" | "TURNSTILE" | "BUILTIN"
+  registerCaptchaMode: "OFF" | "TURNSTILE" | "BUILTIN" | "POW"
+  loginCaptchaMode: "OFF" | "TURNSTILE" | "BUILTIN" | "POW"
   turnstileSiteKey?: string | null
   nicknameChangePointCost: number
   nicknameChangeVip1PointCost: number

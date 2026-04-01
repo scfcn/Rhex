@@ -1,6 +1,5 @@
 import { access, readFile } from "fs/promises"
 import path from "path"
-import { fileURLToPath } from "url"
 
 import { notFound } from "next/navigation"
 
@@ -10,8 +9,7 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 
-const uploadRouteFilePath = fileURLToPath(import.meta.url)
-const projectRoot = path.resolve(path.dirname(uploadRouteFilePath), "../../../../../..")
+const projectRoot = process.cwd()
 const publicRoot = path.join(projectRoot, "public")
 const ALLOWED_UPLOAD_FOLDERS = new Set(["avatars", "posts", "comments", "friend-links", "site-logo"])
 
@@ -43,10 +41,12 @@ async function resolveUploadFilePath(folder: string, fileName: string) {
   const settings = await getSiteSettings()
   const configuredLocalPath = settings.uploadLocalPath?.trim() || "uploads"
   const candidatePaths = [
+    path.join(projectRoot, configuredLocalPath, folder, fileName),
     path.join(publicRoot, configuredLocalPath, folder, fileName),
   ]
 
   if (configuredLocalPath !== "uploads") {
+    candidatePaths.push(path.join(projectRoot, "uploads", folder, fileName))
     candidatePaths.push(path.join(publicRoot, "uploads", folder, fileName))
   }
 

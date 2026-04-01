@@ -5,6 +5,7 @@ import { prisma } from "@/db/client"
 import { apiError } from "@/lib/api-route"
 import { verifyBuiltinCaptchaToken } from "@/lib/builtin-captcha"
 import { enforceSensitiveText } from "@/lib/content-safety"
+import { verifyPowCaptchaSolution } from "@/lib/pow-captcha"
 import { getRequestIp } from "@/lib/request-ip"
 import { getSiteSettings } from "@/lib/site-settings"
 import { verifyTurnstileToken } from "@/lib/turnstile"
@@ -63,6 +64,7 @@ function assertRegisterPayload(body: unknown): RegisterPayload {
 async function verifyRegisterCaptcha(context: RegisterContext) {
   const captchaToken = typeof context.body.captchaToken === "string" ? context.body.captchaToken.trim() : ""
   const builtinCaptchaCode = typeof context.body.builtinCaptchaCode === "string" ? context.body.builtinCaptchaCode.trim() : ""
+  const powNonce = typeof context.body.powNonce === "string" ? context.body.powNonce.trim() : ""
 
   if (context.settings.registerCaptchaMode === "TURNSTILE") {
     if (!context.settings.turnstileSiteKey || !process.env.TURNSTILE_SECRET_KEY?.trim()) {
@@ -81,7 +83,20 @@ async function verifyRegisterCaptcha(context: RegisterContext) {
       apiError(400, "请先完成图形验证码验证")
     }
 
-    verifyBuiltinCaptchaToken(captchaToken, builtinCaptchaCode)
+    await verifyBuiltinCaptchaToken(captchaToken, builtinCaptchaCode)
+  }
+
+  if (context.settings.registerCaptchaMode === "POW") {
+    if (!captchaToken || !powNonce) {
+      apiError(400, "请先完成工作量证明验证")
+    }
+
+    await verifyPowCaptchaSolution({
+      challenge: captchaToken,
+      nonce: powNonce,
+      scope: "register",
+      requestIp: context.registerIp,
+    })
   }
 }
 

@@ -6,6 +6,7 @@ import { useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
 import { BuiltinCaptchaField } from "@/components/builtin-captcha-field"
+import { PowCaptchaField } from "@/components/pow-captcha-field"
 import { TurnstileCaptchaField } from "@/components/turnstile-captcha-field"
 import { Button } from "@/components/ui/button"
 import { TextField } from "@/components/ui/text-field"
@@ -33,6 +34,7 @@ export function RegisterForm({ settings }: RegisterFormProps) {
   const [inviteCode, setInviteCode] = useState(initialInviteCode)
   const [captchaToken, setCaptchaToken] = useState("")
   const [builtinCaptchaCode, setBuiltinCaptchaCode] = useState("")
+  const [powNonce, setPowNonce] = useState("")
   const [loading, setLoading] = useState(false)
   const [emailMessage, setEmailMessage] = useState("")
 
@@ -43,6 +45,7 @@ export function RegisterForm({ settings }: RegisterFormProps) {
   const captchaMode = settings.registerCaptchaMode
   const useTurnstile = captchaMode === "TURNSTILE" && Boolean(settings.turnstileSiteKey)
   const useBuiltinCaptcha = captchaMode === "BUILTIN"
+  const usePowCaptcha = captchaMode === "POW"
 
   const hiddenInviterBound = useMemo(() => !settings.registerInviterEnabled && !!inviterUsername, [settings.registerInviterEnabled, inviterUsername])
   const hiddenInviteCodeBound = useMemo(() => !settings.registerInviteCodeEnabled && !!inviteCode, [settings.registerInviteCodeEnabled, inviteCode])
@@ -73,7 +76,7 @@ export function RegisterForm({ settings }: RegisterFormProps) {
     setLoading(true)
 
 
-    if ((useTurnstile || useBuiltinCaptcha) && !captchaToken) {
+    if ((useTurnstile || useBuiltinCaptcha || usePowCaptcha) && !captchaToken) {
       toast.warning("请先完成验证码验证", "注册校验")
       setLoading(false)
       return
@@ -81,6 +84,12 @@ export function RegisterForm({ settings }: RegisterFormProps) {
 
     if (useBuiltinCaptcha && !builtinCaptchaCode.trim()) {
       toast.warning("请输入图形验证码", "注册校验")
+      setLoading(false)
+      return
+    }
+
+    if (usePowCaptcha && !powNonce) {
+      toast.warning("请先完成工作量证明验证", "注册校验")
       setLoading(false)
       return
     }
@@ -122,6 +131,7 @@ export function RegisterForm({ settings }: RegisterFormProps) {
         gender,
         captchaToken,
         builtinCaptchaCode,
+        powNonce,
       }),
     })
 
@@ -208,6 +218,8 @@ export function RegisterForm({ settings }: RegisterFormProps) {
         {useTurnstile && settings.turnstileSiteKey ? <TurnstileCaptchaField siteKey={settings.turnstileSiteKey} description="使用 Cloudflare Turnstile 防止机器人批量注册。" onTokenChange={setCaptchaToken} /> : null}
 
         {useBuiltinCaptcha ? <BuiltinCaptchaField code={builtinCaptchaCode} onCodeChange={setBuiltinCaptchaCode} onTokenChange={setCaptchaToken} onLoadError={(message) => toast.error(message, "验证码")} /> : null}
+
+        {usePowCaptcha ? <PowCaptchaField scope="register" onTokenChange={setCaptchaToken} onNonceChange={setPowNonce} onLoadError={(message) => toast.error(message, "PoW 验证")} /> : null}
 
         <Button className="w-full" disabled={loading}>{loading ? "注册中..." : "注册并登录"}</Button>
 

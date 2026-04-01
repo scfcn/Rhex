@@ -1,4 +1,4 @@
-export type CaptchaMode = "OFF" | "TURNSTILE" | "BUILTIN"
+export type CaptchaMode = "OFF" | "TURNSTILE" | "BUILTIN" | "POW"
 
 export interface FooterLinkItem {
   label: string
@@ -46,7 +46,7 @@ export function parseHeatColors(raw: unknown) {
 
 export function normalizeCaptchaMode(raw: unknown): CaptchaMode {
   const mode = String(raw ?? "OFF").trim().toUpperCase()
-  return mode === "TURNSTILE" || mode === "BUILTIN" ? mode : "OFF"
+  return mode === "TURNSTILE" || mode === "BUILTIN" || mode === "POW" ? mode : "OFF"
 }
 
 export function normalizeFooterLinks(raw: unknown) {

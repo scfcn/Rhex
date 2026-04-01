@@ -30,8 +30,8 @@ interface AdminBasicSettingsFormProps {
     registrationRequireInviteCode: boolean
     registerInviteCodeEnabled: boolean
     inviteCodePurchaseEnabled: boolean
-    registerCaptchaMode: "OFF" | "TURNSTILE" | "BUILTIN"
-    loginCaptchaMode: "OFF" | "TURNSTILE" | "BUILTIN"
+    registerCaptchaMode: "OFF" | "TURNSTILE" | "BUILTIN" | "POW"
+    loginCaptchaMode: "OFF" | "TURNSTILE" | "BUILTIN" | "POW"
     turnstileSiteKey?: string | null
     postEditableMinutes: number
     commentEditableMinutes: number
@@ -410,14 +410,14 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
           <div className="rounded-[24px] border border-border p-5 space-y-4">
             <div>
               <h3 className="text-sm font-semibold">注册防机器人验证码</h3>
-              <p className="mt-1 text-xs leading-6 text-muted-foreground">支持关闭、Cloudflare Turnstile 与自建图形验证码三种模式。</p>
+              <p className="mt-1 text-xs leading-6 text-muted-foreground">支持关闭、Cloudflare Turnstile、自建图形验证码与 PoW 工作量证明四种模式。</p>
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <CaptchaModeField label="注册验证码模式" value={registerCaptchaMode} onChange={setRegisterCaptchaMode} />
               <CaptchaModeField label="登录验证码模式" value={loginCaptchaMode} onChange={setLoginCaptchaMode} />
               <TextField label="Turnstile Site Key" value={turnstileSiteKey} onChange={setTurnstileSiteKey} placeholder="填写 Cloudflare Turnstile 公钥" />
             </div>
-            <p className="text-xs leading-6 text-muted-foreground">当模式为 `TURNSTILE` 时，需要同时配置环境变量 `TURNSTILE_SECRET_KEY`；当模式为 `BUILTIN` 时，系统会使用站点自建图形验证码，并通过签名 token 校验。</p>
+            <p className="text-xs leading-6 text-muted-foreground">当模式为 `TURNSTILE` 时，需要同时配置环境变量 `TURNSTILE_SECRET_KEY`；当模式为 `BUILTIN` 时，系统会使用站点自建图形验证码；当模式为 `POW` 时，系统会下发签名挑战并要求浏览器完成一次工作量证明，默认读取 `POW_CAPTCHA_SECRET_KEY`，未设置时回退到 `CAPTCHA_SECRET_KEY` 或 `TURNSTILE_SECRET_KEY`。</p>
           </div>
 
           <div className="rounded-[24px] border border-border p-5 space-y-4">
@@ -594,14 +594,15 @@ function SwitchField({ label, checked, onChange }: { label: string; checked: boo
   )
 }
 
-function CaptchaModeField({ label, value, onChange }: { label: string; value: "OFF" | "TURNSTILE" | "BUILTIN"; onChange: (value: "OFF" | "TURNSTILE" | "BUILTIN") => void }) {
+function CaptchaModeField({ label, value, onChange }: { label: string; value: "OFF" | "TURNSTILE" | "BUILTIN" | "POW"; onChange: (value: "OFF" | "TURNSTILE" | "BUILTIN" | "POW") => void }) {
   return (
     <div className="space-y-2">
       <p className="text-sm font-medium">{label}</p>
-      <select value={value} onChange={(event) => onChange(event.target.value as "OFF" | "TURNSTILE" | "BUILTIN")} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
+      <select value={value} onChange={(event) => onChange(event.target.value as "OFF" | "TURNSTILE" | "BUILTIN" | "POW")} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
         <option value="OFF">关闭</option>
         <option value="TURNSTILE">Cloudflare Turnstile</option>
         <option value="BUILTIN">自建图形验证码</option>
+        <option value="POW">PoW 工作量证明</option>
       </select>
     </div>
   )

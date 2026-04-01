@@ -4,6 +4,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/db/client"
 import { apiError, createRouteHandler, apiSuccess, readJsonBody, readOptionalStringField } from "@/lib/api-route"
 import { verifyBuiltinCaptchaToken } from "@/lib/builtin-captcha"
+import { verifyPowCaptchaSolution } from "@/lib/pow-captcha"
 import { getRequestIp } from "@/lib/request-ip"
 import { logRouteWriteSuccess } from "@/lib/route-metadata"
 import { createSessionToken, getSessionCookieName, getSessionCookieOptions } from "@/lib/session"
@@ -23,6 +24,7 @@ export const POST = createRouteHandler(async ({ request }) => {
   const { username, password } = validated.data
   const captchaToken = readOptionalStringField(body, "captchaToken")
   const builtinCaptchaCode = readOptionalStringField(body, "builtinCaptchaCode")
+  const powNonce = readOptionalStringField(body, "powNonce")
   const settings = await getSiteSettings()
 
   return withRequestWriteGuard({
@@ -48,7 +50,20 @@ export const POST = createRouteHandler(async ({ request }) => {
         apiError(400, "请先完成图形验证码验证")
       }
 
-      verifyBuiltinCaptchaToken(captchaToken, builtinCaptchaCode)
+      await verifyBuiltinCaptchaToken(captchaToken, builtinCaptchaCode)
+    }
+
+    if (settings.loginCaptchaMode === "POW") {
+      if (!captchaToken || !powNonce) {
+        apiError(400, "请先完成工作量证明验证")
+      }
+
+      await verifyPowCaptchaSolution({
+        challenge: captchaToken,
+        nonce: powNonce,
+        scope: "login",
+        requestIp: getRequestIp(request),
+      })
     }
 
     const user = await prisma.user.findUnique({

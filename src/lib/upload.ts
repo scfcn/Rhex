@@ -1,6 +1,5 @@
 import { createHash } from "crypto"
 import { mkdir, writeFile } from "fs/promises"
-import { fileURLToPath } from "url"
 import path from "path"
 
 import { getSiteSettings } from "@/lib/site-settings"
@@ -28,9 +27,6 @@ const IMAGE_MIME_TYPES = new Set([
   "image/webp",
   "image/avif",
 ])
-
-const uploadLibFilePath = fileURLToPath(import.meta.url)
-const publicRoot = path.resolve(path.dirname(uploadLibFilePath), "../../public")
 
 /**
  * 通过文件头魔数（magic bytes）检测真实 MIME 类型。
@@ -88,7 +84,7 @@ async function saveToLocal(
   const ext = path.extname(file.name) || ".bin"
   const shortHash = preparedFile.fileHash.slice(0, 16)
   const fileName = `${folder}-${shortHash}${ext}`
-  const uploadRoot = path.join(publicRoot, localPath || "uploads", folder)
+  const uploadRoot = path.resolve(process.cwd(), localPath || "uploads", folder)
 
   await mkdir(uploadRoot, { recursive: true })
   await writeFile(path.join(uploadRoot, fileName), preparedFile.buffer)

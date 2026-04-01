@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation"
 import { useState } from "react"
 
 import { BuiltinCaptchaField } from "@/components/builtin-captcha-field"
+import { PowCaptchaField } from "@/components/pow-captcha-field"
 import { TurnstileCaptchaField } from "@/components/turnstile-captcha-field"
 import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/toast"
@@ -19,19 +20,21 @@ export function LoginForm({ settings }: LoginFormProps) {
   const [password, setPassword] = useState("")
   const [captchaToken, setCaptchaToken] = useState("")
   const [builtinCaptchaCode, setBuiltinCaptchaCode] = useState("")
+  const [powNonce, setPowNonce] = useState("")
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState("")
 
   const captchaMode = settings.loginCaptchaMode
   const useTurnstile = captchaMode === "TURNSTILE" && Boolean(settings.turnstileSiteKey)
   const useBuiltinCaptcha = captchaMode === "BUILTIN"
+  const usePowCaptcha = captchaMode === "POW"
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setLoading(true)
     setMessage("")
 
-    if ((useTurnstile || useBuiltinCaptcha) && !captchaToken) {
+    if ((useTurnstile || useBuiltinCaptcha || usePowCaptcha) && !captchaToken) {
       setMessage("请先完成验证码验证")
       setLoading(false)
       return
@@ -43,12 +46,18 @@ export function LoginForm({ settings }: LoginFormProps) {
       return
     }
 
+    if (usePowCaptcha && !powNonce) {
+      setMessage("请先完成工作量证明验证")
+      setLoading(false)
+      return
+    }
+
     const response = await fetch("/api/auth/login", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ username, password, captchaToken, builtinCaptchaCode }),
+      body: JSON.stringify({ username, password, captchaToken, builtinCaptchaCode, powNonce }),
     })
 
     const result = await response.json()
@@ -100,6 +109,8 @@ export function LoginForm({ settings }: LoginFormProps) {
         {useTurnstile && settings.turnstileSiteKey ? <TurnstileCaptchaField siteKey={settings.turnstileSiteKey} description="使用 Cloudflare Turnstile 防止机器人撞库登录。" onTokenChange={setCaptchaToken} /> : null}
 
         {useBuiltinCaptcha ? <BuiltinCaptchaField code={builtinCaptchaCode} onCodeChange={setBuiltinCaptchaCode} onTokenChange={setCaptchaToken} onLoadError={setMessage} /> : null}
+
+        {usePowCaptcha ? <PowCaptchaField scope="login" onTokenChange={setCaptchaToken} onNonceChange={setPowNonce} onLoadError={setMessage} /> : null}
 
         <Button className="w-full" disabled={loading}>
           {loading ? "登录中..." : "登录"}
