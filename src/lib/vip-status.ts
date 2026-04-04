@@ -6,6 +6,7 @@ export interface VipStateSource {
 interface VipNameClassOptions {
   emphasize?: boolean
   medium?: boolean
+  interactive?: boolean
 }
 
 export function isVipActive(source: VipStateSource | null | undefined) {
@@ -27,7 +28,7 @@ export function getVipLevel(source: VipStateSource | null | undefined) {
 
 export function getVipNameClass(isVip?: boolean, level?: number | null, options?: VipNameClassOptions) {
   const fontWeightClassName = options?.emphasize ? "font-semibold" : options?.medium ? "font-medium" : ""
-  const baseClassName = [fontWeightClassName, "hover:underline"].filter(Boolean).join(" ")
+  const baseClassName = [fontWeightClassName, options?.interactive === false ? "" : "hover:underline"].filter(Boolean).join(" ")
 
   if (!isVip || !level || level <= 0) {
     return baseClassName

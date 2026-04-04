@@ -5,11 +5,9 @@ import { prisma } from "@/db/client"
 import {
 
   createRedeemCodeRecords,
-  createRedeemPointLogWithTx,
   findRedeemCodeByCode,
   findRedeemCodeByCodeWithTx,
   findUserBaseById,
-  incrementUserPointsWithTx,
   listRedeemCodes,
   listRedeemCodesByCodes,
   listRedeemedCodesByUserWithTx,
@@ -20,6 +18,7 @@ import {
 
 
 import { PublicRouteError } from "@/lib/public-route-error"
+import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
 import { getSiteSettings } from "@/lib/site-settings"
 
 
@@ -246,12 +245,29 @@ export async function redeemPointsCode(input: { userId: number; code: string }) 
     }
 
     await markRedeemCodeUsedWithTx(tx, activeRedeemCode.id, input.userId)
-    await incrementUserPointsWithTx(tx, input.userId, activeRedeemCode.points)
-    await createRedeemPointLogWithTx({
+    const latestUser = await tx.user.findUnique({
+      where: { id: input.userId },
+      select: { id: true, points: true },
+    })
+
+    if (!latestUser) {
+      throwRedeemCodeError("用户不存在")
+    }
+
+    const preparedReward = await prepareScopedPointDelta({
+      scopeKey: "REDEEM_CODE_REWARD",
+      baseDelta: activeRedeemCode.points,
+      userId: input.userId,
+    })
+
+    await applyPointDelta({
       tx,
       userId: input.userId,
-      points: activeRedeemCode.points,
+      beforeBalance: latestUser.points,
+      prepared: preparedReward,
+      pointName: settings.pointName,
       reason: `兑换码兑换获得${settings.pointName}（分类:${latestCodeCategory}）`,
+      insufficientMessage: `${settings.pointName}不足，无法完成兑换`,
     })
 
     return {

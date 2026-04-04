@@ -4,7 +4,7 @@ import { apiError } from "@/lib/api-route"
 import { extractSummaryFromContent } from "@/lib/content"
 import { enforceSensitiveText } from "@/lib/content-safety"
 import { createPostMentionNotifications, stripPostContentUserLinks } from "@/lib/post-mentions"
-import { buildPostContentDocument, getAllPostContentText, serializePostContentDocument } from "@/lib/post-content"
+import { buildPostContentDocument, getAllPostContentText, getPostContentMeta, serializePostContentDocument } from "@/lib/post-content"
 import { normalizeManualTags, syncPostTaxonomy } from "@/lib/post-editor"
 import { getSiteSettings } from "@/lib/site-settings"
 import { validatePostPayload } from "@/lib/validators"
@@ -50,6 +50,7 @@ export async function updatePostFlow(input: {
       id: true,
       slug: true,
       authorId: true,
+      content: true,
       createdAt: true,
       lastAppendedAt: true,
       appendices: {
@@ -69,6 +70,7 @@ export async function updatePostFlow(input: {
   }
 
   const isAdmin = input.currentUser.role === "ADMIN" || input.currentUser.role === "MODERATOR"
+  const existingContentMeta = getPostContentMeta(post.content)
   const canEditFull = isAdmin || input.currentUser.id === post.authorId
   if (!canEditFull) {
     apiError(403, "没有权限编辑该帖子")
@@ -92,6 +94,7 @@ export async function updatePostFlow(input: {
       replyThreshold: normalizedReplyThreshold,
       purchaseUnlockContent: purchaseUnlockSafety?.sanitizedText ?? "",
       purchasePrice: normalizedPurchasePrice,
+      meta: existingContentMeta,
     }))
     const summary = extractSummaryFromContent(getAllPostContentText(serializedContent))
     const shouldReview = Boolean(

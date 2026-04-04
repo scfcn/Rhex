@@ -1,9 +1,10 @@
 "use client"
 
 import {  useCallback, useMemo, useRef, useState } from "react"
-import { ImagePlus, List, SmilePlus, Table2, TextQuote } from "lucide-react"
+import { Highlighter, ImagePlus, List, SmilePlus, Table2, TextQuote } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { getMarkdownEditorKeydownResult, type MarkdownEditorUpdate } from "@/lib/markdown-editor-shortcuts"
 import { DEFAULT_MARKDOWN_EMOJI_ITEMS, type MarkdownEmojiItem } from "@/lib/markdown-emoji"
 
 
@@ -78,8 +79,12 @@ export function RichPostEditor({ value, onChange, placeholder, minHeight = 260 }
     event.preventDefault()
   }, [syncSelection])
 
-  function applyWrap(before: string, after = "") {
+  const applyEditorUpdate = useCallback((update: MarkdownEditorUpdate) => {
+    onChange(update.value)
+    restoreSelection(update.selectionStart, update.selectionEnd)
+  }, [onChange, restoreSelection])
 
+  const applyWrap = useCallback((before: string, after = "") => {
     const element = textareaRef.current
     if (!element) {
       onChange(`${value}${before}${after}`)
@@ -90,7 +95,11 @@ export function RichPostEditor({ value, onChange, placeholder, minHeight = 260 }
     const nextValue = insertText(value, start, end, before, after)
     onChange(nextValue)
     restoreSelection(start + before.length, end + before.length)
-  }
+  }, [onChange, restoreSelection, syncSelection, value])
+
+  const applyHighlight = useCallback(() => {
+    applyWrap("==", "==")
+  }, [applyWrap])
 
   function insertTemplate(template: string) {
     const element = textareaRef.current
@@ -158,10 +167,29 @@ export function RichPostEditor({ value, onChange, placeholder, minHeight = 260 }
     }
   }
 
+  const handleTextareaKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const result = getMarkdownEditorKeydownResult(event, {
+      value,
+      selectionStart: event.currentTarget.selectionStart,
+      selectionEnd: event.currentTarget.selectionEnd,
+    })
+    if (!result || result.kind !== "update") {
+      return
+    }
+
+    event.preventDefault()
+    applyEditorUpdate(result.update)
+  }, [applyEditorUpdate, value])
+
   return (
     <div className="space-y-3 rounded-[24px] border border-border bg-card p-4">
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" variant="outline" onMouseDown={handleToolbarMouseDown} onClick={() => applyWrap("**", "**")}>加粗</Button>
+
+        <Button type="button" variant="outline" onMouseDown={handleToolbarMouseDown} onClick={applyHighlight} title="高亮（Ctrl+X）">
+          <Highlighter className="mr-1 h-4 w-4" />
+          高亮
+        </Button>
 
         <Button type="button" variant="outline" onMouseDown={handleToolbarMouseDown} onClick={() => applyWrap("`", "`")}>行内代码</Button>
 
@@ -213,6 +241,7 @@ export function RichPostEditor({ value, onChange, placeholder, minHeight = 260 }
         ref={textareaRef}
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        onKeyDown={handleTextareaKeyDown}
         className="w-full min-w-0 rounded-[18px] border border-border bg-background px-3 py-3 text-sm leading-7 outline-none sm:rounded-[20px] sm:px-4"
 
         style={{ minHeight }}
@@ -220,7 +249,7 @@ export function RichPostEditor({ value, onChange, placeholder, minHeight = 260 }
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-        <p>支持图片、表情短码、列表、引用、表格、基础 Markdown。</p>
+        <p>支持高亮、图片、表情短码、列表、引用、表格、基础 Markdown。</p>
 
         <p>{stats.paragraphs} 段 · {stats.chars} 字</p>
       </div>

@@ -3,11 +3,13 @@ import { ImageIcon, MessageCircle } from "lucide-react"
 
 import { LevelIcon } from "@/components/level-icon"
 import { PostListLink } from "@/components/post-list-link"
-import { getPostPinTone, getPostTitleClassName, PostAccessBadges, PostRedPacketIcon } from "@/components/post-list-shared"
+import { getPostPinTone, getPostTitleClassName, PostAccessBadges, PostRewardPoolIcon } from "@/components/post-list-shared"
+import { TimeTooltip } from "@/components/time-tooltip"
 import { Tooltip } from "@/components/ui/tooltip"
 import { UserStatusBadge } from "@/components/user-status-badge"
 import { VipNameTooltip } from "@/components/vip-name-tooltip"
 import { getPostPath } from "@/lib/post-links"
+import type { PostRewardPoolMode } from "@/lib/post-reward-pool-config"
 import { cn } from "@/lib/utils"
 
 interface PostGalleryGridProps {
@@ -22,6 +24,7 @@ interface PostGalleryGridProps {
     pinScope?: string | null
     pinLabel?: string | null
     hasRedPacket?: boolean
+    rewardMode?: PostRewardPoolMode
     minViewLevel?: number
     minViewVipLevel?: number
     isFeatured?: boolean
@@ -35,6 +38,7 @@ interface PostGalleryGridProps {
     authorVipLevel?: number | null
     authorNameClassName?: string
     metaPrimary: string
+    metaPrimaryRaw?: string
     metaSecondary?: string | null
     commentCount: number
     commentAccentColor: string
@@ -79,9 +83,9 @@ export function PostGalleryGrid({ items, showBoard = true, postLinkDisplayMode =
                       </h2>
                     </PostListLink>
                     {item.hasRedPacket ? (
-                      <Tooltip content="红包帖">
-                        <span className="shrink-0" aria-label="红包帖">
-                          <PostRedPacketIcon className="h-3.5 w-3.5" />
+                      <Tooltip content={item.rewardMode === "JACKPOT" ? "聚宝盆帖" : "红包帖"}>
+                        <span className="shrink-0" aria-label={item.rewardMode === "JACKPOT" ? "聚宝盆帖" : "红包帖"}>
+                          <PostRewardPoolIcon mode={item.rewardMode} className="h-3.5 w-3.5" />
                         </span>
                       </Tooltip>
                     ) : null}
@@ -109,9 +113,15 @@ export function PostGalleryGrid({ items, showBoard = true, postLinkDisplayMode =
                     </VipNameTooltip>
                     {isRestrictedAuthor ? <UserStatusBadge status={item.authorStatus} compact /> : null}
                     <span className="shrink-0">•</span>
-                    <span className="truncate" title={item.metaSecondary ? `${item.metaPrimary} · ${item.metaSecondary}` : item.metaPrimary}>
-                      {item.metaSecondary ? `${item.metaPrimary} · ${item.metaSecondary}` : item.metaPrimary}
-                    </span>
+                    <TimeTooltip value={item.metaPrimaryRaw}>
+                      <span className="truncate">{item.metaPrimary}</span>
+                    </TimeTooltip>
+                    {item.metaSecondary ? (
+                      <>
+                        <span className="shrink-0">·</span>
+                        <span className="truncate" title={item.metaSecondary}>{item.metaSecondary}</span>
+                      </>
+                    ) : null}
                   </div>
                 </div>
 

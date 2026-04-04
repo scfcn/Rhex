@@ -3,7 +3,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Plus, Sparkles, Star, Wallet, Zap } from "lucide-react"
+import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Heart, Plus, Settings, Star, Users, Wallet } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { AdminModal } from "@/components/admin-modal"
@@ -52,6 +52,7 @@ export interface SidebarUserCardData {
   vipExpiresAt?: string | null
   boardCount: number
   favoriteCount: number
+  followerCount: number
   postCount: number
   receivedLikeCount: number
   points?: number
@@ -141,7 +142,6 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
     checkedInToday: Boolean(user?.checkedInToday),
   }))
   const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState("")
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [calendarMonth, setCalendarMonth] = useState(getMonthKey())
   const [calendarLoading, setCalendarLoading] = useState(false)
@@ -304,7 +304,6 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
     }
 
     setLoading(true)
-    setMessage("")
 
     try {
       const response = await fetch("/api/check-in", {
@@ -314,7 +313,6 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
       })
       const result = await response.json()
       if (!response.ok) {
-        setMessage(result.message ?? "签到失败")
         toast.error(result.message ?? "签到失败", "签到失败")
         return
       }
@@ -331,7 +329,6 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
         makeUpCost: 0,
         createdAt: new Date().toISOString(),
       })
-      setMessage(result.message ?? "签到成功")
       toast.success(result.message ?? "签到成功", "签到成功")
       void loadCalendar(calendarMonth)
       router.refresh()
@@ -346,7 +343,6 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
     }
 
     setLoading(true)
-    setMessage("")
 
     try {
       const response = await fetch("/api/check-in", {
@@ -356,7 +352,6 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
       })
       const result = await response.json()
       if (!response.ok) {
-        setMessage(result.message ?? "补签失败")
         toast.error(result.message ?? "补签失败", "补签失败")
         return
       }
@@ -376,7 +371,6 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
         makeUpCost,
         createdAt: new Date().toISOString(),
       })
-      setMessage(result.message ?? "补签成功")
       toast.success(result.message ?? "补签成功", "补签成功")
       void loadCalendar(calendarMonth)
     } finally {
@@ -388,63 +382,67 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
     <>
       <div className="overflow-hidden rounded-[24px] border border-border bg-card shadow-sm shadow-black/5 dark:shadow-black/30">
         <div className="sidebar-user-card-header p-4">
-          <div className="flex items-start gap-3">
-            <Link href={`/users/${currentUser.username}`} className={cn("shrink-0", isRestrictedUser && "grayscale")}>
-              <UserAvatar name={currentUser.nickname ?? currentUser.username} avatarPath={currentUser.avatarPath} size="md" isVip={vipActive} vipLevel={currentUser.vipLevel} />
-            </Link>
-            <div className={cn("min-w-0 flex-1", isRestrictedUser && "grayscale")}>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Link href={`/users/${currentUser.username}`} className="truncate text-sm font-semibold hover:underline">
-                  {currentUser.nickname ?? currentUser.username}
-                </Link>
-                {vipActive ? <VipBadge level={getVipLevel(currentUser)} compact /> : null}
-                {isRestrictedUser ? <UserStatusBadge status={currentUser.status} compact /> : null}
-              </div>
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                {currentUser.level && currentUser.levelName && currentUser.levelColor && currentUser.levelIcon ? (
-                  <LevelBadge level={currentUser.level} name={currentUser.levelName} color={currentUser.levelColor} icon={currentUser.levelIcon} compact />
-                ) : null}
-                <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${roleBadge.className}`}>
-                  {roleBadge.label}
-                </span>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start gap-3">
+              <Link href={`/users/${currentUser.username}`} className={cn("shrink-0", isRestrictedUser && "grayscale")}>
+                <UserAvatar name={currentUser.nickname ?? currentUser.username} avatarPath={currentUser.avatarPath} size="md" isVip={vipActive} vipLevel={currentUser.vipLevel} />
+              </Link>
+              <div className={cn("min-w-0 flex-1", isRestrictedUser && "grayscale")}>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Link href={`/users/${currentUser.username}`} className="truncate text-sm font-semibold hover:underline">
+                    {currentUser.nickname ?? currentUser.username}
+                  </Link>
+                  {vipActive ? <VipBadge level={getVipLevel(currentUser)} compact /> : null}
+                  {isRestrictedUser ? <UserStatusBadge status={currentUser.status} compact /> : null}
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  {currentUser.level && currentUser.levelName && currentUser.levelColor && currentUser.levelIcon ? (
+                    <LevelBadge level={currentUser.level} name={currentUser.levelName} color={currentUser.levelColor} icon={currentUser.levelIcon} compact />
+                  ) : null}
+                  <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${roleBadge.className}`}>
+                    {roleBadge.label}
+                  </span>
+                </div>
               </div>
             </div>
+            <Link
+              href="/settings"
+              aria-label="前往设置"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <Settings className="h-4 w-4" />
+            </Link>
           </div>
         </div>
 
         <div className="space-y-3.5 p-4">
-          <div className="grid grid-cols-3 gap-2">
-            <InlineStatBlock label="主题收藏" value={currentUser.favoriteCount} icon={<Star className="h-3 w-3" />} />
-            <InlineStatBlock label="发表内容" value={currentUser.postCount} icon={<Plus className="h-3 w-3" />} />
-            <InlineStatBlock label="获赞" value={currentUser.receivedLikeCount} icon={<Sparkles className="h-3 w-3" />} />
+          <div className="grid grid-cols-4 gap-1.5">
+            <InlineStatBlock label="收藏" value={currentUser.favoriteCount} icon={<Star className="h-3 w-3" />} href="/settings?tab=post-management&postTab=favorites" />
+            <InlineStatBlock label="内容" value={currentUser.postCount} icon={<Plus className="h-3 w-3" />} href="/settings?tab=post-management&postTab=posts" />
+            <InlineStatBlock label="获赞" value={currentUser.receivedLikeCount} icon={<Heart className="h-3 w-3" />} />
+            <InlineStatBlock label="粉丝" value={currentUser.followerCount} icon={<Users className="h-3 w-3" />} href="/settings?tab=follows&followTab=followers" />
           </div>
 
-          <div className="rounded-[18px] border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-400/20 dark:bg-amber-400/10">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">{pointName}账户</p>
-                <p className="mt-0.5 text-[11px] text-amber-800 dark:text-amber-200/80">当前余额 {points} {pointName}</p>
+          <div className="flex items-center justify-between gap-3 rounded-[18px] border border-amber-200 bg-amber-50/70 px-3 py-2.5 dark:border-amber-400/20 dark:bg-amber-400/10">
+            <Link href="/points" className="flex min-w-0 items-center gap-2 text-amber-900 transition-opacity hover:opacity-80 dark:text-amber-100">
+              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/80 text-amber-600 shadow-sm shadow-amber-950/5 dark:bg-amber-50/10 dark:text-amber-200">
+                <Wallet className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs text-amber-800/80 dark:text-amber-200/80">{pointName}</p>
+                <p className="truncate text-sm font-semibold">{points}</p>
               </div>
-              <Link href="/points" className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-amber-900 shadow-sm shadow-amber-950/5 transition-colors hover:bg-amber-100 dark:bg-amber-50/10 dark:text-amber-100 dark:hover:bg-amber-50/20">
-                <Zap className="h-3 w-3 fill-amber-500 text-amber-500 dark:fill-amber-300 dark:text-amber-300" />
-                明细
-              </Link>
-            </div>
+            </Link>
 
             {safeUser.checkInEnabled ? (
-              <div className="mt-3 space-y-2.5">
- 
-                <Button
-                  className={checkedInToday ? "h-9 w-full rounded-lg gap-1.5 text-xs bg-muted text-muted-foreground hover:bg-muted" : "h-9 w-full rounded-lg gap-1.5 text-xs"}
-                  onClick={() => setCalendarOpen(true)}
-                >
-                  <CalendarDays className="h-4 w-4" />
-                  {checkedInToday ? "今日已签到" : "签到"}
-                </Button>
-              </div>
+              <Button
+                className={checkedInToday ? "h-9 shrink-0 rounded-lg gap-1.5 px-3 text-xs bg-muted text-muted-foreground hover:bg-muted" : "h-9 shrink-0 rounded-lg gap-1.5 px-3 text-xs"}
+                onClick={() => setCalendarOpen(true)}
+              >
+                <CalendarDays className="h-4 w-4" />
+                {checkedInToday ? "已签到" : "签到"}
+              </Button>
             ) : null}
-
-            {message ? <p className="mt-2 text-[11px] text-amber-900/80 dark:text-amber-100/80">{message}</p> : null}
           </div>
 
           <div className="grid grid-cols-2 gap-2 border-t border-border/80 pt-3">
@@ -569,16 +567,30 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
   )
 }
 
-function InlineStatBlock({ label, value, icon }: { label: string; value: number; icon: React.ReactNode }) {
-  return (
-    <div className="rounded-[14px] border border-border bg-secondary/25 px-2.5 py-2 text-center dark:bg-secondary/45">
-      <div className="flex items-center justify-center gap-1.5 text-sm font-semibold leading-none text-foreground">
-        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-background text-muted-foreground">
+function InlineStatBlock({ label, value, icon, href }: { label: string; value: number; icon: React.ReactNode; href?: string }) {
+  const content = (
+    <>
+      <div className="flex items-center justify-center gap-1 text-sm font-semibold leading-none text-foreground">
+        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-background text-muted-foreground">
           {icon}
         </span>
         <span>{value}</span>
       </div>
       <p className="mt-1 text-[10px] leading-none text-muted-foreground">{label}</p>
+    </>
+  )
+
+  if (href) {
+    return (
+      <Link href={href} className="rounded-[12px] border border-border bg-secondary/25 px-2 py-1.5 text-center transition-colors hover:bg-accent/50 dark:bg-secondary/45">
+        {content}
+      </Link>
+    )
+  }
+
+  return (
+    <div className="rounded-[12px] border border-border bg-secondary/25 px-2 py-1.5 text-center dark:bg-secondary/45">
+      {content}
     </div>
   )
 }

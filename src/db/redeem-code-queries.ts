@@ -115,30 +115,3 @@ export async function markRedeemCodeUsedWithTx(tx: Prisma.TransactionClient, red
     },
   })
 }
-
-export async function incrementUserPointsWithTx(tx: Prisma.TransactionClient, userId: number, points: number) {
-  return tx.user.update({
-    where: { id: userId },
-    data: {
-      points: {
-        increment: points,
-      },
-    },
-  })
-}
-
-export async function createRedeemPointLogWithTx(params: {
-  tx: Prisma.TransactionClient
-  userId: number
-  points: number
-  reason: string
-}) {
-  return params.tx.pointLog.create({
-    data: {
-      userId: params.userId,
-      changeType: "INCREASE",
-      changeValue: params.points,
-      reason: params.reason,
-    },
-  })
-}

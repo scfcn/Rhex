@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ExternalLink, Megaphone, Pin } from "lucide-react"
+import { Clock3, ExternalLink, Megaphone, Pin } from "lucide-react"
 
 import type { AnnouncementItem } from "@/lib/announcements"
 
@@ -21,33 +21,29 @@ export function HomeAnnouncementPanel({ announcements }: HomeAnnouncementPanelPr
       </div>
 
       {announcements.length > 0 ? (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {announcements.map((announcement) => {
             const body = (
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    {announcement.isPinned ? <Pin className="h-3.5 w-3.5 shrink-0 text-orange-500" /> : null}
-                    <p style={{ color: announcement.titleColor ?? undefined }} className={announcement.titleBold ? "truncate text-sm font-semibold text-foreground" : "truncate text-sm font-medium text-foreground"}>
-                      {announcement.title}
-                    </p>
-                    {announcement.isExternal ? <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : null}
-                  </div>
-                  <p className="mt-1 text-[11px] text-muted-foreground">{announcement.publishedAtText}</p>
-                </div>
+              <div className="flex items-center gap-2">
+                {announcement.isPinned ? <Pin className="h-3 w-3 shrink-0 text-orange-500" /> : null}
+                <p style={{ color: announcement.titleColor ?? undefined }} className={announcement.titleBold ? "min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground" : "min-w-0 flex-1 truncate text-[13px] font-medium text-foreground"}>
+                  {announcement.title}
+                </p>
+                {announcement.isExternal ? <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground" /> : null}
+                <AnnouncementTimeHint publishedAtText={announcement.publishedAtText} />
               </div>
             )
 
             if (announcement.isExternal) {
               return (
-                <a key={announcement.id} href={announcement.href} target="_blank" rel="noreferrer" className="block rounded-[18px] border border-border/70 bg-background px-3 py-3 transition hover:border-foreground/15 hover:bg-accent/40">
+                <a key={announcement.id} href={announcement.href} target="_blank" rel="noreferrer" className="block rounded-[16px]  transition hover:border-foreground/15 hover:bg-accent/40">
                   {body}
                 </a>
               )
             }
 
             return (
-              <Link key={announcement.id} href={announcement.href} className="block rounded-[18px] border border-border/70 bg-background px-3 py-3 transition hover:border-foreground/15 hover:bg-accent/40">
+              <Link key={announcement.id} href={announcement.href} className="block rounded-[16px] transition hover:border-foreground/15 hover:bg-accent/40">
                 {body}
               </Link>
             )
@@ -59,5 +55,17 @@ export function HomeAnnouncementPanel({ announcements }: HomeAnnouncementPanelPr
         </div>
       )}
     </section>
+  )
+}
+
+function AnnouncementTimeHint({ publishedAtText }: { publishedAtText: string }) {
+  return (
+    <span
+      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      title={`发布时间：${publishedAtText}`}
+      aria-label={`发布时间：${publishedAtText}`}
+    >
+      <Clock3 className="h-3.5 w-3.5" />
+    </span>
   )
 }

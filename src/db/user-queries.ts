@@ -6,6 +6,7 @@ export const userProfileSelect = {
   id: true,
   username: true,
   nickname: true,
+  signature: true,
   role: true,
   bio: true,
   avatarPath: true,
@@ -64,6 +65,45 @@ export function findUserPostsByUsername(username: string) {
   })
 }
 
+export function findUserRepliesByUsername(username: string, limit = 20) {
+  return prisma.comment.findMany({
+    where: {
+      status: "NORMAL",
+      user: {
+        username,
+      },
+      post: {
+        status: "NORMAL",
+      },
+    },
+    select: {
+      id: true,
+      content: true,
+      createdAt: true,
+      likeCount: true,
+      replyToUser: {
+        select: {
+          username: true,
+        },
+      },
+      post: {
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          board: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: [{ createdAt: "desc" }],
+    take: Math.min(Math.max(1, limit), 50),
+  })
+}
+
 export function countUserPosts(userId: number) {
   return prisma.post.count({
     where: {
@@ -94,6 +134,7 @@ export function findUserAccountSettingsById(userId: number) {
     select: {
       email: true,
       emailVerifiedAt: true,
+      signature: true,
     },
   })
 }

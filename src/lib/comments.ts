@@ -1,9 +1,26 @@
-import { countRootCommentsByPostId, countUserRepliesByPostId, findRepliesByParentIds, findRootCommentsByPostId } from "@/db/comment-queries"
+import { findCommentEffectFeedbackByCommentIds } from "@/db/comment-effect-feedback-queries"
+import { countRootCommentsByPostId, countUserRepliesByPostId, findCommentRewardClaimsByCommentIds, findRepliesByParentIds, findRootCommentsByPostId } from "@/db/comment-queries"
 import { formatRelativeTime } from "@/lib/formatters"
+import type { PostRewardPoolEffectFeedback } from "@/lib/post-reward-effect-feedback"
+import type { PostRewardPoolMode } from "@/lib/post-reward-pool-config"
 import { getUserDisplayName } from "@/lib/users"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
 
 const AUTHOR_ONLY_COMMENT_PLACEHOLDER = "此评论仅楼主可看"
+
+interface SiteCommentRewardClaim {
+  amount: number
+  rewardMode: PostRewardPoolMode
+}
+
+function parseRewardEffectFeedback(rawValue: string) {
+  try {
+    const parsed = JSON.parse(rawValue) as PostRewardPoolEffectFeedback
+    return parsed && Array.isArray(parsed.events) ? parsed : null
+  } catch {
+    return null
+  }
+}
 
 export interface SiteCommentReplyItem {
   id: string
@@ -33,8 +50,11 @@ export interface SiteCommentReplyItem {
   replyToAuthor?: string
   content: string
   createdAt: string
+  createdAtRaw: string
   likes: number
   viewerLiked?: boolean
+  rewardClaim?: SiteCommentRewardClaim
+  rewardEffectFeedback?: PostRewardPoolEffectFeedback
 }
 
 export interface SiteCommentItem {
@@ -64,8 +84,11 @@ export interface SiteCommentItem {
   postId: string
   content: string
   createdAt: string
+  createdAtRaw: string
   likes: number
   viewerLiked?: boolean
+  rewardClaim?: SiteCommentRewardClaim
+  rewardEffectFeedback?: PostRewardPoolEffectFeedback
   floor: number
   isAcceptedAnswer: boolean
   isPinnedByAuthor: boolean
@@ -217,6 +240,34 @@ export async function getCommentsByPostId(
       replyToUser: CommentQueryUser | null
       likes?: CommentQueryLike[]
     }>
+    const commentIds = [
+      ...rootIds,
+      ...replies.map((comment) => comment.id),
+    ]
+    const [rewardClaims, rewardEffectFeedbackRows] = await Promise.all([
+      findCommentRewardClaimsByCommentIds(postId, commentIds),
+      findCommentEffectFeedbackByCommentIds(postId, commentIds),
+    ])
+    const rewardClaimMap = new Map<string, SiteCommentRewardClaim>()
+    const rewardEffectFeedbackMap = new Map<string, PostRewardPoolEffectFeedback>()
+
+    rewardClaims.forEach((claim) => {
+      if (!claim.triggerCommentId) {
+        return
+      }
+
+      rewardClaimMap.set(claim.triggerCommentId, {
+        amount: claim.amount,
+        rewardMode: claim.redPacket.packetCount > 0 ? "RED_PACKET" : "JACKPOT",
+      })
+    })
+
+    rewardEffectFeedbackRows.forEach((row) => {
+      const parsed = parseRewardEffectFeedback(row.feedbackJson)
+      if (parsed) {
+        rewardEffectFeedbackMap.set(row.commentId, parsed)
+      }
+    })
 
     const repliesByParentId = new Map<string, SiteCommentReplyItem[]>()
 
@@ -242,8 +293,11 @@ export async function getCommentsByPostId(
         replyToAuthor: comment.replyToUser ? comment.replyToUser.nickname ?? comment.replyToUser.username : undefined,
         content: shouldMaskComment(comment.userId) ? AUTHOR_ONLY_COMMENT_PLACEHOLDER : comment.content,
         createdAt: formatRelativeTime(comment.createdAt),
+        createdAtRaw: comment.createdAt.toISOString(),
         likes: comment.likeCount,
         viewerLiked: Boolean(viewer?.userId && comment.likes?.some((item) => item.userId === viewer.userId)),
+        rewardClaim: rewardClaimMap.get(comment.id),
+        rewardEffectFeedback: rewardEffectFeedbackMap.get(comment.id),
       })
 
       repliesByParentId.set(parentId, currentReplies)
@@ -270,8 +324,11 @@ export async function getCommentsByPostId(
         isPostAuthor: comment.userId === viewer?.postAuthorId,
         content: shouldMaskComment(comment.userId) ? AUTHOR_ONLY_COMMENT_PLACEHOLDER : comment.content,
         createdAt: formatRelativeTime(comment.createdAt),
+        createdAtRaw: comment.createdAt.toISOString(),
         likes: comment.likeCount,
         viewerLiked: Boolean(viewer?.userId && comment.likes?.some((item: CommentQueryLike) => item.userId === viewer.userId)),
+        rewardClaim: rewardClaimMap.get(comment.id),
+        rewardEffectFeedback: rewardEffectFeedbackMap.get(comment.id),
         floor,
         isAcceptedAnswer: comment.isAcceptedAnswer,
         isPinnedByAuthor: comment.isPinnedByAuthor,

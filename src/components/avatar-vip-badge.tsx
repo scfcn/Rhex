@@ -1,5 +1,7 @@
 "use client"
 
+import { useEffect, useRef } from "react"
+
 import { VipLevelIcon } from "@/components/vip-level-icon"
 import { cn } from "@/lib/utils"
 
@@ -22,6 +24,10 @@ const iconSizeClasses = {
   lg: "h-3.5 w-3.5 text-[14px]",
 }
 
+const SPIN_DEGREES_PER_MS = 360 / 1100
+const EASING_TIME_MS = 180
+const MIN_STOP_SPEED = 0.01
+
 function getBadgeTone(level: number) {
   if (level >= 3) {
     return "text-amber-700 shadow-[0_6px_18px_rgba(245,158,11,0.26)] dark:border-amber-300/25 dark:bg-amber-400/18 dark:text-amber-100"
@@ -37,17 +43,101 @@ function getBadgeTone(level: number) {
 export function AvatarVipBadge({ level = 1, size = "md" }: AvatarVipBadgeProps) {
   const normalizedLevel = Math.max(1, level ?? 1)
   const label = `VIP${normalizedLevel} 会员`
+  const badgeRef = useRef<HTMLSpanElement | null>(null)
+  const frameRef = useRef<number | null>(null)
+  const hoveredRef = useRef(false)
+  const angleRef = useRef(0)
+  const velocityRef = useRef(0)
+  const lastTimestampRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    const badge = badgeRef.current
+    const hoverTarget = badge?.parentElement
+    if (!badge || !hoverTarget) {
+      return
+    }
+    const badgeElement = badge
+
+    const mediaQuery = window.matchMedia?.("(prefers-reduced-motion: reduce)")
+    if (mediaQuery?.matches) {
+      return
+    }
+
+    function applyRotation(angle: number) {
+      badgeElement.style.transform = `rotate(${angle}deg)`
+    }
+
+    function stopLoop() {
+      if (frameRef.current !== null) {
+        window.cancelAnimationFrame(frameRef.current)
+        frameRef.current = null
+      }
+      lastTimestampRef.current = null
+    }
+
+    function tick(timestamp: number) {
+      const previousTimestamp = lastTimestampRef.current ?? timestamp
+      const delta = Math.min(32, timestamp - previousTimestamp)
+      lastTimestampRef.current = timestamp
+
+      const targetVelocity = hoveredRef.current ? SPIN_DEGREES_PER_MS : 0
+      const easingFactor = 1 - Math.exp(-delta / EASING_TIME_MS)
+      const nextVelocity = velocityRef.current + (targetVelocity - velocityRef.current) * easingFactor
+      velocityRef.current = nextVelocity
+      angleRef.current = (angleRef.current + (nextVelocity * delta)) % 360
+      applyRotation(angleRef.current)
+
+      if (!hoveredRef.current && Math.abs(nextVelocity) <= MIN_STOP_SPEED) {
+        velocityRef.current = 0
+        stopLoop()
+        return
+      }
+
+      frameRef.current = window.requestAnimationFrame(tick)
+    }
+
+    function ensureLoop() {
+      if (frameRef.current !== null) {
+        return
+      }
+
+      frameRef.current = window.requestAnimationFrame(tick)
+    }
+
+    function handlePointerEnter() {
+      hoveredRef.current = true
+      ensureLoop()
+    }
+
+    function handlePointerLeave() {
+      hoveredRef.current = false
+      if (velocityRef.current > 0) {
+        ensureLoop()
+      }
+    }
+
+    hoverTarget.addEventListener("pointerenter", handlePointerEnter)
+    hoverTarget.addEventListener("pointerleave", handlePointerLeave)
+
+    return () => {
+      hoverTarget.removeEventListener("pointerenter", handlePointerEnter)
+      hoverTarget.removeEventListener("pointerleave", handlePointerLeave)
+      stopLoop()
+      badgeElement.style.transform = ""
+    }
+  }, [])
 
   return (
-      <span
-        className={cn(
-          "pointer-events-auto absolute z-[1] inline-flex items-center justify-center rounded-full transition-transform duration-200 ease-out group-hover/avatar:animate-[spin_1.1s_linear_infinite] hover:animate-[spin_1.1s_linear_infinite]",
-          badgeSizeClasses[size],
-          getBadgeTone(normalizedLevel),
-        )}
-        aria-label={label}
-      >
-        <VipLevelIcon level={normalizedLevel} className={iconSizeClasses[size]} title={label} />
-      </span>
+    <span
+      ref={badgeRef}
+      className={cn(
+        "pointer-events-auto absolute z-[1] inline-flex items-center justify-center rounded-full will-change-transform",
+        badgeSizeClasses[size],
+        getBadgeTone(normalizedLevel),
+      )}
+      aria-label={label}
+    >
+      <VipLevelIcon level={normalizedLevel} className={iconSizeClasses[size]} />
+    </span>
   )
 }

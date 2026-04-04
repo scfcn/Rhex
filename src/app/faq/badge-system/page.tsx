@@ -48,7 +48,7 @@ export default async function BadgeSystemFaqPage() {
         <Card>
           <CardContent className="p-5 text-sm leading-7 text-muted-foreground">
             <p className="font-semibold text-foreground">展示方式</p>
-            <p className="mt-2">领取后的勋章可单独控制是否展示，评论区和资料页会读取已展示勋章。</p>
+            <p className="mt-2">领取后的勋章可单独控制是否展示，评论区和资料页会读取已佩戴勋章。</p>
           </CardContent>
         </Card>
         <Card>

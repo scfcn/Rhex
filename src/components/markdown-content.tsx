@@ -381,6 +381,7 @@ function renderMarkdown(input: string, emojiItems: MarkdownEmojiItem[]) {
 
 function bindImageLightbox(container: HTMLElement, onOpen: (images: LightboxImage[], index: number) => void) {
   const imageEls = Array.from(container.querySelectorAll<HTMLImageElement>("img"))
+    .filter((image) => image.dataset.imageError !== "true")
   const images: LightboxImage[] = imageEls
     .map((img) => ({ src: img.getAttribute("src")?.trim() ?? "", alt: img.getAttribute("alt") ?? "" }))
     .filter((img) => img.src)
@@ -424,7 +425,151 @@ function bindImageLightbox(container: HTMLElement, onOpen: (images: LightboxImag
   }
 }
 
+function isExternalMarkdownLink(href: string) {
+  const normalizedHref = href.trim()
+  if (!normalizedHref) {
+    return false
+  }
+
+  if (/^(mailto:|tel:)/i.test(normalizedHref)) {
+    return true
+  }
+
+  if (typeof window === "undefined") {
+    return /^(https?:)?\/\//i.test(normalizedHref)
+  }
+
+  try {
+    const resolvedUrl = new URL(normalizedHref, window.location.origin)
+    if (!["http:", "https:"].includes(resolvedUrl.protocol)) {
+      return false
+    }
+
+    return resolvedUrl.origin !== window.location.origin
+  } catch {
+    return false
+  }
+}
+
+function enhanceMarkdownLinks(container: HTMLElement) {
+  const links = Array.from(container.querySelectorAll<HTMLAnchorElement>("a[href]"))
+
+  for (const link of links) {
+    if (
+      link.classList.contains("md-heading-anchor")
+      || link.classList.contains("footnote-ref")
+      || link.classList.contains("footnote-backref")
+      || link.querySelector("img")
+    ) {
+      continue
+    }
+
+    link.classList.add("inline-flex", "items-center", "gap-1", "align-baseline")
+
+    const href = link.getAttribute("href")?.trim() ?? ""
+    const isExternal = isExternalMarkdownLink(href)
+
+    if (isExternal) {
+      link.setAttribute("title", "外部链接，请注意目标站点安全")
+      link.setAttribute("aria-label", `${link.textContent?.trim() || "外部链接"}（外部链接，请注意目标站点安全）`)
+    }
+
+    if (link.querySelector(":scope > .md-link-icon")) {
+      continue
+    }
+
+    const icon = document.createElement("span")
+    icon.className = "md-link-icon text-[0.72em] opacity-70"
+    icon.setAttribute("aria-hidden", "true")
+    icon.textContent = isExternal ? "↗" : "⌁"
+    link.appendChild(icon)
+  }
+}
+
+function createBrokenImagePlaceholder(image: HTMLImageElement) {
+  const placeholder = document.createElement("div")
+  placeholder.className = "md-image-fallback my-4 rounded-2xl border border-dashed border-amber-300/80 bg-amber-50/80 px-4 py-5 text-sm text-amber-900 shadow-sm dark:border-amber-800/70 dark:bg-amber-950/20 dark:text-amber-100"
+
+  const title = document.createElement("p")
+  title.className = "font-medium"
+  title.textContent = "图片加载失败"
+
+  const description = document.createElement("p")
+  description.className = "mt-1 text-xs leading-6 text-amber-800/90 dark:text-amber-200/90"
+  description.textContent = image.getAttribute("alt")?.trim()
+    ? `图片“${image.getAttribute("alt")?.trim()}”暂时无法显示，可能已被删除或链接失效。`
+    : "该图片暂时无法显示，可能已被删除或链接失效。"
+
+  placeholder.append(title, description)
+  return placeholder
+}
+
+function setBrokenImageState(image: HTMLImageElement) {
+  if (image.dataset.imageError === "true") {
+    return
+  }
+
+  image.dataset.imageError = "true"
+  image.classList.add("hidden")
+  image.classList.remove("cursor-zoom-in", "transition-opacity", "hover:opacity-90")
+  image.removeAttribute("role")
+  image.removeAttribute("tabindex")
+  image.removeAttribute("aria-label")
+
+  const nextSibling = image.nextElementSibling
+  if (!(nextSibling instanceof HTMLElement) || !nextSibling.classList.contains("md-image-fallback")) {
+    image.insertAdjacentElement("afterend", createBrokenImagePlaceholder(image))
+  }
+}
+
+function clearBrokenImageState(image: HTMLImageElement) {
+  image.dataset.imageError = "false"
+  image.classList.remove("hidden")
+
+  const nextSibling = image.nextElementSibling
+  if (nextSibling instanceof HTMLElement && nextSibling.classList.contains("md-image-fallback")) {
+    nextSibling.remove()
+  }
+}
+
+function bindBrokenImagePlaceholders(container: HTMLElement) {
+  const imageEls = Array.from(container.querySelectorAll<HTMLImageElement>("img"))
+  const cleanups = imageEls.map((image) => {
+    const handleLoad = () => {
+      clearBrokenImageState(image)
+    }
+
+    const handleError = () => {
+      setBrokenImageState(image)
+    }
+
+    image.addEventListener("load", handleLoad)
+    image.addEventListener("error", handleError)
+
+    if (image.complete) {
+      if (image.naturalWidth > 0) {
+        clearBrokenImageState(image)
+      } else {
+        setBrokenImageState(image)
+      }
+    }
+
+    return () => {
+      image.removeEventListener("load", handleLoad)
+      image.removeEventListener("error", handleError)
+    }
+  })
+
+  return () => {
+    for (const cleanup of cleanups) {
+      cleanup()
+    }
+  }
+}
+
 async function enhanceMarkdown(container: HTMLElement) {
+  enhanceMarkdownLinks(container)
+
   const headingSelectors = "h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]"
   for (const heading of Array.from(container.querySelectorAll<HTMLElement>(headingSelectors))) {
     if (heading.querySelector(":scope > a.md-heading-anchor")) {
@@ -612,6 +757,7 @@ export function MarkdownContent({ content, className, emptyText, markdownEmojiMa
       return
     }
 
+    const removeBrokenImagePlaceholders = bindBrokenImagePlaceholders(container)
     let removeImageLightbox = () => {}
     let cancelled = false
 
@@ -627,6 +773,7 @@ export function MarkdownContent({ content, className, emptyText, markdownEmojiMa
 
     return () => {
       cancelled = true
+      removeBrokenImagePlaceholders()
       removeImageLightbox()
     }
   }, [html])

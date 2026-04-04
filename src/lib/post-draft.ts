@@ -22,9 +22,11 @@ export interface LocalPostDraft {
   lotteryPrizes: Array<{ title: string; quantity: string; description: string }>
   lotteryConditions: Array<{ type: string; value: string; operator: string; description: string; groupKey: string }>
   redPacketEnabled: boolean
+  redPacketMode: "RED_PACKET" | "JACKPOT"
   redPacketGrantMode: "FIXED" | "RANDOM"
   redPacketClaimOrderMode: "FIRST_COME_FIRST_SERVED" | "RANDOM"
   redPacketTriggerType: "REPLY" | "LIKE" | "FAVORITE"
+  jackpotInitialPoints: string
   redPacketUnitPoints: string
   redPacketTotalPoints: string
   redPacketPacketCount: string
@@ -63,9 +65,11 @@ export function createEmptyLocalPostDraft(boardSlug = ""): LocalPostDraft {
     lotteryPrizes: [{ title: "一等奖", quantity: "1", description: "填写奖品描述" }],
     lotteryConditions: [{ type: "REPLY_CONTENT_LENGTH", value: "10", operator: "GTE", description: "回帖内容至少 10 字", groupKey: "default" }],
     redPacketEnabled: false,
+    redPacketMode: "RED_PACKET",
     redPacketGrantMode: "FIXED",
     redPacketClaimOrderMode: "FIRST_COME_FIRST_SERVED",
     redPacketTriggerType: "REPLY",
+    jackpotInitialPoints: "100",
     redPacketUnitPoints: "10",
     redPacketTotalPoints: "10",
     redPacketPacketCount: "1",

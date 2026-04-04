@@ -5,7 +5,7 @@ import React from "react"
 import { AdminModal } from "@/components/admin-modal"
 import { EmojiPicker } from "@/components/emoji-picker"
 import { FloatingEditorPanel } from "@/components/refined-rich-post-editor/floating-panels"
-import type { FloatingPanelPosition } from "@/components/refined-rich-post-editor/types"
+import type { FloatingPanelPosition, UploadSummary } from "@/components/refined-rich-post-editor/types"
 import type { MarkdownEmojiItem } from "@/lib/markdown-emoji"
 import { cn } from "@/lib/utils"
 import type { UploadFileResult } from "@/hooks/use-image-upload"
@@ -17,15 +17,6 @@ type FloatingPanelBaseProps = {
   position: FloatingPanelPosition | null
   ready: boolean
   panelRef: React.MutableRefObject<HTMLDivElement | null>
-}
-
-type UploadSummary = {
-  totalCount: number
-  queuedCount: number
-  activeCount: number
-  successCount: number
-  errorCount: number
-  completedCount: number
 }
 
 type Base64DialogProps = {

@@ -1,6 +1,7 @@
 import { Eye, MessageCircle, ThumbsUp } from "lucide-react"
 
 import { PostListLink } from "@/components/post-list-link"
+import { TimeTooltip } from "@/components/time-tooltip"
 import { UserDisplayedBadges } from "@/components/user-displayed-badges"
 import { getPostPath } from "@/lib/post-links"
 import type { SitePostItem } from "@/lib/posts"
@@ -36,7 +37,9 @@ export function PostCardList({ posts, pointName = "积分", compact = false, sho
               <UserDisplayedBadges badges={post.authorDisplayedBadges} compact />
               <span>·</span>
 
-              <span>{post.publishedAt}</span>
+              <TimeTooltip value={post.publishedAtRaw}>
+                <span>{post.publishedAt}</span>
+              </TimeTooltip>
               {post.bounty ? (
                 <>
                   <span>·</span>

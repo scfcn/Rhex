@@ -2,8 +2,10 @@
 
 import { useState } from "react"
 
+import { AccessThresholdSelectGroup } from "@/components/access-threshold-select-group"
 import { Button } from "@/components/ui/button"
 import { DialogBackdrop, DialogPanel, DialogPortal, DialogPositioner } from "@/components/ui/dialog"
+import type { AccessThresholdOption } from "@/lib/access-threshold-options"
 
 interface PostViewLevelModalProps {
   open: boolean
@@ -11,25 +13,29 @@ interface PostViewLevelModalProps {
     minViewLevel: string
     minViewVipLevel: string
   }
+  levelOptions: AccessThresholdOption[]
+  vipLevelOptions: AccessThresholdOption[]
   onChange: (value: { minViewLevel: string; minViewVipLevel: string }) => void
   onClose: () => void
 }
 
-export function PostViewLevelModal({ open, value, onChange, onClose }: PostViewLevelModalProps) {
+export function PostViewLevelModal({ open, value, levelOptions, vipLevelOptions, onChange, onClose }: PostViewLevelModalProps) {
   return (
     <DialogPortal open={open} onClose={onClose}>
       <div className="fixed inset-0 z-[120]">
         <DialogBackdrop onClick={onClose} />
         <DialogPositioner>
-          {open ? <PostViewLevelModalBody initialValue={value} onChange={onChange} onClose={onClose} /> : null}
+          {open ? <PostViewLevelModalBody initialValue={value} levelOptions={levelOptions} vipLevelOptions={vipLevelOptions} onChange={onChange} onClose={onClose} /> : null}
         </DialogPositioner>
       </div>
     </DialogPortal>
   )
 }
 
-function PostViewLevelModalBody({ initialValue, onChange, onClose }: {
+function PostViewLevelModalBody({ initialValue, levelOptions, vipLevelOptions, onChange, onClose }: {
   initialValue: { minViewLevel: string; minViewVipLevel: string }
+  levelOptions: AccessThresholdOption[]
+  vipLevelOptions: AccessThresholdOption[]
   onChange: (value: { minViewLevel: string; minViewVipLevel: string }) => void
   onClose: () => void
 }) {
@@ -55,24 +61,14 @@ function PostViewLevelModalBody({ initialValue, onChange, onClose }: {
       </div>
 
       <div className="space-y-4 px-6 py-5">
-        <div className="space-y-2">
-          <p className="text-sm font-medium">最低浏览等级</p>
-          <input
-            value={draftLevelValue}
-            onChange={(event) => setDraftLevelValue(event.target.value)}
-            className="h-11 w-full rounded-full border border-border bg-card px-4 text-sm outline-none"
-            placeholder="输入等级，0 表示公开可见"
-          />
-        </div>
-        <div className="space-y-2">
-          <p className="text-sm font-medium">最低 VIP 浏览等级</p>
-          <input
-            value={draftVipLevelValue}
-            onChange={(event) => setDraftVipLevelValue(event.target.value)}
-            className="h-11 w-full rounded-full border border-border bg-card px-4 text-sm outline-none"
-            placeholder="输入 VIP 等级，0 表示不限制"
-          />
-        </div>
+        <AccessThresholdSelectGroup
+          levelValue={draftLevelValue}
+          vipLevelValue={draftVipLevelValue}
+          levelOptions={levelOptions}
+          vipLevelOptions={vipLevelOptions}
+          onLevelChange={setDraftLevelValue}
+          onVipLevelChange={setDraftVipLevelValue}
+        />
       </div>
 
       <div className="flex items-center justify-end gap-3 border-t border-border px-6 py-4">

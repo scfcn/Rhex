@@ -8,7 +8,6 @@ const nextConfig = {
   reactStrictMode: true,
   productionBrowserSourceMaps:false,
   experimental: {
-    webpackBuildWorker: true,
     serverSourceMaps:false,
   },
   turbopack: {

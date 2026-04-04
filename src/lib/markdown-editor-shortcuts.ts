@@ -595,6 +595,13 @@ export function getMarkdownEditorKeydownResult(event: ShortcutKeyboardEvent, sta
       }
     }
 
+    if (lowerKey === "x") {
+      return {
+        kind: "update",
+        update: insertSelection(state, buildInlineHighlightMarkdown),
+      }
+    }
+
     if (lowerKey === "k") {
       return { kind: "ui", action: "open-link-panel" }
     }

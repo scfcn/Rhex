@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, Eye } from "lucide-react"
 
 import { FollowToggleButton } from "@/components/follow-toggle-button"
 import { LevelIcon } from "@/components/level-icon"
+import { TimeTooltip } from "@/components/time-tooltip"
 import { UserAvatar } from "@/components/user-avatar"
 import { UserDisplayedBadges, type DisplayedBadgeItem } from "@/components/user-displayed-badges"
 import { UserStatusBadge } from "@/components/user-status-badge"
@@ -27,6 +28,7 @@ interface PostDetailHeaderProps {
     authorVerification?: UserVerificationBadgeItem | null
     authorDisplayedBadges?: DisplayedBadgeItem[]
     publishedAt: string
+    publishedAtRaw?: string
     type?: string
     typeLabel: string
     isPinned: boolean
@@ -171,7 +173,9 @@ export function PostDetailHeader({ post, isFollowingPost, isRestrictedAuthor, zo
             <UserDisplayedBadges badges={post.authorDisplayedBadges} compact appearance="plain" spacing="tight" />
             {isRestrictedAuthor ? <UserStatusBadge status={post.authorStatus} compact /> : null}
             <span>·</span>
-            <span>{post.publishedAt}</span>
+            <TimeTooltip value={post.publishedAtRaw}>
+              <span>{post.publishedAt}</span>
+            </TimeTooltip>
           </div>
         </div>
       </div>

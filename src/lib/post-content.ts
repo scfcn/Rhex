@@ -1,3 +1,5 @@
+import type { StoredPostRewardPoolConfig } from "@/lib/post-reward-pool-config"
+
 export type PostBlockAccessType = "PUBLIC" | "AUTHOR_ONLY" | "REPLY_UNLOCK" | "PURCHASE_UNLOCK"
 
 export interface PostContentBlock {
@@ -9,9 +11,14 @@ export interface PostContentBlock {
   summary?: string
 }
 
+export interface PostContentMeta {
+  rewardPool?: StoredPostRewardPoolConfig | null
+}
+
 export interface PostContentDocument {
   version: 1
   blocks: PostContentBlock[]
+  meta?: PostContentMeta
 }
 
 function createId(prefix: string, index: number) {
@@ -55,6 +62,7 @@ export function buildPostContentDocument(input: {
   replyThreshold?: number
   purchaseUnlockContent?: string
   purchasePrice?: number
+  meta?: PostContentMeta
 }): PostContentDocument {
   const blocks: PostContentBlock[] = []
   const publicContent = normalizeText(input.publicContent)
@@ -101,6 +109,7 @@ export function buildPostContentDocument(input: {
     blocks: blocks.length > 0
       ? blocks
       : [{ id: "public-1", type: "PUBLIC", text: "" }],
+    meta: input.meta,
   }
 }
 
@@ -132,6 +141,7 @@ export function parsePostContentDocument(rawContent: string): PostContentDocumen
         return {
           version: 1,
           blocks: normalizedBlocks,
+          meta: parsed.meta,
         }
       }
     }
@@ -164,5 +174,9 @@ export function getAllPostContentText(rawContent: string) {
     .map((block) => block.text)
     .join("\n\n")
     .trim()
+}
+
+export function getPostContentMeta(rawContent: string) {
+  return parsePostContentDocument(rawContent).meta
 }
 

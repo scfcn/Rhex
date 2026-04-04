@@ -101,6 +101,24 @@ export function findUserRssPosts(username: string, limit = RSS_POST_LIMIT) {
   })
 }
 
+export function findTagRssPosts(tagSlug: string, limit = RSS_POST_LIMIT) {
+  return prisma.post.findMany({
+    where: {
+      status: "NORMAL",
+      tags: {
+        some: {
+          tag: {
+            slug: tagSlug,
+          },
+        },
+      },
+    },
+    orderBy: getRssPostOrderBy(),
+    take: limit,
+    select: rssPostSelect,
+  })
+}
+
 export { RSS_POST_LIMIT }
 export type RssPostRecord = Prisma.PostGetPayload<{ select: typeof rssPostSelect }>
 

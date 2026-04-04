@@ -29,6 +29,7 @@ export async function getSidebarCurrentUserStats(username: string) {
     return {
       boardCount: 0,
       favoriteCount: 0,
+      followerCount: 0,
       postCount: 0,
       receivedLikeCount: 0,
       points: 0,
@@ -45,6 +46,7 @@ export async function getSidebarCurrentUserStats(username: string) {
   return {
     boardCount,
     favoriteCount,
+    followerCount: user._count.followedByUsers,
     postCount: user.postCount,
     receivedLikeCount: user.likeReceivedCount,
     points: user.points,
@@ -85,6 +87,7 @@ export async function buildSidebarUser(user: SidebarUserSource, stats: SidebarUs
     vipExpiresAt: user.vipExpiresAt?.toString?.() ?? null,
     boardCount: stats?.boardCount ?? 0,
     favoriteCount: stats?.favoriteCount ?? 0,
+    followerCount: stats?.followerCount ?? 0,
     postCount: stats?.postCount ?? 0,
     receivedLikeCount: stats?.receivedLikeCount ?? 0,
     points: stats?.points ?? user.points ?? 0,
@@ -108,6 +111,4 @@ export async function resolveSidebarUser(user: SidebarUserSource, settings: Site
   const stats = await getSidebarCurrentUserStats(user.username)
   return buildSidebarUser(user, stats, settings)
 }
-
-
 

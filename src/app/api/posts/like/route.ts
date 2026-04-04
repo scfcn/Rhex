@@ -33,12 +33,11 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     liked: result.liked,
   })
 
-  return apiSuccess({ liked: result.liked }, result.liked ? (redPacketClaim?.claimed ? `点赞成功，并领取了 ${redPacketClaim.amount} ${redPacketClaim.pointName} 红包` : "点赞成功") : "已取消点赞")
+  return apiSuccess({ liked: result.liked }, result.liked ? (redPacketClaim?.claimed ? `点赞成功，并获得了 ${redPacketClaim.amount} ${redPacketClaim.pointName} ${redPacketClaim.rewardMode === "JACKPOT" ? "聚宝盆奖励" : "红包"}` : "点赞成功") : "已取消点赞")
 }, {
   errorMessage: "帖子点赞失败",
   logPrefix: "[api/posts/like] unexpected error",
   unauthorizedMessage: "请先登录后再点赞",
   allowStatuses: ["ACTIVE", "MUTED", "BANNED", "INACTIVE"],
 })
-
 

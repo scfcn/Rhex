@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation"
 import { useState } from "react"
 
 import { BuiltinCaptchaField } from "@/components/builtin-captcha-field"
+import { ExternalAuthEntry } from "@/components/external-auth-entry"
 import { PowCaptchaField } from "@/components/pow-captcha-field"
 import { TurnstileCaptchaField } from "@/components/turnstile-captcha-field"
 import { Button } from "@/components/ui/button"
@@ -106,7 +107,7 @@ export function LoginForm({ settings }: LoginFormProps) {
           />
         </div>
 
-        {useTurnstile && settings.turnstileSiteKey ? <TurnstileCaptchaField siteKey={settings.turnstileSiteKey} description="使用 Cloudflare Turnstile 防止机器人撞库登录。" onTokenChange={setCaptchaToken} /> : null}
+        {useTurnstile && settings.turnstileSiteKey ? <TurnstileCaptchaField siteKey={settings.turnstileSiteKey} onTokenChange={setCaptchaToken} /> : null}
 
         {useBuiltinCaptcha ? <BuiltinCaptchaField code={builtinCaptchaCode} onCodeChange={setBuiltinCaptchaCode} onTokenChange={setCaptchaToken} onLoadError={setMessage} /> : null}
 
@@ -115,6 +116,8 @@ export function LoginForm({ settings }: LoginFormProps) {
         <Button className="w-full" disabled={loading}>
           {loading ? "登录中..." : "登录"}
         </Button>
+
+        <ExternalAuthEntry settings={settings} mode="login" />
 
         {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
       </form>

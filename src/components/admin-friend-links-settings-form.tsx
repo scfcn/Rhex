@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation"
 
 import { Loader2, Plus, Upload } from "lucide-react"
 
+import { AdminFormModal } from "@/components/admin-modal"
 import { Button } from "@/components/ui/button"
-import { DialogBackdrop, DialogPanel, DialogPortal, DialogPositioner } from "@/components/ui/dialog"
 import { toast } from "@/components/ui/toast"
 import type { FriendLinkItem } from "@/lib/friend-links"
 
@@ -290,50 +290,44 @@ export function AdminFriendLinksSettingsForm({ initialSettings, items, pendingCo
         </div>
       </section>
 
-      <DialogPortal open={createOpen} onClose={() => setCreateOpen(false)} closeOnEscape={!isPending}>
-        <div className="fixed inset-0 z-[120]">
-          <DialogBackdrop onClick={isPending ? undefined : () => setCreateOpen(false)} />
-          <DialogPositioner>
-            <DialogPanel className="max-w-xl p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-lg font-semibold">新增友情链接</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">管理员可直接创建友情链接，默认创建为已通过状态。</p>
-                </div>
-                <Button type="button" variant="ghost" className="h-8 px-2" onClick={() => setCreateOpen(false)} disabled={isPending}>关闭</Button>
-              </div>
-              <form onSubmit={createFriendLink} className="mt-5 space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field label="网站名称">
-                    <input value={createDraft.name} onChange={(event) => updateCreateDraft("name", event.target.value)} className="h-10 w-full rounded-[16px] border border-border bg-background px-3 text-sm outline-none" placeholder="请输入网站名称" />
-                  </Field>
-                  <Field label="网站链接">
-                    <input value={createDraft.url} onChange={(event) => updateCreateDraft("url", event.target.value)} className="h-10 w-full rounded-[16px] border border-border bg-background px-3 text-sm outline-none" placeholder="请输入网站地址（以 http 开头）" />
-                  </Field>
-                  <Field label="排序值">
-                    <input value={createDraft.sortOrder} onChange={(event) => updateCreateDraft("sortOrder", event.target.value)} className="h-10 w-full rounded-[16px] border border-border bg-background px-3 text-sm outline-none" placeholder="数字越小越靠前" />
-                  </Field>
-                </div>
-                <Field label="LOGO">
-                  <LogoUploader
-                    value={createDraft.logoPath}
-                    uploading={uploadingTarget === "create"}
-                    onValueChange={(value) => updateCreateDraft("logoPath", value)}
-                    onUpload={(file) => uploadLogo(file, "create")}
-                  />
-                </Field>
-                <Field label="备注">
-                  <textarea value={createDraft.reviewNote} onChange={(event) => updateCreateDraft("reviewNote", event.target.value)} className="min-h-[100px] w-full rounded-[18px] border border-border bg-background px-3 py-2.5 text-sm outline-none" placeholder="例如：首页推荐、合作来源等。" />
-                </Field>
-                <div className="flex items-center gap-3">
-                  <Button disabled={isPending}>{isPending ? "提交中..." : "新增友情链接"}</Button>
-                  <Button type="button" variant="ghost" disabled={isPending} onClick={() => setCreateOpen(false)}>取消</Button>
-                </div>
-              </form>
-            </DialogPanel>
-          </DialogPositioner>
+      <AdminFormModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSubmit={createFriendLink}
+        title="新增友情链接"
+        description="管理员可直接创建友情链接，默认创建为已通过状态。"
+        closeDisabled={isPending}
+        closeOnEscape={!isPending}
+        footer={({ formId }) => (
+          <div className="flex items-center gap-3">
+            <Button type="submit" form={formId} disabled={isPending}>{isPending ? "提交中..." : "新增友情链接"}</Button>
+            <Button type="button" variant="ghost" disabled={isPending} onClick={() => setCreateOpen(false)}>取消</Button>
+          </div>
+        )}
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="网站名称">
+            <input value={createDraft.name} onChange={(event) => updateCreateDraft("name", event.target.value)} className="h-10 w-full rounded-[16px] border border-border bg-background px-3 text-sm outline-none" placeholder="请输入网站名称" />
+          </Field>
+          <Field label="网站链接">
+            <input value={createDraft.url} onChange={(event) => updateCreateDraft("url", event.target.value)} className="h-10 w-full rounded-[16px] border border-border bg-background px-3 text-sm outline-none" placeholder="请输入网站地址（以 http 开头）" />
+          </Field>
+          <Field label="排序值">
+            <input value={createDraft.sortOrder} onChange={(event) => updateCreateDraft("sortOrder", event.target.value)} className="h-10 w-full rounded-[16px] border border-border bg-background px-3 text-sm outline-none" placeholder="数字越小越靠前" />
+          </Field>
         </div>
-      </DialogPortal>
+        <Field label="LOGO">
+          <LogoUploader
+            value={createDraft.logoPath}
+            uploading={uploadingTarget === "create"}
+            onValueChange={(value) => updateCreateDraft("logoPath", value)}
+            onUpload={(file) => uploadLogo(file, "create")}
+          />
+        </Field>
+        <Field label="备注">
+          <textarea value={createDraft.reviewNote} onChange={(event) => updateCreateDraft("reviewNote", event.target.value)} className="min-h-[100px] w-full rounded-[18px] border border-border bg-background px-3 py-2.5 text-sm outline-none" placeholder="例如：首页推荐、合作来源等。" />
+        </Field>
+      </AdminFormModal>
     </div>
   )
 }

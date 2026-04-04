@@ -181,7 +181,7 @@ a {
 }
 
 .sidebar-user-card-header {
-  background: radial-gradient(circle at top, rgba(96, 165, 250, 0.18), transparent 42%), linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(241, 245, 249, 0.98));
+  background: radial-gradient(circle at top, hsl(var(--primary) / 0.18), transparent 42%), linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(241, 245, 249, 0.98));
 }
 
 html.dark .sidebar-user-card-header {
@@ -288,4 +288,81 @@ html.dark .sidebar-user-card-header {
     opacity: 1;
     transform: translate3d(0, 0, 0) scale(1);
   }
+}
+
+.reactEasyCrop_Container {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: move;
+  user-select: none;
+  touch-action: none;
+}
+
+.reactEasyCrop_Image,
+.reactEasyCrop_Video {
+  will-change: transform;
+}
+
+.reactEasyCrop_Contain {
+  position: absolute;
+  inset: 0;
+  max-width: 100%;
+  max-height: 100%;
+  margin: auto;
+}
+
+.reactEasyCrop_Cover_Horizontal {
+  width: 100%;
+  height: auto;
+}
+
+.reactEasyCrop_Cover_Vertical {
+  width: auto;
+  height: 100%;
+}
+
+.reactEasyCrop_CropArea {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 0.5);
+  color: rgb(0 0 0 / 0.5);
+  box-shadow: 0 0 0 9999em;
+  transform: translate(-50%, -50%);
+}
+
+.reactEasyCrop_CropAreaRound {
+  border-radius: 9999px;
+}
+
+.reactEasyCrop_CropAreaGrid::before {
+  content: " ";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 33.33%;
+  right: 33.33%;
+  box-sizing: border-box;
+  border: 1px solid rgb(255 255 255 / 0.5);
+  border-top: 0;
+  border-bottom: 0;
+}
+
+.reactEasyCrop_CropAreaGrid::after {
+  content: " ";
+  position: absolute;
+  top: 33.33%;
+  right: 0;
+  bottom: 33.33%;
+  left: 0;
+  box-sizing: border-box;
+  border: 1px solid rgb(255 255 255 / 0.5);
+  border-right: 0;
+  border-left: 0;
 }

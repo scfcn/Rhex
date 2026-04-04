@@ -4,6 +4,8 @@ import { apiError } from "@/lib/api-route"
 import { checkBoardPermission, getBoardAccessContextByPostId } from "@/lib/board-access"
 import { extractMentionTexts, findMentionUsers, resolveMentionsInText } from "@/lib/comment-mentions"
 import { enforceSensitiveText } from "@/lib/content-safety"
+import { enforceInteractionGate } from "@/lib/interaction-gates"
+import { prepareScopedPointDelta } from "@/lib/point-center"
 import { getSiteSettings } from "@/lib/site-settings"
 import { ensureUsersCanInteract } from "@/lib/user-blocks"
 import { validateCommentPayload } from "@/lib/validators"
@@ -52,6 +54,12 @@ export async function createCommentFlow(input: {
     apiError(403, permission.message || "当前没有回复权限")
   }
 
+  enforceInteractionGate({
+    action: "COMMENT_CREATE",
+    settings: settings.interactionGates,
+    user: dbUser,
+  })
+
   if (postContext.settings.replyIntervalSeconds > 0 && dbUser.lastCommentAt) {
     const waitSeconds = postContext.settings.replyIntervalSeconds - Math.floor((Date.now() - new Date(dbUser.lastCommentAt).getTime()) / 1000)
     if (waitSeconds > 0) {
@@ -59,7 +67,13 @@ export async function createCommentFlow(input: {
     }
   }
 
-  const requiredPoints = Math.max(0, -(postContext.settings.replyPointDelta ?? 0))
+  const replyPointDeltaPrepared = await prepareScopedPointDelta({
+    scopeKey: "COMMENT_CREATE",
+    baseDelta: postContext.settings.replyPointDelta ?? 0,
+    userId: input.currentUser.id,
+  })
+
+  const requiredPoints = Math.max(0, -replyPointDeltaPrepared.finalDelta)
   if (dbUser.points < requiredPoints) {
     apiError(400, `当前${settings.pointName}不足，无法在该节点回复`)
   }
@@ -97,6 +111,7 @@ export async function createCommentFlow(input: {
     parentId: normalizedParentId || undefined,
     replyToUserId: normalizedReplyToUserId ?? undefined,
     replyPointDelta: postContext.settings.replyPointDelta ?? 0,
+    replyPointDeltaPrepared,
     pointName: settings.pointName,
     senderName: input.currentUser.nickname ?? input.currentUser.username,
     postAuthorId: postContext.post.authorId,

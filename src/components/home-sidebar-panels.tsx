@@ -44,7 +44,7 @@ export function HomeSidebarPanels({ user, hotTopics, postLinkDisplayMode = "SLUG
   return (
     <div className="sticky top-20 min-w-0 w-full max-w-full space-y-4">
       <SidebarUserCard user={user} createPostHref={createPostHref} siteName={siteName} siteDescription={siteDescription} />
-      {user ? <ReadingHistoryPanel variant="sidebar" title="今日访问" limit={5} moreHref="/settings?tab=follows&followTab=history" showOnlyToday requireLoggedIn isLoggedIn hideWhenEmpty stabilizeLayoutOnHydration /> : null}
+
 
       {topPanels.map((panel) => <div key={panel.id}>{panel.content}</div>)}
 
@@ -105,6 +105,8 @@ export function HomeSidebarPanels({ user, hotTopics, postLinkDisplayMode = "SLUG
       {bottomPanels.map((panel) => <div key={panel.id}>{panel.content}</div>)}
 
       {stats ? <HomeSiteStatsCard stats={stats} /> : null}
+
+            {user ? <ReadingHistoryPanel variant="sidebar" title="近期访问" limit={5} moreHref="/settings?tab=follows&followTab=history" showOnlyToday requireLoggedIn isLoggedIn hideWhenEmpty stabilizeLayoutOnHydration /> : null}
     </div>
   )
 }

@@ -14,6 +14,7 @@ export default async function PointsSystemFaqPage() {
     { label: "VIP1 / VIP2 / VIP3 签到", value: `${settings.checkInVip1Reward} / ${settings.checkInVip2Reward} / ${settings.checkInVip3Reward}` },
     { label: "普通 / VIP1 / VIP2 / VIP3 补签", value: `${settings.checkInMakeUpCardPrice} / ${settings.checkInVip1MakeUpCardPrice} / ${settings.checkInVip2MakeUpCardPrice} / ${settings.checkInVip3MakeUpCardPrice}` },
     { label: "普通 / VIP1 / VIP2 / VIP3 改昵称", value: `${settings.nicknameChangePointCost} / ${settings.nicknameChangeVip1PointCost} / ${settings.nicknameChangeVip2PointCost} / ${settings.nicknameChangeVip3PointCost}` },
+    { label: "普通 / VIP1 / VIP2 / VIP3 改头像", value: `${settings.avatarChangePointCost} / ${settings.avatarChangeVip1PointCost} / ${settings.avatarChangeVip2PointCost} / ${settings.avatarChangeVip3PointCost}` },
     { label: "普通 / VIP1 / VIP2 / VIP3 邀请码", value: `${settings.inviteCodePrice} / ${settings.inviteCodeVip1Price} / ${settings.inviteCodeVip2Price} / ${settings.inviteCodeVip3Price}` },
     { label: "普通 / VIP1 / VIP2 / VIP3 下线帖子", value: `${settings.postOfflinePrice} / ${settings.postOfflineVip1Price} / ${settings.postOfflineVip2Price} / ${settings.postOfflineVip3Price}` },
   ]
@@ -23,7 +24,7 @@ export default async function PointsSystemFaqPage() {
       currentPath="/faq/points-system"
       eyebrow="Points System"
       title={`${settings.pointName}系统`}
-      description={`${settings.pointName} 是站内通用结算与门槛单位。它既可以决定你能不能看、能不能发，也会参与购买 VIP、邀请码、补签、改昵称、作者下线帖子等功能。`}
+      description={`${settings.pointName} 是站内通用结算与门槛单位。它既可以决定你能不能看、能不能发，也会参与购买 VIP、邀请码、补签、改昵称、改头像、作者下线帖子等功能。`}
     >
       <section className="grid gap-4 lg:grid-cols-3">
         <Card>
@@ -35,7 +36,7 @@ export default async function PointsSystemFaqPage() {
         <Card>
           <CardContent className="p-5">
             <p className="font-semibold">它能购买什么</p>
-            <p className="mt-2 text-sm leading-7 text-muted-foreground">VIP、邀请码、补签、改昵称、作者下线帖子、付费隐藏内容，都可以直接用 {settings.pointName} 结算。</p>
+            <p className="mt-2 text-sm leading-7 text-muted-foreground">VIP、邀请码、补签、改昵称、改头像、作者下线帖子、付费隐藏内容，都可以直接用 {settings.pointName} 结算。</p>
           </CardContent>
         </Card>
         <Card>
@@ -78,7 +79,7 @@ export default async function PointsSystemFaqPage() {
         </CardHeader>
         <CardContent className="grid gap-3 text-sm leading-7 text-muted-foreground md:grid-cols-3">
           <div className="rounded-[20px] bg-secondary/40 p-4">和等级不同，{settings.pointName} 更偏即时结算与消费能力；等级更偏长期成长门槛。</div>
-          <div className="rounded-[20px] bg-secondary/40 p-4">{settings.pointName} 会直接影响 VIP 购买、邀请码购买、补签和改昵称这些付费型功能。</div>
+          <div className="rounded-[20px] bg-secondary/40 p-4">{settings.pointName} 会直接影响 VIP 购买、邀请码购买、补签、改昵称和改头像这些付费型功能。</div>
           <div className="rounded-[20px] bg-secondary/40 p-4">如果想追踪每一笔变化，可以到个人设置里的“{settings.pointName}记录”查看完整明细。</div>
         </CardContent>
       </Card>

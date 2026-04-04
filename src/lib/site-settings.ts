@@ -13,7 +13,8 @@ import {
 import { defaultSiteSettingsCreateInput } from "@/lib/site-settings-defaults"
 import { parseMarkdownEmojiMapJson } from "@/lib/markdown-emoji"
 import { normalizePostListDisplayMode, type PostListDisplayMode } from "@/lib/post-list-display"
-import { resolveCheckInMakeUpPriceSettings, resolveCheckInRewardSettings, resolveHomeSidebarAnnouncementSettings, resolveInviteCodePurchasePriceSettings, resolveMarkdownImageUploadSettings, resolveNicknameChangePointCostSettings, resolveVipLevelIconSettings } from "@/lib/site-settings-app-state"
+import { resolveAuthProviderSettings, resolveAvatarChangePointCostSettings, resolveCheckInMakeUpPriceSettings, resolveCheckInRewardSettings, resolveCommentAccessSettings, resolveHomeSidebarAnnouncementSettings, resolveInteractionGateSettings, resolveIntroductionChangePointCostSettings, resolveInviteCodePurchasePriceSettings, resolveMarkdownImageUploadSettings, resolveNicknameChangePointCostSettings, resolvePostJackpotSettings, resolveRegistrationRewardSettings, resolveVipLevelIconSettings, type InteractionGateSettings } from "@/lib/site-settings-app-state"
+import { resolveAuthProviderSensitiveConfig, resolveCaptchaSensitiveConfig } from "@/lib/site-settings-sensitive-state"
 import { resolveSiteSearchSettings, type SiteSearchSettings } from "@/lib/site-search-settings"
 import { normalizePositiveInteger } from "@/lib/shared/normalizers"
 import { type SiteTippingGiftItem } from "@/lib/tipping-gifts"
@@ -25,6 +26,7 @@ export type { FooterLinkItem } from "@/lib/shared/config-parsers"
 export type PostLinkDisplayMode = "SLUG" | "ID"
 export type { SiteSearchSettings } from "@/lib/site-search-settings"
 export type { SiteTippingGiftItem } from "@/lib/tipping-gifts"
+export type { InteractionGateAction, InteractionGateCondition, InteractionGateRule, InteractionGateSettings } from "@/lib/site-settings-app-state"
 
 export interface SiteSettingsData {
   siteName: string
@@ -63,6 +65,7 @@ export interface SiteSettingsData {
   postOfflineVip3Price: number
   inviteRewardInviter: number
   inviteRewardInvitee: number
+  registerInitialPoints: number
   registrationEnabled: boolean
   registrationRequireInviteCode: boolean
   registerInviteCodeEnabled: boolean
@@ -78,8 +81,18 @@ export interface SiteSettingsData {
   nicknameChangeVip1PointCost: number
   nicknameChangeVip2PointCost: number
   nicknameChangeVip3PointCost: number
+  introductionChangePointCost: number
+  introductionChangeVip1PointCost: number
+  introductionChangeVip2PointCost: number
+  introductionChangeVip3PointCost: number
+  avatarChangePointCost: number
+  avatarChangeVip1PointCost: number
+  avatarChangeVip2PointCost: number
+  avatarChangeVip3PointCost: number
   postEditableMinutes: number
   commentEditableMinutes: number
+  guestCanViewComments: boolean
+  interactionGates: InteractionGateSettings
   tippingEnabled: boolean
   tippingDailyLimit: number
   tippingPerPostLimit: number
@@ -88,6 +101,11 @@ export interface SiteSettingsData {
   postRedPacketEnabled: boolean
   postRedPacketMaxPoints: number
   postRedPacketDailyLimit: number
+  postJackpotEnabled: boolean
+  postJackpotMinInitialPoints: number
+  postJackpotMaxInitialPoints: number
+  postJackpotReplyIncrementPoints: number
+  postJackpotHitProbability: number
   heatViewWeight: number
   heatCommentWeight: number
   heatLikeWeight: number
@@ -106,6 +124,9 @@ export interface SiteSettingsData {
   registerGenderEnabled: boolean
   registerGenderRequired: boolean
   registerInviterEnabled: boolean
+  authGithubEnabled: boolean
+  authGoogleEnabled: boolean
+  authPasskeyEnabled: boolean
   smtpEnabled: boolean
   vipMonthlyPrice: number
   vipQuarterlyPrice: number
@@ -128,6 +149,14 @@ export interface SiteSettingsData {
 
 /** 含敏感字段的完整配置，仅在服务端内部使用（mailer、lottery 等），禁止序列化到客户端 */
 export interface ServerSiteSettingsData extends SiteSettingsData {
+  githubClientId?: string | null
+  githubClientSecret?: string | null
+  googleClientId?: string | null
+  googleClientSecret?: string | null
+  passkeyRpId?: string | null
+  passkeyRpName?: string | null
+  passkeyOrigin?: string | null
+  turnstileSecretKey?: string | null
   smtpHost?: string | null
   smtpPort?: number | null
   smtpUser?: string | null
@@ -248,6 +277,7 @@ function mapSiteSettings(record: {
   uploadAvatarMaxFileSizeMb: number
   markdownEmojiMapJson?: string | null
   appStateJson?: string | null
+  sensitiveStateJson?: string | null
   friendLinksEnabled: boolean
   friendLinkApplicationEnabled: boolean
   friendLinkAnnouncement: string
@@ -269,6 +299,14 @@ function mapSiteSettings(record: {
     appStateJson: record.appStateJson,
     normalPrice: record.nicknameChangePointCost,
   })
+  const introductionChangePointCosts = resolveIntroductionChangePointCostSettings({
+    appStateJson: record.appStateJson,
+    normalPrice: 0,
+  })
+  const avatarChangePointCosts = resolveAvatarChangePointCostSettings({
+    appStateJson: record.appStateJson,
+    normalPrice: 0,
+  })
   const tippingAmounts = parseTippingAmounts(record.tippingAmounts)
   const searchSettings = resolveSiteSearchSettings(record.appStateJson)
   const homeSidebarAnnouncementSettings = resolveHomeSidebarAnnouncementSettings({
@@ -282,6 +320,30 @@ function mapSiteSettings(record: {
     appStateJson: record.appStateJson,
     enabledFallback: true,
   })
+  const commentAccessSettings = resolveCommentAccessSettings({
+    appStateJson: record.appStateJson,
+    guestCanViewFallback: true,
+  })
+  const interactionGateSettings = resolveInteractionGateSettings({
+    appStateJson: record.appStateJson,
+  })
+  const authProviderSettings = resolveAuthProviderSettings({
+    appStateJson: record.appStateJson,
+  })
+  const registrationRewardSettings = resolveRegistrationRewardSettings({
+    appStateJson: record.appStateJson,
+    initialPointsFallback: 0,
+  })
+  const postJackpotSettings = resolvePostJackpotSettings({
+    appStateJson: record.appStateJson,
+    enabledFallback: false,
+    minInitialPointsFallback: 100,
+    maxInitialPointsFallback: 1000,
+    replyIncrementPointsFallback: 25,
+    hitProbabilityFallback: 15,
+  })
+  const authProviderSensitiveConfig = resolveAuthProviderSensitiveConfig(record.sensitiveStateJson)
+  const captchaSensitiveConfig = resolveCaptchaSensitiveConfig(record.sensitiveStateJson)
 
   return {
     siteName: record.siteName,
@@ -320,6 +382,7 @@ function mapSiteSettings(record: {
     postOfflineVip3Price: record.postOfflineVip3Price,
     inviteRewardInviter: record.inviteRewardInviter,
     inviteRewardInvitee: record.inviteRewardInvitee,
+    registerInitialPoints: registrationRewardSettings.initialPoints,
     registrationEnabled: record.registrationEnabled,
     registrationRequireInviteCode: record.registrationRequireInviteCode,
     registerInviteCodeEnabled: record.registerInviteCodeEnabled,
@@ -335,8 +398,18 @@ function mapSiteSettings(record: {
     nicknameChangeVip1PointCost: nicknameChangePointCosts.vip1,
     nicknameChangeVip2PointCost: nicknameChangePointCosts.vip2,
     nicknameChangeVip3PointCost: nicknameChangePointCosts.vip3,
+    introductionChangePointCost: introductionChangePointCosts.normal,
+    introductionChangeVip1PointCost: introductionChangePointCosts.vip1,
+    introductionChangeVip2PointCost: introductionChangePointCosts.vip2,
+    introductionChangeVip3PointCost: introductionChangePointCosts.vip3,
+    avatarChangePointCost: avatarChangePointCosts.normal,
+    avatarChangeVip1PointCost: avatarChangePointCosts.vip1,
+    avatarChangeVip2PointCost: avatarChangePointCosts.vip2,
+    avatarChangeVip3PointCost: avatarChangePointCosts.vip3,
     postEditableMinutes: normalizePositiveInteger(record.postEditableMinutes, 10),
     commentEditableMinutes: normalizePositiveInteger(record.commentEditableMinutes, 5),
+    guestCanViewComments: commentAccessSettings.guestCanView,
+    interactionGates: interactionGateSettings,
     tippingEnabled: record.tippingEnabled,
     tippingDailyLimit: record.tippingDailyLimit,
     tippingPerPostLimit: record.tippingPerPostLimit,
@@ -345,6 +418,11 @@ function mapSiteSettings(record: {
     postRedPacketEnabled: record.postRedPacketEnabled,
     postRedPacketMaxPoints: record.postRedPacketMaxPoints,
     postRedPacketDailyLimit: record.postRedPacketDailyLimit,
+    postJackpotEnabled: postJackpotSettings.enabled,
+    postJackpotMinInitialPoints: postJackpotSettings.minInitialPoints,
+    postJackpotMaxInitialPoints: postJackpotSettings.maxInitialPoints,
+    postJackpotReplyIncrementPoints: postJackpotSettings.replyIncrementPoints,
+    postJackpotHitProbability: postJackpotSettings.hitProbability,
     heatViewWeight: record.heatViewWeight,
     heatCommentWeight: record.heatCommentWeight,
     heatLikeWeight: record.heatLikeWeight,
@@ -363,6 +441,17 @@ function mapSiteSettings(record: {
     registerGenderEnabled: record.registerGenderEnabled,
     registerGenderRequired: record.registerGenderRequired,
     registerInviterEnabled: record.registerInviterEnabled,
+    authGithubEnabled: authProviderSettings.githubEnabled,
+    authGoogleEnabled: authProviderSettings.googleEnabled,
+    authPasskeyEnabled: authProviderSettings.passkeyEnabled,
+    githubClientId: authProviderSensitiveConfig.githubClientId,
+    githubClientSecret: authProviderSensitiveConfig.githubClientSecret,
+    googleClientId: authProviderSensitiveConfig.googleClientId,
+    googleClientSecret: authProviderSensitiveConfig.googleClientSecret,
+    passkeyRpId: authProviderSensitiveConfig.passkeyRpId,
+    passkeyRpName: authProviderSensitiveConfig.passkeyRpName,
+    passkeyOrigin: authProviderSensitiveConfig.passkeyOrigin,
+    turnstileSecretKey: captchaSensitiveConfig.turnstileSecretKey,
     smtpEnabled: record.smtpEnabled,
     smtpHost: record.smtpHost,
     smtpPort: record.smtpPort,
@@ -404,7 +493,31 @@ export async function ensureSiteSettings(): Promise<SiteSettingsData> {
 }
 
 function toPublicSiteSettings(data: ServerSiteSettingsData): SiteSettingsData {
-  const { smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom, smtpSecure, ...rest } = data
+  const {
+    githubClientId,
+    githubClientSecret,
+    googleClientId,
+    googleClientSecret,
+    passkeyRpId,
+    passkeyRpName,
+    passkeyOrigin,
+    turnstileSecretKey,
+    smtpHost,
+    smtpPort,
+    smtpUser,
+    smtpPass,
+    smtpFrom,
+    smtpSecure,
+    ...rest
+  } = data
+  void githubClientId
+  void githubClientSecret
+  void googleClientId
+  void googleClientSecret
+  void passkeyRpId
+  void passkeyRpName
+  void passkeyOrigin
+  void turnstileSecretKey
   void smtpHost
   void smtpPort
   void smtpUser

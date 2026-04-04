@@ -8,6 +8,7 @@ import { buildHomeFeedHref } from "@/lib/home-feed-route"
 import { normalizePostListDisplayMode, type PostListDisplayMode } from "@/lib/post-list-display"
 import { getSiteSettings } from "@/lib/site-settings"
 import { resolvePostHeatStyle } from "@/lib/post-heat"
+import type { PostRewardPoolMode } from "@/lib/post-reward-pool-config"
 import { getVipNameClass, isVipActive } from "@/lib/vip-status"
 
 interface ForumFeedListProps {
@@ -26,6 +27,7 @@ interface FeedDisplayItem {
   pinScope?: string | null
   pinLabel?: string | null
   hasRedPacket: boolean
+  rewardMode?: PostRewardPoolMode
   minViewLevel?: number
   minViewVipLevel?: number
   isFeatured: boolean
@@ -40,6 +42,7 @@ interface FeedDisplayItem {
   authorVipLevel?: number | null
   authorNameClassName: string
   metaPrimary: string
+  metaPrimaryRaw?: string
   metaSecondary?: string | null
   commentCount: number
   commentAccentColor: string
@@ -86,6 +89,7 @@ export async function ForumFeedList({ items, currentSort, listDisplayMode, postL
       pinScope: item.pinScope,
       pinLabel: getFeedPinLabel(item.pinScope),
       hasRedPacket: item.hasRedPacket,
+      rewardMode: item.rewardMode,
       minViewLevel: item.minViewLevel ?? undefined,
       minViewVipLevel: item.minViewVipLevel ?? undefined,
       isFeatured: item.isFeatured,
@@ -100,6 +104,7 @@ export async function ForumFeedList({ items, currentSort, listDisplayMode, postL
       authorVipLevel: item.authorVipLevel,
       authorNameClassName: getVipNameClass(authorIsVip, item.authorVipLevel, { emphasize: true }),
       metaPrimary: currentSort === "new" ? item.publishedAt : item.lastRepliedAt,
+      metaPrimaryRaw: currentSort === "new" ? item.publishedAtRaw : item.lastRepliedAtRaw,
       metaSecondary: (currentSort === "latest" || currentSort === "following") && item.latestReplyAuthorName ? `最新回复 ${item.latestReplyAuthorName}` : null,
       commentCount: item.commentCount,
       commentAccentColor: commentHeat.color,
@@ -144,6 +149,7 @@ export async function ForumFeedList({ items, currentSort, listDisplayMode, postL
                 pinScope: item.pinScope,
                 pinLabel: getFeedPinLabel(item.pinScope),
                 hasRedPacket: item.hasRedPacket,
+                rewardMode: item.rewardMode,
                 minViewLevel: item.minViewLevel ?? undefined,
                 minViewVipLevel: item.minViewVipLevel ?? undefined,
                 isFeatured: item.isFeatured,
@@ -158,6 +164,7 @@ export async function ForumFeedList({ items, currentSort, listDisplayMode, postL
                 authorVipLevel: item.authorVipLevel,
                 authorNameClassName: item.authorNameClassName,
                 metaPrimary: item.metaPrimary,
+                metaPrimaryRaw: item.metaPrimaryRaw,
                 metaSecondary: item.metaSecondary,
                 commentCount: item.commentCount,
                 commentAccentColor: item.commentAccentColor,
@@ -186,6 +193,7 @@ export async function ForumFeedList({ items, currentSort, listDisplayMode, postL
               pinScope: item.pinScope,
               pinLabel: item.pinLabel,
               hasRedPacket: item.hasRedPacket,
+              rewardMode: item.rewardMode,
               minViewLevel: item.minViewLevel,
               minViewVipLevel: item.minViewVipLevel,
               isFeatured: item.isFeatured,
@@ -199,6 +207,7 @@ export async function ForumFeedList({ items, currentSort, listDisplayMode, postL
               authorVipLevel: item.authorVipLevel,
               authorNameClassName: item.authorNameClassName,
               metaPrimary: item.metaPrimary,
+              metaPrimaryRaw: item.metaPrimaryRaw,
               metaSecondary: item.metaSecondary,
               commentCount: item.commentCount,
               commentAccentColor: item.commentAccentColor,
@@ -219,6 +228,7 @@ export async function ForumFeedList({ items, currentSort, listDisplayMode, postL
                 pinScope: item.pinScope,
                 pinLabel: getFeedPinLabel(item.pinScope),
                 hasRedPacket: item.hasRedPacket,
+                rewardMode: item.rewardMode,
                 minViewLevel: item.minViewLevel ?? undefined,
                 minViewVipLevel: item.minViewVipLevel ?? undefined,
                 isFeatured: item.isFeatured,
@@ -233,6 +243,7 @@ export async function ForumFeedList({ items, currentSort, listDisplayMode, postL
                 authorVipLevel: item.authorVipLevel,
                 authorNameClassName: item.authorNameClassName,
                 metaPrimary: item.metaPrimary,
+                metaPrimaryRaw: item.metaPrimaryRaw,
                 metaSecondary: item.metaSecondary,
                 commentCount: item.commentCount,
                 commentAccentColor: item.commentAccentColor,

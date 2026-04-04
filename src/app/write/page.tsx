@@ -5,9 +5,12 @@ import { CreatePostForm } from "@/components/create-post-form"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { buildUserLevelThresholdOptions, buildVipLevelThresholdOptions } from "@/lib/access-threshold-options"
 import { getCurrentUser } from "@/lib/auth"
 import { getBoards, type SiteBoardItem } from "@/lib/boards"
+import { getLevelDefinitions } from "@/lib/level-system"
 import { parsePostContentDocument } from "@/lib/post-content"
+import { parsePostRewardPoolConfigFromContent } from "@/lib/post-red-packets"
 import { getEditablePostBySlug } from "@/lib/posts"
 import { DEFAULT_ALLOWED_POST_TYPES } from "@/lib/post-types"
 import { readSearchParam } from "@/lib/search-params"
@@ -57,10 +60,12 @@ export async function generateMetadata(props: PageProps<"/write">): Promise<Meta
 
 export default async function WritePage(props: PageProps<"/write">) {
   const searchParams = await props.searchParams;
-  const [user, zones, boards, settings] = await Promise.all([getCurrentUser(), getZones(), getBoards(), getSiteSettings()])
+  const [user, zones, boards, settings, levelDefinitions] = await Promise.all([getCurrentUser(), getZones(), getBoards(), getSiteSettings(), getLevelDefinitions()])
   const mode = readSearchParam(searchParams?.mode) === "edit" ? "edit" : "create"
   const editingSlug = readSearchParam(searchParams?.post)
   const preferredBoardSlug = readSearchParam(searchParams?.board) ?? ""
+  const viewLevelOptions = buildUserLevelThresholdOptions(levelDefinitions)
+  const viewVipLevelOptions = buildVipLevelThresholdOptions()
 
   const groupedBoardOptions: BoardOptionGroup[] = zones
     .map((zone: SiteZoneItem) => ({
@@ -106,6 +111,7 @@ export default async function WritePage(props: PageProps<"/write">) {
     : null
 
   const contentDocument = editingPost ? parsePostContentDocument(editingPost.content) : null
+  const rewardPoolConfig = editingPost ? parsePostRewardPoolConfigFromContent(editingPost.content) : null
   const publicBlock = contentDocument?.blocks.find((block) => block.type === "PUBLIC")
   const replyUnlockBlock = contentDocument?.blocks.find((block) => block.type === "REPLY_UNLOCK")
   const purchaseUnlockBlock = contentDocument?.blocks.find((block) => block.type === "PURCHASE_UNLOCK")
@@ -143,6 +149,8 @@ export default async function WritePage(props: PageProps<"/write">) {
                     vipLevel: user.vipLevel,
                     vipExpiresAt: user.vipExpiresAt?.toISOString?.() ? user.vipExpiresAt.toISOString() : (user.vipExpiresAt as unknown as string | null),
                   }}
+                  viewLevelOptions={viewLevelOptions}
+                  viewVipLevelOptions={viewVipLevelOptions}
                   mode="edit"
                   postId={editingPost.id}
                   successSlug={editingPost.slug}
@@ -162,20 +170,31 @@ export default async function WritePage(props: PageProps<"/write">) {
                     bountyPoints: editingPost.bountyPoints,
                     pollOptions: editingPost.pollOptions.map((item) => item.content),
                     tags: editingPost.tags.map((item) => item.tag.name),
-                    redPacketConfig: editingPost.redPacket
+                    redPacketConfig: editingPost.redPacket && rewardPoolConfig
                       ? {
+                          mode: rewardPoolConfig.mode,
                           enabled: true,
-                          grantMode: editingPost.redPacket.grantMode,
-                          claimOrderMode: editingPost.redPacket.claimOrderMode,
+                          grantMode: rewardPoolConfig.mode === "RED_PACKET" ? editingPost.redPacket.grantMode : undefined,
+                          claimOrderMode: rewardPoolConfig.mode === "RED_PACKET" ? editingPost.redPacket.claimOrderMode : undefined,
                           triggerType: editingPost.redPacket.triggerType,
-                          totalPoints: editingPost.redPacket.totalPoints,
-                          unitPoints: editingPost.redPacket.grantMode === "FIXED"
-                            ? Math.floor(editingPost.redPacket.totalPoints / Math.max(1, editingPost.redPacket.packetCount))
-                            : editingPost.redPacket.totalPoints,
-                          packetCount: editingPost.redPacket.packetCount,
+                          initialPoints: rewardPoolConfig.mode === "JACKPOT" ? rewardPoolConfig.initialPoints : undefined,
+                          totalPoints: rewardPoolConfig.mode === "RED_PACKET" ? editingPost.redPacket.totalPoints : undefined,
+                          unitPoints: rewardPoolConfig.mode === "RED_PACKET"
+                            ? (editingPost.redPacket.grantMode === "FIXED"
+                              ? Math.floor(editingPost.redPacket.totalPoints / Math.max(1, editingPost.redPacket.packetCount))
+                              : editingPost.redPacket.totalPoints)
+                            : undefined,
+                          packetCount: rewardPoolConfig.mode === "RED_PACKET" ? editingPost.redPacket.packetCount : undefined,
                         }
                       : undefined,
                   }}
+                  postRedPacketEnabled={settings.postRedPacketEnabled}
+                  postRedPacketMaxPoints={settings.postRedPacketMaxPoints}
+                  postJackpotEnabled={settings.postJackpotEnabled}
+                  postJackpotMinInitialPoints={settings.postJackpotMinInitialPoints}
+                  postJackpotMaxInitialPoints={settings.postJackpotMaxInitialPoints}
+                  postJackpotReplyIncrementPoints={settings.postJackpotReplyIncrementPoints}
+                  postJackpotHitProbability={settings.postJackpotHitProbability}
                 />
               )
             ) : (
@@ -183,6 +202,12 @@ export default async function WritePage(props: PageProps<"/write">) {
                 boardOptions={boardOptions}
                 pointName={settings.pointName}
                 postRedPacketEnabled={settings.postRedPacketEnabled}
+                postRedPacketMaxPoints={settings.postRedPacketMaxPoints}
+                postJackpotEnabled={settings.postJackpotEnabled}
+                postJackpotMinInitialPoints={settings.postJackpotMinInitialPoints}
+                postJackpotMaxInitialPoints={settings.postJackpotMaxInitialPoints}
+                postJackpotReplyIncrementPoints={settings.postJackpotReplyIncrementPoints}
+                postJackpotHitProbability={settings.postJackpotHitProbability}
                 markdownEmojiMap={settings.markdownEmojiMap}
                 currentUser={{
                   username: user.username,
@@ -192,6 +217,8 @@ export default async function WritePage(props: PageProps<"/write">) {
                   vipLevel: user.vipLevel,
                   vipExpiresAt: user.vipExpiresAt?.toISOString?.() ? user.vipExpiresAt.toISOString() : (user.vipExpiresAt as unknown as string | null),
                 }}
+                viewLevelOptions={viewLevelOptions}
+                viewVipLevelOptions={viewVipLevelOptions}
                 initialValues={preferredBoardSlug ? { title: "", content: "", boardSlug: preferredBoardSlug, postType: "NORMAL" } : undefined}
               />
             )}

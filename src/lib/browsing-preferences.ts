@@ -1,6 +1,7 @@
 export interface BrowsingPreferencesSnapshot {
   dimReadPostTitles: boolean
   openPostLinksInNewTab: boolean
+  rewardPoolIntroAnimationMode: "always" | "once-per-tab" | "never"
 }
 
 export const BROWSING_PREFERENCES_STORAGE_KEY = "rhex:browsing-preferences:v1"
@@ -8,6 +9,7 @@ export const BROWSING_PREFERENCES_CHANGE_EVENT = "rhex:browsing-preferences-chan
 export const DEFAULT_BROWSING_PREFERENCES: BrowsingPreferencesSnapshot = {
   dimReadPostTitles: false,
   openPostLinksInNewTab: false,
+  rewardPoolIntroAnimationMode: "always",
 }
 
 let cachedSnapshot: BrowsingPreferencesSnapshot = DEFAULT_BROWSING_PREFERENCES
@@ -27,6 +29,11 @@ function normalizeBrowsingPreferences(value: unknown): BrowsingPreferencesSnapsh
   return {
     dimReadPostTitles: Boolean(candidate.dimReadPostTitles),
     openPostLinksInNewTab: Boolean(candidate.openPostLinksInNewTab),
+    rewardPoolIntroAnimationMode: candidate.rewardPoolIntroAnimationMode === "never"
+      ? "never"
+      : candidate.rewardPoolIntroAnimationMode === "once-per-tab"
+        ? "once-per-tab"
+        : "always",
   }
 }
 

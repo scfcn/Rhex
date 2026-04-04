@@ -13,17 +13,29 @@ export interface SettingsNavItem {
 
 interface SettingsSidebarNavProps {
   items: SettingsNavItem[]
+  title?: string
+  showDescriptions?: boolean
+  onItemSelect?: (item: SettingsNavItem) => void
+  buildHref?: (item: SettingsNavItem) => string
+  className?: string
 }
 
-export function SettingsSidebarNav({ items }: SettingsSidebarNavProps) {
+export function SettingsSidebarNav({
+  items,
+  title = "Account",
+  showDescriptions = false,
+  onItemSelect,
+  buildHref,
+  className,
+}: SettingsSidebarNavProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const currentTab = searchParams.get("tab") ?? items[0]?.key ?? "profile"
 
   return (
-    <nav className="rounded-[24px] border border-border bg-card p-2.5 shadow-soft">
+    <nav className={cn("rounded-[24px] border border-border bg-card p-2.5 shadow-soft", className)}>
       <div className="mb-2 px-2.5 pt-1.5">
-        <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Account</p>
+        <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">{title}</p>
       </div>
       <div className="space-y-1">
 
@@ -34,7 +46,10 @@ export function SettingsSidebarNav({ items }: SettingsSidebarNavProps) {
             <button
               key={item.key}
               type="button"
-              onClick={() => router.push(`/settings?tab=${item.key}`)}
+              onClick={() => {
+                onItemSelect?.(item)
+                router.push(buildHref ? buildHref(item) : `/settings?tab=${item.key}`)
+              }}
               className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-[22px] px-4 py-3 text-left transition-colors",
                 active
@@ -44,6 +59,9 @@ export function SettingsSidebarNav({ items }: SettingsSidebarNavProps) {
             >
               <div className="min-w-0">
                 <p className={cn("text-sm font-medium leading-5", active ? "text-background" : "text-foreground")}>{item.label}</p>
+                {showDescriptions ? (
+                  <p className={cn("mt-1 text-xs leading-5", active ? "text-background/70" : "text-muted-foreground")}>{item.description}</p>
+                ) : null}
               </div>
               <ChevronRight className={cn("h-3.5 w-3.5 shrink-0", active ? "text-background/75" : "text-muted-foreground")} />
 

@@ -247,7 +247,7 @@ export function Tooltip({
               id={tooltipId}
               role="tooltip"
               className={cn(
-                "pointer-events-none fixed z-[90] max-w-[min(280px,calc(100vw-24px))] rounded-2xl border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.98))] px-3 py-2 text-[12px] font-medium leading-5 text-slate-700 shadow-[0_18px_45px_rgba(15,23,42,0.18)] backdrop-blur-md transition-opacity duration-150 dark:border-slate-700/80 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.96))] dark:text-slate-100",
+                "pointer-events-none fixed z-[140] max-w-[min(280px,calc(100vw-24px))] rounded-2xl border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.98))] px-3 py-2 text-[12px] font-medium leading-5 text-slate-700 shadow-[0_18px_45px_rgba(15,23,42,0.18)] backdrop-blur-md transition-opacity duration-150 dark:border-slate-700/80 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.96))] dark:text-slate-100",
                 contentClassName,
               )}
               style={{

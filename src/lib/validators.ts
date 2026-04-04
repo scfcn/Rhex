@@ -27,8 +27,29 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
+function isValidHttpUrl(value: string) {
+  try {
+    const url = new URL(value)
+    return url.protocol === "http:" || url.protocol === "https:"
+  } catch {
+    return false
+  }
+}
+
 function isValidPhone(value: string) {
   return /^1\d{10}$/.test(value)
+}
+
+function validateNotificationWebhookUrl(notificationWebhookUrl: string) {
+  if (notificationWebhookUrl.length > 1000) {
+    return "Webhook URL 长度不能超过 1000 个字符"
+  }
+
+  if (notificationWebhookUrl && !isValidHttpUrl(notificationWebhookUrl)) {
+    return "Webhook URL 仅支持 http 或 https 地址"
+  }
+
+  return null
 }
 
 export function validateAuthPayload(body: unknown): ValidationResult<{
@@ -277,9 +298,48 @@ export function validateCommentPayload(body: unknown): ValidationResult<{ postId
   }
 }
 
-export function validateProfilePayload(body: unknown): ValidationResult<{ nickname: string; bio: string; email: string; gender: string }> {
+export function validateNotificationSettingsPayload(body: unknown, options?: {
+  requireUrlWhenEnabled?: boolean
+  requireUrl?: boolean
+}): ValidationResult<{
+  externalNotificationEnabled: boolean
+  notificationWebhookUrl: string
+}> {
+  const externalNotificationEnabled = Boolean(getField(body, "externalNotificationEnabled"))
+  const notificationWebhookUrl = normalizeString(getField(body, "notificationWebhookUrl"))
+  const webhookUrlError = validateNotificationWebhookUrl(notificationWebhookUrl)
+
+  if (webhookUrlError) {
+    return { success: false, message: webhookUrlError }
+  }
+
+  if ((options?.requireUrlWhenEnabled ?? true) && externalNotificationEnabled && !notificationWebhookUrl) {
+    return { success: false, message: "开启站外通知前请先填写 Webhook URL" }
+  }
+
+  if ((options?.requireUrl ?? false) && !notificationWebhookUrl) {
+    return { success: false, message: "请先填写 Webhook URL" }
+  }
+
+  return {
+    success: true,
+    data: {
+      externalNotificationEnabled,
+      notificationWebhookUrl,
+    },
+  }
+}
+
+export function validateProfilePayload(body: unknown): ValidationResult<{
+  nickname: string
+  bio: string
+  introduction: string
+  email: string
+  gender: string
+}> {
   const nickname = normalizeString(getField(body, "nickname"))
   const bio = normalizeString(getField(body, "bio"))
+  const introduction = normalizeString(getField(body, "introduction"))
   const email = normalizeString(getField(body, "email"))
   const gender = normalizeString(getField(body, "gender"))
 
@@ -295,6 +355,10 @@ export function validateProfilePayload(body: unknown): ValidationResult<{ nickna
     return { success: false, message: "个人简介长度不能超过 200 个字符" }
   }
 
+  if (introduction.length > 20000) {
+    return { success: false, message: "个人介绍长度不能超过 20000 个字符" }
+  }
+
   if (email && !isValidEmail(email)) {
     return { success: false, message: "邮箱格式不正确" }
   }
@@ -308,6 +372,7 @@ export function validateProfilePayload(body: unknown): ValidationResult<{ nickna
     data: {
       nickname,
       bio,
+      introduction,
       email,
       gender,
     },

@@ -1,10 +1,15 @@
 import { prisma } from "@/db/client"
+import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
 import { getSiteSettings } from "@/lib/site-settings"
 
 const PURCHASE_REASON_PREFIX = "[purchase:block]"
 
+function buildReasonPrefix(postId: string, blockId: string) {
+  return `${PURCHASE_REASON_PREFIX} post=${postId} block=${blockId}`
+}
+
 function buildReason(postId: string, blockId: string, pointName: string, price: number) {
-  return `${PURCHASE_REASON_PREFIX} 购买帖子隐藏内容（${price}${pointName}） post=${postId} block=${blockId}`
+  return `${buildReasonPrefix(postId, blockId)} 购买帖子隐藏内容（${price}${pointName}）`
 }
 
 export async function purchasePostBlock(options: { userId: number; postId: string; blockId: string; price: number; sellerId: number }) {
@@ -14,7 +19,9 @@ export async function purchasePostBlock(options: { userId: number; postId: strin
     const existing = await tx.pointLog.findFirst({
       where: {
         userId: options.userId,
-        reason: buildReason(options.postId, options.blockId, settings.pointName, options.price),
+        reason: {
+          startsWith: buildReasonPrefix(options.postId, options.blockId),
+        },
       },
       select: { id: true },
     })
@@ -28,47 +35,47 @@ export async function purchasePostBlock(options: { userId: number; postId: strin
       select: { id: true, points: true },
     })
 
-    if (!user || user.points < options.price) {
+    const seller = await tx.user.findUnique({
+      where: { id: options.sellerId },
+      select: { id: true, points: true },
+    })
+
+    const buyerPreparedDelta = await prepareScopedPointDelta({
+      scopeKey: "POST_UNLOCK_OUTGOING",
+      baseDelta: -options.price,
+      userId: options.userId,
+    })
+    const sellerPreparedDelta = await prepareScopedPointDelta({
+      scopeKey: "POST_UNLOCK_INCOMING",
+      baseDelta: options.price,
+      userId: options.sellerId,
+    })
+
+    if (!user || !seller || (buyerPreparedDelta.finalDelta < 0 && user.points < Math.abs(buyerPreparedDelta.finalDelta))) {
       throw new Error(`当前${settings.pointName}不足`)
     }
 
-    await tx.user.update({
-      where: { id: options.userId },
-      data: {
-        points: {
-          decrement: options.price,
-        },
-      },
+    await applyPointDelta({
+      tx,
+      userId: options.userId,
+      beforeBalance: user.points,
+      prepared: buyerPreparedDelta,
+      pointName: settings.pointName,
+      insufficientMessage: `当前${settings.pointName}不足`,
+      reason: buildReason(options.postId, options.blockId, settings.pointName, options.price),
+      relatedType: "POST",
+      relatedId: options.postId,
     })
 
-    await tx.user.update({
-      where: { id: options.sellerId },
-      data: {
-        points: {
-          increment: options.price,
-        },
-      },
-    })
-
-    await tx.pointLog.createMany({
-      data: [
-        {
-          userId: options.userId,
-          changeType: "DECREASE",
-          changeValue: options.price,
-          reason: buildReason(options.postId, options.blockId, settings.pointName, options.price),
-          relatedType: "POST",
-          relatedId: options.postId,
-        },
-        {
-          userId: options.sellerId,
-          changeType: "INCREASE",
-          changeValue: options.price,
-          reason: `帖子隐藏内容被购买，获得${options.price}${settings.pointName}`,
-          relatedType: "POST",
-          relatedId: options.postId,
-        },
-      ],
+    await applyPointDelta({
+      tx,
+      userId: options.sellerId,
+      beforeBalance: seller.points,
+      prepared: sellerPreparedDelta,
+      pointName: settings.pointName,
+      reason: "帖子隐藏内容被购买",
+      relatedType: "POST",
+      relatedId: options.postId,
     })
 
     return { alreadyOwned: false }

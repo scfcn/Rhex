@@ -1,8 +1,19 @@
-import { BadgeRuleOperator, BadgeRuleType } from "@/db/types"
+import { randomUUID } from "node:crypto"
+
+import { BadgeRuleOperator, BadgeRuleType, PointEffectDirection, PointEffectRuleKind, PointEffectTargetType, Prisma } from "@/db/types"
 
 import { apiError, apiSuccess, createAdminRouteHandler, readJsonBody, requireStringField } from "@/lib/api-route"
 import { getRequestIp, writeAdminLog } from "@/lib/admin"
+import { isBadgeRuleTypeValue, type BadgeRuleTypeValue } from "@/lib/badge-rule-definitions"
 import { prisma } from "@/db/client"
+import { findBadgeEffectRulesByBadgeIds } from "@/db/badge-queries"
+import {
+  isPointEffectScopeCompatibleWithTargetType,
+  isPointEffectScopeKey,
+  isPointEffectTargetTypeEnabledForBadgeEffects,
+  normalizePointEffectDirectionByRuleKind,
+  normalizePointEffectScopeKeysByTargetType,
+} from "@/lib/point-effect-definitions"
 
 function normalizeText(value: unknown, fallback = "") {
   return String(value ?? fallback).trim()
@@ -17,46 +28,251 @@ function normalizeNumber(value: unknown, fallback = 0) {
   return Number.isFinite(numberValue) ? numberValue : fallback
 }
 
-function isRuleType(value: string): value is BadgeRuleType {
-  return Object.values(BadgeRuleType).includes(value as BadgeRuleType)
+function isRuleType(value: string): value is BadgeRuleTypeValue {
+  return isBadgeRuleTypeValue(value)
 }
 
 function isRuleOperator(value: string): value is BadgeRuleOperator {
   return Object.values(BadgeRuleOperator).includes(value as BadgeRuleOperator)
 }
 
-function parseRules(input: unknown) {
-  if (!Array.isArray(input)) {
+function isPointEffectTargetType(value: string): value is PointEffectTargetType {
+  return Object.values(PointEffectTargetType).includes(value as PointEffectTargetType)
+}
+
+function isPointEffectRuleKind(value: string): value is PointEffectRuleKind {
+  return Object.values(PointEffectRuleKind).includes(value as PointEffectRuleKind)
+}
+
+function isPointEffectDirection(value: string): value is PointEffectDirection {
+  return Object.values(PointEffectDirection).includes(value as PointEffectDirection)
+}
+
+function ensureArrayInput(input: unknown, label: string) {
+  if (input === undefined || input === null) {
     return []
   }
 
+  if (!Array.isArray(input)) {
+    apiError(400, `${label}格式不正确`)
+  }
+
   return input
-    .map((item, index) => {
-      const row = item as Record<string, unknown>
-      const ruleType = normalizeText(row.ruleType)
-      const operator = normalizeText(row.operator)
-      const value = normalizeText(row.value)
-      const extraValue = normalizeText(row.extraValue)
+}
 
-      if (!isRuleType(ruleType) || !isRuleOperator(operator) || !value) {
-        return null
-      }
+function ensureObjectItem(item: unknown, label: string, index: number) {
+  if (!item || typeof item !== "object" || Array.isArray(item)) {
+    apiError(400, `${label}第 ${index + 1} 项格式不正确`)
+  }
 
-      return {
-        ruleType,
-        operator,
-        value,
-        extraValue: extraValue || null,
-        sortOrder: normalizeNumber(row.sortOrder, index),
-      }
-    })
-    .filter(Boolean) as Array<{
-      ruleType: BadgeRuleType
-      operator: BadgeRuleOperator
-      value: string
-      extraValue: string | null
-      sortOrder: number
-    }>
+  return item as Record<string, unknown>
+}
+
+function parseRules(input: unknown) {
+  return ensureArrayInput(input, "领取条件").map((item, index) => {
+    const row = ensureObjectItem(item, "领取条件", index)
+    const itemLabel = `领取条件第 ${index + 1} 项`
+    const ruleType = normalizeText(row.ruleType)
+    const operator = normalizeText(row.operator)
+    const value = normalizeText(row.value)
+    const extraValue = normalizeText(row.extraValue)
+
+    if (!isRuleType(ruleType)) {
+      apiError(400, `${itemLabel}的条件类型无效`)
+    }
+
+    if (!isRuleOperator(operator)) {
+      apiError(400, `${itemLabel}的运算符无效`)
+    }
+
+    if (!value) {
+      apiError(400, `${itemLabel}的目标值不能为空`)
+    }
+
+    if (operator === BadgeRuleOperator.BETWEEN && !extraValue) {
+      apiError(400, `${itemLabel}使用区间运算时必须填写额外值`)
+    }
+
+    return {
+      ruleType,
+      operator,
+      value,
+      extraValue: extraValue || null,
+      sortOrder: normalizeNumber(row.sortOrder, index),
+    }
+  }) as Array<{
+    ruleType: BadgeRuleTypeValue
+    operator: BadgeRuleOperator
+    value: string
+    extraValue: string | null
+    sortOrder: number
+  }>
+}
+
+function parseOptionalMinute(value: unknown, fieldLabel: string, itemLabel: string) {
+  const normalized = String(value ?? "").trim()
+  if (!normalized) {
+    return null
+  }
+
+  const minute = Number(normalized)
+  if (!Number.isInteger(minute) || minute < 0 || minute > 1439) {
+    apiError(400, `${itemLabel}的${fieldLabel}无效`)
+  }
+
+  return minute
+}
+
+function parseEffects(input: unknown) {
+  return ensureArrayInput(input, "佩戴特效").map((item, index) => {
+    const row = ensureObjectItem(item, "佩戴特效", index)
+    const itemLabel = `佩戴特效第 ${index + 1} 项`
+    const name = normalizeText(row.name)
+    const targetType = normalizeText(row.targetType)
+    const ruleKind = normalizeText(row.ruleKind)
+    const direction = normalizeText(row.direction, PointEffectDirection.BUFF)
+    const rawScopeKeys = Array.isArray(row.scopeKeys)
+      ? row.scopeKeys.map((scopeKey) => normalizeText(scopeKey))
+      : null
+    const value = Number(row.value)
+    const extraValue = String(row.extraValue ?? "").trim()
+
+    if (!name) {
+      apiError(400, `${itemLabel}的特效名称不能为空`)
+    }
+
+    if (!isPointEffectTargetType(targetType)) {
+      apiError(400, `${itemLabel}的作用目标无效`)
+    }
+
+    if (!isPointEffectTargetTypeEnabledForBadgeEffects(targetType)) {
+      apiError(400, `${itemLabel}的作用目标当前未开放`)
+    }
+
+    if (!isPointEffectRuleKind(ruleKind)) {
+      apiError(400, `${itemLabel}的生效规则无效`)
+    }
+
+    if (!isPointEffectDirection(direction)) {
+      apiError(400, `${itemLabel}的增减方向无效`)
+    }
+
+    if (!Number.isFinite(value)) {
+      apiError(400, `${itemLabel}的基础值无效`)
+    }
+
+    if (!rawScopeKeys) {
+      apiError(400, `${itemLabel}的生效范围格式不正确`)
+    }
+
+    if (rawScopeKeys.length === 0) {
+      apiError(400, `${itemLabel}至少选择一个生效范围`)
+    }
+
+    const invalidScopeKey = rawScopeKeys.find((scopeKey) => !isPointEffectScopeKey(scopeKey))
+    if (invalidScopeKey) {
+      apiError(400, `${itemLabel}包含无效的生效范围`)
+    }
+
+    const incompatibleScopeKey = rawScopeKeys.find((scopeKey) => !isPointEffectScopeCompatibleWithTargetType(scopeKey, targetType))
+    if (incompatibleScopeKey) {
+      apiError(400, `${itemLabel}的生效范围与作用目标不兼容`)
+    }
+
+    const scopeKeys = normalizePointEffectScopeKeysByTargetType(rawScopeKeys, targetType)
+    if (scopeKeys.length === 0) {
+      apiError(400, `${itemLabel}至少选择一个生效范围`)
+    }
+
+    const normalizedDirection = normalizePointEffectDirectionByRuleKind(direction, ruleKind)
+    if (normalizedDirection !== direction) {
+      apiError(400, `${itemLabel}的增减方向与生效规则不兼容`)
+    }
+
+    const parsedExtraValue = extraValue === "" ? null : Number(extraValue)
+    if (extraValue !== "" && !Number.isFinite(parsedExtraValue)) {
+      apiError(400, `${itemLabel}的额外值无效`)
+    }
+
+    return {
+      id: normalizeText(row.id) || randomUUID(),
+      name,
+      description: normalizeText(row.description) || null,
+      targetType,
+      scopeKeys,
+      ruleKind,
+      direction: normalizedDirection,
+      value,
+      extraValue: parsedExtraValue,
+      startMinuteOfDay: parseOptionalMinute(row.startMinuteOfDay, "开始时间", itemLabel),
+      endMinuteOfDay: parseOptionalMinute(row.endMinuteOfDay, "结束时间", itemLabel),
+      sortOrder: normalizeNumber(row.sortOrder, index),
+      status: row.status === undefined ? true : normalizeBoolean(row.status),
+    }
+  }) as Array<{
+    id: string
+    name: string
+    description: string | null
+    targetType: PointEffectTargetType
+    scopeKeys: string[]
+    ruleKind: PointEffectRuleKind
+    direction: PointEffectDirection
+    value: number
+    extraValue: number | null
+    startMinuteOfDay: number | null
+    endMinuteOfDay: number | null
+    sortOrder: number
+    status: boolean
+  }>
+}
+
+async function replaceBadgeEffects(tx: Prisma.TransactionClient, badgeId: string, effects: ReturnType<typeof parseEffects>) {
+  await tx.$executeRaw`DELETE FROM "PointEffectRule" WHERE "badgeId" = ${badgeId}`
+
+  if (effects.length === 0) {
+    return
+  }
+
+  const values = effects.map((effect) => Prisma.sql`(
+    ${effect.id},
+    ${badgeId},
+    ${effect.name},
+    ${effect.description},
+    ${effect.targetType}::"PointEffectTargetType",
+    ${effect.scopeKeys}::TEXT[],
+    ${effect.ruleKind}::"PointEffectRuleKind",
+    ${effect.direction}::"PointEffectDirection",
+    ${effect.value},
+    ${effect.extraValue},
+    ${effect.startMinuteOfDay},
+    ${effect.endMinuteOfDay},
+    ${effect.sortOrder},
+    ${effect.status},
+    NOW(),
+    NOW()
+  )`)
+
+  await tx.$executeRaw(Prisma.sql`
+    INSERT INTO "PointEffectRule" (
+      "id",
+      "badgeId",
+      "name",
+      "description",
+      "targetType",
+      "scopeKeys",
+      "ruleKind",
+      "direction",
+      "value",
+      "extraValue",
+      "startMinuteOfDay",
+      "endMinuteOfDay",
+      "sortOrder",
+      "status",
+      "createdAt",
+      "updatedAt"
+    )
+    VALUES ${Prisma.join(values)}
+  `)
 }
 
 export const GET = createAdminRouteHandler(async () => {
@@ -73,6 +289,18 @@ export const GET = createAdminRouteHandler(async () => {
       },
     },
   })
+  const effectRows = await findBadgeEffectRulesByBadgeIds(badges.map((badge) => badge.id))
+  const effectMap = new Map<string, Awaited<ReturnType<typeof findBadgeEffectRulesByBadgeIds>>[number][]>()
+
+  effectRows.forEach((effect) => {
+    if (!effect.badgeId) {
+      return
+    }
+
+    const current = effectMap.get(effect.badgeId) ?? []
+    current.push(effect)
+    effectMap.set(effect.badgeId, current)
+  })
 
   return apiSuccess(badges.map((badge) => ({
     id: badge.id,
@@ -85,12 +313,18 @@ export const GET = createAdminRouteHandler(async () => {
     imageUrl: badge.imageUrl,
     category: badge.category,
     sortOrder: badge.sortOrder,
+    pointsCost: badge.pointsCost,
     status: badge.status,
     isHidden: badge.isHidden,
     grantedUserCount: badge._count.users,
     createdAt: badge.createdAt.toISOString(),
     updatedAt: badge.updatedAt.toISOString(),
     rules: badge.rules,
+    effects: (effectMap.get(badge.id) ?? []).map((effect) => ({
+      ...effect,
+      createdAt: effect.createdAt.toISOString(),
+      updatedAt: effect.updatedAt.toISOString(),
+    })),
   })))
 }, {
   errorMessage: "读取勋章列表失败",
@@ -104,24 +338,34 @@ export const POST = createAdminRouteHandler(async ({ request, adminUser }) => {
   const name = requireStringField(body, "name", "勋章名称和标识不能为空")
   const code = requireStringField(body, "code", "勋章名称和标识不能为空")
   const rules = parseRules(body.rules)
+  const effects = parseEffects(body.effects)
 
-  const badge = await prisma.badge.create({
-    data: {
-      name,
-      code,
-      description: normalizeText(body.description) || undefined,
-      iconPath: normalizeText(body.iconPath) || undefined,
-      iconText: normalizeText(body.iconText, "🏅") || "🏅",
-      color: normalizeText(body.color, "#f59e0b") || "#f59e0b",
-      imageUrl: normalizeText(body.imageUrl) || undefined,
-      category: normalizeText(body.category, "社区成就") || "社区成就",
-      sortOrder: normalizeNumber(body.sortOrder),
-      status: body.status === undefined ? true : normalizeBoolean(body.status),
-      isHidden: normalizeBoolean(body.isHidden),
-      rules: {
-        create: rules,
+  const badge = await prisma.$transaction(async (tx) => {
+    const createdBadge = await tx.badge.create({
+      data: {
+        name,
+        code,
+        description: normalizeText(body.description) || undefined,
+        iconPath: normalizeText(body.iconPath) || undefined,
+        iconText: normalizeText(body.iconText, "🏅") || "🏅",
+        color: normalizeText(body.color, "#f59e0b") || "#f59e0b",
+        imageUrl: normalizeText(body.imageUrl) || undefined,
+        category: normalizeText(body.category, "社区成就") || "社区成就",
+        sortOrder: normalizeNumber(body.sortOrder),
+        pointsCost: Math.max(0, normalizeNumber(body.pointsCost)),
+        status: body.status === undefined ? true : normalizeBoolean(body.status),
+        isHidden: normalizeBoolean(body.isHidden),
+        rules: {
+          create: rules.map((rule) => ({
+            ...rule,
+            ruleType: rule.ruleType as BadgeRuleType,
+          })),
+        },
       },
-    },
+    })
+
+    await replaceBadgeEffects(tx, createdBadge.id, effects)
+    return createdBadge
   })
 
   await writeAdminLog(adminUser.id, "badge.create", "BADGE", badge.id, `创建勋章 ${name}`, requestIp)
@@ -139,6 +383,7 @@ export const PUT = createAdminRouteHandler(async ({ request, adminUser }) => {
   const name = requireStringField(body, "name", "缺少必要参数")
   const code = requireStringField(body, "code", "缺少必要参数")
   const rules = parseRules(body.rules)
+  const effects = parseEffects(body.effects)
 
   await prisma.$transaction(async (tx) => {
     await tx.badge.update({
@@ -153,6 +398,7 @@ export const PUT = createAdminRouteHandler(async ({ request, adminUser }) => {
         imageUrl: normalizeText(body.imageUrl) || undefined,
         category: normalizeText(body.category, "社区成就") || "社区成就",
         sortOrder: normalizeNumber(body.sortOrder),
+        pointsCost: Math.max(0, normalizeNumber(body.pointsCost)),
         status: body.status === undefined ? true : normalizeBoolean(body.status),
         isHidden: normalizeBoolean(body.isHidden),
       },
@@ -164,7 +410,7 @@ export const PUT = createAdminRouteHandler(async ({ request, adminUser }) => {
       await tx.badgeRule.createMany({
         data: rules.map((rule) => ({
           badgeId: id,
-          ruleType: rule.ruleType,
+          ruleType: rule.ruleType as BadgeRuleType,
           operator: rule.operator,
           value: rule.value,
           extraValue: rule.extraValue,
@@ -172,6 +418,8 @@ export const PUT = createAdminRouteHandler(async ({ request, adminUser }) => {
         })),
       })
     }
+
+    await replaceBadgeEffects(tx, id, effects)
   })
 
   await writeAdminLog(adminUser.id, "badge.update", "BADGE", id, `更新勋章 ${name}`, requestIp)

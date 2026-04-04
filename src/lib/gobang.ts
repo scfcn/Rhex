@@ -10,9 +10,9 @@ import { countGobangMatchesInRange, createGobangMatchRecord, finishGobangMatch, 
 
 import { getGobangAppConfig } from "@/lib/app-config"
 import { getBusinessDayRange } from "@/lib/formatters"
+import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
 import { getSiteSettings } from "@/lib/site-settings"
 import { isVipActive } from "@/lib/vip-status"
-import { createPointLog, decrementUserPoints } from "@/db/point-log-queries"
 
 
 
@@ -354,63 +354,97 @@ async function creditUserPoints(userId: number, amount: number, reason: string) 
     return
   }
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      points: {
-        increment: amount,
-      },
-    },
-  })
-
-  await prisma.pointLog.create({
-    data: {
+  const [settings, preparedReward, user] = await Promise.all([
+    getSiteSettings(),
+    prepareScopedPointDelta({
+      scopeKey: "GOBANG_WAGER_INCOMING",
+      baseDelta: amount,
       userId,
-      changeType: "INCREASE",
-      changeValue: amount,
-      reason,
-    },
+    }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        points: true,
+      },
+    }),
+  ])
+
+  if (!user) {
+    throw new Error("用户不存在")
+  }
+
+  await applyPointDelta({
+    tx: prisma,
+    userId,
+    beforeBalance: user.points,
+    prepared: preparedReward,
+    pointName: settings.pointName,
+    reason,
   })
 }
 
 export async function createGobangMatch(user: CurrentUser) {
-  const config = await getGobangPluginConfig()
-  const todayCounts = await countTodayMatches(user.id)
+  const [config, todayCounts, settings] = await Promise.all([
+    getGobangPluginConfig(),
+    countTodayMatches(user.id),
+    getSiteSettings(),
+  ])
   const policy = resolveChallengePolicy(user, todayCounts, config)
-
-  if (policy.ticketCost > 0) {
-    await decrementUserPoints(user.id, policy.ticketCost)
-
-    await createPointLog({
-      userId: user.id,
-      changeType: "DECREASE",
-      changeValue: policy.ticketCost,
-      reason: "[app:五子棋] 付费挑战扣除门票",
-    })
-
-  }
-
+  const preparedTicketCost = policy.ticketCost > 0
+    ? await prepareScopedPointDelta({
+        scopeKey: "GOBANG_WAGER_OUTGOING",
+        baseDelta: -policy.ticketCost,
+        userId: user.id,
+      })
+    : null
   const id = randomUUID()
   const playerFirst = Math.random() >= 0.5
 
-  await createGobangMatchRecord({
-    id,
-    creatorId: user.id,
-    ticketCost: policy.ticketCost,
-    winReward: policy.winReward,
-  })
-
-  if (!playerFirst) {
-    const center = chooseAiMove(Array.from({ length: BOARD_SIZE }, () => Array.from({ length: BOARD_SIZE }, () => 0)), config.aiLevel)
-    await insertGobangMoveNow({
-      id: randomUUID(),
-      matchId: id,
-      playerId: AI_PLAYER_ID,
-      step: 1,
-      x: center.x,
-      y: center.y,
+  await prisma.$transaction(async (tx) => {
+    const latestUser = await tx.user.findUnique({
+      where: { id: user.id },
+      select: {
+        id: true,
+        points: true,
+      },
     })
-  }
+
+    if (!latestUser) {
+      throw new Error("用户不存在")
+    }
+
+    if (preparedTicketCost) {
+      await applyPointDelta({
+        tx,
+        userId: latestUser.id,
+        beforeBalance: latestUser.points,
+        prepared: preparedTicketCost,
+        pointName: settings.pointName,
+        insufficientMessage: `${settings.pointName}不足，无法开始付费挑战`,
+        reason: "[app:五子棋] 付费挑战门票",
+      })
+    }
+
+    await createGobangMatchRecord({
+      id,
+      creatorId: user.id,
+      ticketCost: policy.ticketCost,
+      winReward: policy.winReward,
+    })
+
+    if (!playerFirst) {
+      const center = chooseAiMove(Array.from({ length: BOARD_SIZE }, () => Array.from({ length: BOARD_SIZE }, () => 0)), config.aiLevel)
+      await insertGobangMoveNow({
+        id: randomUUID(),
+        matchId: id,
+        playerId: AI_PLAYER_ID,
+        step: 1,
+        x: center.x,
+        y: center.y,
+      })
+    }
+  })
 
 
   return {

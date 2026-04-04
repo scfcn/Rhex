@@ -1,91 +1,64 @@
 "use client"
 
-import Image from "next/image"
-import { useState, useTransition } from "react"
-import { Loader2, Upload } from "lucide-react"
+import { useState } from "react"
 
-
+import { useAdminMutation } from "@/hooks/use-admin-mutation"
 import { Button } from "@/components/ui/button"
 import { TextField } from "@/components/ui/text-field"
-import { saveAdminSiteSettings } from "@/lib/admin-site-settings-client"
+import { adminPost } from "@/lib/admin-client"
+import {
+  buildAdminSiteSettingsPayload,
+  createAdminSiteSettingsDraft,
+  SiteLogoUploadCard,
+  uploadSiteLogoFile,
+  type AdminSiteSettingsDraft,
+  type AdminSiteSettingsInitialSettings,
+} from "@/components/admin-site-settings.shared"
 
 interface AdminSiteSettingsFormProps {
-  initialSettings: {
-    siteName: string
-    siteSlogan: string
-    siteDescription: string
-    siteLogoText: string
-    siteLogoPath?: string | null
-    siteSeoKeywords?: string[]
-    vipMonthlyPrice: number
-    vipQuarterlyPrice: number
-    vipYearlyPrice: number
-    postOfflinePrice: number
-    postOfflineVip1Price: number
-    postOfflineVip2Price: number
-    postOfflineVip3Price: number
-    uploadProvider: string
-    uploadLocalPath: string
-    uploadBaseUrl?: string | null
-    uploadOssBucket?: string | null
-    uploadOssRegion?: string | null
-    uploadOssEndpoint?: string | null
-  }
+  initialSettings: AdminSiteSettingsInitialSettings
 }
 
 export function AdminSiteSettingsForm({ initialSettings }: AdminSiteSettingsFormProps) {
-  const [siteName, setSiteName] = useState(initialSettings.siteName)
-  const [siteSlogan, setSiteSlogan] = useState(initialSettings.siteSlogan)
-  const [siteDescription, setSiteDescription] = useState(initialSettings.siteDescription)
-  const [siteLogoText, setSiteLogoText] = useState(initialSettings.siteLogoText)
-  const [siteLogoPath, setSiteLogoPath] = useState(initialSettings.siteLogoPath ?? "")
+  const [draft, setDraft] = useState(() => createAdminSiteSettingsDraft(initialSettings))
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
-  const [vipMonthlyPrice, setVipMonthlyPrice] = useState(String(initialSettings.vipMonthlyPrice))
-  const [vipQuarterlyPrice, setVipQuarterlyPrice] = useState(String(initialSettings.vipQuarterlyPrice))
-  const [vipYearlyPrice, setVipYearlyPrice] = useState(String(initialSettings.vipYearlyPrice))
-  const [postOfflinePrice, setPostOfflinePrice] = useState(String(initialSettings.postOfflinePrice))
-  const [postOfflineVip1Price, setPostOfflineVip1Price] = useState(String(initialSettings.postOfflineVip1Price))
-  const [postOfflineVip2Price, setPostOfflineVip2Price] = useState(String(initialSettings.postOfflineVip2Price))
-  const [postOfflineVip3Price, setPostOfflineVip3Price] = useState(String(initialSettings.postOfflineVip3Price))
-  const [uploadProvider, setUploadProvider] = useState(initialSettings.uploadProvider)
-
-  const [uploadLocalPath, setUploadLocalPath] = useState(initialSettings.uploadLocalPath)
-  const [uploadBaseUrl, setUploadBaseUrl] = useState(initialSettings.uploadBaseUrl ?? "")
-  const [uploadOssBucket, setUploadOssBucket] = useState(initialSettings.uploadOssBucket ?? "")
-  const [uploadOssRegion, setUploadOssRegion] = useState(initialSettings.uploadOssRegion ?? "")
-  const [uploadOssEndpoint, setUploadOssEndpoint] = useState(initialSettings.uploadOssEndpoint ?? "")
   const [feedback, setFeedback] = useState("")
-  const [isPending, startTransition] = useTransition()
+  const { isPending, runMutation } = useAdminMutation()
+
+  function updateDraftField<Key extends keyof AdminSiteSettingsDraft>(field: Key, value: AdminSiteSettingsDraft[Key]) {
+    setDraft((current) => ({ ...current, [field]: value }))
+  }
+
+  const {
+    siteName,
+    siteSlogan,
+    siteDescription,
+    siteLogoText,
+    siteLogoPath,
+    vipMonthlyPrice,
+    vipQuarterlyPrice,
+    vipYearlyPrice,
+    postOfflinePrice,
+    postOfflineVip1Price,
+    postOfflineVip2Price,
+    postOfflineVip3Price,
+    uploadProvider,
+    uploadLocalPath,
+    uploadBaseUrl,
+    uploadOssBucket,
+    uploadOssRegion,
+    uploadOssEndpoint,
+  } = draft
 
   async function uploadSiteLogo(file: File) {
-    if (!file.type.startsWith("image/")) {
-      setFeedback("请先选择图片格式的站点 Logo")
-      return
-    }
-
     setIsUploadingLogo(true)
     setFeedback("")
 
     try {
-      const formData = new FormData()
-      formData.append("file", file)
-      formData.append("folder", "site-logo")
-
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      })
-      const result = await response.json()
-
-      if (!response.ok || result.code !== 0) {
-        setFeedback(result.message ?? "站点 Logo 上传失败")
-        return
-      }
-
-      setSiteLogoPath(String(result.data?.urlPath ?? ""))
+      updateDraftField("siteLogoPath", await uploadSiteLogoFile(file))
       setFeedback("站点 Logo 上传成功")
-    } catch {
-      setFeedback("站点 Logo 上传失败，请稍后再试")
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "站点 Logo 上传失败，请稍后再试")
     } finally {
       setIsUploadingLogo(false)
     }
@@ -97,92 +70,55 @@ export function AdminSiteSettingsForm({ initialSettings }: AdminSiteSettingsForm
       onSubmit={(event) => {
         event.preventDefault()
         setFeedback("")
-        startTransition(async () => {
-          const result = await saveAdminSiteSettings({
-            siteName,
-            siteSlogan,
-            siteDescription,
-            siteLogoText,
-            siteLogoPath,
-            vipMonthlyPrice: Number(vipMonthlyPrice),
-            vipQuarterlyPrice: Number(vipQuarterlyPrice),
-            vipYearlyPrice: Number(vipYearlyPrice),
-            postOfflinePrice: Number(postOfflinePrice),
-            postOfflineVip1Price: Number(postOfflineVip1Price),
-            postOfflineVip2Price: Number(postOfflineVip2Price),
-            postOfflineVip3Price: Number(postOfflineVip3Price),
-            uploadProvider,
-            uploadLocalPath,
-            uploadBaseUrl,
-            uploadOssBucket,
-            uploadOssRegion,
-            uploadOssEndpoint,
-          })
-          setFeedback(result.message)
+        runMutation({
+          mutation: () => adminPost("/api/admin/site-settings", buildAdminSiteSettingsPayload(draft), {
+            defaultSuccessMessage: "保存成功",
+            defaultErrorMessage: "保存失败",
+          }),
+          showSuccessToast: false,
+          showErrorToast: false,
+          onSuccess: (result) => {
+            setFeedback(result.message)
+          },
+          onError: (error) => {
+            setFeedback(error.message)
+          },
         })
       }}
     >
       <div className="grid gap-4 md:grid-cols-2">
-        <TextField label="站点名称" value={siteName} onChange={setSiteName} placeholder="如 兴趣论坛" />
-        <TextField label="Logo 文案" value={siteLogoText} onChange={setSiteLogoText} placeholder="如 兴趣论坛" />
+        <TextField label="站点名称" value={siteName} onChange={(value) => updateDraftField("siteName", value)} placeholder="如 兴趣论坛" />
+        <TextField label="Logo 文案" value={siteLogoText} onChange={(value) => updateDraftField("siteLogoText", value)} placeholder="如 兴趣论坛" />
       </div>
-      <TextField label="站点 Slogan" value={siteSlogan} onChange={setSiteSlogan} placeholder="如 Waste your time on things you love" />
+      <TextField label="站点 Slogan" value={siteSlogan} onChange={(value) => updateDraftField("siteSlogan", value)} placeholder="如 Waste your time on things you love" />
       <div className="space-y-2">
         <p className="text-sm font-medium">站点描述</p>
-        <textarea value={siteDescription} onChange={(event) => setSiteDescription(event.target.value)} className="min-h-[140px] w-full rounded-[24px] border border-border bg-background px-4 py-3 text-sm outline-none" />
+        <textarea value={siteDescription} onChange={(event) => updateDraftField("siteDescription", event.target.value)} className="min-h-[140px] w-full rounded-[24px] border border-border bg-background px-4 py-3 text-sm outline-none" />
       </div>
-      <div className="space-y-3 rounded-[24px] border border-border p-5">
-        <div>
-          <h3 className="text-sm font-semibold">站点 Logo</h3>
-          <p className="mt-1 text-xs leading-6 text-muted-foreground">支持上传图片或直接填写图片地址；未设置时，前台继续使用默认 SVG 图标。</p>
-        </div>
-        <div className="space-y-3 rounded-[18px] border border-dashed border-border bg-card/60 p-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium transition hover:bg-accent">
-              {isUploadingLogo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              {isUploadingLogo ? "上传中..." : "上传站点 Logo"}
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                disabled={isUploadingLogo}
-                onChange={(event) => {
-                  const file = event.target.files?.[0]
-                  if (file) {
-                    void uploadSiteLogo(file)
-                  }
-                  event.target.value = ""
-                }}
-              />
-            </label>
-            <Button type="button" variant="ghost" disabled={!siteLogoPath || isUploadingLogo} onClick={() => setSiteLogoPath("")}>清空图片 Logo</Button>
-          </div>
-          <input value={siteLogoPath} onChange={(event) => setSiteLogoPath(event.target.value)} className="h-10 w-full rounded-[16px] border border-border bg-background px-3 text-sm outline-none" placeholder="或直接填写站点 Logo 地址" />
-          {siteLogoPath ? (
-            <div className="relative h-16 w-40 overflow-hidden rounded-xl border border-border bg-white p-2">
-              <Image src={siteLogoPath} alt="站点 Logo 预览" fill sizes="160px" className="object-contain" unoptimized />
-            </div>
-          ) : null}
-
-        </div>
-      </div>
+      <SiteLogoUploadCard
+        value={siteLogoPath}
+        uploading={isUploadingLogo}
+        onValueChange={(value) => updateDraftField("siteLogoPath", value)}
+        onUpload={uploadSiteLogo}
+        onClear={() => updateDraftField("siteLogoPath", "")}
+      />
       <div className="rounded-[24px] border border-border p-5 space-y-5">
         <div>
           <h3 className="text-sm font-semibold">VIP 套餐价格</h3>
           <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <TextField label="月卡积分价格（VIP1）" value={vipMonthlyPrice} onChange={setVipMonthlyPrice} placeholder="如 3000" />
-            <TextField label="季卡积分价格（VIP2）" value={vipQuarterlyPrice} onChange={setVipQuarterlyPrice} placeholder="如 8000" />
-            <TextField label="年卡积分价格（VIP3）" value={vipYearlyPrice} onChange={setVipYearlyPrice} placeholder="如 30000" />
+            <TextField label="月卡积分价格（VIP1）" value={vipMonthlyPrice} onChange={(value) => updateDraftField("vipMonthlyPrice", value)} placeholder="如 3000" />
+            <TextField label="季卡积分价格（VIP2）" value={vipQuarterlyPrice} onChange={(value) => updateDraftField("vipQuarterlyPrice", value)} placeholder="如 8000" />
+            <TextField label="年卡积分价格（VIP3）" value={vipYearlyPrice} onChange={(value) => updateDraftField("vipYearlyPrice", value)} placeholder="如 30000" />
           </div>
         </div>
         <div>
           <h3 className="text-sm font-semibold">作者下线帖子价格</h3>
           <p className="mt-1 text-xs text-muted-foreground">0 表示免费；普通用户与 VIP1 / VIP2 / VIP3 按当前身份分别结算。</p>
           <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <TextField label="普通用户积分价格" value={postOfflinePrice} onChange={setPostOfflinePrice} placeholder="如 50" />
-            <TextField label="VIP1 积分价格" value={postOfflineVip1Price} onChange={setPostOfflineVip1Price} placeholder="如 30" />
-            <TextField label="VIP2 积分价格" value={postOfflineVip2Price} onChange={setPostOfflineVip2Price} placeholder="如 20" />
-            <TextField label="VIP3 积分价格" value={postOfflineVip3Price} onChange={setPostOfflineVip3Price} placeholder="如 0" />
+            <TextField label="普通用户积分价格" value={postOfflinePrice} onChange={(value) => updateDraftField("postOfflinePrice", value)} placeholder="如 50" />
+            <TextField label="VIP1 积分价格" value={postOfflineVip1Price} onChange={(value) => updateDraftField("postOfflineVip1Price", value)} placeholder="如 30" />
+            <TextField label="VIP2 积分价格" value={postOfflineVip2Price} onChange={(value) => updateDraftField("postOfflineVip2Price", value)} placeholder="如 20" />
+            <TextField label="VIP3 积分价格" value={postOfflineVip3Price} onChange={(value) => updateDraftField("postOfflineVip3Price", value)} placeholder="如 0" />
           </div>
         </div>
       </div>
@@ -192,17 +128,17 @@ export function AdminSiteSettingsForm({ initialSettings }: AdminSiteSettingsForm
         <h3 className="text-sm font-semibold">上传存储设置</h3>
         <div className="space-y-2">
           <p className="text-sm font-medium">存储策略</p>
-          <select value={uploadProvider} onChange={(event) => setUploadProvider(event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
+          <select value={uploadProvider} onChange={(event) => updateDraftField("uploadProvider", event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
             <option value="local">本地存储</option>
             <option value="oss">OSS（预留）</option>
           </select>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
-          <TextField label="本地上传目录" value={uploadLocalPath} onChange={setUploadLocalPath} placeholder="如 uploads" />
-          <TextField label="资源访问基础 URL" value={uploadBaseUrl} onChange={setUploadBaseUrl} placeholder="留空则自动使用 /uploads" />
-          <TextField label="OSS Bucket" value={uploadOssBucket} onChange={setUploadOssBucket} placeholder="如 my-bucket" />
-          <TextField label="OSS Region" value={uploadOssRegion} onChange={setUploadOssRegion} placeholder="如 ap-guangzhou" />
-          <TextField label="OSS Endpoint" value={uploadOssEndpoint} onChange={setUploadOssEndpoint} placeholder="如 https://oss.example.com" />
+          <TextField label="本地上传目录" value={uploadLocalPath} onChange={(value) => updateDraftField("uploadLocalPath", value)} placeholder="如 uploads" />
+          <TextField label="资源访问基础 URL" value={uploadBaseUrl} onChange={(value) => updateDraftField("uploadBaseUrl", value)} placeholder="留空则自动使用 /uploads" />
+          <TextField label="OSS Bucket" value={uploadOssBucket} onChange={(value) => updateDraftField("uploadOssBucket", value)} placeholder="如 my-bucket" />
+          <TextField label="OSS Region" value={uploadOssRegion} onChange={(value) => updateDraftField("uploadOssRegion", value)} placeholder="如 ap-guangzhou" />
+          <TextField label="OSS Endpoint" value={uploadOssEndpoint} onChange={(value) => updateDraftField("uploadOssEndpoint", value)} placeholder="如 https://oss.example.com" />
         </div>
         <p className="text-xs leading-6 text-muted-foreground">当前先完整支持本地上传，OSS 配置项先保留在后台设置中，后续可继续接入真实云存储实现。</p>
       </div>

@@ -24,15 +24,15 @@ function tabClassName(active: boolean) {
 export function FaqPageFrame({ currentPath, children }: FaqPageFrameProps) {
   return (
     <div className="space-y-6">
-
-
-      <div className="sticky top-20 z-10 overflow-x-auto pb-1">
-        <div className="inline-flex min-w-full gap-2 rounded-[24px] border border-border bg-card p-2 shadow-sm">
-          {FAQ_TABS.map((tab) => (
-            <Link key={tab.href} href={tab.href} className={tabClassName(currentPath === tab.href)}>
-              {tab.label}
-            </Link>
-          ))}
+      <div className="sticky top-20 z-10 pb-1">
+        <div className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          <div className="inline-flex min-w-max gap-2 rounded-[24px] border border-border bg-card p-2 shadow-sm md:flex md:min-w-0 md:flex-wrap">
+            {FAQ_TABS.map((tab) => (
+              <Link key={tab.href} href={tab.href} className={tabClassName(currentPath === tab.href)}>
+                {tab.label}
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
 

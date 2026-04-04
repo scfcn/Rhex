@@ -4,6 +4,7 @@ import path from "path"
 import { notFound } from "next/navigation"
 
 import { getSiteSettings } from "@/lib/site-settings"
+import { normalizeUploadLocalPath } from "@/lib/upload-path"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -39,7 +40,13 @@ function isSafeSegment(value: string) {
 
 async function resolveUploadFilePath(folder: string, fileName: string) {
   const settings = await getSiteSettings()
-  const configuredLocalPath = settings.uploadLocalPath?.trim() || "uploads"
+  const configuredLocalPath = (() => {
+    try {
+      return normalizeUploadLocalPath(settings.uploadLocalPath)
+    } catch {
+      return "uploads"
+    }
+  })()
   const candidatePaths = [
     path.join(projectRoot, configuredLocalPath, folder, fileName),
     path.join(publicRoot, configuredLocalPath, folder, fileName),

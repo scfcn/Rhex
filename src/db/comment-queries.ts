@@ -1,6 +1,7 @@
 import type { Prisma } from "@/db/types"
-import { ChangeType, NotificationType } from "@/db/types"
+import { NotificationType } from "@/db/types"
 import { prisma } from "@/db/client"
+import { applyPointDelta, type PreparedPointDelta } from "@/lib/point-center"
 import { createNotifications } from "@/lib/notification-writes"
 
 
@@ -252,6 +253,31 @@ export function findRepliesByParentIds(params: {
   })
 }
 
+export function findCommentRewardClaimsByCommentIds(postId: string, commentIds: string[]) {
+  if (commentIds.length === 0) {
+    return Promise.resolve([])
+  }
+
+  return prisma.postRedPacketClaim.findMany({
+    where: {
+      postId,
+      triggerType: "REPLY",
+      triggerCommentId: {
+        in: commentIds,
+      },
+    },
+    select: {
+      triggerCommentId: true,
+      amount: true,
+      redPacket: {
+        select: {
+          packetCount: true,
+        },
+      },
+    },
+  })
+}
+
 export function countUserRepliesByPostId(postId: string, userId: number) {
   return prisma.comment.count({
     where: {
@@ -313,6 +339,7 @@ export async function createCommentWithRelations(params: {
   parentId?: string
   replyToUserId?: number
   replyPointDelta: number
+  replyPointDeltaPrepared: PreparedPointDelta
   pointName: string
   senderName: string
   postAuthorId: number
@@ -332,39 +359,29 @@ export async function createCommentWithRelations(params: {
       },
     })
 
-    await tx.user.update({
+    const updatedUser = await tx.user.update({
       where: { id: params.userId },
       data: {
         commentCount: {
           increment: 1,
         },
         lastCommentAt: new Date(),
-        ...(params.replyPointDelta < 0
-          ? {
-              points: {
-                decrement: Math.abs(params.replyPointDelta),
-              },
-            }
-          : params.replyPointDelta > 0
-            ? {
-                points: {
-                  increment: params.replyPointDelta,
-                },
-              }
-            : {}),
+      },
+      select: {
+        points: true,
       },
     })
 
-    if (params.replyPointDelta !== 0) {
-      await tx.pointLog.create({
-        data: {
-          userId: params.userId,
-          changeType: params.replyPointDelta > 0 ? ChangeType.INCREASE : ChangeType.DECREASE,
-          changeValue: Math.abs(params.replyPointDelta),
-          reason: params.replyPointDelta > 0 ? `在指定节点回复获得${params.pointName}` : `在指定节点回复扣除${params.pointName}`,
-          relatedType: "COMMENT",
-          relatedId: comment.id,
-        },
+    if (params.replyPointDeltaPrepared.finalDelta !== 0) {
+      await applyPointDelta({
+        tx,
+        userId: params.userId,
+        beforeBalance: updatedUser.points,
+        prepared: params.replyPointDeltaPrepared,
+        pointName: params.pointName,
+        reason: "在指定节点回复",
+        relatedType: "COMMENT",
+        relatedId: comment.id,
       })
     }
 

@@ -5,7 +5,8 @@ import { apiError, readOptionalNumberField, readOptionalStringField, type JsonOb
 import { normalizeMarkdownEmojiItems, serializeMarkdownEmojiItems } from "@/lib/markdown-emoji"
 import { defaultSiteSettingsCreateInput } from "@/lib/site-settings-defaults"
 import { normalizePostListDisplayMode } from "@/lib/post-list-display"
-import { mergeCheckInMakeUpPriceSettings, mergeCheckInRewardSettings, mergeHomeSidebarAnnouncementSettings, mergeInviteCodePurchasePriceSettings, mergeMarkdownImageUploadSettings, mergeNicknameChangePointCostSettings, mergeVipLevelIconSettings, resolveHomeSidebarAnnouncementSettings, resolveMarkdownImageUploadSettings } from "@/lib/site-settings-app-state"
+import { mergeAuthProviderSettings, mergeAvatarChangePointCostSettings, mergeCheckInMakeUpPriceSettings, mergeCheckInRewardSettings, mergeCommentAccessSettings, mergeHomeSidebarAnnouncementSettings, mergeInteractionGateSettings, mergeIntroductionChangePointCostSettings, mergeInviteCodePurchasePriceSettings, mergeMarkdownImageUploadSettings, mergeNicknameChangePointCostSettings, mergePostJackpotSettings, mergeRegistrationRewardSettings, mergeVipLevelIconSettings, resolveAvatarChangePointCostSettings, resolveHomeSidebarAnnouncementSettings, resolveIntroductionChangePointCostSettings, resolveMarkdownImageUploadSettings, resolvePostJackpotSettings, resolveRegistrationRewardSettings } from "@/lib/site-settings-app-state"
+import { mergeAuthProviderSensitiveConfig, mergeCaptchaSensitiveConfig } from "@/lib/site-settings-sensitive-state"
 import { mergeSiteSearchSettings, resolveSiteSearchSettings } from "@/lib/site-search-settings"
 import { normalizeCaptchaMode, normalizeFooterLinks } from "@/lib/shared/config-parsers"
 import { normalizeHeatColors, normalizeHeatThresholds, normalizePositiveInteger, normalizeTippingAmounts } from "@/lib/shared/normalizers"
@@ -13,6 +14,7 @@ import { createSiteSettingsRecordWithFullData, updateSiteSettingsHeaderApps } fr
 import { normalizeHeaderAppIconName, normalizeSiteHeaderAppLinks } from "@/lib/site-header-app-links"
 import { invalidateSiteSettingsCache } from "@/lib/site-settings"
 import { getDefaultTippingGiftItemsFromAmounts, normalizeTippingGiftItems } from "@/lib/tipping-gifts"
+import { normalizeUploadLocalPath } from "@/lib/upload-path"
 import { normalizeVipLevelIcons } from "@/lib/vip-level-icons"
 
 export async function getOrCreateSiteSettings() {
@@ -131,6 +133,11 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
   if (section === "site-registration") {
     const inviteRewardInviter = Math.max(0, readOptionalNumberField(body, "inviteRewardInviter") ?? 0)
     const inviteRewardInvitee = Math.max(0, readOptionalNumberField(body, "inviteRewardInvitee") ?? 0)
+    const existingRegistrationRewardSettings = resolveRegistrationRewardSettings({
+      appStateJson: existing.appStateJson,
+      initialPointsFallback: 0,
+    })
+    const registerInitialPoints = Math.max(0, readOptionalNumberField(body, "registerInitialPoints") ?? existingRegistrationRewardSettings.initialPoints)
     const registrationEnabled = Boolean(body.registrationEnabled)
     const registrationRequireInviteCode = Boolean(body.registrationRequireInviteCode)
     const registerInviteCodeEnabled = Boolean(body.registerInviteCodeEnabled)
@@ -138,6 +145,7 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
     const registerCaptchaMode = normalizeCaptchaMode(body.registerCaptchaMode)
     const loginCaptchaMode = normalizeCaptchaMode(body.loginCaptchaMode)
     const turnstileSiteKey = readOptionalStringField(body, "turnstileSiteKey") || null
+    const turnstileSecretKey = readOptionalStringField(body, "turnstileSecretKey") || null
     const registerEmailEnabled = Boolean(body.registerEmailEnabled)
     const registerEmailRequired = registerEmailEnabled && Boolean(body.registerEmailRequired)
     const registerEmailVerification = registerEmailEnabled && Boolean(body.registerEmailVerification)
@@ -149,6 +157,16 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
     const registerGenderEnabled = Boolean(body.registerGenderEnabled)
     const registerGenderRequired = registerGenderEnabled && Boolean(body.registerGenderRequired)
     const registerInviterEnabled = Boolean(body.registerInviterEnabled)
+    const authGithubEnabled = Boolean(body.authGithubEnabled)
+    const authGoogleEnabled = Boolean(body.authGoogleEnabled)
+    const authPasskeyEnabled = Boolean(body.authPasskeyEnabled)
+    const githubClientId = readOptionalStringField(body, "githubClientId") || null
+    const githubClientSecret = readOptionalStringField(body, "githubClientSecret") || null
+    const googleClientId = readOptionalStringField(body, "googleClientId") || null
+    const googleClientSecret = readOptionalStringField(body, "googleClientSecret") || null
+    const passkeyRpId = readOptionalStringField(body, "passkeyRpId") || null
+    const passkeyRpName = readOptionalStringField(body, "passkeyRpName") || null
+    const passkeyOrigin = readOptionalStringField(body, "passkeyOrigin") || null
     const smtpEnabled = Boolean(body.smtpEnabled)
     const smtpHost = readOptionalStringField(body, "smtpHost") || null
     const smtpPortRaw = readOptionalNumberField(body, "smtpPort") ?? 0
@@ -162,13 +180,37 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
       apiError(400, "注册要求必须填写邀请码时，不能关闭邀请码输入框显示")
     }
 
-    if ((registerCaptchaMode === "TURNSTILE" || loginCaptchaMode === "TURNSTILE") && !turnstileSiteKey) {
-      apiError(400, "启用 Turnstile 验证码时，必须填写 Turnstile Site Key")
+    if ((registerCaptchaMode === "TURNSTILE" || loginCaptchaMode === "TURNSTILE") && (!turnstileSiteKey || !turnstileSecretKey)) {
+      apiError(400, "启用 Turnstile 验证码时，必须同时填写 Turnstile Site Key 和 Secret Key")
     }
 
     if (smtpEnabled && (!smtpHost || !smtpPort || !smtpUser || !smtpPass || !smtpFrom)) {
       apiError(400, "开启 SMTP 时请完整填写主机、端口、账号、密码和发件人地址")
     }
+
+    const appStateWithRegistrationRewards = mergeRegistrationRewardSettings(existing.appStateJson, {
+      initialPoints: registerInitialPoints,
+    })
+    const appStateJson = mergeAuthProviderSettings(appStateWithRegistrationRewards, {
+      githubEnabled: authGithubEnabled,
+      googleEnabled: authGoogleEnabled,
+      passkeyEnabled: authPasskeyEnabled,
+    })
+    const currentSensitiveStateJson = ("sensitiveStateJson" in existing ? existing.sensitiveStateJson : null) ?? null
+    const sensitiveStateWithAuthProvider = mergeAuthProviderSensitiveConfig(currentSensitiveStateJson, {
+      githubClientId,
+      githubClientSecret,
+      googleClientId,
+      googleClientSecret,
+      passkeyRpId,
+      passkeyRpName,
+      passkeyOrigin,
+    })
+    const sensitiveStateJson = mergeCaptchaSensitiveConfig(sensitiveStateWithAuthProvider, {
+      turnstileSecretKey: registerCaptchaMode === "TURNSTILE" || loginCaptchaMode === "TURNSTILE"
+        ? turnstileSecretKey
+        : null,
+    })
 
     const settings = await prisma.siteSetting.update({
       where: { id: existing.id },
@@ -193,6 +235,8 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
         registerGenderEnabled,
         registerGenderRequired,
         registerInviterEnabled,
+        appStateJson,
+        sensitiveStateJson,
         smtpEnabled,
         smtpHost,
         smtpPort,
@@ -209,6 +253,11 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
   }
 
   if (section === "site-interaction") {
+    const guestCanViewComments = body.guestCanViewComments === undefined ? true : Boolean(body.guestCanViewComments)
+    const postCreateRequireEmailVerified = Boolean(body.postCreateRequireEmailVerified)
+    const commentCreateRequireEmailVerified = Boolean(body.commentCreateRequireEmailVerified)
+    const postCreateMinRegisteredMinutes = Math.max(0, readOptionalNumberField(body, "postCreateMinRegisteredMinutes") ?? 0)
+    const commentCreateMinRegisteredMinutes = Math.max(0, readOptionalNumberField(body, "commentCreateMinRegisteredMinutes") ?? 0)
     const tippingEnabled = Boolean(body.tippingEnabled)
     const tippingDailyLimit = Math.max(1, readOptionalNumberField(body, "tippingDailyLimit") ?? 1)
     const tippingPerPostLimit = Math.max(1, readOptionalNumberField(body, "tippingPerPostLimit") ?? 1)
@@ -221,6 +270,21 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
     const postRedPacketEnabled = Boolean(body.postRedPacketEnabled)
     const postRedPacketMaxPoints = Math.max(1, readOptionalNumberField(body, "postRedPacketMaxPoints") ?? 1)
     const postRedPacketDailyLimit = Math.max(1, readOptionalNumberField(body, "postRedPacketDailyLimit") ?? 1)
+    const existingPostJackpotSettings = resolvePostJackpotSettings({
+      appStateJson: existing.appStateJson,
+      enabledFallback: false,
+      minInitialPointsFallback: 100,
+      maxInitialPointsFallback: 1000,
+      replyIncrementPointsFallback: 25,
+      hitProbabilityFallback: 15,
+    })
+    const postJackpotEnabled = body.postJackpotEnabled === undefined
+      ? existingPostJackpotSettings.enabled
+      : Boolean(body.postJackpotEnabled)
+    const postJackpotMinInitialPoints = Math.max(1, readOptionalNumberField(body, "postJackpotMinInitialPoints") ?? existingPostJackpotSettings.minInitialPoints)
+    const postJackpotMaxInitialPoints = Math.max(postJackpotMinInitialPoints, readOptionalNumberField(body, "postJackpotMaxInitialPoints") ?? existingPostJackpotSettings.maxInitialPoints)
+    const postJackpotReplyIncrementPoints = Math.max(1, readOptionalNumberField(body, "postJackpotReplyIncrementPoints") ?? existingPostJackpotSettings.replyIncrementPoints)
+    const postJackpotHitProbability = Math.min(100, Math.max(1, readOptionalNumberField(body, "postJackpotHitProbability") ?? existingPostJackpotSettings.hitProbability))
     const heatViewWeight = Math.max(0, readOptionalNumberField(body, "heatViewWeight") ?? 0)
     const heatCommentWeight = Math.max(0, readOptionalNumberField(body, "heatCommentWeight") ?? 0)
     const heatLikeWeight = Math.max(0, readOptionalNumberField(body, "heatLikeWeight") ?? 0)
@@ -236,6 +300,38 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
     if (postRedPacketEnabled && postRedPacketDailyLimit < postRedPacketMaxPoints) {
       apiError(400, "每日发红包积分上限不能小于单个红包上限")
     }
+
+    const appStateWithCommentAccess = mergeCommentAccessSettings(existing.appStateJson, {
+      guestCanView: guestCanViewComments,
+    })
+
+    const appStateWithInteractionGates = mergeInteractionGateSettings(appStateWithCommentAccess, {
+      version: 1,
+      actions: {
+        POST_CREATE: {
+          enabled: postCreateRequireEmailVerified || postCreateMinRegisteredMinutes > 0,
+          conditions: [
+            ...(postCreateRequireEmailVerified ? [{ type: "EMAIL_VERIFIED", enabled: true } as const] : []),
+            ...(postCreateMinRegisteredMinutes > 0 ? [{ type: "REGISTERED_MINUTES", value: postCreateMinRegisteredMinutes } as const] : []),
+          ],
+        },
+        COMMENT_CREATE: {
+          enabled: commentCreateRequireEmailVerified || commentCreateMinRegisteredMinutes > 0,
+          conditions: [
+            ...(commentCreateRequireEmailVerified ? [{ type: "EMAIL_VERIFIED", enabled: true } as const] : []),
+            ...(commentCreateMinRegisteredMinutes > 0 ? [{ type: "REGISTERED_MINUTES", value: commentCreateMinRegisteredMinutes } as const] : []),
+          ],
+        },
+      },
+    })
+
+    const appStateJson = mergePostJackpotSettings(appStateWithInteractionGates, {
+      enabled: postJackpotEnabled,
+      minInitialPoints: postJackpotMinInitialPoints,
+      maxInitialPoints: postJackpotMaxInitialPoints,
+      replyIncrementPoints: postJackpotReplyIncrementPoints,
+      hitProbability: postJackpotHitProbability,
+    })
 
     if (heatStageThresholds.length !== 9) {
       apiError(400, "帖子热度阈值必须配置 9 段数值")
@@ -256,6 +352,7 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
           postRedPacketEnabled,
           postRedPacketMaxPoints,
           postRedPacketDailyLimit,
+          appStateJson,
           heatViewWeight,
           heatCommentWeight,
           heatLikeWeight,
@@ -312,6 +409,22 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
     const nicknameChangeVip1PointCost = Math.max(0, readOptionalNumberField(body, "nicknameChangeVip1PointCost") ?? nicknameChangePointCost)
     const nicknameChangeVip2PointCost = Math.max(0, readOptionalNumberField(body, "nicknameChangeVip2PointCost") ?? nicknameChangePointCost)
     const nicknameChangeVip3PointCost = Math.max(0, readOptionalNumberField(body, "nicknameChangeVip3PointCost") ?? nicknameChangePointCost)
+    const existingIntroductionChangePointCosts = resolveIntroductionChangePointCostSettings({
+      appStateJson: existing.appStateJson,
+      normalPrice: 0,
+    })
+    const introductionChangePointCost = Math.max(0, readOptionalNumberField(body, "introductionChangePointCost") ?? existingIntroductionChangePointCosts.normal)
+    const introductionChangeVip1PointCost = Math.max(0, readOptionalNumberField(body, "introductionChangeVip1PointCost") ?? existingIntroductionChangePointCosts.vip1)
+    const introductionChangeVip2PointCost = Math.max(0, readOptionalNumberField(body, "introductionChangeVip2PointCost") ?? existingIntroductionChangePointCosts.vip2)
+    const introductionChangeVip3PointCost = Math.max(0, readOptionalNumberField(body, "introductionChangeVip3PointCost") ?? existingIntroductionChangePointCosts.vip3)
+    const existingAvatarChangePointCosts = resolveAvatarChangePointCostSettings({
+      appStateJson: existing.appStateJson,
+      normalPrice: 0,
+    })
+    const avatarChangePointCost = Math.max(0, readOptionalNumberField(body, "avatarChangePointCost") ?? existingAvatarChangePointCosts.normal)
+    const avatarChangeVip1PointCost = Math.max(0, readOptionalNumberField(body, "avatarChangeVip1PointCost") ?? existingAvatarChangePointCosts.vip1)
+    const avatarChangeVip2PointCost = Math.max(0, readOptionalNumberField(body, "avatarChangeVip2PointCost") ?? existingAvatarChangePointCosts.vip2)
+    const avatarChangeVip3PointCost = Math.max(0, readOptionalNumberField(body, "avatarChangeVip3PointCost") ?? existingAvatarChangePointCosts.vip3)
     const inviteCodePrice = Math.max(0, readOptionalNumberField(body, "inviteCodePrice") ?? existing.inviteCodePrice ?? 0)
     const inviteCodeVip1Price = Math.max(0, readOptionalNumberField(body, "inviteCodeVip1Price") ?? inviteCodePrice)
     const inviteCodeVip2Price = Math.max(0, readOptionalNumberField(body, "inviteCodeVip2Price") ?? inviteCodePrice)
@@ -343,7 +456,19 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
       vip2: nicknameChangeVip2PointCost,
       vip3: nicknameChangeVip3PointCost,
     })
-    const appStateJson = mergeInviteCodePurchasePriceSettings(appStateWithNicknamePointCosts, {
+    const appStateWithIntroductionPointCosts = mergeIntroductionChangePointCostSettings(appStateWithNicknamePointCosts, {
+      normal: introductionChangePointCost,
+      vip1: introductionChangeVip1PointCost,
+      vip2: introductionChangeVip2PointCost,
+      vip3: introductionChangeVip3PointCost,
+    })
+    const appStateWithAvatarPointCosts = mergeAvatarChangePointCostSettings(appStateWithIntroductionPointCosts, {
+      normal: avatarChangePointCost,
+      vip1: avatarChangeVip1PointCost,
+      vip2: avatarChangeVip2PointCost,
+      vip3: avatarChangeVip3PointCost,
+    })
+    const appStateJson = mergeInviteCodePurchasePriceSettings(appStateWithAvatarPointCosts, {
       vip1: inviteCodeVip1Price,
       vip2: inviteCodeVip2Price,
       vip3: inviteCodeVip3Price,
@@ -382,7 +507,12 @@ export async function updateSiteSettingsBySection(body: JsonObject) {
 
   if (section === "upload") {
     const uploadProvider = readOptionalStringField(body, "uploadProvider") || "local"
-    const uploadLocalPath = readOptionalStringField(body, "uploadLocalPath") || "uploads"
+    let uploadLocalPath = "uploads"
+    try {
+      uploadLocalPath = normalizeUploadLocalPath(readOptionalStringField(body, "uploadLocalPath"))
+    } catch (error) {
+      apiError(400, error instanceof Error ? error.message : "本地上传目录配置不合法")
+    }
     const uploadBaseUrl = readOptionalStringField(body, "uploadBaseUrl") || null
     const uploadOssBucket = readOptionalStringField(body, "uploadOssBucket") || null
     const uploadOssRegion = readOptionalStringField(body, "uploadOssRegion") || null

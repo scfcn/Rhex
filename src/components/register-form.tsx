@@ -6,6 +6,7 @@ import { useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
 import { BuiltinCaptchaField } from "@/components/builtin-captcha-field"
+import { ExternalAuthEntry } from "@/components/external-auth-entry"
 import { PowCaptchaField } from "@/components/pow-captcha-field"
 import { TurnstileCaptchaField } from "@/components/turnstile-captcha-field"
 import { Button } from "@/components/ui/button"
@@ -215,13 +216,15 @@ export function RegisterForm({ settings }: RegisterFormProps) {
           <p className="rounded-2xl border border-border bg-secondary/50 px-4 py-3 text-sm text-muted-foreground">已通过链接绑定邀请码 <span className="font-mono font-medium text-foreground">{inviteCode}</span>，当前输入框已按后台设置隐藏。</p>
         ) : null}
 
-        {useTurnstile && settings.turnstileSiteKey ? <TurnstileCaptchaField siteKey={settings.turnstileSiteKey} description="使用 Cloudflare Turnstile 防止机器人批量注册。" onTokenChange={setCaptchaToken} /> : null}
+        {useTurnstile && settings.turnstileSiteKey ? <TurnstileCaptchaField siteKey={settings.turnstileSiteKey} onTokenChange={setCaptchaToken} /> : null}
 
         {useBuiltinCaptcha ? <BuiltinCaptchaField code={builtinCaptchaCode} onCodeChange={setBuiltinCaptchaCode} onTokenChange={setCaptchaToken} onLoadError={(message) => toast.error(message, "验证码")} /> : null}
 
         {usePowCaptcha ? <PowCaptchaField scope="register" onTokenChange={setCaptchaToken} onNonceChange={setPowNonce} onLoadError={(message) => toast.error(message, "PoW 验证")} /> : null}
 
         <Button className="w-full" disabled={loading}>{loading ? "注册中..." : "注册并登录"}</Button>
+
+        <ExternalAuthEntry settings={settings} mode="register" />
 
       </form>
     </>

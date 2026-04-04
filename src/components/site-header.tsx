@@ -1,6 +1,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { Bell } from "lucide-react"
+import { Suspense } from "react"
 
 import { HeaderUserActions } from "@/components/header-user-actions"
 import { MobileHeaderQuickActions } from "@/components/mobile-header-quick-actions"
@@ -82,7 +83,9 @@ export async function SiteHeader() {
 
             <div className="hidden flex-1 md:block">
               <div className="ml-4 max-w-md">
-                <SearchForm compact appLinks={settings.headerAppLinks} appIconName={settings.headerAppIconName} search={settings.search} />
+                <Suspense fallback={<div className="h-9 w-full rounded-full border border-border bg-muted/50" aria-hidden="true" />}>
+                  <SearchForm compact appLinks={settings.headerAppLinks} appIconName={settings.headerAppIconName} search={settings.search} />
+                </Suspense>
               </div>
 
             </div>

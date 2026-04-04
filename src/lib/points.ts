@@ -2,6 +2,7 @@ import { ChangeType } from "@/db/types"
 
 import { countUserPointLogs, findUserPointLogsPage } from "@/db/point-log-queries"
 import { formatDateTime } from "@/lib/formatters"
+import { parsePointLogAuditTrail } from "@/lib/point-log-audit"
 
 import { withRuntimeFallback } from "@/lib/runtime-errors"
 import { normalizePositiveInteger } from "@/lib/shared/normalizers"
@@ -12,10 +13,18 @@ export interface SitePointLogItem {
   changeType: ChangeType
   changeValue: number
   reason: string
+  displayReason: string
   relatedType?: string | null
   relatedId?: string | null
   createdAt: string
+  beforeBalance?: number | null
+  afterBalance?: number | null
   isRedeemCode?: boolean
+  pointEffect?: {
+    baseValue: string
+    ruleSummary: string
+    deltaValue: string
+  } | null
 }
 
 export interface UserPointLogsResult {
@@ -42,6 +51,7 @@ export async function getUserPointLogs(userId: number, options: { page?: number;
 
     return {
       items: logs.map((log) => ({
+        ...parsePointLogAuditTrail(log.reason),
         id: log.id,
         changeType: log.changeType,
         changeValue: log.changeValue,

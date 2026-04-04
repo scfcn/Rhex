@@ -1,13 +1,14 @@
-import { ChangeType, VerificationChannel } from "@/db/types"
+import { VerificationChannel } from "@/db/types"
 import { hashSync } from "bcryptjs"
 
 import { prisma } from "@/db/client"
 import { apiError } from "@/lib/api-route"
 import { verifyBuiltinCaptchaToken } from "@/lib/builtin-captcha"
 import { enforceSensitiveText } from "@/lib/content-safety"
+import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
 import { verifyPowCaptchaSolution } from "@/lib/pow-captcha"
 import { getRequestIp } from "@/lib/request-ip"
-import { getSiteSettings } from "@/lib/site-settings"
+import { getServerSiteSettings } from "@/lib/site-settings"
 import { verifyTurnstileToken } from "@/lib/turnstile"
 import { validateAuthPayload } from "@/lib/validators"
 import { verifyCode } from "@/lib/verification"
@@ -44,7 +45,7 @@ interface RegisterPayload {
 interface RegisterContext {
   payload: RegisterPayload
   body: Record<string, unknown>
-  settings: Awaited<ReturnType<typeof getSiteSettings>>
+  settings: Awaited<ReturnType<typeof getServerSiteSettings>>
   registerIp: string | null
   userAgent: string | null
   nicknameSafety: Awaited<ReturnType<typeof enforceSensitiveText>> | null
@@ -67,7 +68,7 @@ async function verifyRegisterCaptcha(context: RegisterContext) {
   const powNonce = typeof context.body.powNonce === "string" ? context.body.powNonce.trim() : ""
 
   if (context.settings.registerCaptchaMode === "TURNSTILE") {
-    if (!context.settings.turnstileSiteKey || !process.env.TURNSTILE_SECRET_KEY?.trim()) {
+    if (!context.settings.turnstileSiteKey || !context.settings.turnstileSecretKey) {
       apiError(500, "站点未完成 Turnstile 验证码配置，请联系管理员")
     }
 
@@ -75,7 +76,7 @@ async function verifyRegisterCaptcha(context: RegisterContext) {
       apiError(400, "请先完成验证码验证")
     }
 
-    await verifyTurnstileToken(captchaToken, context.registerIp)
+    await verifyTurnstileToken(captchaToken, context.registerIp, context.settings.turnstileSecretKey)
   }
 
   if (context.settings.registerCaptchaMode === "BUILTIN") {
@@ -209,7 +210,7 @@ async function verifyRegisterContactCodes(context: RegisterContext) {
 export async function createRegisterFlow(options: RegisterFlowOptions): Promise<RegisterFlowResult> {
   const payload = assertRegisterPayload(options.body)
   const body = options.body as Record<string, unknown>
-  const settings = await getSiteSettings()
+  const settings = await getServerSiteSettings()
   const registerIp = getRequestIp(options.request)
   const userAgent = options.request.headers.get("user-agent")
   const nicknameSafety = payload.nickname
@@ -232,16 +233,17 @@ export async function createRegisterFlow(options: RegisterFlowOptions): Promise<
 
   const inviterReward = Math.max(0, settings.inviteRewardInviter)
   const inviteeReward = Math.max(0, settings.inviteRewardInvitee)
+  const registerInitialPoints = Math.max(0, settings.registerInitialPoints)
   const sanitizedNickname = nicknameSafety?.sanitizedText || payload.username
 
   const user = await prisma.$transaction(async (tx) => {
-    let inviter: null | { id: number; username: string } = null
+    let inviter: null | { id: number; username: string; points: number } = null
     let inviteCodeRecord: null | { id: string; code: string } = null
 
     if (payload.inviterUsername) {
       inviter = await tx.user.findUnique({
         where: { username: payload.inviterUsername },
-        select: { id: true, username: true },
+        select: { id: true, username: true, points: true },
       })
 
       if (!inviter) {
@@ -264,6 +266,7 @@ export async function createRegisterFlow(options: RegisterFlowOptions): Promise<
             select: {
               id: true,
               username: true,
+              points: true,
             },
           },
         },
@@ -287,9 +290,12 @@ export async function createRegisterFlow(options: RegisterFlowOptions): Promise<
         inviter = {
           id: foundCode.createdBy.id,
           username: foundCode.createdBy.username,
+          points: foundCode.createdBy.points,
         }
       }
     }
+
+    const inviteeRegisterReward = inviter && inviteeReward > 0 ? inviteeReward : 0
 
     const createdUser = await tx.user.create({
       data: {
@@ -306,7 +312,7 @@ export async function createRegisterFlow(options: RegisterFlowOptions): Promise<
         inviterId: inviter?.id,
         lastLoginAt: new Date(),
         lastLoginIp: registerIp,
-        points: inviteeReward,
+        points: 0,
       },
       select: {
         id: true,
@@ -329,7 +335,6 @@ export async function createRegisterFlow(options: RegisterFlowOptions): Promise<
         where: { id: inviter.id },
         data: {
           inviteCount: { increment: 1 },
-          points: { increment: inviterReward },
         },
       })
     }
@@ -343,25 +348,60 @@ export async function createRegisterFlow(options: RegisterFlowOptions): Promise<
     })
 
     if (inviter && inviterReward > 0) {
-      await tx.pointLog.create({
-        data: {
-          userId: inviter.id,
-          changeType: ChangeType.INCREASE,
-          changeValue: inviterReward,
-          reason: `邀请用户 ${createdUser.username} 注册奖励${settings.pointName}`,
-        },
+      const preparedInviterReward = await prepareScopedPointDelta({
+        scopeKey: "INVITE_REWARD_INVITER",
+        baseDelta: inviterReward,
+        userId: inviter.id,
+      })
+
+      await applyPointDelta({
+        tx,
+        userId: inviter.id,
+        beforeBalance: inviter.points,
+        prepared: preparedInviterReward,
+        pointName: settings.pointName,
+        reason: `邀请用户 ${createdUser.username} 注册奖励`,
       })
     }
 
-    if (inviter && inviteeReward > 0) {
-      await tx.pointLog.create({
-        data: {
-          userId: createdUser.id,
-          changeType: ChangeType.INCREASE,
-          changeValue: inviteeReward,
-          reason: `通过 ${inviter.username} 的邀请注册奖励${settings.pointName}`,
-        },
+    let pointBalanceCursor = 0
+
+    if (registerInitialPoints > 0) {
+      const preparedRegisterInitialReward = await prepareScopedPointDelta({
+        scopeKey: "REGISTER_INITIAL_REWARD",
+        baseDelta: registerInitialPoints,
+        userId: createdUser.id,
       })
+
+      const registerInitialRewardResult = await applyPointDelta({
+        tx,
+        userId: createdUser.id,
+        beforeBalance: pointBalanceCursor,
+        prepared: preparedRegisterInitialReward,
+        pointName: settings.pointName,
+        reason: "新用户注册赠送积分",
+      })
+
+      pointBalanceCursor = registerInitialRewardResult.afterBalance
+    }
+
+    if (inviter && inviteeRegisterReward > 0) {
+      const preparedInviteeReward = await prepareScopedPointDelta({
+        scopeKey: "INVITE_REWARD_INVITEE",
+        baseDelta: inviteeRegisterReward,
+        userId: createdUser.id,
+      })
+
+      const inviteeRewardResult = await applyPointDelta({
+        tx,
+        userId: createdUser.id,
+        beforeBalance: pointBalanceCursor,
+        prepared: preparedInviteeReward,
+        pointName: settings.pointName,
+        reason: `通过 ${inviter.username} 的邀请注册奖励`,
+      })
+
+      pointBalanceCursor = inviteeRewardResult.afterBalance
     }
 
     return createdUser

@@ -16,6 +16,7 @@ interface BadgeCenterItem {
   color: string
   imageUrl?: string | null
   category?: string | null
+  pointsCost: number
   grantedUserCount?: number
   rules: Array<{ id: string; ruleType: string; operator: string; value: string; extraValue?: string | null; sortOrder: number }>
   eligibility: {
@@ -24,6 +25,9 @@ interface BadgeCenterItem {
     alreadyGranted: boolean
     progressText: string
     failedRules: string[]
+    pointsCost: number
+    purchaseRequired: boolean
+    canAffordPurchase: boolean
   }
   display: {
     isDisplayed: boolean
@@ -131,7 +135,7 @@ export function BadgeCenter({ badges, isLoggedIn }: BadgeCenterProps) {
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">Badge Center</p>
             <h1 className="mt-2 text-3xl font-semibold">社区勋章中心</h1>
-            <p className="mt-2 text-sm leading-7 text-muted-foreground">满足条件后由你自己手动领取。已领取的勋章可以选择展示在帖子用户名右侧，最多展示 {MAX_DISPLAYED_BADGES} 个。</p>
+            <p className="mt-2 text-sm leading-7 text-muted-foreground">满足条件后由你自己手动领取。已领取的勋章可以选择佩戴在帖子用户名右侧，最多佩戴{MAX_DISPLAYED_BADGES} 个。</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {categories.map((category) => (
@@ -146,7 +150,7 @@ export function BadgeCenter({ badges, isLoggedIn }: BadgeCenterProps) {
             ))}
           </div>
         </div>
-        {isLoggedIn ? <p className="mt-4 text-xs text-muted-foreground">当前已展示 {displayedCount} / {MAX_DISPLAYED_BADGES} 个勋章。</p> : null}
+        {isLoggedIn ? <p className="mt-4 text-xs text-muted-foreground">当前已佩戴 {displayedCount} / {MAX_DISPLAYED_BADGES} 个勋章。</p> : null}
       </div>
 
       {!isLoggedIn ? <div className="rounded-[24px] border border-dashed border-border bg-card p-6 text-sm text-muted-foreground">登录后可以查看自己哪些勋章已达成，并手动领取。</div> : null}
@@ -155,9 +159,17 @@ export function BadgeCenter({ badges, isLoggedIn }: BadgeCenterProps) {
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {filteredItems.map((badge) => {
           const statusLabel = badge.eligibility.alreadyGranted ? "已领取" : badge.eligibility.eligible ? "可领取" : "未达成"
-          const claimButtonLabel = badge.eligibility.alreadyGranted ? "已领取" : badge.eligibility.eligible ? "立即领取" : badge.eligibility.progressText
-          const claimButtonDisabled = !isLoggedIn || badge.eligibility.alreadyGranted || !badge.eligibility.eligible || isPending
-          const displayButtonLabel = badge.display.isDisplayed ? "取消展示" : "展示到帖子" 
+          const claimButtonLabel = badge.eligibility.alreadyGranted
+            ? "已领取"
+            : !badge.eligibility.eligible
+              ? badge.eligibility.progressText
+              : badge.eligibility.purchaseRequired
+                ? badge.eligibility.canAffordPurchase
+                  ? `支付 ${badge.eligibility.pointsCost} 积分领取`
+                  : `需要 ${badge.eligibility.pointsCost} 积分`
+                : "立即领取"
+          const claimButtonDisabled = !isLoggedIn || badge.eligibility.alreadyGranted || !badge.eligibility.eligible || isPending || (badge.eligibility.purchaseRequired && !badge.eligibility.canAffordPurchase)
+          const displayButtonLabel = badge.display.isDisplayed ? "取消佩戴" : "佩戴" 
           const displayButtonDisabled = !isLoggedIn || !badge.display.canDisplay || isPending || (!badge.display.isDisplayed && displayedCount >= MAX_DISPLAYED_BADGES)
 
           return (
@@ -176,7 +188,7 @@ export function BadgeCenter({ badges, isLoggedIn }: BadgeCenterProps) {
                   </div>
                   <span className={badge.eligibility.alreadyGranted ? "rounded-full bg-emerald-100 px-3 py-1 text-xs text-emerald-700" : badge.eligibility.eligible ? "rounded-full bg-orange-100 px-3 py-1 text-xs text-orange-700" : "rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600"}>{statusLabel}</span>
                 </div>
-                <p className="mt-4 text-sm leading-7 text-muted-foreground">{badge.description || "收集社区勋章，展示你的独特身份。"}</p>
+                <p className="mt-4 text-sm leading-7 text-muted-foreground">{badge.description || "收集社区勋章，佩戴你的独特身份。"}</p>
               </div>
 
               <div className="space-y-4 p-5 pt-0">
@@ -185,6 +197,7 @@ export function BadgeCenter({ badges, isLoggedIn }: BadgeCenterProps) {
                   <ul className="mt-2 space-y-1.5">
                     {badge.rules.length === 0 ? <li>无门槛，登录即可领取</li> : badge.rules.map((rule) => <li key={rule.id}>- {rule.value}{rule.extraValue ? ` ~ ${rule.extraValue}` : ""} · {rule.ruleType}</li>)}
                   </ul>
+                  {badge.pointsCost > 0 ? <p className="mt-3">领取时需额外支付 {badge.pointsCost} 积分。</p> : null}
                 </div>
 
                 {badge.eligibility.failedRules.length > 0 && !badge.eligibility.alreadyGranted ? (
@@ -195,7 +208,7 @@ export function BadgeCenter({ badges, isLoggedIn }: BadgeCenterProps) {
 
                 {badge.eligibility.alreadyGranted ? (
                   <div className="rounded-[22px] border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
-                    {badge.display.isDisplayed ? `当前已展示，展示顺序第 ${badge.display.displayOrder || 1} 位。` : `你已领取该勋章，可选择展示到帖子用户名右侧（最多 ${MAX_DISPLAYED_BADGES} 个）。`}
+                    {badge.display.isDisplayed ? `当前已佩戴，佩戴顺序第 ${badge.display.displayOrder || 1} 位。` : `你已领取该勋章，可选择佩戴到帖子用户名右侧（最多 ${MAX_DISPLAYED_BADGES} 个）。`}
                   </div>
                 ) : null}
 

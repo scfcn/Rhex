@@ -33,10 +33,9 @@ interface VerifyPowCaptchaSolutionOptions {
 function resolveSecret() {
   const secret = process.env.POW_CAPTCHA_SECRET_KEY?.trim()
     || process.env.CAPTCHA_SECRET_KEY?.trim()
-    || process.env.TURNSTILE_SECRET_KEY?.trim()
 
   if (!secret) {
-    throw new Error("缺少 POW_CAPTCHA_SECRET_KEY、CAPTCHA_SECRET_KEY 或 TURNSTILE_SECRET_KEY，无法校验 PoW 验证码")
+    throw new Error("缺少 POW_CAPTCHA_SECRET_KEY 或 CAPTCHA_SECRET_KEY，无法校验 PoW 验证码")
   }
 
   return secret
@@ -158,8 +157,7 @@ async function consumePowChallenge(challengeId: string, scope: PowCaptchaScope, 
 export function hasPowCaptchaSecret() {
   return Boolean(
     process.env.POW_CAPTCHA_SECRET_KEY?.trim()
-    || process.env.CAPTCHA_SECRET_KEY?.trim()
-    || process.env.TURNSTILE_SECRET_KEY?.trim(),
+    || process.env.CAPTCHA_SECRET_KEY?.trim(),
   )
 }
 

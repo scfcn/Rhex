@@ -52,6 +52,20 @@ export interface NicknameChangePointCostSettings {
   vip3: number
 }
 
+export interface IntroductionChangePointCostSettings {
+  normal: number
+  vip1: number
+  vip2: number
+  vip3: number
+}
+
+export interface AvatarChangePointCostSettings {
+  normal: number
+  vip1: number
+  vip2: number
+  vip3: number
+}
+
 export interface InviteCodePurchasePriceSettings {
   normal: number
   vip1: number
@@ -67,7 +81,51 @@ export interface HomeSidebarAnnouncementSettings {
   enabled: boolean
 }
 
+export interface CommentAccessSettings {
+  guestCanView: boolean
+}
+
+export type InteractionGateAction = "POST_CREATE" | "COMMENT_CREATE"
+
+export type InteractionGateCondition =
+  | {
+      type: "EMAIL_VERIFIED"
+      enabled: true
+    }
+  | {
+      type: "REGISTERED_MINUTES"
+      value: number
+    }
+
+export interface InteractionGateRule {
+  enabled: boolean
+  conditions: InteractionGateCondition[]
+}
+
+export interface InteractionGateSettings {
+  version: 1
+  actions: Record<InteractionGateAction, InteractionGateRule>
+}
+
+export interface AuthProviderSettings {
+  githubEnabled: boolean
+  googleEnabled: boolean
+  passkeyEnabled: boolean
+}
+
 export type VipLevelIconSettings = VipLevelIcons
+
+export interface RegistrationRewardSettings {
+  initialPoints: number
+}
+
+export interface PostJackpotSettings {
+  enabled: boolean
+  minInitialPoints: number
+  maxInitialPoints: number
+  replyIncrementPoints: number
+  hitProbability: number
+}
 
 export function resolveTippingGiftSettings(options: {
   appStateJson?: string | null
@@ -214,6 +272,84 @@ export function mergeNicknameChangePointCostSettings(
   return JSON.stringify(root)
 }
 
+export function resolveIntroductionChangePointCostSettings(options: {
+  appStateJson?: string | null
+  normalPrice: number
+}): IntroductionChangePointCostSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const introductionChangePointCosts = isRecord(siteSettingsState.introductionChangePointCosts)
+    ? siteSettingsState.introductionChangePointCosts
+    : {}
+
+  const normal = normalizeNonNegativeInteger(introductionChangePointCosts.normal, normalizeNonNegativeInteger(options.normalPrice, 0))
+
+  return {
+    normal,
+    vip1: normalizeNonNegativeInteger(introductionChangePointCosts.vip1, normal),
+    vip2: normalizeNonNegativeInteger(introductionChangePointCosts.vip2, normal),
+    vip3: normalizeNonNegativeInteger(introductionChangePointCosts.vip3, normal),
+  }
+}
+
+export function mergeIntroductionChangePointCostSettings(
+  appStateJson: string | null | undefined,
+  input: IntroductionChangePointCostSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    introductionChangePointCosts: {
+      normal: normalizeNonNegativeInteger(input.normal, 0),
+      vip1: normalizeNonNegativeInteger(input.vip1, 0),
+      vip2: normalizeNonNegativeInteger(input.vip2, 0),
+      vip3: normalizeNonNegativeInteger(input.vip3, 0),
+    },
+  }
+
+  return JSON.stringify(root)
+}
+
+export function resolveAvatarChangePointCostSettings(options: {
+  appStateJson?: string | null
+  normalPrice: number
+}): AvatarChangePointCostSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const avatarChangePointCosts = isRecord(siteSettingsState.avatarChangePointCosts)
+    ? siteSettingsState.avatarChangePointCosts
+    : {}
+
+  const normal = normalizeNonNegativeInteger(avatarChangePointCosts.normal, normalizeNonNegativeInteger(options.normalPrice, 0))
+
+  return {
+    normal,
+    vip1: normalizeNonNegativeInteger(avatarChangePointCosts.vip1, normal),
+    vip2: normalizeNonNegativeInteger(avatarChangePointCosts.vip2, normal),
+    vip3: normalizeNonNegativeInteger(avatarChangePointCosts.vip3, normal),
+  }
+}
+
+export function mergeAvatarChangePointCostSettings(
+  appStateJson: string | null | undefined,
+  input: AvatarChangePointCostSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    avatarChangePointCosts: {
+      normal: normalizeNonNegativeInteger(input.normal, 0),
+      vip1: normalizeNonNegativeInteger(input.vip1, 0),
+      vip2: normalizeNonNegativeInteger(input.vip2, 0),
+      vip3: normalizeNonNegativeInteger(input.vip3, 0),
+    },
+  }
+
+  return JSON.stringify(root)
+}
+
 export function resolveInviteCodePurchasePriceSettings(options: {
   appStateJson?: string | null
   normalPrice: number
@@ -318,6 +454,115 @@ export function mergeHomeSidebarAnnouncementSettings(
   return JSON.stringify(root)
 }
 
+export function resolveCommentAccessSettings(options: {
+  appStateJson?: string | null
+  guestCanViewFallback?: boolean
+} = {}): CommentAccessSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const commentAccess = isRecord(siteSettingsState.commentAccess)
+    ? siteSettingsState.commentAccess
+    : {}
+
+  return {
+    guestCanView: typeof commentAccess.guestCanView === "boolean"
+      ? commentAccess.guestCanView
+      : options.guestCanViewFallback ?? true,
+  }
+}
+
+export function mergeCommentAccessSettings(
+  appStateJson: string | null | undefined,
+  input: CommentAccessSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    commentAccess: {
+      guestCanView: input.guestCanView,
+    },
+  }
+
+  return JSON.stringify(root)
+}
+
+function createEmptyInteractionGateRule(): InteractionGateRule {
+  return {
+    enabled: false,
+    conditions: [],
+  }
+}
+
+function normalizeInteractionGateCondition(value: unknown): InteractionGateCondition | null {
+  if (!isRecord(value) || typeof value.type !== "string") {
+    return null
+  }
+
+  if (value.type === "EMAIL_VERIFIED") {
+    return value.enabled === false ? null : { type: "EMAIL_VERIFIED", enabled: true }
+  }
+
+  if (value.type === "REGISTERED_MINUTES") {
+    const minutes = normalizeNonNegativeInteger(value.value, 0)
+    return minutes > 0 ? { type: "REGISTERED_MINUTES", value: minutes } : null
+  }
+
+  return null
+}
+
+function normalizeInteractionGateRule(value: unknown): InteractionGateRule {
+  if (!isRecord(value)) {
+    return createEmptyInteractionGateRule()
+  }
+
+  const conditions = Array.isArray(value.conditions)
+    ? value.conditions.map(normalizeInteractionGateCondition).filter(Boolean) as InteractionGateCondition[]
+    : []
+
+  const dedupedConditions = Array.from(new Map(conditions.map((condition) => [condition.type, condition])).values())
+
+  return {
+    enabled: dedupedConditions.length > 0,
+    conditions: dedupedConditions,
+  }
+}
+
+function normalizeInteractionGateSettings(value: unknown): InteractionGateSettings {
+  const actions = isRecord(value) && isRecord(value.actions) ? value.actions : {}
+
+  return {
+    version: 1,
+    actions: {
+      POST_CREATE: normalizeInteractionGateRule(actions.POST_CREATE),
+      COMMENT_CREATE: normalizeInteractionGateRule(actions.COMMENT_CREATE),
+    },
+  }
+}
+
+export function resolveInteractionGateSettings(options: {
+  appStateJson?: string | null
+} = {}): InteractionGateSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  return normalizeInteractionGateSettings(siteSettingsState.interactionGates)
+}
+
+export function mergeInteractionGateSettings(
+  appStateJson: string | null | undefined,
+  input: InteractionGateSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+  const normalized = normalizeInteractionGateSettings(input)
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    interactionGates: normalized,
+  }
+
+  return JSON.stringify(root)
+}
+
 export function resolveVipLevelIconSettings(options: {
   appStateJson?: string | null
 } = {}): VipLevelIconSettings {
@@ -343,6 +588,137 @@ export function mergeVipLevelIconSettings(
   root[SITE_SETTINGS_STATE_KEY] = {
     ...siteSettingsState,
     vipLevelIcons: normalizeVipLevelIcons(input),
+  }
+
+  return JSON.stringify(root)
+}
+
+export function resolveAuthProviderSettings(options: {
+  appStateJson?: string | null
+  githubEnabledFallback?: boolean
+  googleEnabledFallback?: boolean
+  passkeyEnabledFallback?: boolean
+} = {}): AuthProviderSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const authProviders = isRecord(siteSettingsState.authProviders)
+    ? siteSettingsState.authProviders
+    : {}
+
+  return {
+    githubEnabled: typeof authProviders.githubEnabled === "boolean"
+      ? authProviders.githubEnabled
+      : options.githubEnabledFallback ?? false,
+    googleEnabled: typeof authProviders.googleEnabled === "boolean"
+      ? authProviders.googleEnabled
+      : options.googleEnabledFallback ?? false,
+    passkeyEnabled: typeof authProviders.passkeyEnabled === "boolean"
+      ? authProviders.passkeyEnabled
+      : options.passkeyEnabledFallback ?? false,
+  }
+}
+
+export function mergeAuthProviderSettings(
+  appStateJson: string | null | undefined,
+  input: AuthProviderSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    authProviders: {
+      githubEnabled: input.githubEnabled,
+      googleEnabled: input.googleEnabled,
+      passkeyEnabled: input.passkeyEnabled,
+    },
+  }
+
+  return JSON.stringify(root)
+}
+
+export function resolvePostJackpotSettings(options: {
+  appStateJson?: string | null
+  enabledFallback?: boolean
+  minInitialPointsFallback?: number
+  maxInitialPointsFallback?: number
+  replyIncrementPointsFallback?: number
+  hitProbabilityFallback?: number
+} = {}): PostJackpotSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const postJackpot = isRecord(siteSettingsState.postJackpot)
+    ? siteSettingsState.postJackpot
+    : {}
+
+  const minInitialPoints = normalizeNonNegativeInteger(postJackpot.minInitialPoints, normalizeNonNegativeInteger(options.minInitialPointsFallback, 100))
+  const maxInitialPoints = Math.max(
+    minInitialPoints,
+    normalizeNonNegativeInteger(postJackpot.maxInitialPoints, normalizeNonNegativeInteger(options.maxInitialPointsFallback, 1000)),
+  )
+
+  return {
+    enabled: typeof postJackpot.enabled === "boolean"
+      ? postJackpot.enabled
+      : options.enabledFallback ?? false,
+    minInitialPoints,
+    maxInitialPoints,
+    replyIncrementPoints: normalizeNonNegativeInteger(postJackpot.replyIncrementPoints, normalizeNonNegativeInteger(options.replyIncrementPointsFallback, 25)),
+    hitProbability: Math.max(1, Math.min(100, normalizeNonNegativeInteger(postJackpot.hitProbability, normalizeNonNegativeInteger(options.hitProbabilityFallback, 15)))),
+  }
+}
+
+export function mergePostJackpotSettings(
+  appStateJson: string | null | undefined,
+  input: PostJackpotSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    postJackpot: {
+      enabled: input.enabled,
+      minInitialPoints: normalizeNonNegativeInteger(input.minInitialPoints, 100),
+      maxInitialPoints: Math.max(
+        normalizeNonNegativeInteger(input.minInitialPoints, 100),
+        normalizeNonNegativeInteger(input.maxInitialPoints, 1000),
+      ),
+      replyIncrementPoints: normalizeNonNegativeInteger(input.replyIncrementPoints, 25),
+      hitProbability: Math.max(1, Math.min(100, normalizeNonNegativeInteger(input.hitProbability, 15))),
+    },
+  }
+
+  return JSON.stringify(root)
+}
+
+export function resolveRegistrationRewardSettings(options: {
+  appStateJson?: string | null
+  initialPointsFallback?: number
+} = {}): RegistrationRewardSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const registrationRewards = isRecord(siteSettingsState.registrationRewards)
+    ? siteSettingsState.registrationRewards
+    : {}
+
+  return {
+    initialPoints: normalizeNonNegativeInteger(
+      registrationRewards.initialPoints,
+      normalizeNonNegativeInteger(options.initialPointsFallback, 0),
+    ),
+  }
+}
+
+export function mergeRegistrationRewardSettings(
+  appStateJson: string | null | undefined,
+  input: RegistrationRewardSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    registrationRewards: {
+      initialPoints: normalizeNonNegativeInteger(input.initialPoints, 0),
+    },
   }
 
   return JSON.stringify(root)

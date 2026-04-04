@@ -151,6 +151,11 @@ export function serializeDateTime(input: string | Date | null | undefined) {
   return `${getPart("year")}-${getPart("month")}-${getPart("day")} ${getPart("hour")}:${getPart("minute")}:${getPart("second")}`
 }
 
+export function formatPreciseDateTime(input: string | Date | null | undefined) {
+  const serialized = serializeDateTime(input)
+  return serialized ? serialized.slice(0, 16) : null
+}
+
 export function serializeDate(input: string | Date | null | undefined) {
   if (!input) {
     return null

@@ -92,6 +92,7 @@ export const siteSettingsSelect = {
   headerAppIconName: true,
   footerLinksJson: true,
   appStateJson: true,
+  sensitiveStateJson: true,
 
 } as const
 

@@ -16,6 +16,9 @@ export const currentUserRecordSelect = {
   points: true,
   vipLevel: true,
   vipExpiresAt: true,
+  createdAt: true,
+  emailVerifiedAt: true,
+  phoneVerifiedAt: true,
   lastPostAt: true,
   lastCommentAt: true,
 } satisfies Prisma.UserSelect

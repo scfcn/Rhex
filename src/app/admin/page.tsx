@@ -34,10 +34,11 @@ import { isLocalPostType } from "@/lib/post-types"
 
 import { getAdminLogCenter } from "@/lib/admin-logs"
 import { getAdminUsers } from "@/lib/admin-users"
-import { getAllBadges, type BadgeItem, type BadgeRuleItem } from "@/lib/badges"
+import { getAllBadges, type BadgeEffectRuleItem, type BadgeItem, type BadgeRuleItem } from "@/lib/badges"
 import { formatMonthDayTime } from "@/lib/formatters"
 import { getInviteCodeList } from "@/lib/invite-codes"
 import { getLevelDefinitions } from "@/lib/level-system"
+import { minuteOfDayToTimeInput } from "@/lib/point-effect-definitions"
 import { getRedeemCodeList } from "@/lib/redeem-codes"
 import { getAdminReports } from "@/lib/reports"
 import { getAdminFriendLinkPageData } from "@/lib/friend-links"
@@ -133,6 +134,7 @@ export default async function AdminPage(props: PageProps<"/admin">) {
   const currentSettingsSection: AdminSettingsSectionKey = adminSettingsSections.includes((currentSettingsSectionValue as AdminSettingsSectionKey) ?? "profile")
     ? ((currentSettingsSectionValue as AdminSettingsSectionKey) ?? "profile")
     : "profile"
+  const currentSettingsSubTab = readSearchParam(searchParams?.subTab) ?? ""
   const currentPostTypeValue = readSearchParam(searchParams?.type)
   const currentPostType = isLocalPostType(currentPostTypeValue) ? currentPostTypeValue : "ALL"
   const currentPostStatusValue = readSearchParam(searchParams?.status)
@@ -369,6 +371,7 @@ export default async function AdminPage(props: PageProps<"/admin">) {
           imageUrl: badge.imageUrl ?? "",
           category: badge.category ?? "社区成就",
           sortOrder: badge.sortOrder,
+          pointsCost: badge.pointsCost,
           status: badge.status,
           isHidden: badge.isHidden,
           grantedUserCount: badge.grantedUserCount ?? 0,
@@ -379,6 +382,21 @@ export default async function AdminPage(props: PageProps<"/admin">) {
             value: rule.value,
             extraValue: rule.extraValue ?? "",
             sortOrder: rule.sortOrder,
+          })),
+          effects: badge.effects.map((effect: BadgeEffectRuleItem) => ({
+            id: effect.id,
+            name: effect.name,
+            description: effect.description ?? "",
+            targetType: effect.targetType,
+            scopeKeys: effect.scopeKeys,
+            ruleKind: effect.ruleKind,
+            direction: effect.direction,
+            value: String(effect.value),
+            extraValue: effect.extraValue === null || effect.extraValue === undefined ? "" : String(effect.extraValue),
+            startMinuteOfDay: minuteOfDayToTimeInput(effect.startMinuteOfDay),
+            endMinuteOfDay: minuteOfDayToTimeInput(effect.endMinuteOfDay),
+            sortOrder: effect.sortOrder,
+            status: effect.status,
           })),
         }))} /> : null}
         {tab === "verifications" ? <AdminVerificationManager initialTypes={verificationTypes!.map((item) => ({
@@ -443,12 +461,12 @@ export default async function AdminPage(props: PageProps<"/admin">) {
           } : null,
         }))} /> : null}
         {tab === "announcements" ? <AdminAnnouncementManager initialItems={announcements} /> : null}
-        {tab === "settings" && currentSettingsSection === "profile" ? <AdminBasicSettingsForm initialSettings={siteSettings!} mode="profile" /> : null}
+        {tab === "settings" && currentSettingsSection === "profile" ? <AdminBasicSettingsForm initialSettings={siteSettings!} mode="profile" initialSubTab={currentSettingsSubTab} /> : null}
         {tab === "settings" && currentSettingsSection === "markdown-emoji" ? <AdminMarkdownEmojiSettingsForm initialItems={siteSettings!.markdownEmojiMap} /> : null}
         {tab === "settings" && currentSettingsSection === "footer-links" ? <AdminFooterLinksSettingsForm initialLinks={siteSettings!.footerLinks} /> : null}
         {tab === "settings" && currentSettingsSection === "apps" ? <AdminAppsSettingsForm initialLinks={siteSettings!.headerAppLinks} initialIconName={siteSettings!.headerAppIconName} /> : null}
-        {tab === "settings" && currentSettingsSection === "registration" ? <AdminBasicSettingsForm initialSettings={siteSettings!} mode="registration" /> : null}
-        {tab === "settings" && currentSettingsSection === "interaction" ? <AdminBasicSettingsForm initialSettings={siteSettings!} mode="interaction" /> : null}
+        {tab === "settings" && currentSettingsSection === "registration" ? <AdminBasicSettingsForm initialSettings={siteSettings!} mode="registration" initialSubTab={currentSettingsSubTab} /> : null}
+        {tab === "settings" && currentSettingsSection === "interaction" ? <AdminBasicSettingsForm initialSettings={siteSettings!} mode="interaction" initialSubTab={currentSettingsSubTab} /> : null}
         {tab === "settings" && currentSettingsSection === "friend-links" ? <AdminFriendLinksSettingsForm initialSettings={friendLinks!.settings} items={friendLinks!.items} pendingCount={friendLinks!.pendingCount} /> : null}
         {tab === "settings" && currentSettingsSection === "invite-codes" ? <AdminInviteCodeManager initialInviteCodes={inviteCodes} /> : null}
         {tab === "settings" && currentSettingsSection === "redeem-codes" ? <AdminRedeemCodeManager initialRedeemCodes={redeemCodes} /> : null}

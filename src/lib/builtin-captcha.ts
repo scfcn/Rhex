@@ -9,15 +9,14 @@ const BUILTIN_CAPTCHA_CONSUME_KIND = "captcha"
 const BUILTIN_CAPTCHA_PURGE_SAMPLING_RATE = 0.01
 
 export function hasBuiltinCaptchaSecret() {
-  return Boolean(process.env.CAPTCHA_SECRET_KEY?.trim() || process.env.TURNSTILE_SECRET_KEY?.trim())
+  return Boolean(process.env.CAPTCHA_SECRET_KEY?.trim())
 }
 
 function resolveSecret() {
-
-  const secret = process.env.CAPTCHA_SECRET_KEY?.trim() || process.env.TURNSTILE_SECRET_KEY?.trim()
+  const secret = process.env.CAPTCHA_SECRET_KEY?.trim()
 
   if (!secret) {
-    throw new Error("缺少 CAPTCHA_SECRET_KEY 或 TURNSTILE_SECRET_KEY 环境变量，无法校验内建验证码")
+    throw new Error("缺少 CAPTCHA_SECRET_KEY 环境变量，无法校验内建验证码")
   }
 
   return secret

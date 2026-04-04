@@ -4,6 +4,7 @@ import { executeUserCheckIn, listUserCheckInLogsInRange } from "@/db/check-in-qu
 import { apiError } from "@/lib/api-route"
 import { getLocalDateKey, getMonthKey } from "@/lib/date-key"
 import { recordUserCheckInGrowth } from "@/lib/level-system"
+import { prepareScopedPointDelta, type PreparedPointDelta } from "@/lib/point-center"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
 
@@ -28,8 +29,10 @@ interface ExecuteCheckInOptions {
   userId: number
   dateKey: string
   reward: number
+  rewardDelta: PreparedPointDelta
   pointName: string
   makeUpCost: number
+  makeUpCostDelta: PreparedPointDelta
   isMakeUp: boolean
 }
 
@@ -241,14 +244,26 @@ export async function submitCheckInAction(user: CurrentUserRecord, body: unknown
   const payload = parseCheckInActionPayload(body)
   const todayKey = getLocalDateKey()
   const reward = resolveUserCheckInReward(snapshot, user)
+  const rewardDelta = await prepareScopedPointDelta({
+    scopeKey: "CHECK_IN_REWARD",
+    baseDelta: reward,
+    userId: user.id,
+  })
 
   if (payload.action === "check-in") {
     const result = await executeCheckIn({
       userId: user.id,
       dateKey: todayKey,
       reward,
+      rewardDelta,
       pointName: snapshot.pointName,
       makeUpCost: 0,
+      makeUpCostDelta: {
+        scopeKey: "CHECK_IN_MAKE_UP_COST",
+        baseDelta: 0,
+        finalDelta: 0,
+        appliedRules: [],
+      },
       isMakeUp: false,
     })
 
@@ -258,7 +273,9 @@ export async function submitCheckInAction(user: CurrentUserRecord, body: unknown
       date: todayKey,
       message: result.alreadyCheckedIn
         ? "今天已经签到过了"
-        : `签到成功，获得 ${reward} ${snapshot.pointName}`,
+        : rewardDelta.finalDelta !== 0
+          ? `签到成功，相关${snapshot.pointName}已结算`
+          : "签到成功",
     }
   }
 
@@ -273,7 +290,12 @@ export async function submitCheckInAction(user: CurrentUserRecord, body: unknown
   }
 
   const makeUpCost = resolveUserMakeUpPrice(snapshot, user)
-  if (makeUpCost > 0 && user.points < makeUpCost) {
+  const makeUpCostDelta = await prepareScopedPointDelta({
+    scopeKey: "CHECK_IN_MAKE_UP_COST",
+    baseDelta: -makeUpCost,
+    userId: user.id,
+  })
+  if (makeUpCostDelta.finalDelta < 0 && user.points < Math.abs(makeUpCostDelta.finalDelta)) {
     apiError(409, `${snapshot.pointName}不足，无法补签`)
   }
 
@@ -281,8 +303,10 @@ export async function submitCheckInAction(user: CurrentUserRecord, body: unknown
     userId: user.id,
     dateKey: targetDateKey,
     reward,
+    rewardDelta,
     pointName: snapshot.pointName,
     makeUpCost,
+    makeUpCostDelta,
     isMakeUp: true,
   })
 
@@ -295,8 +319,8 @@ export async function submitCheckInAction(user: CurrentUserRecord, body: unknown
     alreadyCheckedIn: false,
     date: targetDateKey,
     makeUpCost,
-    message: makeUpCost > 0
-      ? `补签成功，消耗 ${makeUpCost} ${snapshot.pointName}，获得 ${reward} ${snapshot.pointName}`
-      : `补签成功，获得 ${reward} ${snapshot.pointName}`,
+    message: makeUpCostDelta.finalDelta !== 0 || rewardDelta.finalDelta !== 0
+      ? `补签成功，相关${snapshot.pointName}已结算`
+      : "补签成功",
   }
 }

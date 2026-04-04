@@ -4,6 +4,7 @@ import { Bookmark, Flag, ThumbsUp } from "lucide-react"
 import { useState, useTransition } from "react"
 
 import { PostAuthorInlineCard } from "@/components/post-author-inline-card"
+import { PostRewardPoolIntroAnimation } from "@/components/post-reward-pool-intro-animation"
 import { PostRedPacketPanel } from "@/components/post-red-packet-panel"
 import { PostTipPanel } from "@/components/post-tip-panel"
 import { ReportDialog } from "@/components/report-dialog"
@@ -90,6 +91,7 @@ export function PostEngagementBar({ postId, author, likeCount, favoriteCount = 0
 
   return (
     <div className="mt-8 flex flex-col gap-3 text-sm text-muted-foreground">
+      {redPacket?.enabled ? <PostRewardPoolIntroAnimation postId={postId} summary={redPacket} /> : null}
       <div className="border-t border-border/70 pt-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0 flex-1 pr-4">
@@ -97,7 +99,7 @@ export function PostEngagementBar({ postId, author, likeCount, favoriteCount = 0
           </div>
 
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-4">
-            {redPacket?.enabled ? <PostRedPacketPanel pointName={redPacket.pointName} summary={redPacket} /> : null}
+            {redPacket?.enabled ? <PostRedPacketPanel postId={postId} pointName={redPacket.pointName} summary={redPacket} /> : null}
             <button
               type="button"
               title={liked ? "取消点赞" : "点赞"}

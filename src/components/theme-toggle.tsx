@@ -1,30 +1,48 @@
 "use client"
 
-import { Monitor, Moon, Sun } from "lucide-react"
+import { Monitor, Moon, Palette, Sun, Type } from "lucide-react"
 import { useEffect, useRef, useState, useSyncExternalStore } from "react"
 
 import { Button } from "@/components/ui/button"
-import { THEME_STORAGE_KEY, type ThemePreference, applyTheme, resolveStoredThemePreference } from "@/lib/theme"
+import {
+  FONT_SIZE_PRESET_STORAGE_KEY,
+  FONT_SIZE_PRESETS,
+  THEME_PRESET_STORAGE_KEY,
+  THEME_PRESETS,
+  THEME_SETTINGS_CHANGE_EVENT,
+  THEME_STORAGE_KEY,
+  type FontSizePreset,
+  type ThemePreference,
+  type ThemePreset,
+  applyTheme,
+  getThemePresetDisplayMeta,
+  readStoredCustomThemeConfig,
+  resolveStoredFontSizePreset,
+  resolveStoredThemePreference,
+  resolveStoredThemePreset,
+  setStoredFontSizePreset,
+  setStoredThemePreference,
+  setStoredThemePreset,
+} from "@/lib/theme"
 
-const themeMeta: Record<ThemePreference, { label: string; description: string; icon: typeof Sun }> = {
+const themeMeta: Record<ThemePreference, { label: string; icon: typeof Sun }> = {
   light: {
     label: "白天模式",
-    description: "使用浅色界面",
     icon: Sun,
   },
   dark: {
     label: "黑夜模式",
-    description: "使用深色界面",
     icon: Moon,
   },
   system: {
     label: "跟随系统",
-    description: "跟随设备主题",
     icon: Monitor,
   },
 }
 
 const themeOptions: ThemePreference[] = ["light", "dark", "system"]
+const themePresetOptions = Object.entries(THEME_PRESETS) as Array<[keyof typeof THEME_PRESETS, (typeof THEME_PRESETS)[keyof typeof THEME_PRESETS]]>
+const fontSizePresetOptions = Object.entries(FONT_SIZE_PRESETS) as Array<[FontSizePreset, (typeof FONT_SIZE_PRESETS)[FontSizePreset]]>
 
 export function ThemeToggle() {
   const [themePreference, setThemePreference] = useState<ThemePreference>(() => {
@@ -33,6 +51,20 @@ export function ThemeToggle() {
     }
 
     return resolveStoredThemePreference(window.localStorage.getItem(THEME_STORAGE_KEY))
+  })
+  const [themePreset, setThemePreset] = useState<ThemePreset>(() => {
+    if (typeof window === "undefined") {
+      return "default"
+    }
+
+    return resolveStoredThemePreset(window.localStorage.getItem(THEME_PRESET_STORAGE_KEY))
+  })
+  const [fontSizePreset, setFontSizePreset] = useState<FontSizePreset>(() => {
+    if (typeof window === "undefined") {
+      return "normal"
+    }
+
+    return resolveStoredFontSizePreset(window.localStorage.getItem(FONT_SIZE_PRESET_STORAGE_KEY))
   })
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -43,8 +75,8 @@ export function ThemeToggle() {
   )
 
   useEffect(() => {
-    applyTheme(themePreference)
-  }, [themePreference])
+    applyTheme(themePreference, themePreset, fontSizePreset)
+  }, [themePreference, themePreset, fontSizePreset])
 
   useEffect(() => {
     if (!mounted || themePreference !== "system") {
@@ -52,14 +84,14 @@ export function ThemeToggle() {
     }
 
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
-    const handleChange = () => applyTheme("system")
+    const handleChange = () => applyTheme("system", themePreset, fontSizePreset)
 
     mediaQuery.addEventListener("change", handleChange)
 
     return () => {
       mediaQuery.removeEventListener("change", handleChange)
     }
-  }, [mounted, themePreference])
+  }, [mounted, themePreference, themePreset, fontSizePreset])
 
   useEffect(() => {
     if (!menuOpen) {
@@ -89,58 +121,163 @@ export function ThemeToggle() {
     }
   }, [menuOpen])
 
-  function handleSelect(preference: ThemePreference) {
-    applyTheme(preference)
-    window.localStorage.setItem(THEME_STORAGE_KEY, preference)
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    const syncThemeState = () => {
+      setThemePreference(resolveStoredThemePreference(window.localStorage.getItem(THEME_STORAGE_KEY)))
+      setThemePreset(resolveStoredThemePreset(window.localStorage.getItem(THEME_PRESET_STORAGE_KEY)))
+      setFontSizePreset(resolveStoredFontSizePreset(window.localStorage.getItem(FONT_SIZE_PRESET_STORAGE_KEY)))
+    }
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === THEME_STORAGE_KEY || event.key === THEME_PRESET_STORAGE_KEY || event.key === FONT_SIZE_PRESET_STORAGE_KEY || event.key === "rhex-custom-theme") {
+        syncThemeState()
+      }
+    }
+
+    window.addEventListener(THEME_SETTINGS_CHANGE_EVENT, syncThemeState)
+    window.addEventListener("storage", handleStorage)
+
+    return () => {
+      window.removeEventListener(THEME_SETTINGS_CHANGE_EVENT, syncThemeState)
+      window.removeEventListener("storage", handleStorage)
+    }
+  }, [])
+
+  function handleThemeSelect(preference: ThemePreference) {
+    applyTheme(preference, themePreset, fontSizePreset)
+    setStoredThemePreference(preference)
     setThemePreference(preference)
-    setMenuOpen(false)
+  }
+
+  function handlePresetSelect(preset: ThemePreset) {
+    applyTheme(themePreference, preset, fontSizePreset)
+    setStoredThemePreset(preset)
+    setThemePreset(preset)
+  }
+
+  function handleFontSizePresetSelect(preset: FontSizePreset) {
+    applyTheme(themePreference, themePreset, preset)
+    setStoredFontSizePreset(preset)
+    setFontSizePreset(preset)
   }
 
   const currentTheme = mounted ? themePreference : "light"
+  const currentPreset = mounted ? themePreset : "default"
   const currentMeta = themeMeta[currentTheme]
   const CurrentIcon = currentMeta.icon
+  const currentPresetMeta = getThemePresetDisplayMeta(currentPreset, readStoredCustomThemeConfig())
 
   return (
     <div ref={menuRef} className="relative">
       <Button
         type="button"
         variant="ghost"
-        className="h-8 gap-1.5 rounded-md border border-border bg-background/80 px-3 backdrop-blur hover:bg-accent"
+        className="h-7 gap-1 rounded-full border border-border bg-background px-2 hover:bg-accent"
         onClick={() => setMenuOpen((current) => !current)}
         aria-expanded={menuOpen}
         aria-haspopup="menu"
-        aria-label={mounted ? `当前${currentMeta.label}` : "切换主题"}
-        title={mounted ? `当前${currentMeta.label}` : "切换主题"}
+        aria-label={mounted ? `当前${currentMeta.label}，主题 ${currentPresetMeta.label}` : "切换主题"}
+        title={mounted ? `当前${currentMeta.label}，主题 ${currentPresetMeta.label}` : "切换主题"}
       >
-        <CurrentIcon className="h-4 w-4" />
+        <CurrentIcon className="h-3.5 w-3.5" />
+        <span
+          className="h-2 w-2 rounded-full border border-white/60"
+          style={{ backgroundColor: `hsl(${currentPresetMeta.preview[0]})` }}
+          aria-hidden="true"
+        />
       </Button>
 
       {menuOpen ? (
-        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-48 rounded-2xl border border-border bg-background p-2 shadow-2xl" role="menu" aria-label="主题模式">
-          {themeOptions.map((option) => {
-            const meta = themeMeta[option]
-            const Icon = meta.icon
-            const active = currentTheme === option
+        <div className="fixed left-2 right-2 top-14 z-50 max-h-[calc(100vh-4rem)] overflow-y-auto rounded-xl border border-border bg-background p-1.5 shadow-2xl sm:absolute sm:left-auto sm:right-0 sm:top-[calc(100%+8px)] sm:max-h-none sm:w-72 sm:overflow-visible" role="menu" aria-label="主题模式">
+          <div className="flex items-center gap-1.5 px-1 pb-1 pt-0.5 text-[10px] font-semibold tracking-[0.14em] text-muted-foreground">
+            <Sun className="h-3 w-3" />
+            <span>界面模式</span>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5">
+            {themeOptions.map((option) => {
+              const meta = themeMeta[option]
+              const Icon = meta.icon
+              const active = currentTheme === option
 
-            return (
-              <button
-                key={option}
-                type="button"
-                className={active ? "flex w-full items-center gap-3 rounded-xl bg-accent px-3 py-2 text-left" : "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors hover:bg-accent"}
-                onClick={() => handleSelect(option)}
-                role="menuitemradio"
-                aria-checked={active}
-              >
-                <div className={active ? "flex h-8 w-8 items-center justify-center rounded-full bg-foreground text-background" : "flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-foreground"}>
-                  <Icon className="h-4 w-4" />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-sm font-medium">{meta.label}</div>
-                  <div className="text-xs text-muted-foreground">{meta.description}</div>
-                </div>
-              </button>
-            )
-          })}
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  className={active ? "flex h-7.5 w-full items-center justify-center rounded-full bg-foreground text-background shadow-sm" : "flex h-7.5 w-full items-center justify-center rounded-full border border-border bg-background text-foreground transition-colors hover:bg-accent"}
+                  onClick={() => handleThemeSelect(option)}
+                  role="menuitemradio"
+                  aria-checked={active}
+                  aria-label={meta.label}
+                  title={meta.label}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="mx-1.5 my-1.5 border-t border-border" />
+          <div className="flex items-center gap-1.5 px-1 pb-1 text-[10px] font-semibold tracking-[0.14em] text-muted-foreground">
+            <Palette className="h-3 w-3" />
+            <span>主题预设</span>
+          </div>
+          <div className="grid grid-cols-5 gap-1.5">
+            {themePresetOptions.map(([presetKey, presetMeta]) => {
+              const active = currentPreset === presetKey
+
+              return (
+                <button
+                  key={presetKey}
+                  type="button"
+                  onClick={() => handlePresetSelect(presetKey)}
+                  className={active ? "flex h-7.5 w-full items-center justify-center rounded-full border border-foreground/10 bg-accent px-1 shadow-sm" : "flex h-7.5 w-full items-center justify-center rounded-full border border-border bg-background px-1 transition-colors hover:bg-accent"}
+                  aria-label={presetMeta.label}
+                  title={presetMeta.label}
+                >
+                  <span className="flex items-center gap-1">
+                    {presetMeta.preview.map((color: string) => (
+                      <span
+                        key={`${presetKey}-${color}`}
+                        className={active ? "h-2.5 w-2.5 rounded-full border border-white/70 shadow-sm" : "h-2.5 w-2.5 rounded-full border border-white/60 shadow-sm"}
+                        style={{ backgroundColor: `hsl(${color})` }}
+                        aria-hidden="true"
+                      />
+                    ))}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="mx-1.5 my-1.5 border-t border-border" />
+          <div className="flex items-center gap-1.5 px-1 pb-1 text-[10px] font-semibold tracking-[0.14em] text-muted-foreground">
+            <Type className="h-3 w-3" />
+            <span>字号预设</span>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5">
+            {fontSizePresetOptions.map(([presetKey, presetMeta]) => {
+              const active = fontSizePreset === presetKey
+
+              return (
+                <button
+                  key={presetKey}
+                  type="button"
+                  onClick={() => handleFontSizePresetSelect(presetKey)}
+                  className={active ? "flex h-7.5 w-full items-center justify-center rounded-full bg-foreground text-background shadow-sm" : "flex h-7.5 w-full items-center justify-center rounded-full border border-border bg-background text-foreground transition-colors hover:bg-accent"}
+                  aria-label={presetMeta.label}
+                  title={presetMeta.label}
+                >
+                  <span className={presetKey === "compact" ? "text-[10px] font-semibold leading-none" : presetKey === "relaxed" ? "text-[13px] font-semibold leading-none" : "text-[11px] font-semibold leading-none"}>
+                    A
+                  </span>
+                </button>
+              )
+            })}
+          </div>
         </div>
       ) : null}
     </div>

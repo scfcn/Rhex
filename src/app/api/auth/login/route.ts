@@ -8,7 +8,7 @@ import { verifyPowCaptchaSolution } from "@/lib/pow-captcha"
 import { getRequestIp } from "@/lib/request-ip"
 import { logRouteWriteSuccess } from "@/lib/route-metadata"
 import { createSessionToken, getSessionCookieName, getSessionCookieOptions } from "@/lib/session"
-import { getSiteSettings } from "@/lib/site-settings"
+import { getServerSiteSettings } from "@/lib/site-settings"
 import { verifyTurnstileToken } from "@/lib/turnstile"
 import { validateAuthPayload } from "@/lib/validators"
 import { withRequestWriteGuard } from "@/lib/write-guard"
@@ -25,7 +25,7 @@ export const POST = createRouteHandler(async ({ request }) => {
   const captchaToken = readOptionalStringField(body, "captchaToken")
   const builtinCaptchaCode = readOptionalStringField(body, "builtinCaptchaCode")
   const powNonce = readOptionalStringField(body, "powNonce")
-  const settings = await getSiteSettings()
+  const settings = await getServerSiteSettings()
 
   return withRequestWriteGuard({
     request,
@@ -34,7 +34,7 @@ export const POST = createRouteHandler(async ({ request }) => {
     cooldownMessage: "登录尝试过于频繁，请稍后再试",
   }, async () => {
     if (settings.loginCaptchaMode === "TURNSTILE") {
-      if (!settings.turnstileSiteKey || !process.env.TURNSTILE_SECRET_KEY?.trim()) {
+      if (!settings.turnstileSiteKey || !settings.turnstileSecretKey) {
         apiError(500, "站点未完成 Turnstile 验证码配置，请联系管理员")
       }
 
@@ -42,7 +42,7 @@ export const POST = createRouteHandler(async ({ request }) => {
         apiError(400, "请先完成验证码验证")
       }
 
-      await verifyTurnstileToken(captchaToken, getRequestIp(request))
+      await verifyTurnstileToken(captchaToken, getRequestIp(request), settings.turnstileSecretKey)
     }
 
     if (settings.loginCaptchaMode === "BUILTIN") {

@@ -1,5 +1,5 @@
 import { getCurrentUserRecord } from "@/db/current-user"
-import { ChangeType, type Prisma } from "@/db/types"
+import { type Prisma } from "@/db/types"
 
 import { prisma } from "@/db/client"
 import { apiError } from "@/lib/api-route"
@@ -8,10 +8,12 @@ import { extractSummaryFromContent } from "@/lib/content"
 import { enforceSensitiveText } from "@/lib/content-safety"
 import { parseBusinessDateTime } from "@/lib/formatters"
 import { determineLotteryTriggerMode, normalizeLotteryConfig } from "@/lib/lottery"
+import { enforceInteractionGate } from "@/lib/interaction-gates"
 import { createPostMentionNotifications, stripPostContentUserLinks } from "@/lib/post-mentions"
-
+import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
 import { buildPostContentDocument, getAllPostContentText, serializePostContentDocument } from "@/lib/post-content"
 import { createPostRedPacketAfterPostCreated, normalizePostRedPacketConfig } from "@/lib/post-red-packets"
+import type { StoredPostRewardPoolConfig } from "@/lib/post-reward-pool-config"
 import { normalizeManualTags, syncPostTaxonomy } from "@/lib/post-editor"
 import { getSiteSettings } from "@/lib/site-settings"
 import { validatePostPayload } from "@/lib/validators"
@@ -49,7 +51,11 @@ export async function createPostFlow(body: unknown) {
 
   const normalizedLottery = postType === "LOTTERY" ? normalizeLotteryConfig(lotteryConfig) : null
   const normalizedRedPacket = await normalizePostRedPacketConfig(redPacketConfig)
-  const redPacketTotalPoints = normalizedRedPacket.data?.enabled ? normalizedRedPacket.data.totalPoints : 0
+  const redPacketTotalPoints = normalizedRedPacket.data?.enabled
+    ? normalizedRedPacket.data.mode === "JACKPOT"
+      ? (normalizedRedPacket.data.initialPoints ?? 0)
+      : (normalizedRedPacket.data.totalPoints ?? 0)
+    : 0
 
   if (postType === "LOTTERY" && (!normalizedLottery?.success || !normalizedLottery.data)) {
     apiError(400, normalizedLottery?.message ?? "抽奖配置不合法")
@@ -70,6 +76,11 @@ export async function createPostFlow(body: unknown) {
     replyThreshold: replyThreshold ?? undefined,
     purchaseUnlockContent: purchaseUnlockSafety?.sanitizedText ?? "",
     purchasePrice: purchasePrice ?? undefined,
+    meta: normalizedRedPacket.data?.enabled
+      ? {
+          rewardPool: normalizedRedPacket.data as StoredPostRewardPoolConfig,
+        }
+      : undefined,
   })
 
   const serializedContent = serializePostContentDocument(contentDocument)
@@ -98,6 +109,12 @@ export async function createPostFlow(body: unknown) {
     apiError(403, "当前节点不支持此帖子类型")
   }
 
+  enforceInteractionGate({
+    action: "POST_CREATE",
+    settings: settings.interactionGates,
+    user: author,
+  })
+
   const lastPostAt = (author as { lastPostAt?: Date | null }).lastPostAt ?? null
   if (boardContext.settings.postIntervalSeconds > 0 && lastPostAt) {
     const waitSeconds = boardContext.settings.postIntervalSeconds - Math.floor((Date.now() - new Date(lastPostAt).getTime()) / 1000)
@@ -106,11 +123,23 @@ export async function createPostFlow(body: unknown) {
     }
   }
 
-  const totalPointCost = Math.max(0, -(boardContext.settings.postPointDelta ?? 0))
-    + (postType === "BOUNTY" ? (bountyPoints ?? 0) : 0)
+  const preparedPostDelta = await prepareScopedPointDelta({
+    scopeKey: "POST_CREATE",
+    baseDelta: boardContext.settings.postPointDelta ?? 0,
+    userId: author.id,
+  })
+  const preparedBountyDelta = postType === "BOUNTY" && bountyPoints
+    ? await prepareScopedPointDelta({
+        scopeKey: "BOUNTY_POST_FREEZE",
+        baseDelta: -bountyPoints,
+        userId: author.id,
+      })
+    : null
+  const totalRequiredPointCost = Math.max(0, -preparedPostDelta.finalDelta)
+    + Math.max(0, -(preparedBountyDelta?.finalDelta ?? 0))
     + redPacketTotalPoints
 
-  if (author.points < totalPointCost) {
+  if (author.points < totalRequiredPointCost) {
     apiError(400, `当前${settings.pointName}不足，无法在该节点发布此帖子`)
   }
 
@@ -150,58 +179,51 @@ export async function createPostFlow(body: unknown) {
 
     const createdPost = await tx.post.create({ data: { ...postCreateData, activityAt: new Date() } })
 
-    const pointDelta = boardContext.settings.postPointDelta ?? 0
-
-    const totalDeduction = Math.max(0, -pointDelta) + (postType === "BOUNTY" ? (bountyPoints ?? 0) : 0) + redPacketTotalPoints
-    const totalIncrease = Math.max(0, pointDelta)
-
     const userUpdateData: {
       postCount: { increment: number }
       lastPostAt: Date
-      points?: { decrement: number } | { increment: number }
     } = {
       postCount: { increment: 1 },
       lastPostAt: new Date(),
     }
 
-    if (totalDeduction > 0) {
-      userUpdateData.points = { decrement: totalDeduction }
-    } else if (totalIncrease > 0) {
-      userUpdateData.points = { increment: totalIncrease }
-    }
-
     await tx.user.update({ where: { id: author.id }, data: userUpdateData })
 
-    if (pointDelta !== 0) {
-      await tx.pointLog.create({
-        data: {
-          userId: author.id,
-          changeType: pointDelta > 0 ? ChangeType.INCREASE : ChangeType.DECREASE,
-          changeValue: Math.abs(pointDelta),
-          reason: pointDelta > 0 ? `在指定节点发帖获得${settings.pointName}` : `在指定节点发帖扣除${settings.pointName}`,
-          relatedType: "POST",
-          relatedId: createdPost.id,
-        },
+    let authorPointBalanceCursor = author.points
+
+    if (preparedPostDelta.finalDelta !== 0) {
+      const postDeltaResult = await applyPointDelta({
+        tx,
+        userId: author.id,
+        beforeBalance: authorPointBalanceCursor,
+        prepared: preparedPostDelta,
+        pointName: settings.pointName,
+        reason: "在指定节点发帖",
+        relatedType: "POST",
+        relatedId: createdPost.id,
       })
+      authorPointBalanceCursor = postDeltaResult.afterBalance
     }
 
-    if (postType === "BOUNTY" && bountyPoints) {
-      await tx.pointLog.create({
-        data: {
-          userId: author.id,
-          changeType: ChangeType.DECREASE,
-          changeValue: bountyPoints,
-          reason: `发布悬赏帖冻结${settings.pointName}`,
-          relatedType: "POST",
-          relatedId: createdPost.id,
-        },
+    if (preparedBountyDelta) {
+      const bountyResult = await applyPointDelta({
+        tx,
+        userId: author.id,
+        beforeBalance: authorPointBalanceCursor,
+        prepared: preparedBountyDelta,
+        pointName: settings.pointName,
+        reason: "发布悬赏帖冻结积分",
+        relatedType: "POST",
+        relatedId: createdPost.id,
       })
+      authorPointBalanceCursor = bountyResult.afterBalance
     }
 
     await createPostRedPacketAfterPostCreated({
       tx,
       postId: createdPost.id,
       senderId: author.id,
+      senderBalanceBeforeChange: authorPointBalanceCursor,
       config: normalizedRedPacket.data,
       pointName: settings.pointName,
     })

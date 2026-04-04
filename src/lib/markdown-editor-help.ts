@@ -12,6 +12,7 @@ function buildShortcutTable(platform: ClientPlatform) {
     ["加粗", renderShortcut(platform, { windows: ["Ctrl+B"], mac: ["Cmd+B"], default: ["Ctrl+B"] })],
     ["斜体", renderShortcut(platform, { windows: ["Ctrl+I"], mac: ["Cmd+I"], default: ["Ctrl+I"] })],
     ["删除线", renderShortcut(platform, { windows: ["Alt+Shift+5"], mac: ["Cmd+Shift+5"], default: ["Alt+Shift+5"] })],
+    ["高亮", renderShortcut(platform, { windows: ["Ctrl+X"], mac: ["Cmd+X"], default: ["Ctrl+X"] })],
     ["插入链接", renderShortcut(platform, { windows: ["Ctrl+K"], mac: ["Cmd+K"], default: ["Ctrl+K"] })],
     ["标题 / 正文", renderShortcut(platform, { windows: ["Ctrl+1-6 / Ctrl+0"], mac: ["Cmd+1-6 / Cmd+0"], default: ["Ctrl+1-6 / Ctrl+0"] })],
     ["引用", renderShortcut(platform, { windows: ["Ctrl+Shift+Q"], mac: ["Cmd+Shift+Q"], default: ["Ctrl+Shift+Q"] })],

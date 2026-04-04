@@ -24,6 +24,14 @@ interface AdminVipSettingsFormProps {
     nicknameChangeVip1PointCost: number
     nicknameChangeVip2PointCost: number
     nicknameChangeVip3PointCost: number
+    introductionChangePointCost: number
+    introductionChangeVip1PointCost: number
+    introductionChangeVip2PointCost: number
+    introductionChangeVip3PointCost: number
+    avatarChangePointCost: number
+    avatarChangeVip1PointCost: number
+    avatarChangeVip2PointCost: number
+    avatarChangeVip3PointCost: number
     inviteCodePrice: number
     inviteCodeVip1Price: number
     inviteCodeVip2Price: number
@@ -59,6 +67,14 @@ export function AdminVipSettingsForm({ initialSettings }: AdminVipSettingsFormPr
   const [nicknameChangeVip1PointCost, setNicknameChangeVip1PointCost] = useState(String(initialSettings.nicknameChangeVip1PointCost))
   const [nicknameChangeVip2PointCost, setNicknameChangeVip2PointCost] = useState(String(initialSettings.nicknameChangeVip2PointCost))
   const [nicknameChangeVip3PointCost, setNicknameChangeVip3PointCost] = useState(String(initialSettings.nicknameChangeVip3PointCost))
+  const [introductionChangePointCost, setIntroductionChangePointCost] = useState(String(initialSettings.introductionChangePointCost))
+  const [introductionChangeVip1PointCost, setIntroductionChangeVip1PointCost] = useState(String(initialSettings.introductionChangeVip1PointCost))
+  const [introductionChangeVip2PointCost, setIntroductionChangeVip2PointCost] = useState(String(initialSettings.introductionChangeVip2PointCost))
+  const [introductionChangeVip3PointCost, setIntroductionChangeVip3PointCost] = useState(String(initialSettings.introductionChangeVip3PointCost))
+  const [avatarChangePointCost, setAvatarChangePointCost] = useState(String(initialSettings.avatarChangePointCost))
+  const [avatarChangeVip1PointCost, setAvatarChangeVip1PointCost] = useState(String(initialSettings.avatarChangeVip1PointCost))
+  const [avatarChangeVip2PointCost, setAvatarChangeVip2PointCost] = useState(String(initialSettings.avatarChangeVip2PointCost))
+  const [avatarChangeVip3PointCost, setAvatarChangeVip3PointCost] = useState(String(initialSettings.avatarChangeVip3PointCost))
   const [inviteCodePrice, setInviteCodePrice] = useState(String(initialSettings.inviteCodePrice))
   const [inviteCodeVip1Price, setInviteCodeVip1Price] = useState(String(initialSettings.inviteCodeVip1Price))
   const [inviteCodeVip2Price, setInviteCodeVip2Price] = useState(String(initialSettings.inviteCodeVip2Price))
@@ -100,6 +116,14 @@ export function AdminVipSettingsForm({ initialSettings }: AdminVipSettingsFormPr
             nicknameChangeVip1PointCost: Number(nicknameChangeVip1PointCost),
             nicknameChangeVip2PointCost: Number(nicknameChangeVip2PointCost),
             nicknameChangeVip3PointCost: Number(nicknameChangeVip3PointCost),
+            introductionChangePointCost: Number(introductionChangePointCost),
+            introductionChangeVip1PointCost: Number(introductionChangeVip1PointCost),
+            introductionChangeVip2PointCost: Number(introductionChangeVip2PointCost),
+            introductionChangeVip3PointCost: Number(introductionChangeVip3PointCost),
+            avatarChangePointCost: Number(avatarChangePointCost),
+            avatarChangeVip1PointCost: Number(avatarChangeVip1PointCost),
+            avatarChangeVip2PointCost: Number(avatarChangeVip2PointCost),
+            avatarChangeVip3PointCost: Number(avatarChangeVip3PointCost),
             inviteCodePrice: Number(inviteCodePrice),
             inviteCodeVip1Price: Number(inviteCodeVip1Price),
             inviteCodeVip2Price: Number(inviteCodeVip2Price),
@@ -144,6 +168,18 @@ export function AdminVipSettingsForm({ initialSettings }: AdminVipSettingsFormPr
           <TextField label="VIP1 改昵称积分" value={nicknameChangeVip1PointCost} onChange={setNicknameChangeVip1PointCost} placeholder="0 表示免费" />
           <TextField label="VIP2 改昵称积分" value={nicknameChangeVip2PointCost} onChange={setNicknameChangeVip2PointCost} placeholder="0 表示免费" />
           <TextField label="VIP3 改昵称积分" value={nicknameChangeVip3PointCost} onChange={setNicknameChangeVip3PointCost} placeholder="0 表示免费" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <TextField label="普通用户改介绍积分" value={introductionChangePointCost} onChange={setIntroductionChangePointCost} placeholder="0 表示免费" />
+          <TextField label="VIP1 改介绍积分" value={introductionChangeVip1PointCost} onChange={setIntroductionChangeVip1PointCost} placeholder="0 表示免费" />
+          <TextField label="VIP2 改介绍积分" value={introductionChangeVip2PointCost} onChange={setIntroductionChangeVip2PointCost} placeholder="0 表示免费" />
+          <TextField label="VIP3 改介绍积分" value={introductionChangeVip3PointCost} onChange={setIntroductionChangeVip3PointCost} placeholder="0 表示免费" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <TextField label="普通用户改头像积分" value={avatarChangePointCost} onChange={setAvatarChangePointCost} placeholder="0 表示免费" />
+          <TextField label="VIP1 改头像积分" value={avatarChangeVip1PointCost} onChange={setAvatarChangeVip1PointCost} placeholder="0 表示免费" />
+          <TextField label="VIP2 改头像积分" value={avatarChangeVip2PointCost} onChange={setAvatarChangeVip2PointCost} placeholder="0 表示免费" />
+          <TextField label="VIP3 改头像积分" value={avatarChangeVip3PointCost} onChange={setAvatarChangeVip3PointCost} placeholder="0 表示免费" />
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <TextField label="普通用户签到奖励" value={checkInReward} onChange={setCheckInReward} placeholder="如 5" />

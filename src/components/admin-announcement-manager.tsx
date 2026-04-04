@@ -2,15 +2,15 @@
 
 import Link from "next/link"
 import { ArrowUpRight, BookOpen, ExternalLink, Loader2, Pin, Plus, Save, Trash2 } from "lucide-react"
-import { useMemo, useState, useTransition } from "react"
-import { useRouter } from "next/navigation"
+import { useMemo, useState } from "react"
 
+import { useAdminMutation } from "@/hooks/use-admin-mutation"
+import { AdminFormModal } from "@/components/admin-modal"
 import { PickerPopover, PickerTriggerField, normalizeHexColor } from "@/components/admin-picker-popover"
 import { RefinedRichPostEditor } from "@/components/refined-rich-post-editor"
 import { Button } from "@/components/ui/button"
-import { DialogBackdrop, DialogPanel, DialogPortal, DialogPositioner } from "@/components/ui/dialog"
-import { toast } from "@/components/ui/toast"
 import type { AdminAnnouncementItem } from "@/lib/admin-announcements"
+import { adminGet, adminPost } from "@/lib/admin-client"
 import { buildSiteDocumentHref, getSiteDocumentTypeLabel, isExternalSiteDocumentHref, normalizeSiteDocumentSlug } from "@/lib/site-document-types"
 
 interface AdminAnnouncementManagerProps {
@@ -33,6 +33,12 @@ interface AnnouncementDraft {
   titleBold: boolean
   status: DraftStatus
   isPinned: boolean
+}
+
+interface StatusAction {
+  status: DraftStatus
+  label: string
+  variant: "default" | "outline" | "ghost"
 }
 
 const EMPTY_DRAFT: AnnouncementDraft = {
@@ -59,14 +65,61 @@ const TITLE_COLOR_PRESETS = [
   "#7c3aed",
 ] as const
 
+function isNullableString(value: unknown) {
+  return value === null || typeof value === "string"
+}
+
+function isAdminAnnouncementItem(value: unknown): value is AdminAnnouncementItem {
+  if (!value || typeof value !== "object") {
+    return false
+  }
+
+  const item = value as Partial<AdminAnnouncementItem>
+  return typeof item.id === "string"
+    && (item.type === "ANNOUNCEMENT" || item.type === "HELP")
+    && typeof item.title === "string"
+    && typeof item.content === "string"
+    && (item.sourceType === "DOCUMENT" || item.sourceType === "LINK")
+    && isNullableString(item.slug)
+    && isNullableString(item.linkUrl)
+    && isNullableString(item.titleColor)
+    && typeof item.titleBold === "boolean"
+    && (item.status === "DRAFT" || item.status === "PUBLISHED" || item.status === "OFFLINE")
+    && typeof item.isPinned === "boolean"
+}
+
+function isAdminAnnouncementList(value: unknown): value is AdminAnnouncementItem[] {
+  return Array.isArray(value) && value.every(isAdminAnnouncementItem)
+}
+
+function getAvailableStatusActions(status: DraftStatus): StatusAction[] {
+  if (status === "PUBLISHED") {
+    return [
+      { status: "DRAFT", label: "转草稿", variant: "outline" },
+      { status: "OFFLINE", label: "下线", variant: "ghost" },
+    ]
+  }
+
+  if (status === "OFFLINE") {
+    return [
+      { status: "PUBLISHED", label: "发布", variant: "default" },
+      { status: "DRAFT", label: "转草稿", variant: "outline" },
+    ]
+  }
+
+  return [
+    { status: "PUBLISHED", label: "发布", variant: "default" },
+    { status: "OFFLINE", label: "下线", variant: "ghost" },
+  ]
+}
+
 export function AdminAnnouncementManager({ initialItems }: AdminAnnouncementManagerProps) {
-  const router = useRouter()
   const [items, setItems] = useState(initialItems)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [createDraft, setCreateDraft] = useState<AnnouncementDraft>(EMPTY_DRAFT)
   const [editingDrafts, setEditingDrafts] = useState<Record<string, AnnouncementDraft>>(() => Object.fromEntries(initialItems.map((item) => [item.id, toDraft(item)])))
-  const [isPending, startTransition] = useTransition()
+  const { isPending, runMutation } = useAdminMutation()
 
   const stats = useMemo(() => ({
     total: items.length,
@@ -89,36 +142,62 @@ export function AdminAnnouncementManager({ initialItems }: AdminAnnouncementMana
     }))
   }
 
-  async function refreshList() {
-    const response = await fetch("/api/admin/announcements", { cache: "no-store" })
-    const result = await response.json()
-    if (!response.ok || !Array.isArray(result.data)) {
-      throw new Error(result.message ?? "刷新站点文档列表失败")
-    }
+  function syncItems(nextItems: AdminAnnouncementItem[]) {
+    setItems(nextItems)
+    setEditingDrafts(Object.fromEntries(nextItems.map((item) => [item.id, toDraft(item)])))
+  }
 
-    setItems(result.data)
-    setEditingDrafts(Object.fromEntries(result.data.map((item: AdminAnnouncementItem) => [item.id, toDraft(item)])))
+  async function refreshList() {
+    const result = await adminGet<AdminAnnouncementItem[]>("/api/admin/announcements", {
+      cache: "no-store",
+      validateData: isAdminAnnouncementList,
+      invalidDataMessage: "站点文档列表返回格式不正确",
+      defaultErrorMessage: "刷新站点文档列表失败",
+    })
+
+    syncItems(result.data)
+  }
+
+  function runAnnouncementMutation(
+    body: Record<string, unknown>,
+    options: {
+      successTitle: string
+      errorTitle: string
+      successMessage: string
+      errorMessage: string
+      onSuccess?: () => void | Promise<void>
+    },
+  ) {
+    runMutation({
+      mutation: async () => {
+        const result = await adminPost("/api/admin/announcements", body, {
+          defaultSuccessMessage: options.successMessage,
+          defaultErrorMessage: options.errorMessage,
+        })
+
+        await refreshList()
+        return result
+      },
+      successTitle: options.successTitle,
+      errorTitle: options.errorTitle,
+      refreshRouter: true,
+      onSuccess: async () => {
+        await options.onSuccess?.()
+      },
+    })
   }
 
   function submitCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    startTransition(async () => {
-      const response = await fetch("/api/admin/announcements", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "save", ...createDraft }),
-      })
-      const result = await response.json()
-      if (!response.ok) {
-        toast.error(result.message ?? "站点文档创建失败", "创建失败")
-        return
-      }
-
-      await refreshList()
-      setCreateDraft(EMPTY_DRAFT)
-      setCreateOpen(false)
-      toast.success(result.message ?? "站点文档已创建", "创建成功")
-      router.refresh()
+    runAnnouncementMutation({ action: "save", ...createDraft }, {
+      successTitle: "创建成功",
+      errorTitle: "创建失败",
+      successMessage: "站点文档已创建",
+      errorMessage: "站点文档创建失败",
+      onSuccess: () => {
+        setCreateDraft(EMPTY_DRAFT)
+        setCreateOpen(false)
+      },
     })
   }
 
@@ -128,82 +207,46 @@ export function AdminAnnouncementManager({ initialItems }: AdminAnnouncementMana
       return
     }
 
-    startTransition(async () => {
-      const response = await fetch("/api/admin/announcements", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "save", id, ...draft }),
-      })
-      const result = await response.json()
-      if (!response.ok) {
-        toast.error(result.message ?? "站点文档保存失败", "保存失败")
-        return
-      }
-
-      await refreshList()
-      setEditingId(null)
-      toast.success(result.message ?? "站点文档已更新", "保存成功")
-      router.refresh()
+    runAnnouncementMutation({ action: "save", id, ...draft }, {
+      successTitle: "保存成功",
+      errorTitle: "保存失败",
+      successMessage: "站点文档已更新",
+      errorMessage: "站点文档保存失败",
+      onSuccess: () => {
+        setEditingId(null)
+      },
     })
   }
 
   function submitDelete(id: string) {
-    startTransition(async () => {
-      const response = await fetch("/api/admin/announcements", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "delete", id }),
-      })
-      const result = await response.json()
-      if (!response.ok) {
-        toast.error(result.message ?? "站点文档删除失败", "删除失败")
-        return
-      }
-
-      await refreshList()
-      if (editingId === id) {
-        setEditingId(null)
-      }
-      toast.success(result.message ?? "站点文档已删除", "删除成功")
-      router.refresh()
+    runAnnouncementMutation({ action: "delete", id }, {
+      successTitle: "删除成功",
+      errorTitle: "删除失败",
+      successMessage: "站点文档已删除",
+      errorMessage: "站点文档删除失败",
+      onSuccess: () => {
+        if (editingId === id) {
+          setEditingId(null)
+        }
+      },
     })
   }
 
   function submitTogglePin(id: string, isPinned: boolean) {
-    startTransition(async () => {
-      const response = await fetch("/api/admin/announcements", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "toggle-pin", id, isPinned }),
-      })
-      const result = await response.json()
-      if (!response.ok) {
-        toast.error(result.message ?? "置顶状态更新失败", "操作失败")
-        return
-      }
-
-      await refreshList()
-      toast.success(result.message ?? "置顶状态已更新", "操作成功")
-      router.refresh()
+    runAnnouncementMutation({ action: "toggle-pin", id, isPinned }, {
+      successTitle: "操作成功",
+      errorTitle: "操作失败",
+      successMessage: "置顶状态已更新",
+      errorMessage: "置顶状态更新失败",
     })
   }
 
   function submitStatus(id: string, status: DraftStatus) {
-    startTransition(async () => {
-      const response = await fetch("/api/admin/announcements", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "update-status", id, status }),
-      })
-      const result = await response.json()
-      if (!response.ok) {
-        toast.error(result.message ?? "站点文档状态更新失败", "操作失败")
-        return
-      }
-
-      await refreshList()
-      toast.success(result.message ?? "站点文档状态已更新", "操作成功")
-      router.refresh()
+    runAnnouncementMutation({ action: "update-status", id, status }, {
+      successTitle: "操作成功",
+      errorTitle: "操作失败",
+      successMessage: "站点文档状态已更新",
+      errorMessage: "站点文档状态更新失败",
     })
   }
 
@@ -290,9 +333,18 @@ export function AdminAnnouncementManager({ initialItems }: AdminAnnouncementMana
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <Button type="button" className="h-8 rounded-full px-3 text-xs" disabled={isPending} onClick={() => submitStatus(item.id, "PUBLISHED")}>发布</Button>
-                  <Button type="button" variant="outline" className="h-8 rounded-full px-3 text-xs" disabled={isPending} onClick={() => submitStatus(item.id, "DRAFT")}>转草稿</Button>
-                  <Button type="button" variant="ghost" className="h-8 rounded-full px-3 text-xs" disabled={isPending} onClick={() => submitStatus(item.id, "OFFLINE")}>下线</Button>
+                  {getAvailableStatusActions(item.status).map((action) => (
+                    <Button
+                      key={`${item.id}-${action.status}`}
+                      type="button"
+                      variant={action.variant}
+                      className="h-8 rounded-full px-3 text-xs"
+                      disabled={isPending}
+                      onClick={() => submitStatus(item.id, action.status)}
+                    >
+                      {action.label}
+                    </Button>
+                  ))}
                 </div>
 
                 {activeEditing ? <EditorForm draft={draft} isPending={isPending} onChange={(key, value) => updateEditingDraft(item.id, key, value)} onSubmit={() => submitUpdate(item.id)} /> : null}
@@ -304,35 +356,26 @@ export function AdminAnnouncementManager({ initialItems }: AdminAnnouncementMana
         </div>
       </section>
 
-      <DialogPortal open={createOpen} onClose={() => setCreateOpen(false)} closeOnEscape={!isPending}>
-        <div className="fixed inset-0 z-[120]">
-          <DialogBackdrop onClick={isPending ? undefined : () => setCreateOpen(false)} />
-          <DialogPositioner className="px-3 py-4">
-            <DialogPanel className="flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col p-0">
-              <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
-                <div>
-                  <h3 className="text-lg font-semibold">新增站点文档</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">一个入口管理公告与帮助文档，支持文档页和跳转链接两种模式。</p>
-                </div>
-                <Button type="button" variant="ghost" className="h-8 px-2" onClick={() => setCreateOpen(false)} disabled={isPending}>关闭</Button>
-              </div>
-              <form onSubmit={submitCreate} className="flex min-h-0 flex-1 flex-col">
-                <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-                  <div className="space-y-4">
-                    <EditorFields draft={createDraft} onChange={updateCreateDraft} />
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 border-t border-border px-5 py-4">
-                  <Button disabled={isPending} className="rounded-full">
-                    {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}创建站点文档
-                  </Button>
-                  <Button type="button" variant="ghost" disabled={isPending} onClick={() => setCreateOpen(false)}>取消</Button>
-                </div>
-              </form>
-            </DialogPanel>
-          </DialogPositioner>
-        </div>
-      </DialogPortal>
+      <AdminFormModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSubmit={submitCreate}
+        title="新增站点文档"
+        description="一个入口管理公告与帮助文档，支持文档页和跳转链接两种模式。"
+        size="lg"
+        closeDisabled={isPending}
+        closeOnEscape={!isPending}
+        footer={({ formId }) => (
+          <div className="flex items-center gap-3">
+            <Button type="submit" form={formId} disabled={isPending} className="rounded-full">
+              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}创建站点文档
+            </Button>
+            <Button type="button" variant="ghost" disabled={isPending} onClick={() => setCreateOpen(false)}>取消</Button>
+          </div>
+        )}
+      >
+        <EditorFields draft={createDraft} onChange={updateCreateDraft} />
+      </AdminFormModal>
     </div>
   )
 }

@@ -1,5 +1,4 @@
 import BigNumber from "bignumber.js"
-import type { Prisma } from "@prisma/client"
 
 export { YinYangContractPage } from "@/components/yinyang-contract-page"
 
@@ -7,6 +6,7 @@ export { YinYangContractAdminPage } from "@/components/yinyang-contract-admin-pa
 
 import { prisma } from "@/db/client"
 import { createSystemNotification } from "@/lib/notification-writes"
+import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
 import {
   countUserAcceptedChallengesInRange,
   countUserCreatedChallengesInRange,
@@ -249,47 +249,6 @@ async function ensureAcceptAllowance(userId: number, config: AppConfig) {
 
   return acceptedToday
 }
-
-
-
-type PointMutationClient = Pick<Prisma.TransactionClient, "user">
-
-async function applyBalanceChange(tx: PointMutationClient, userId: number, changeValue: number) {
-
-
-  if (changeValue === 0) {
-    return
-  }
-  if (changeValue > 0) {
-    await tx.user.update({
-      where: { id: userId },
-      data: {
-        points: {
-          increment: changeValue,
-        },
-      },
-    })
-    return
-  }
-  const amount = Math.abs(changeValue)
-  const current = await tx.user.findUnique({
-    where: { id: userId },
-    select: { id: true, points: true },
-  })
-  if (!current || current.points < amount) {
-    businessRuleError("积分余额不足")
-  }
-
-  await tx.user.update({
-    where: { id: userId },
-    data: {
-      points: {
-        decrement: amount,
-      },
-    },
-  })
-}
-
 async function bumpDailyStats(userId: number, patch: { winCount?: number; loseCount?: number; todayProfitPoints?: number; todayLossPoints?: number }) {
   const { start } = getBusinessDayRange()
   const dateKey = start.toISOString().slice(0, 10)
@@ -446,7 +405,7 @@ export async function getYinYangLobbyData(user: CurrentUser | null): Promise<Yin
 }
 
 export async function createYinYangChallenge(user: CurrentUser, input: CreateChallengeInput) {
-  const { config } = await getConfigAndSettings()
+  const { config, pointName } = await getConfigAndSettings()
   if (!Boolean(config.enabled)) {
     businessRuleError("阴阳契应用暂未开启")
   }
@@ -478,17 +437,31 @@ export async function createYinYangChallenge(user: CurrentUser, input: CreateCha
   }
 
   await ensureCreateAllowance(user.id, config)
-  if ((user.points ?? 0) < stakePoints) {
+  const { rewardPoints, taxPoints } = calculateRewardPoints(stakePoints, Number(config.taxRateBps ?? 1000))
+  const challengeId = createUuid()
+  const preparedStakeDelta = await prepareScopedPointDelta({
+    scopeKey: "YINYANG_STAKE_OUTGOING",
+    baseDelta: -stakePoints,
+    userId: user.id,
+  })
+
+  if (preparedStakeDelta.finalDelta < 0 && (user.points ?? 0) < Math.abs(preparedStakeDelta.finalDelta)) {
     businessRuleError("积分不足，无法发起挑战")
   }
 
-
-  const { rewardPoints, taxPoints } = calculateRewardPoints(stakePoints, Number(config.taxRateBps ?? 1000))
-  const challengeId = createUuid()
-
   await prisma.$transaction(async (tx) => {
+    const latestUser = await tx.user.findUnique({
+      where: { id: user.id },
+      select: {
+        id: true,
+        points: true,
+      },
+    })
 
-    await applyBalanceChange(tx, user.id, -stakePoints)
+    if (!latestUser) {
+      businessRuleError("用户不存在")
+    }
+
     await createYinYangChallengeRecord({
       tx,
       id: challengeId,
@@ -504,15 +477,17 @@ export async function createYinYangChallenge(user: CurrentUser, input: CreateCha
       taxRateBps: Number(config.taxRateBps ?? 1000),
       taxPoints,
     })
-    await tx.pointLog.create({
-      data: {
-        userId: user.id,
-        changeType: "DECREASE",
-        changeValue: stakePoints,
-        reason: "[app:阴阳契] 发起挑战扣除托管本金",
-        relatedType: "YINYANG_CHALLENGE",
-        relatedId: challengeId,
-      },
+
+    await applyPointDelta({
+      tx,
+      userId: user.id,
+      beforeBalance: latestUser.points,
+      prepared: preparedStakeDelta,
+      pointName,
+      insufficientMessage: "积分不足，无法发起挑战",
+      reason: "[app:阴阳契] 发起挑战扣除托管本金",
+      relatedType: "YINYANG_CHALLENGE",
+      relatedId: challengeId,
     })
   })
 
@@ -531,12 +506,17 @@ export async function acceptYinYangChallenge(user: CurrentUser, input: AcceptCha
     businessRuleError("该挑战已不可应战")
   }
 
-  if ((user.points ?? 0) < challenge.stakePoints) {
-    businessRuleError("积分不足，无法应战")
-  }
-
   const { config, pointName: rewardPointName } = await getConfigAndSettings()
   await ensureAcceptAllowance(user.id, config)
+  const preparedStakeDelta = await prepareScopedPointDelta({
+    scopeKey: "YINYANG_STAKE_OUTGOING",
+    baseDelta: -challenge.stakePoints,
+    userId: user.id,
+  })
+
+  if (preparedStakeDelta.finalDelta < 0 && (user.points ?? 0) < Math.abs(preparedStakeDelta.finalDelta)) {
+    businessRuleError("积分不足，无法应战")
+  }
 
 
 
@@ -547,16 +527,28 @@ export async function acceptYinYangChallenge(user: CurrentUser, input: AcceptCha
     }
 
 
-    await applyBalanceChange(tx, user.id, -challenge.stakePoints)
-    await tx.pointLog.create({
-      data: {
-        userId: user.id,
-        changeType: "DECREASE",
-        changeValue: challenge.stakePoints,
-        reason: "[app:阴阳契] 应战扣除托管本金",
-        relatedType: "YINYANG_CHALLENGE",
-        relatedId: challenge.id,
+    const challenger = await tx.user.findUnique({
+      where: { id: user.id },
+      select: {
+        id: true,
+        points: true,
       },
+    })
+
+    if (!challenger) {
+      businessRuleError("用户不存在")
+    }
+
+    await applyPointDelta({
+      tx,
+      userId: user.id,
+      beforeBalance: challenger.points,
+      prepared: preparedStakeDelta,
+      pointName: rewardPointName,
+      insufficientMessage: "积分不足，无法应战",
+      reason: "[app:阴阳契] 应战扣除托管本金",
+      relatedType: "YINYANG_CHALLENGE",
+      relatedId: challenge.id,
     })
 
     const isCorrect = input.selectedOption === challenge.correctOption
@@ -564,16 +556,35 @@ export async function acceptYinYangChallenge(user: CurrentUser, input: AcceptCha
     const loserId = isCorrect ? challenge.creatorId : user.id
     const winnerSettlement = challenge.stakePoints + challenge.rewardPoints
 
-    await applyBalanceChange(tx, winnerId, winnerSettlement)
-    await tx.pointLog.create({
-      data: {
-        userId: winnerId,
-        changeType: "INCREASE",
-        changeValue: winnerSettlement,
-        reason: isCorrect ? "[app:阴阳契] 挑战胜利返还本金并发放奖励" : "[app:阴阳契] 守擂成功返还本金并发放奖励",
-        relatedType: "YINYANG_CHALLENGE",
-        relatedId: challenge.id,
-      },
+    const preparedWinnerSettlement = await prepareScopedPointDelta({
+      scopeKey: "YINYANG_SETTLEMENT_INCOMING",
+      baseDelta: winnerSettlement,
+      userId: winnerId,
+    })
+    const winner = winnerId === challenger.id
+      ? challenger
+      : await tx.user.findUnique({
+          where: { id: winnerId },
+          select: {
+            id: true,
+            points: true,
+          },
+        })
+
+    if (!winner) {
+      businessRuleError("用户不存在")
+    }
+
+    await applyPointDelta({
+      tx,
+      userId: winnerId,
+      beforeBalance: winner.points,
+      prepared: preparedWinnerSettlement,
+      pointName: rewardPointName,
+      insufficientMessage: "积分不足，无法完成阴阳契结算",
+      reason: isCorrect ? "[app:阴阳契] 挑战胜利返还本金并发放奖励" : "[app:阴阳契] 守擂成功返还本金并发放奖励",
+      relatedType: "YINYANG_CHALLENGE",
+      relatedId: challenge.id,
     })
 
     await createYinYangChallengeAttempt({

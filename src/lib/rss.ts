@@ -1,4 +1,4 @@
-import { findBoardRssPosts, findRssPosts, RSS_POST_LIMIT, type RssPostRecord, findUserRssPosts, findZoneRssPosts } from "@/db/rss-queries"
+import { findBoardRssPosts, findRssPosts, RSS_POST_LIMIT, type RssPostRecord, findTagRssPosts, findUserRssPosts, findZoneRssPosts } from "@/db/rss-queries"
 import { getCanonicalPostPath } from "@/lib/post-links"
 import { getPublicPostContentText } from "@/lib/post-content"
 import { getSiteSettings } from "@/lib/site-settings"
@@ -201,6 +201,25 @@ export async function generateUserRssXml(user: { username: string; displayName?:
         link: await toAbsoluteSiteUrl(`/users/${encodeURIComponent(user.username)}`),
         description: normalizeText(user.bio || `${displayName} 发布的最新帖子订阅`),
         feedPath: `/users/${encodeURIComponent(user.username)}/rss.xml`,
+      },
+      posts,
+    }
+  })())
+}
+
+export async function generateTagRssXml(tag: { slug: string; name: string; description?: string | null }) {
+  return generateRssXmlBySource((async () => {
+    const [settings, posts] = await Promise.all([
+      getSiteSettings(),
+      findTagRssPosts(tag.slug, RSS_POST_LIMIT),
+    ])
+
+    return {
+      channel: {
+        title: `#${normalizeText(tag.name)} - ${normalizeText(settings.siteName)}`,
+        link: await toAbsoluteSiteUrl(`/tags/${encodeURIComponent(tag.slug)}`),
+        description: normalizeText(tag.description || `标签 ${tag.name} 下的最新帖子订阅`),
+        feedPath: `/tags/${encodeURIComponent(tag.slug)}/rss.xml`,
       },
       posts,
     }

@@ -5,7 +5,9 @@ import { formatRelativeTime } from "@/lib/formatters"
 import { extractPinnedPostIds } from "@/lib/pinned-posts"
 
 import { resolvePostCoverImage } from "@/lib/post-cover"
+import { parsePostRewardPoolConfigFromContent } from "@/lib/post-red-packets"
 import { getPostTypeLabel, type LocalPostType } from "@/lib/post-types"
+import type { PostRewardPoolMode } from "@/lib/post-reward-pool-config"
 
 export type FeedSort = "latest" | "new" | "hot" | "weekly" | "following"
 
@@ -25,7 +27,9 @@ export interface ForumFeedItem {
   authorVipLevel?: number | null
   authorVipExpiresAt?: string | null
   publishedAt: string
+  publishedAtRaw: string
   lastRepliedAt: string
+  lastRepliedAtRaw: string
   latestReplyAuthorName: string | null
   latestReplyExcerpt: string | null
   commentCount: number
@@ -34,6 +38,7 @@ export interface ForumFeedItem {
   tipCount: number
   tipTotalPoints: number
   hasRedPacket: boolean
+  rewardMode?: PostRewardPoolMode
   isPinned: boolean
 
   pinScope?: string | null
@@ -86,6 +91,7 @@ function mapFeedPost(post: FeedPostRecord | PinnedFeedPostRecord): ForumFeedItem
   const feedPost = post as unknown as FeedPost
   const latestReply = feedPost.comments?.[0]
   const postType = (feedPost.type ?? "NORMAL") as LocalPostType
+  const rewardPoolConfig = feedPost.redPacket ? parsePostRewardPoolConfigFromContent(feedPost.content) : null
 
   return {
     id: feedPost.id,
@@ -103,7 +109,9 @@ function mapFeedPost(post: FeedPostRecord | PinnedFeedPostRecord): ForumFeedItem
     authorVipLevel: feedPost.author.vipLevel,
     authorVipExpiresAt: feedPost.author.vipExpiresAt ? new Date(feedPost.author.vipExpiresAt).toISOString() : null,
     publishedAt: formatRelativeTime(feedPost.publishedAt ?? feedPost.createdAt),
+    publishedAtRaw: (feedPost.publishedAt ?? feedPost.createdAt).toISOString(),
     lastRepliedAt: formatRelativeTime(feedPost.lastCommentedAt ?? feedPost.publishedAt ?? feedPost.createdAt),
+    lastRepliedAtRaw: (feedPost.lastCommentedAt ?? feedPost.publishedAt ?? feedPost.createdAt).toISOString(),
     latestReplyAuthorName: latestReply ? latestReply.user.nickname ?? latestReply.user.username : null,
     latestReplyExcerpt: latestReply ? latestReply.content.slice(0, 42) : null,
     commentCount: feedPost.commentCount,
@@ -112,6 +120,7 @@ function mapFeedPost(post: FeedPostRecord | PinnedFeedPostRecord): ForumFeedItem
     tipCount: feedPost.tipCount ?? 0,
     tipTotalPoints: feedPost.tipTotalPoints ?? 0,
     hasRedPacket: Boolean(feedPost.redPacket),
+    rewardMode: rewardPoolConfig?.mode,
     isPinned: feedPost.isPinned,
 
     pinScope: feedPost.pinScope ?? (feedPost.isPinned ? "BOARD" : "NONE"),

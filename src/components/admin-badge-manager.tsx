@@ -1,24 +1,57 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { useMemo, useState, useTransition } from "react"
-import { BadgeRuleOperator, BadgeRuleType } from "@/db/types"
-import { Pencil, Plus, Save, Trash2 } from "lucide-react"
+import { BadgeRuleOperator, BadgeRuleType, PointEffectDirection, PointEffectRuleKind, PointEffectTargetType } from "@/db/types"
+import { CircleHelp, Pencil, Plus, Save, Sparkles, Trash2 } from "lucide-react"
 
 import { AdminIconPickerField } from "@/components/admin-icon-picker-field"
+import { AdminModal } from "@/components/admin-modal"
 import { LevelIcon } from "@/components/level-icon"
 import { Button } from "@/components/ui/button"
 import { showConfirm } from "@/components/ui/confirm-dialog"
-
-
-
+import { Tooltip } from "@/components/ui/tooltip"
+import { BADGE_RULE_TYPE_OPTIONS, type BadgeRuleTypeValue } from "@/lib/badge-rule-definitions"
+import {
+  POINT_EFFECT_DIRECTION_OPTIONS,
+  POINT_EFFECT_RULE_KIND_OPTIONS,
+  getDefaultPointEffectScopeKeysByTargetType,
+  getPointEffectAllScopeKeyByTargetType,
+  getPointEffectDirectionOptionsByRuleKind,
+  getPointEffectDirectionLabel,
+  getPointEffectRuleKindLabel,
+  getPointEffectScopeLabel,
+  getPointEffectScopeOptionsByTargetType,
+  getPointEffectTargetOptionsForBadgeEffects,
+  getPointEffectTargetLabel,
+  normalizePointEffectScopeKeysByTargetType,
+  normalizePointEffectDirectionByRuleKind,
+  timeInputToMinuteOfDay,
+} from "@/lib/point-effect-definitions"
 
 type BadgeRuleFormItem = {
   id?: string
-  ruleType: BadgeRuleType
+  ruleType: BadgeRuleTypeValue
   operator: BadgeRuleOperator
   value: string
   extraValue?: string
   sortOrder: number
+}
+
+type BadgeEffectFormItem = {
+  id?: string
+  name: string
+  description: string
+  targetType: PointEffectTargetType
+  scopeKeys: string[]
+  ruleKind: PointEffectRuleKind
+  direction: PointEffectDirection
+  value: string
+  extraValue: string
+  startMinuteOfDay: string
+  endMinuteOfDay: string
+  sortOrder: number
+  status: boolean
 }
 
 type BadgeFormItem = {
@@ -31,33 +64,25 @@ type BadgeFormItem = {
   imageUrl: string
   category: string
   sortOrder: number
+  pointsCost: number
   status: boolean
   isHidden: boolean
   grantedUserCount?: number
   rules: BadgeRuleFormItem[]
+  effects: BadgeEffectFormItem[]
 }
 
 interface AdminBadgeManagerProps {
   initialBadges: BadgeFormItem[]
 }
 
+type EffectModalState = {
+  mode: "create" | "edit"
+  effectIndex: number | null
+  draft: BadgeEffectFormItem
+} | null
+
 const BADGE_COLOR_PRESETS = ["#f59e0b", "#ef4444", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#64748b"]
-
-const ruleTypeOptions: Array<{ value: BadgeRuleType; label: string; placeholder: string }> = [
-  { value: BadgeRuleType.REGISTER_DAYS, label: "注册天数", placeholder: "如 30" },
-  { value: BadgeRuleType.REGISTER_TIME_RANGE, label: "注册时间", placeholder: "开始时间，如 2026-01-01T00:00:00.000Z" },
-  { value: BadgeRuleType.POST_COUNT, label: "发帖数", placeholder: "如 10" },
-  { value: BadgeRuleType.COMMENT_COUNT, label: "回复数", placeholder: "如 20" },
-  { value: BadgeRuleType.RECEIVED_LIKE_COUNT, label: "获赞数", placeholder: "如 100" },
-  { value: BadgeRuleType.INVITE_COUNT, label: "邀请人数", placeholder: "如 5" },
-  { value: "ACCEPTED_ANSWER_COUNT" as BadgeRuleType, label: "被采纳数", placeholder: "如 3" },
-  { value: BadgeRuleType.USER_ID, label: "UID", placeholder: "如 1000" },
-
-
-  { value: BadgeRuleType.LEVEL, label: "等级", placeholder: "如 5" },
-  { value: BadgeRuleType.CHECK_IN_DAYS, label: "签到天数", placeholder: "如 30" },
-  { value: BadgeRuleType.VIP_LEVEL, label: "VIP 等级", placeholder: "如 2" },
-]
 
 const operatorOptions: Array<{ value: BadgeRuleOperator; label: string }> = [
   { value: BadgeRuleOperator.GT, label: ">" },
@@ -90,10 +115,29 @@ function createBadge(nextSortOrder: number): BadgeFormItem {
     imageUrl: "",
     category: "社区成就",
     sortOrder: nextSortOrder,
+    pointsCost: 0,
     status: true,
     isHidden: false,
-    rules: [createRule(0)],
+    rules: [],
+    effects: [],
   }
+}
+
+function createEffect(sortOrder: number): BadgeEffectFormItem {
+  return normalizeEffectDraft({
+    name: "新特效",
+    description: "",
+    targetType: PointEffectTargetType.POINTS,
+    scopeKeys: getDefaultPointEffectScopeKeysByTargetType(PointEffectTargetType.POINTS),
+    ruleKind: PointEffectRuleKind.FIXED,
+    direction: PointEffectDirection.BUFF,
+    value: "1",
+    extraValue: "",
+    startMinuteOfDay: "",
+    endMinuteOfDay: "",
+    sortOrder,
+    status: true,
+  })
 }
 
 function normalizeColor(color: string) {
@@ -104,12 +148,38 @@ function normalizeColor(color: string) {
   return "#f59e0b"
 }
 
+function normalizeEffectDraft(effect: BadgeEffectFormItem): BadgeEffectFormItem {
+  const scopeKeys = normalizePointEffectScopeKeysByTargetType(effect.scopeKeys, effect.targetType)
+  return {
+    ...effect,
+    direction: normalizePointEffectDirectionByRuleKind(effect.direction, effect.ruleKind),
+    scopeKeys,
+  }
+}
+
+function buildEffectScopeSummary(effect: BadgeEffectFormItem) {
+  if (effect.scopeKeys.length === 0) {
+    return "未设置范围"
+  }
+
+  return effect.scopeKeys.map((scopeKey) => getPointEffectScopeLabel(scopeKey)).join(" · ")
+}
+
+function buildEffectTimeSummary(effect: BadgeEffectFormItem) {
+  if (!effect.startMinuteOfDay && !effect.endMinuteOfDay) {
+    return "全天"
+  }
+
+  return `${effect.startMinuteOfDay || "00:00"} - ${effect.endMinuteOfDay || "23:59"}`
+}
+
 export function AdminBadgeManager({ initialBadges }: AdminBadgeManagerProps) {
   const [badges, setBadges] = useState(initialBadges)
   const [editingIndex, setEditingIndex] = useState<number | null>(initialBadges[0] ? 0 : null)
   const [feedback, setFeedback] = useState("")
   const [isPending, startTransition] = useTransition()
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
+  const [effectModal, setEffectModal] = useState<EffectModalState>(null)
 
   const editingBadge = editingIndex === null ? null : badges[editingIndex] ?? null
 
@@ -121,6 +191,17 @@ export function AdminBadgeManager({ initialBadges }: AdminBadgeManagerProps) {
     })
     return Array.from(record.entries())
   }, [badges])
+
+  const modalScopeOptions = effectModal
+    ? getPointEffectScopeOptionsByTargetType(effectModal.draft.targetType)
+    : []
+  const modalAllScopeKey = effectModal
+    ? getPointEffectAllScopeKeyByTargetType(effectModal.draft.targetType)
+    : null
+  const targetOptions = getPointEffectTargetOptionsForBadgeEffects()
+  const modalDirectionOptions = effectModal
+    ? getPointEffectDirectionOptionsByRuleKind(effectModal.draft.ruleKind)
+    : POINT_EFFECT_DIRECTION_OPTIONS
 
   function updateBadge(index: number, patch: Partial<BadgeFormItem>) {
     setBadges((current) => current.map((badge, badgeIndex) => (badgeIndex === index ? { ...badge, ...patch } : badge)))
@@ -139,6 +220,22 @@ export function AdminBadgeManager({ initialBadges }: AdminBadgeManagerProps) {
     }))
   }
 
+  function updateEffectModalDraft(patch: Partial<BadgeEffectFormItem>) {
+    setEffectModal((current) => {
+      if (!current) {
+        return null
+      }
+
+      return {
+        ...current,
+        draft: normalizeEffectDraft({
+          ...current.draft,
+          ...patch,
+        }),
+      }
+    })
+  }
+
   function appendBadge() {
     setBadges((current) => {
       const next = [...current, createBadge(current.length)]
@@ -146,6 +243,7 @@ export function AdminBadgeManager({ initialBadges }: AdminBadgeManagerProps) {
       return next
     })
     setColorPickerOpen(false)
+    setEffectModal(null)
   }
 
   function appendRule(index: number) {
@@ -161,6 +259,69 @@ export function AdminBadgeManager({ initialBadges }: AdminBadgeManagerProps) {
     }))
   }
 
+  function openCreateEffectModal() {
+    if (!editingBadge) {
+      return
+    }
+
+    setEffectModal({
+      mode: "create",
+      effectIndex: null,
+      draft: createEffect(editingBadge.effects.length),
+    })
+  }
+
+  function openEditEffectModal(effectIndex: number) {
+    if (!editingBadge) {
+      return
+    }
+
+    const effect = editingBadge.effects[effectIndex]
+    if (!effect) {
+      return
+    }
+
+    setEffectModal({
+      mode: "edit",
+      effectIndex,
+      draft: normalizeEffectDraft(effect),
+    })
+  }
+
+  function closeEffectModal() {
+    setEffectModal(null)
+  }
+
+  function commitEffectModal() {
+    if (editingIndex === null || !effectModal) {
+      return
+    }
+
+    const nextEffect = normalizeEffectDraft(effectModal.draft)
+    setBadges((current) => current.map((badge, badgeIndex) => {
+      if (badgeIndex !== editingIndex) {
+        return badge
+      }
+
+      if (effectModal.mode === "edit" && effectModal.effectIndex !== null) {
+        return {
+          ...badge,
+          effects: badge.effects.map((effect, effectIndex) => (
+            effectIndex === effectModal.effectIndex
+              ? { ...nextEffect, sortOrder: effectModal.effectIndex }
+              : effect
+          )),
+        }
+      }
+
+      return {
+        ...badge,
+        effects: [...badge.effects, { ...nextEffect, sortOrder: badge.effects.length }],
+      }
+    }))
+    closeEffectModal()
+  }
+
   function removeRule(index: number, ruleIndex: number) {
     setBadges((current) => current.map((badge, badgeIndex) => {
       if (badgeIndex !== index) {
@@ -170,9 +331,30 @@ export function AdminBadgeManager({ initialBadges }: AdminBadgeManagerProps) {
       const nextRules = badge.rules.filter((_, itemIndex) => itemIndex !== ruleIndex).map((rule, itemIndex) => ({ ...rule, sortOrder: itemIndex }))
       return {
         ...badge,
-        rules: nextRules.length > 0 ? nextRules : [createRule(0)],
+        rules: nextRules,
       }
     }))
+  }
+
+  function removeEffect(index: number, effectIndex: number) {
+    setBadges((current) => current.map((badge, badgeIndex) => {
+      if (badgeIndex !== index) {
+        return badge
+      }
+
+      return {
+        ...badge,
+        effects: badge.effects.filter((_, itemIndex) => itemIndex !== effectIndex).map((effect, itemIndex) => ({ ...effect, sortOrder: itemIndex })),
+      }
+    }))
+
+    setEffectModal((current) => {
+      if (!current || current.mode !== "edit" || current.effectIndex !== effectIndex) {
+        return current
+      }
+
+      return null
+    })
   }
 
   function saveBadge(index: number) {
@@ -189,6 +371,12 @@ export function AdminBadgeManager({ initialBadges }: AdminBadgeManagerProps) {
           rules: badge.rules.map((rule, ruleIndex) => ({
             ...rule,
             sortOrder: ruleIndex,
+          })),
+          effects: badge.effects.map((effect, effectIndex) => ({
+            ...effect,
+            sortOrder: effectIndex,
+            startMinuteOfDay: timeInputToMinuteOfDay(effect.startMinuteOfDay),
+            endMinuteOfDay: timeInputToMinuteOfDay(effect.endMinuteOfDay),
           })),
         }),
       })
@@ -210,6 +398,7 @@ export function AdminBadgeManager({ initialBadges }: AdminBadgeManagerProps) {
         if (current === index) return null
         return current > index ? current - 1 : current
       })
+      closeEffectModal()
       return
     }
 
@@ -244,7 +433,7 @@ export function AdminBadgeManager({ initialBadges }: AdminBadgeManagerProps) {
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-[28px] border border-border bg-card p-5">
         <div>
           <h3 className="text-lg font-semibold">勋章系统</h3>
-          <p className="mt-1 text-sm text-muted-foreground">后台自定义勋章和领取条件，前台用户满足条件后手动领取。</p>
+          <p className="mt-1 text-sm text-muted-foreground">后台自定义勋章、领取条件、积分购买价和佩戴特效，前台用户满足条件后手动领取并可佩戴生效。</p>
         </div>
         <Button className="gap-2 rounded-full" onClick={appendBadge} type="button">
           <Plus className="h-4 w-4" />
@@ -268,6 +457,7 @@ export function AdminBadgeManager({ initialBadges }: AdminBadgeManagerProps) {
                   onClick={() => {
                     setEditingIndex(index)
                     setColorPickerOpen(false)
+                    closeEffectModal()
                   }}
                   className={editingIndex === index ? "w-full rounded-[22px] border border-foreground bg-accent/60 p-4 text-left" : "w-full rounded-[22px] border border-border bg-background p-4 text-left hover:bg-accent/40"}
                 >
@@ -282,7 +472,7 @@ export function AdminBadgeManager({ initialBadges }: AdminBadgeManagerProps) {
                           <p className="truncate text-sm font-semibold">{badge.name}</p>
                           <span className={badge.status ? "rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] text-emerald-700" : "rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600"}>{badge.status ? "启用" : "停用"}</span>
                         </div>
-                        <p className="mt-1 truncate text-xs text-muted-foreground">{badge.category || "社区成就"} · 领取 {badge.grantedUserCount ?? 0}</p>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">{badge.category || "社区成就"} · 条件 {badge.rules.length} · 特效 {badge.effects.length} · 领取 {badge.grantedUserCount ?? 0}</p>
                       </div>
                     </div>
                     <Pencil className="h-4 w-4 text-muted-foreground" />
@@ -310,7 +500,7 @@ export function AdminBadgeManager({ initialBadges }: AdminBadgeManagerProps) {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h4 className="text-base font-semibold">勋章编辑</h4>
-                  <p className="mt-1 text-sm text-muted-foreground">条件为全部满足后可领取，前台由用户手动领取。</p>
+                  <p className="mt-1 text-sm text-muted-foreground">条件为全部满足后可领取；不配条件即可纯积分购买；佩戴后仅已展示勋章的特效会生效。</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" variant="outline" className="gap-2 rounded-full" onClick={() => removeBadge(editingIndex!)}>
@@ -328,6 +518,7 @@ export function AdminBadgeManager({ initialBadges }: AdminBadgeManagerProps) {
                 <Field label="勋章名称" value={editingBadge.name} onChange={(value) => updateBadge(editingIndex!, { name: value })} placeholder="如 论坛先锋" />
                 <Field label="唯一标识" value={editingBadge.code} onChange={(value) => updateBadge(editingIndex!, { code: value.replace(/\s+/g, "_") })} placeholder="如 forum_pioneer" />
                 <Field label="分类" value={editingBadge.category} onChange={(value) => updateBadge(editingIndex!, { category: value })} placeholder="如 社区成就" />
+                <Field label="领取价格（积分）" type="number" value={String(editingBadge.pointsCost)} onChange={(value) => updateBadge(editingIndex!, { pointsCost: Math.max(0, Number(value) || 0) })} placeholder="如 100" />
                 <AdminIconPickerField
                   label="图标"
                   value={editingBadge.iconText}
@@ -399,7 +590,7 @@ export function AdminBadgeManager({ initialBadges }: AdminBadgeManagerProps) {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h5 className="text-sm font-semibold">领取条件</h5>
-                    <p className="mt-1 text-xs text-muted-foreground">第一版按 AND 逻辑判断：下列规则全部满足才可领取。</p>
+                    <p className="mt-1 text-xs text-muted-foreground">按 AND 逻辑判断；可以为空，留空时表示无门槛或仅需积分购买。</p>
                   </div>
                   <Button type="button" variant="outline" className="gap-2 rounded-full" onClick={() => appendRule(editingIndex!)}>
                     <Plus className="h-4 w-4" />
@@ -408,13 +599,14 @@ export function AdminBadgeManager({ initialBadges }: AdminBadgeManagerProps) {
                 </div>
 
                 <div className="mt-4 space-y-3">
+                  {editingBadge.rules.length === 0 ? <p className="text-sm text-muted-foreground">当前未设置领取条件。</p> : null}
                   {editingBadge.rules.map((rule, ruleIndex) => {
-                    const typeMeta = ruleTypeOptions.find((item) => item.value === rule.ruleType)
+                    const typeMeta = BADGE_RULE_TYPE_OPTIONS.find((item) => item.value === rule.ruleType)
                     const isTimeRange = rule.ruleType === BadgeRuleType.REGISTER_TIME_RANGE
                     return (
                       <div key={`${rule.id ?? ruleIndex}-${rule.ruleType}`} className="rounded-[22px] border border-border bg-secondary/20 p-4">
                         <div className="grid gap-3 xl:grid-cols-[180px_120px_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-end">
-                          <SelectField label="条件类型" value={rule.ruleType} options={ruleTypeOptions.map((item) => ({ value: item.value, label: item.label }))} onChange={(value) => updateRule(editingIndex!, ruleIndex, { ruleType: value as BadgeRuleType })} />
+                          <SelectField label="条件类型" value={rule.ruleType} options={BADGE_RULE_TYPE_OPTIONS.map((item) => ({ value: item.value, label: item.label }))} onChange={(value) => updateRule(editingIndex!, ruleIndex, { ruleType: value as BadgeRuleTypeValue })} />
                           <SelectField label="运算符" value={rule.operator} options={operatorOptions} onChange={(value) => updateRule(editingIndex!, ruleIndex, { operator: value as BadgeRuleOperator })} />
                           <Field label={isTimeRange ? "开始值 / 时间" : "目标值"} value={rule.value} onChange={(value) => updateRule(editingIndex!, ruleIndex, { value })} placeholder={typeMeta?.placeholder ?? "请输入条件值"} />
                           <Field label={rule.operator === BadgeRuleOperator.BETWEEN ? "结束时间 / 额外值" : "额外值（可选）"} value={rule.extraValue ?? ""} onChange={(value) => updateRule(editingIndex!, ruleIndex, { extraValue: value })} placeholder={rule.operator === BadgeRuleOperator.BETWEEN ? "结束时间" : "一般可留空"} />
@@ -426,34 +618,276 @@ export function AdminBadgeManager({ initialBadges }: AdminBadgeManagerProps) {
                 </div>
               </div>
 
+              <div className="mt-6 rounded-[24px] border border-border p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h5 className="text-sm font-semibold">佩戴特效</h5>
+                    <p className="mt-1 text-xs text-muted-foreground">改为模态框编辑；作用目标会联动过滤生效范围，避免积分和概率范围混配。</p>
+                  </div>
+                  <Button type="button" variant="outline" className="gap-2 rounded-full" onClick={openCreateEffectModal}>
+                    <Plus className="h-4 w-4" />
+                    新增特效
+                  </Button>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {editingBadge.effects.length === 0 ? <p className="text-sm text-muted-foreground">当前未设置佩戴特效。</p> : null}
+                  {editingBadge.effects.map((effect, effectIndex) => (
+                    <div key={`${effect.id ?? effectIndex}-${effect.name}`} className="rounded-[22px] border border-border bg-secondary/20 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-3">
+                            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                              <Sparkles className="h-4 w-4" />
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold">{effect.name}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {getPointEffectTargetLabel(effect.targetType)} · {getPointEffectRuleKindLabel(effect.ruleKind)} · {getPointEffectDirectionLabel(effect.direction)} · {effect.status ? "启用" : "停用"}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="mt-3 grid gap-2 text-xs text-muted-foreground md:grid-cols-3">
+                            <p>范围：{buildEffectScopeSummary(effect)}</p>
+                            <p>时间：{buildEffectTimeSummary(effect)}</p>
+                            <p>数值：{effect.extraValue ? `${effect.value} - ${effect.extraValue}` : effect.value}</p>
+                          </div>
+                          {effect.description ? <p className="mt-2 text-xs text-muted-foreground">{effect.description}</p> : null}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button type="button" variant="outline" className="rounded-full" onClick={() => openEditEffectModal(effectIndex)}>编辑</Button>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center justify-end gap-3">
+                        <Button type="button" variant="outline" className="rounded-full" onClick={() => removeEffect(editingIndex!, effectIndex)}>删除特效</Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {feedback ? <p className="mt-4 text-sm text-muted-foreground">{feedback}</p> : null}
             </div>
           )}
         </section>
       </div>
+
+      <AdminModal
+        open={Boolean(effectModal)}
+        onClose={closeEffectModal}
+        size="xl"
+        title={effectModal?.mode === "edit" ? "编辑佩戴特效" : "新增佩戴特效"}
+        description="作用目标切换时，生效范围会自动过滤为兼容选项。"
+        footer={(
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button type="button" variant="outline" className="rounded-full" onClick={closeEffectModal}>取消</Button>
+            <Button type="button" className="rounded-full" onClick={commitEffectModal} disabled={!effectModal?.draft.name.trim() || effectModal.draft.scopeKeys.length === 0}>
+              保存特效
+            </Button>
+          </div>
+        )}
+      >
+        {effectModal ? (
+          <div className="space-y-5">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <Field label="特效名称" value={effectModal.draft.name} onChange={(value) => updateEffectModalDraft({ name: value })} placeholder="如 签到增益" />
+              <Field label="说明" value={effectModal.draft.description} onChange={(value) => updateEffectModalDraft({ description: value })} placeholder="可选" />
+              <SelectField
+                label="作用目标"
+                hint={(
+                  <div className="space-y-1">
+                    <p>决定特效修改的是积分数值还是中奖概率。</p>
+                    <p>切换后，生效范围会自动过滤为对应类型。</p>
+                  </div>
+                )}
+                value={effectModal.draft.targetType}
+                options={targetOptions.map((item) => ({ value: item.value, label: item.label }))}
+                onChange={(value) => updateEffectModalDraft({ targetType: value as PointEffectTargetType })}
+              />
+              <SelectField
+                label="生效规则"
+                hint={(
+                  <div className="space-y-1">
+                    <p>固定值 / 百分比：按确定值结算。</p>
+                    <p>随机固定值 / 随机百分比：会结合基础值和额外值组成区间。</p>
+                    <p>随机正负倍数：只允许搭配“随机正负”方向。</p>
+                  </div>
+                )}
+                value={effectModal.draft.ruleKind}
+                options={POINT_EFFECT_RULE_KIND_OPTIONS.map((item) => ({ value: item.value, label: item.label }))}
+                onChange={(value) => updateEffectModalDraft({ ruleKind: value as PointEffectRuleKind })}
+              />
+              <SelectField
+                label="增减方向"
+                hint={(
+                  <div className="space-y-1">
+                    <p>增益：在原值基础上增加。</p>
+                    <p>减益：在原值基础上减少。</p>
+                    <p>随机正负：每次随机为正向或负向，只在“随机正负倍数”下可选。</p>
+                  </div>
+                )}
+                value={effectModal.draft.direction}
+                options={modalDirectionOptions.map((item) => ({ value: item.value, label: item.label }))}
+                onChange={(value) => updateEffectModalDraft({ direction: value as PointEffectDirection })}
+              />
+              <Field
+                label="基础值"
+                hint={(
+                  <div className="space-y-1">
+                    <p>固定值：直接填增减数值，如 `5`。</p>
+                    <p>百分比：填百分数本体，如 `2` 表示 2%。</p>
+                    <p>随机区间 / 随机倍数：这里填区间起点。</p>
+                  </div>
+                )}
+                value={effectModal.draft.value}
+                onChange={(value) => updateEffectModalDraft({ value })}
+                placeholder="如 5 或 2"
+              />
+              <Field
+                label="额外值 / 区间上限"
+                hint={(
+                  <div className="space-y-1">
+                    <p>固定值 / 百分比：一般留空。</p>
+                    <p>随机固定值 / 随机百分比：填写区间上限，如 `5-10` 里的 `10`。</p>
+                    <p>随机正负倍数：填写倍数上限，如 `1-2` 里的 `2`。</p>
+                  </div>
+                )}
+                value={effectModal.draft.extraValue}
+                onChange={(value) => updateEffectModalDraft({ extraValue: value })}
+                placeholder="随机规则可填"
+              />
+              <Field
+                label="开始时间"
+                hint={(
+                  <div className="space-y-1">
+                    <p>按 `HH:mm` 选择，如 `09:00`。</p>
+                    <p>和结束时间一起构成生效时段。</p>
+                    <p>开始和结束都留空表示全天生效。</p>
+                  </div>
+                )}
+                type="time"
+                value={effectModal.draft.startMinuteOfDay}
+                onChange={(value) => updateEffectModalDraft({ startMinuteOfDay: value })}
+              />
+              <Field
+                label="结束时间"
+                hint={(
+                  <div className="space-y-1">
+                    <p>按 `HH:mm` 选择，如 `23:00`。</p>
+                    <p>若开始时间大于结束时间，表示跨天生效。</p>
+                    <p>例如 `22:00 - 02:00` 表示夜间时段。</p>
+                  </div>
+                )}
+                type="time"
+                value={effectModal.draft.endMinuteOfDay}
+                onChange={(value) => updateEffectModalDraft({ endMinuteOfDay: value })}
+              />
+            </div>
+
+            <div className="rounded-[24px] border border-border p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <h5 className="text-sm font-semibold">生效范围</h5>
+                    <Tooltip
+                      align="start"
+                      content={(
+                        <div className="space-y-1">
+                          <p>“所有积分增减 / 所有概率”和具体子项互斥。</p>
+                          <p>选了“所有”，就不会再选具体子项。</p>
+                          <p>选了任一子项，“所有”会自动取消并禁用。</p>
+                        </div>
+                      )}
+                    >
+                      <span className="inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full border border-border text-muted-foreground">
+                        <CircleHelp className="h-3 w-3" />
+                      </span>
+                    </Tooltip>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">当前只展示 {getPointEffectTargetLabel(effectModal.draft.targetType)} 可用范围。</p>
+                </div>
+                <label className="flex items-center gap-2 rounded-[16px] border border-border bg-background px-3 py-2 text-xs">
+                  <input type="checkbox" checked={effectModal.draft.status} onChange={(event) => updateEffectModalDraft({ status: event.target.checked })} />
+                  启用该特效
+                </label>
+              </div>
+
+              <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {modalScopeOptions.map((scopeOption) => {
+                  const allScopeKey = modalAllScopeKey ?? ""
+                  const checked = effectModal.draft.scopeKeys.includes(scopeOption.value)
+                  const hasSubScopesSelected = Boolean(modalAllScopeKey) && effectModal.draft.scopeKeys.some((scopeKey) => scopeKey !== allScopeKey)
+                  const allScopeSelected = Boolean(modalAllScopeKey) && effectModal.draft.scopeKeys.includes(allScopeKey)
+                  const disabled = modalAllScopeKey
+                    ? scopeOption.value === allScopeKey
+                      ? hasSubScopesSelected && !checked
+                      : allScopeSelected
+                    : false
+                  return (
+                    <label key={`effect-scope-${scopeOption.value}`} className="flex items-center gap-2 rounded-[16px] border border-border bg-background px-3 py-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={disabled}
+                        onChange={(event) => updateEffectModalDraft({
+                          scopeKeys: event.target.checked
+                            ? scopeOption.value === allScopeKey
+                              ? [scopeOption.value]
+                              : [
+                                  ...effectModal.draft.scopeKeys.filter((scopeKey) => scopeKey !== allScopeKey),
+                                  scopeOption.value,
+                                ]
+                            : effectModal.draft.scopeKeys.filter((scopeKey) => scopeKey !== scopeOption.value),
+                        })}
+                      />
+                      {scopeOption.label}
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </AdminModal>
     </div>
   )
 }
 
-function Field({ label, value, onChange, placeholder, type = "text", className = "" }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; type?: string; className?: string }) {
+function Field({ label, hint, value, onChange, placeholder, type = "text", className = "" }: { label: string; hint?: ReactNode; value: string; onChange: (value: string) => void; placeholder?: string; type?: string; className?: string }) {
   return (
     <label className={`space-y-2 ${className}`}>
-      <span className="text-sm font-medium">{label}</span>
+      <LabelWithHint label={label} hint={hint} />
       <input type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-11 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-none transition-colors focus:border-foreground/30" />
     </label>
   )
 }
 
-function SelectField({ label, value, options, onChange }: { label: string; value: string; options: Array<{ value: string; label: string }>; onChange: (value: string) => void }) {
+function SelectField({ label, hint, value, options, onChange }: { label: string; hint?: ReactNode; value: string; options: Array<{ value: string; label: string }>; onChange: (value: string) => void }) {
   return (
     <label className="space-y-2">
-      <span className="text-sm font-medium">{label}</span>
+      <LabelWithHint label={label} hint={hint} />
       <select value={value} onChange={(event) => onChange(event.target.value)} className="h-11 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-none transition-colors focus:border-foreground/30">
         {options.map((option) => (
           <option key={option.value} value={option.value}>{option.label}</option>
         ))}
       </select>
     </label>
+  )
+}
+
+function LabelWithHint({ label, hint }: { label: string; hint?: ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-sm font-medium">
+      <span>{label}</span>
+      {hint ? (
+        <Tooltip content={hint} align="start">
+          <span className="inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full border border-border text-muted-foreground">
+            <CircleHelp className="h-3 w-3" />
+          </span>
+        </Tooltip>
+      ) : null}
+    </span>
   )
 }
 
@@ -470,7 +904,7 @@ function PopoverTriggerField({ value, onClick, previewColor }: { value: string; 
   )
 }
 
-function PickerPopover({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+function PickerPopover({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
   return (
     <div className="mt-2 rounded-[18px] border border-border bg-background p-3 shadow-lg shadow-black/10">
       <div className="mb-2 flex items-center justify-between gap-2">

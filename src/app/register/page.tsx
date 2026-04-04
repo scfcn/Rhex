@@ -49,6 +49,7 @@ export default async function RegisterPage(props: PageProps<"/register">) {
 
   const inviterUsername = readSearchParam(searchParams?.invite) ?? readSearchParam(searchParams?.inviter) ?? ""
   const inviteCode = readSearchParam(searchParams?.code) ?? ""
+  const authError = readSearchParam(searchParams?.authError) ?? ""
 
   return (
     <div className="min-h-screen ">
@@ -59,6 +60,7 @@ export default async function RegisterPage(props: PageProps<"/register">) {
             <CardTitle>注册论坛账户</CardTitle>
           </CardHeader>
           <CardContent>
+            {authError ? <p className="mb-4 rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">{authError}</p> : null}
             {inviterUsername ? <p className="mb-4 rounded-2xl border border-border bg-secondary/60 px-4 py-3 text-sm text-muted-foreground">当前通过用户 <span className="font-medium text-foreground">{inviterUsername}</span> 的邀请进入注册。</p> : null}
             {inviteCode ? <p className="mb-4 rounded-2xl border border-border bg-secondary/60 px-4 py-3 text-sm text-muted-foreground">当前注册链接已带入邀请码 <span className="font-mono font-medium text-foreground">{inviteCode}</span>。</p> : null}
             <RegisterForm settings={settings} />

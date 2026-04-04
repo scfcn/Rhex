@@ -1,5 +1,6 @@
 import { prisma } from "@/db/client"
 import { createSystemNotification as createSystemNotificationEntry } from "@/lib/notification-writes"
+import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
 
 import type { SelfServeAdOrderStatus, SelfServeAdSlotType } from "@/lib/self-serve-ads.shared"
 
@@ -18,7 +19,11 @@ export function submitSelfServeAdOrderTransaction(data: {
   pricePoints: number
   pointReason: string
 }) {
-  return prisma.$transaction(async (tx) => {
+  return prepareScopedPointDelta({
+    scopeKey: "SELF_SERVE_AD_PURCHASE",
+    baseDelta: -data.pricePoints,
+    userId: data.userId,
+  }).then((preparedPurchase) => prisma.$transaction(async (tx) => {
     const latestUser = await tx.user.findUnique({
       where: { id: data.userId },
       select: { id: true, points: true },
@@ -28,22 +33,18 @@ export function submitSelfServeAdOrderTransaction(data: {
       throw new Error("用户不存在")
     }
 
-    if (latestUser.points < data.pricePoints) {
+    if (preparedPurchase.finalDelta < 0 && latestUser.points < Math.abs(preparedPurchase.finalDelta)) {
       return { error: "POINTS_NOT_ENOUGH" as const }
     }
 
-    await tx.user.update({
-      where: { id: latestUser.id },
-      data: { points: { decrement: data.pricePoints } },
-    })
-
-    await tx.pointLog.create({
-      data: {
-        userId: latestUser.id,
-        changeType: "DECREASE",
-        changeValue: data.pricePoints,
-        reason: data.pointReason,
-      },
+    await applyPointDelta({
+      tx,
+      userId: latestUser.id,
+      beforeBalance: latestUser.points,
+      prepared: preparedPurchase,
+      pointName: "积分",
+      insufficientMessage: "积分不足，无法提交广告订单",
+      reason: data.pointReason,
     })
 
     const order = await tx.selfServeAdOrder.create({
@@ -59,13 +60,13 @@ export function submitSelfServeAdOrderTransaction(data: {
         textColor: data.textColor,
         backgroundColor: data.backgroundColor,
         durationMonths: data.durationMonths,
-        pricePoints: data.pricePoints,
+        pricePoints: Math.max(0, -preparedPurchase.finalDelta),
         status: "PENDING",
       },
     })
 
     return { error: null as null, order }
-  })
+  }))
 }
 
 export function createSystemNotification(data: {

@@ -2,6 +2,7 @@ import { type Prisma } from "@prisma/client"
 
 import { prisma } from "@/db/client"
 import { countPostGiftEventsBySender, createPostGiftEvent, listPostGiftStats, listPostGiftSupportAggregates, listRecentPostGiftEvents, type PostGiftRecentEventItem, type PostGiftStatItem } from "@/db/post-gift-queries"
+import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
 import { getBusinessDayRange } from "@/lib/formatters"
 import { createSystemNotification } from "@/lib/notification-writes"
 import { PublicRouteError } from "@/lib/public-route-error"
@@ -156,6 +157,11 @@ async function createPostSupportBaseTransaction(params: {
   }) => Promise<void>
 }) {
   const { start, end } = getTodayRange()
+  const senderPreparedDelta = await prepareScopedPointDelta({
+    scopeKey: params.gift ? "GIFT_OUTGOING" : "TIP_OUTGOING",
+    baseDelta: -params.amount,
+    userId: params.senderId,
+  })
 
   return prisma.$transaction(async (tx) => {
     const [postRecord, senderRecord] = await Promise.all([
@@ -173,7 +179,7 @@ async function createPostSupportBaseTransaction(params: {
       post: postRecord,
       sender: senderRecord,
       senderId: params.senderId,
-      amount: params.amount,
+      amount: Math.max(params.amount, Math.abs(senderPreparedDelta.finalDelta)),
       pointName: params.pointName,
     })
 
@@ -195,22 +201,19 @@ async function createPostSupportBaseTransaction(params: {
       postTipError(400, `该帖子打赏次数已达上限（${params.perPostLimit} 次）`)
     }
 
-    await tx.user.update({
-      where: { id: sender.id },
-      data: {
-        points: {
-          decrement: params.amount,
-        },
-      },
+    const recipient = await tx.user.findUnique({
+      where: { id: post.authorId },
+      select: { id: true, points: true },
     })
 
-    await tx.user.update({
-      where: { id: post.authorId },
-      data: {
-        points: {
-          increment: params.amount,
-        },
-      },
+    if (!recipient) {
+      postTipError(404, "帖子作者不存在")
+    }
+
+    const recipientPreparedDelta = await prepareScopedPointDelta({
+      scopeKey: params.gift ? "GIFT_INCOMING" : "TIP_INCOMING",
+      baseDelta: params.amount,
+      userId: post.authorId,
     })
 
     await tx.post.update({
@@ -231,27 +234,29 @@ async function createPostSupportBaseTransaction(params: {
       sender,
     })
 
-    await tx.pointLog.createMany({
-      data: [
-        {
-          userId: sender.id,
-          changeType: "DECREASE",
-          changeValue: params.amount,
-          reason: buildTipReason(post.id, params.amount, params.pointName, params.gift),
-          relatedType: "POST",
-          relatedId: post.id,
-        },
-        {
-          userId: post.authorId,
-          changeType: "INCREASE",
-          changeValue: params.amount,
-          reason: params.gift
-            ? `帖子收到礼物 ${params.gift.name}，获得${params.amount}${params.pointName}`
-            : `帖子被打赏，获得${params.amount}${params.pointName}`,
-          relatedType: "POST",
-          relatedId: post.id,
-        },
-      ],
+    await applyPointDelta({
+      tx,
+      userId: sender.id,
+      beforeBalance: sender.points,
+      prepared: senderPreparedDelta,
+      pointName: params.pointName,
+      insufficientMessage: `${params.pointName}不足，无法完成打赏`,
+      reason: buildTipReason(post.id, params.amount, params.pointName, params.gift),
+      relatedType: "POST",
+      relatedId: post.id,
+    })
+
+    await applyPointDelta({
+      tx,
+      userId: post.authorId,
+      beforeBalance: recipient.points,
+      prepared: recipientPreparedDelta,
+      pointName: params.pointName,
+      reason: params.gift
+        ? `帖子收到礼物 ${params.gift.name}`
+        : "帖子被打赏",
+      relatedType: "POST",
+      relatedId: post.id,
     })
 
     await createSystemNotification({
@@ -262,8 +267,8 @@ async function createPostSupportBaseTransaction(params: {
       relatedId: post.id,
       title: "你的帖子收到了打赏",
       content: params.gift
-        ? `${sender.username} 送出了 ${params.gift.name} 给你的帖子《${post.title}》，你已收到 ${params.amount} ${params.pointName}。`
-        : `${sender.username} 打赏了你的帖子《${post.title}》，你已收到 ${params.amount} ${params.pointName}。`,
+        ? `${sender.username} 送出了 ${params.gift.name} 给你的帖子《${post.title}》，你已收到 ${Math.abs(recipientPreparedDelta.finalDelta)} ${params.pointName}。`
+        : `${sender.username} 打赏了你的帖子《${post.title}》，你已收到 ${Math.abs(recipientPreparedDelta.finalDelta)} ${params.pointName}。`,
     })
 
     return {

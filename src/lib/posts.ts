@@ -8,6 +8,7 @@ import { mapLotteryView } from "@/lib/lottery"
 import { getPublicPostContentText, parsePostContentDocument } from "@/lib/post-content"
 import type { PostRedPacketSummary } from "@/lib/post-red-packets"
 import type { PostTipSummary } from "@/lib/post-tips"
+import type { PostRewardPoolMode } from "@/lib/post-reward-pool-config"
 import { withRuntimeFallback } from "@/lib/runtime-errors"
 import type { SiteTippingGiftItem } from "@/lib/site-settings"
 
@@ -74,6 +75,7 @@ export interface SitePostItem {
   }>
 
   publishedAt: string
+  publishedAtRaw?: string
 
   excerpt: string
   coverImage?: string | null
@@ -109,6 +111,7 @@ export interface SitePostItem {
   isPinned: boolean
   pinScope?: string | null
   hasRedPacket?: boolean
+  rewardMode?: PostRewardPoolMode
   minViewLevel?: number
   minViewVipLevel?: number
   isFeatured: boolean

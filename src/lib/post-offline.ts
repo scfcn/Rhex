@@ -1,7 +1,8 @@
-import { ChangeType, PostStatus } from "@/db/types"
+import { PostStatus } from "@/db/types"
 
 import { prisma } from "@/db/client"
 import { getCurrentUser } from "@/lib/auth"
+import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
 import { getSiteSettings } from "@/lib/site-settings"
 import { isVipActive } from "@/lib/vip-status"
 
@@ -103,24 +104,22 @@ export async function offlineOwnPost(input: { postId: string; reason?: string | 
     }
 
     if (latestPrice.amount > 0) {
-      await tx.user.update({
-        where: { id: latestUser.id },
-        data: {
-          points: {
-            decrement: latestPrice.amount,
-          },
-        },
+      const preparedPrice = await prepareScopedPointDelta({
+        scopeKey: "POST_OFFLINE_PURCHASE",
+        baseDelta: -latestPrice.amount,
+        userId: latestUser.id,
       })
 
-      await tx.pointLog.create({
-        data: {
-          userId: latestUser.id,
-          changeType: ChangeType.DECREASE,
-          changeValue: latestPrice.amount,
-          reason: `作者下线帖子扣除${settings.pointName}`,
-          relatedType: "POST",
-          relatedId: post.id,
-        },
+      await applyPointDelta({
+        tx,
+        userId: latestUser.id,
+        beforeBalance: latestUser.points,
+        prepared: preparedPrice,
+        pointName: settings.pointName,
+        insufficientMessage: `当前${settings.pointName}不足`,
+        reason: "作者下线帖子",
+        relatedType: "POST",
+        relatedId: post.id,
       })
     }
 

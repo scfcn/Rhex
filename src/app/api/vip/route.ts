@@ -1,8 +1,7 @@
 import { getCurrentUserRecord } from "@/db/current-user"
-import { ChangeType } from "@/db/types"
-
 import { prisma } from "@/db/client"
 import { apiError, apiSuccess, createUserRouteHandler, readJsonBody, requireStringField } from "@/lib/api-route"
+import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
 import { getSiteSettings } from "@/lib/site-settings"
 
 function addDays(date: Date, days: number) {
@@ -32,8 +31,13 @@ export const POST = createUserRouteHandler(async ({ request }) => {
 
   if (action in vipPlanMap) {
     const plan = vipPlanMap[action as keyof typeof vipPlanMap]
+    const preparedPurchase = await prepareScopedPointDelta({
+      scopeKey: "VIP_PURCHASE",
+      baseDelta: -plan.points,
+      userId: dbUser.id,
+    })
 
-    if (dbUser.points < plan.points) {
+    if (preparedPurchase.finalDelta < 0 && dbUser.points < Math.abs(preparedPurchase.finalDelta)) {
       apiError(400, `${settings.pointName}不足，无法购买${plan.label}`)
     }
 
@@ -45,24 +49,22 @@ export const POST = createUserRouteHandler(async ({ request }) => {
         data: {
           vipLevel: Math.max(dbUser.vipLevel || 0, plan.level),
           vipExpiresAt: nextExpiresAt,
-          points: {
-            decrement: plan.points,
-          },
         },
       })
-      await tx.pointLog.create({
-        data: {
-          userId: dbUser.id,
-          changeType: ChangeType.DECREASE,
-          changeValue: plan.points,
-          reason: `${settings.pointName}购买${plan.label}`,
-        },
+      await applyPointDelta({
+        tx,
+        userId: dbUser.id,
+        beforeBalance: dbUser.points,
+        prepared: preparedPurchase,
+        pointName: settings.pointName,
+        insufficientMessage: `${settings.pointName}不足，无法购买${plan.label}`,
+        reason: `购买${plan.label}`,
       })
       await tx.vipOrder.create({
         data: {
           userId: dbUser.id,
           orderType: action,
-          pointsCost: plan.points,
+          pointsCost: Math.max(0, -preparedPurchase.finalDelta),
           days: plan.days,
           vipLevel: Math.max(dbUser.vipLevel || 0, plan.level),
           expiresAt: nextExpiresAt,
@@ -71,7 +73,7 @@ export const POST = createUserRouteHandler(async ({ request }) => {
       })
     })
 
-    return apiSuccess(undefined, `已成功使用${settings.pointName}开通 / 续费 ${plan.label}`)
+    return apiSuccess(undefined, `已成功开通 / 续费 ${plan.label}`)
   }
 
   apiError(400, "不支持的 VIP 操作")

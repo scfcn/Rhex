@@ -7,7 +7,7 @@ import {
 import { syncUserReceivedLikes } from "@/lib/level-system"
 import { logError } from "@/lib/logger"
 import { enrollUserInLotteryPool } from "@/lib/lottery"
-import { tryClaimPostRedPacket } from "@/lib/post-red-packets"
+import { tryTriggerPostRewardPool } from "@/lib/post-red-packets"
 
 function logSideEffectError(scope: string, error: unknown) {
   logError({ scope: "side-effect", metadata: { effect: scope } }, error)
@@ -63,7 +63,7 @@ export async function handlePostLikeSideEffects(input: {
   targetUserId: number | null
 }) {
   const redPacketClaim = input.liked
-    ? await swallowSideEffect(`post-like:red-packet:${input.postId}:${input.userId}`, () => tryClaimPostRedPacket({
+    ? await swallowSideEffect(`post-like:red-packet:${input.postId}:${input.userId}`, () => tryTriggerPostRewardPool({
         postId: input.postId,
         userId: input.userId,
         triggerType: "LIKE",
@@ -93,7 +93,7 @@ export async function handlePostFavoriteSideEffects(input: {
     }
   }
 
-  const redPacketClaim = await swallowSideEffect(`post-favorite:red-packet:${input.postId}:${input.userId}`, () => tryClaimPostRedPacket({
+  const redPacketClaim = await swallowSideEffect(`post-favorite:red-packet:${input.postId}:${input.userId}`, () => tryTriggerPostRewardPool({
     postId: input.postId,
     userId: input.userId,
     triggerType: "FAVORITE",
@@ -115,7 +115,7 @@ export async function handleCommentCreateSideEffects(input: {
   userId: number
   commentId: string
 }) {
-  const redPacketClaim = await swallowSideEffect(`comment-create:red-packet:${input.commentId}`, () => tryClaimPostRedPacket({
+  const redPacketClaim = await swallowSideEffect(`comment-create:red-packet:${input.commentId}`, () => tryTriggerPostRewardPool({
     postId: input.postId,
     userId: input.userId,
     triggerType: "REPLY",

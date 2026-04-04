@@ -35,7 +35,9 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     })
   }
 
-  const redPacketMessage = redPacketClaim?.claimed ? `，并领取了 ${redPacketClaim.amount} ${redPacketClaim.pointName} 红包` : ""
+  const redPacketMessage = redPacketClaim?.claimed
+    ? `，并获得了 ${redPacketClaim.amount} ${redPacketClaim.pointName} ${redPacketClaim.rewardMode === "JACKPOT" ? "聚宝盆奖励" : "红包"}`
+    : ""
 
   logRequestSucceeded({
     scope: "comments-create",

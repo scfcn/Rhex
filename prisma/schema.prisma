@@ -138,6 +138,25 @@ enum ChangeType {
   DECREASE
 }
 
+enum PointEffectTargetType {
+  POINTS
+  PROBABILITY
+}
+
+enum PointEffectRuleKind {
+  FIXED
+  PERCENTAGE
+  RANDOM_FIXED
+  RANDOM_PERCENTAGE
+  RANDOM_SIGNED_MULTIPLIER
+}
+
+enum PointEffectDirection {
+  BUFF
+  NERF
+  RANDOM_SIGNED
+}
+
 enum AnnouncementStatus {
   DRAFT
   PUBLISHED
@@ -168,6 +187,10 @@ enum BadgeRuleType {
   COMMENT_COUNT
   RECEIVED_LIKE_COUNT
   INVITE_COUNT
+  ACCEPTED_ANSWER_COUNT
+  SENT_TIP_COUNT
+  RECEIVED_TIP_COUNT
+  FOLLOWER_COUNT
   USER_ID
   LEVEL
   CHECK_IN_DAYS
@@ -292,9 +315,12 @@ model User {
   postGiftStatsReceived  PostGiftStats[] @relation("PostGiftStatsReceiver")
   redPacketsSent    PostRedPacket[]
   redPacketClaims   PostRedPacketClaim[] @relation("PostRedPacketClaimUser")
+  commentEffectFeedbacks CommentEffectFeedback[]
   checkInLogs       UserCheckInLog[]
   pollVotes         PollVote[]
   uploads           Upload[]
+  authAccounts      AuthAccount[]
+  authPasskeys      AuthPasskey[]
   userBadges        UserBadge[]
   adminLogs         AdminLog[]
   announcements     Announcement[] @relation("announcementCreator")
@@ -318,6 +344,41 @@ model User {
   @@index([status])
   @@index([createdAt])
   @@index([inviterId])
+}
+
+model AuthAccount {
+  id                String   @id
+  userId            Int
+  provider          String
+  providerAccountId String
+  providerUsername  String?
+  providerEmail     String?
+  metadataJson      String?
+  createdAt         DateTime @db.Timestamptz(3) @default(now())
+  updatedAt         DateTime @db.Timestamptz(3) @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId, provider])
+}
+
+model AuthPasskey {
+  id                  String   @id
+  userId              Int
+  credentialId        String   @unique
+  credentialPublicKey String
+  counter             BigInt   @default(0)
+  deviceType          String?
+  backedUp            Boolean  @default(false)
+  transports          String?
+  name                String?
+  lastUsedAt          DateTime? @db.Timestamptz(3)
+  createdAt           DateTime @db.Timestamptz(3) @default(now())
+  updatedAt           DateTime @db.Timestamptz(3) @updatedAt
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([lastUsedAt])
 }
 
 model UserLevelProgress {
@@ -647,6 +708,7 @@ model Post {
   giftStats              PostGiftStats[]
   redPacket              PostRedPacket?
   redPacketClaims        PostRedPacketClaim[]
+  commentEffectFeedbacks CommentEffectFeedback[]
   followers              PostFollow[]
 
   @@index([boardId])
@@ -746,6 +808,7 @@ model Comment {
   pollVotes             PollVote[]
   lotteryParticipants   LotteryParticipant[]
   redPacketClaims       PostRedPacketClaim[]
+  effectFeedback        CommentEffectFeedback?
 
   @@index([postId])
   @@index([userId])
@@ -976,12 +1039,14 @@ model Badge {
   imageUrl    String?
   category    String?     @default("社区成就")
   sortOrder   Int         @default(0)
+  pointsCost  Int         @default(0)
   status      Boolean     @default(true)
   isHidden    Boolean     @default(false)
   createdAt   DateTime   @db.Timestamptz(3)       @default(now())
   updatedAt   DateTime   @db.Timestamptz(3)       @updatedAt
   users       UserBadge[]
   rules       BadgeRule[]
+  effects     PointEffectRule[]
 
   @@index([status, sortOrder])
 }
@@ -1076,6 +1141,29 @@ model PointLog {
 
   @@index([userId])
   @@index([createdAt])
+}
+
+model PointEffectRule {
+  id               String                  @id @default(cuid())
+  badgeId          String?
+  name             String
+  description      String?
+  targetType       PointEffectTargetType
+  scopeKeys        String[]
+  ruleKind         PointEffectRuleKind
+  direction        PointEffectDirection    @default(BUFF)
+  value            Float
+  extraValue       Float?
+  startMinuteOfDay Int?
+  endMinuteOfDay   Int?
+  sortOrder        Int                     @default(0)
+  status           Boolean                 @default(true)
+  createdAt        DateTime   @db.Timestamptz(3)   @default(now())
+  updatedAt        DateTime   @db.Timestamptz(3)   @updatedAt
+  badge            Badge?                  @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@index([status, targetType, sortOrder])
+  @@index([badgeId, status, targetType, sortOrder])
 }
 
 model VipOrder {
@@ -1268,6 +1356,7 @@ model SiteSetting {
   headerAppLinksJson            String?  @default("[{\"id\":\"home\",\"name\":\"首页\",\"href\":\"/\"},{\"id\":\"boards\",\"name\":\"节点\",\"href\":\"/boards\"},{\"id\":\"write\",\"name\":\"发帖\",\"href\":\"/write\"},{\"id\":\"messages\",\"name\":\"消息\",\"href\":\"/messages\"}]")
   headerAppIconName            String   @default("grid")
   appStateJson               String?  @default("{}")
+  sensitiveStateJson         String?  @default("{}")
   footerLinksJson               String?  @default("[{\"label\":\"关于\",\"href\":\"/about\"},{\"label\":\"小黑屋\",\"href\":\"/prison\"},{\"label\":\"帮助文档\",\"href\":\"/help\"},{\"label\":\"FAQ\",\"href\":\"/faq\"},{\"label\":\"协议\",\"href\":\"/terms\"}]")
   createdAt                     DateTime   @db.Timestamptz(3)    @default(now())
   updatedAt                     DateTime   @db.Timestamptz(3)    @updatedAt
@@ -1385,11 +1474,33 @@ model PostRedPacketClaim {
   post             Post                     @relation(fields: [postId], references: [id], onDelete: Cascade)
   user             User                     @relation("PostRedPacketClaimUser", fields: [userId], references: [id], onDelete: Cascade)
   triggerComment   Comment?                 @relation(fields: [triggerCommentId], references: [id], onDelete: SetNull)
+  effectFeedbacks  CommentEffectFeedback[]
 
-  @@unique([redPacketId, userId])
+  @@unique([redPacketId, userId, triggerCommentId])
   @@index([postId, createdAt])
   @@index([userId, createdAt])
   @@index([redPacketId, createdAt])
+}
+
+model CommentEffectFeedback {
+  id            String              @id @default(cuid())
+  postId        String
+  commentId     String              @unique
+  userId        Int
+  scene         String
+  rewardClaimId String?
+  feedbackJson  Json
+  createdAt     DateTime            @db.Timestamptz(3) @default(now())
+  updatedAt     DateTime            @db.Timestamptz(3) @updatedAt
+  post          Post                @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment       Comment             @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rewardClaim   PostRedPacketClaim? @relation(fields: [rewardClaimId], references: [id], onDelete: SetNull)
+
+  @@index([postId, commentId])
+  @@index([postId, createdAt])
+  @@index([userId, createdAt])
+  @@index([rewardClaimId])
 }
 
 model InviteCode {

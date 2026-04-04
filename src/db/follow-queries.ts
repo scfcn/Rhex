@@ -398,6 +398,12 @@ export function countUserUserFollows(userId: number) {
   })
 }
 
+export function countUserFollowers(userId: number) {
+  return prisma.userFollow.count({
+    where: { followingId: userId },
+  })
+}
+
 export function findUserUserFollowsById(userId: number, options: { page: number; pageSize: number }) {
   const normalizedPageSize = Math.min(Math.max(1, options.pageSize), 50)
 
@@ -405,6 +411,24 @@ export function findUserUserFollowsById(userId: number, options: { page: number;
     where: { followerId: userId },
     include: {
       following: {
+        select: userFollowTargetSelect,
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    skip: (options.page - 1) * normalizedPageSize,
+    take: normalizedPageSize,
+  })
+}
+
+export function findUserFollowersById(userId: number, options: { page: number; pageSize: number }) {
+  const normalizedPageSize = Math.min(Math.max(1, options.pageSize), 50)
+
+  return prisma.userFollow.findMany({
+    where: { followingId: userId },
+    include: {
+      follower: {
         select: userFollowTargetSelect,
       },
     },

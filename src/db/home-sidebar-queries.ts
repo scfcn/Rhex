@@ -77,6 +77,11 @@ export function findSidebarCurrentUser(username: string) {
       postCount: true,
       points: true,
       likeReceivedCount: true,
+      _count: {
+        select: {
+          followedByUsers: true,
+        },
+      },
     },
   })
 }

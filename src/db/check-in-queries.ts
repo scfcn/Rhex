@@ -1,7 +1,6 @@
-import { ChangeType } from "@/db/types"
-
 import { prisma } from "@/db/client"
 import { withDbTransaction } from "@/db/helpers"
+import { applyPointDelta, type PreparedPointDelta } from "@/lib/point-center"
 
 export interface UserCheckInCalendarEntryRow {
   checkedInOn: string
@@ -15,8 +14,10 @@ export interface ExecuteUserCheckInParams {
   userId: number
   dateKey: string
   reward: number
+  rewardDelta: PreparedPointDelta
   pointName: string
   makeUpCost: number
+  makeUpCostDelta: PreparedPointDelta
   isMakeUp: boolean
 }
 
@@ -79,18 +80,6 @@ export async function executeUserCheckIn(params: ExecuteUserCheckInParams): Prom
       return { alreadyCheckedIn: true, points: dbUser.points }
     }
 
-    const updatedUser = await tx.user.update({
-      where: { id: dbUser.id },
-      data: {
-        points: {
-          increment: params.reward - params.makeUpCost,
-        },
-      },
-      select: {
-        points: true,
-      },
-    })
-
     await tx.userCheckInLog.create({
       data: {
         userId: dbUser.id,
@@ -101,28 +90,34 @@ export async function executeUserCheckIn(params: ExecuteUserCheckInParams): Prom
       },
     })
 
-    if (params.makeUpCost > 0) {
-      await tx.pointLog.create({
-        data: {
-          userId: dbUser.id,
-          changeType: ChangeType.DECREASE,
-          changeValue: params.makeUpCost,
-          reason: `购买签到补签卡，消耗${params.pointName}`,
-        },
+    let pointBalanceCursor = dbUser.points
+
+    if (params.makeUpCostDelta.finalDelta !== 0) {
+      const makeUpCostResult = await applyPointDelta({
+        tx,
+        userId: dbUser.id,
+        beforeBalance: pointBalanceCursor,
+        prepared: params.makeUpCostDelta,
+        pointName: params.pointName,
+        insufficientMessage: `${params.pointName}不足，无法补签`,
+        reason: `购买签到补签卡，消耗${params.pointName}`,
       })
+      pointBalanceCursor = makeUpCostResult.afterBalance
     }
 
-    if (params.reward > 0) {
-      await tx.pointLog.create({
-        data: {
-          userId: dbUser.id,
-          changeType: ChangeType.INCREASE,
-          changeValue: params.reward,
-          reason: params.isMakeUp ? `补签获得${params.pointName}` : `每日签到获得${params.pointName}`,
-        },
+    if (params.rewardDelta.finalDelta !== 0) {
+      const rewardResult = await applyPointDelta({
+        tx,
+        userId: dbUser.id,
+        beforeBalance: pointBalanceCursor,
+        prepared: params.rewardDelta,
+        pointName: params.pointName,
+        insufficientMessage: `${params.pointName}不足，无法完成签到结算`,
+        reason: params.isMakeUp ? `补签获得${params.pointName}` : `每日签到获得${params.pointName}`,
       })
+      pointBalanceCursor = rewardResult.afterBalance
     }
 
-    return { alreadyCheckedIn: false, points: updatedUser.points }
+    return { alreadyCheckedIn: false, points: pointBalanceCursor }
   })
 }

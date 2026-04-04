@@ -22,12 +22,14 @@ import {
   CoverConfigModal,
   LotterySettingsSection,
   PollSettingsSection,
+  PostRewardPoolModal,
   PostEnhancementsSection,
   TagConfigModal,
 } from "@/components/create-post-form.sections"
 import {
   buildInitialPostDraft,
   buildLotteryConditionItem,
+  buildNextLotteryConditionGroupKey,
   buildSubmitRequest,
   getAvailablePostTypes,
   normalizeDraftData,
@@ -46,8 +48,16 @@ export function CreatePostForm({
   boardOptions,
   pointName,
   postRedPacketEnabled = false,
+  postRedPacketMaxPoints = 100,
+  postJackpotEnabled = false,
+  postJackpotMinInitialPoints = 100,
+  postJackpotMaxInitialPoints = 1000,
+  postJackpotReplyIncrementPoints = 25,
+  postJackpotHitProbability = 15,
   markdownEmojiMap,
   currentUser,
+  viewLevelOptions,
+  viewVipLevelOptions,
   mode = "create",
   postId,
   initialValues,
@@ -65,6 +75,7 @@ export function CreatePostForm({
   const [tagInput, setTagInput] = useState("")
   const [tagModalOpen, setTagModalOpen] = useState(false)
   const [coverModalOpen, setCoverModalOpen] = useState(false)
+  const [rewardPoolModalOpen, setRewardPoolModalOpen] = useState(false)
   const [tagEditingIndex, setTagEditingIndex] = useState<number | null>(null)
   const [tagEditingValue, setTagEditingValue] = useState("")
   const [pendingDraftToRestore, setPendingDraftToRestore] = useState<LocalPostDraft | null>(null)
@@ -97,6 +108,7 @@ export function CreatePostForm({
     () => multiplyPositiveSafeIntegers(normalizedRedPacketUnitPoints, normalizedRedPacketPacketCount),
     [normalizedRedPacketPacketCount, normalizedRedPacketUnitPoints],
   )
+  const rewardPoolFeatureEnabled = postRedPacketEnabled || postJackpotEnabled
   const allBoards = useMemo(() => boardOptions.flatMap((group) => group.items), [boardOptions])
   const selectedBoard = allBoards.find((item) => item.value === draft.boardSlug) ?? allBoards[0]
   const allowedPostTypes = useMemo(() => resolveAllowedPostTypes(selectedBoard), [selectedBoard])
@@ -360,9 +372,9 @@ export function CreatePostForm({
   }
 
   function updateLotteryCondition(index: number, field: keyof LocalPostDraft["lotteryConditions"][number], value: string) {
-    updateDraftField(
-      "lotteryConditions",
-      draft.lotteryConditions.map((item, currentIndex) => {
+    setDraft((current) => ({
+      ...current,
+      lotteryConditions: current.lotteryConditions.map((item, currentIndex) => {
         if (currentIndex !== index) {
           return item
         }
@@ -376,19 +388,63 @@ export function CreatePostForm({
 
         return { ...item, [field]: value }
       }),
-    )
+    }))
   }
 
-  function addLotteryCondition(type = "LIKE_POST", groupKey = "default") {
-    if (draft.lotteryConditions.length < 20) {
-      updateDraftField("lotteryConditions", [...draft.lotteryConditions, buildLotteryConditionItem(type, pointName, groupKey)])
-    }
+  function addLotteryCondition(type = "REPLY_CONTENT_LENGTH", groupKey = "default") {
+    setDraft((current) => {
+      if (current.lotteryConditions.length >= 20) {
+        return current
+      }
+
+      return {
+        ...current,
+        lotteryConditions: [...current.lotteryConditions, buildLotteryConditionItem(type, pointName, groupKey)],
+      }
+    })
+  }
+
+  function addLotteryConditionGroup() {
+    setDraft((current) => {
+      if (current.lotteryConditions.length >= 20) {
+        return current
+      }
+
+      return {
+        ...current,
+        lotteryConditions: [
+          ...current.lotteryConditions,
+          buildLotteryConditionItem("REPLY_CONTENT_LENGTH", pointName, buildNextLotteryConditionGroupKey(current.lotteryConditions)),
+        ],
+      }
+    })
   }
 
   function removeLotteryCondition(index: number) {
-    if (draft.lotteryConditions.length > 1) {
-      updateDraftField("lotteryConditions", draft.lotteryConditions.filter((_, currentIndex) => currentIndex !== index))
-    }
+    setDraft((current) => {
+      if (current.lotteryConditions.length <= 1) {
+        return current
+      }
+
+      return {
+        ...current,
+        lotteryConditions: current.lotteryConditions.filter((_, currentIndex) => currentIndex !== index),
+      }
+    })
+  }
+
+  function removeLotteryConditionGroup(groupKey: string) {
+    setDraft((current) => {
+      const remainingConditions = current.lotteryConditions.filter((item) => item.groupKey !== groupKey)
+      if (remainingConditions.length === 0) {
+        return current
+      }
+
+      return {
+        ...current,
+        lotteryConditions: remainingConditions,
+      }
+    })
   }
 
   async function handleCoverUpload(event: ChangeEvent<HTMLInputElement>) {
@@ -569,6 +625,8 @@ export function CreatePostForm({
             lotteryParticipantGoal={draft.lotteryParticipantGoal}
             lotteryPrizes={draft.lotteryPrizes}
             lotteryConditions={draft.lotteryConditions}
+            userLevelOptions={viewLevelOptions}
+            vipLevelOptions={viewVipLevelOptions}
             onLotteryStartsAtChange={(value) => updateDraftField("lotteryStartsAt", value)}
             onLotteryEndsAtChange={(value) => updateDraftField("lotteryEndsAt", value)}
             onLotteryParticipantGoalChange={(value) => updateDraftField("lotteryParticipantGoal", value)}
@@ -576,8 +634,10 @@ export function CreatePostForm({
             onAddLotteryPrize={addLotteryPrize}
             onRemoveLotteryPrize={removeLotteryPrize}
             onLotteryConditionChange={updateLotteryCondition}
+            onAddLotteryConditionGroup={addLotteryConditionGroup}
             onAddLotteryCondition={addLotteryCondition}
             onRemoveLotteryCondition={removeLotteryCondition}
+            onRemoveLotteryConditionGroup={removeLotteryConditionGroup}
             disabled={isEditMode}
           />
         ) : null}
@@ -597,8 +657,7 @@ export function CreatePostForm({
 
         <PostEnhancementsSection
           pointName={pointName}
-          postRedPacketEnabled={postRedPacketEnabled}
-          disabled={isEditMode}
+          postRedPacketEnabled={rewardPoolFeatureEnabled}
           settings={{
             finalTags: draft.manualTags,
             autoExtractedTags,
@@ -611,13 +670,14 @@ export function CreatePostForm({
             minViewLevel: draft.minViewLevel,
             minViewVipLevel: draft.minViewVipLevel,
             redPacketEnabled: draft.redPacketEnabled,
+            redPacketMode: draft.redPacketMode,
             redPacketGrantMode: draft.redPacketGrantMode,
-            redPacketClaimOrderMode: draft.redPacketClaimOrderMode,
             redPacketTriggerType: draft.redPacketTriggerType,
-            redPacketUnitPoints: draft.redPacketUnitPoints,
-            redPacketTotalPoints: draft.redPacketTotalPoints,
-            redPacketPacketCount: draft.redPacketPacketCount,
+            jackpotInitialPoints: draft.jackpotInitialPoints,
             fixedRedPacketTotalPoints,
+            postJackpotMinInitialPoints,
+            postJackpotReplyIncrementPoints,
+            postJackpotHitProbability,
           }}
           actions={{
             onOpenTagModal: () => setTagModalOpen(true),
@@ -631,10 +691,24 @@ export function CreatePostForm({
             onClearPurchaseUnlock: () => patchDraft({ purchaseUnlockContent: "", purchasePrice: "20" }),
             onOpenViewLevelModal: () => setActiveModal("view-level"),
             onClearViewLevel: () => patchDraft({ minViewLevel: "0", minViewVipLevel: "0" }),
+            onOpenRewardPoolModal: () => setRewardPoolModalOpen(true),
+            onClearRewardPool: () => patchDraft({
+              redPacketEnabled: false,
+              redPacketMode: "RED_PACKET",
+              jackpotInitialPoints: String(postJackpotMinInitialPoints),
+              redPacketGrantMode: "FIXED",
+              redPacketClaimOrderMode: "FIRST_COME_FIRST_SERVED",
+              redPacketTriggerType: "REPLY",
+              redPacketUnitPoints: "10",
+              redPacketTotalPoints: "10",
+              redPacketPacketCount: "1",
+            }),
             onRedPacketEnabledChange: (checked) => updateDraftField("redPacketEnabled", checked),
+            onRedPacketModeChange: (value) => updateDraftField("redPacketMode", value),
             onRedPacketGrantModeChange: (value) => updateDraftField("redPacketGrantMode", value),
             onRedPacketClaimOrderModeChange: (value) => updateDraftField("redPacketClaimOrderMode", value),
             onRedPacketTriggerTypeChange: (value) => updateDraftField("redPacketTriggerType", value),
+            onJackpotInitialPointsChange: (value) => updateDraftField("jackpotInitialPoints", value),
             onRedPacketValueChange: (value) => {
               if (draft.redPacketGrantMode === "FIXED") {
                 updateDraftField("redPacketUnitPoints", value)
@@ -694,6 +768,43 @@ export function CreatePostForm({
         onRemoveManualTag={removeManualTag}
       />
 
+      <PostRewardPoolModal
+        open={rewardPoolModalOpen}
+        pointName={pointName}
+        redPacketEnabled={postRedPacketEnabled}
+        redPacketMaxPoints={postRedPacketMaxPoints}
+        jackpotEnabled={postJackpotEnabled}
+        jackpotMinInitialPoints={postJackpotMinInitialPoints}
+        jackpotMaxInitialPoints={postJackpotMaxInitialPoints}
+        jackpotReplyIncrementPoints={postJackpotReplyIncrementPoints}
+        currentUserPoints={currentUser.points}
+        value={{
+          enabled: draft.redPacketEnabled,
+          mode: draft.redPacketMode,
+          grantMode: draft.redPacketGrantMode,
+          claimOrderMode: draft.redPacketClaimOrderMode,
+          triggerType: draft.redPacketTriggerType,
+          jackpotInitialPoints: draft.jackpotInitialPoints,
+          unitPoints: draft.redPacketUnitPoints,
+          totalPoints: draft.redPacketTotalPoints,
+          packetCount: draft.redPacketPacketCount,
+          fixedTotalPoints: fixedRedPacketTotalPoints,
+        }}
+        disabled={isEditMode}
+        onClose={() => setRewardPoolModalOpen(false)}
+        onChange={{
+          onEnabledChange: (checked) => updateDraftField("redPacketEnabled", checked),
+          onModeChange: (value) => updateDraftField("redPacketMode", value),
+          onGrantModeChange: (value) => updateDraftField("redPacketGrantMode", value),
+          onClaimOrderModeChange: (value) => updateDraftField("redPacketClaimOrderMode", value),
+          onTriggerTypeChange: (value) => updateDraftField("redPacketTriggerType", value),
+          onJackpotInitialPointsChange: (value) => updateDraftField("jackpotInitialPoints", value),
+          onUnitPointsChange: (value) => updateDraftField("redPacketUnitPoints", value),
+          onTotalPointsChange: (value) => updateDraftField("redPacketTotalPoints", value),
+          onPacketCountChange: (value) => updateDraftField("redPacketPacketCount", value),
+        }}
+      />
+
       <HiddenContentModal
         open={activeModal === "reply"}
         title="配置回复后可看"
@@ -706,6 +817,8 @@ export function CreatePostForm({
       <PostViewLevelModal
         open={activeModal === "view-level"}
         value={{ minViewLevel: draft.minViewLevel, minViewVipLevel: draft.minViewVipLevel }}
+        levelOptions={viewLevelOptions}
+        vipLevelOptions={viewVipLevelOptions}
         onChange={({ minViewLevel, minViewVipLevel }) => patchDraft({ minViewLevel, minViewVipLevel })}
         onClose={() => setActiveModal(null)}
       />

@@ -1,9 +1,11 @@
 import {
   countUserBoardFollows,
+  countUserFollowers,
   countUserPostFollows,
   countUserTagFollows,
   countUserUserFollows,
   findUserBoardFollowsById,
+  findUserFollowersById,
   findUserPostFollowsById,
   findUserTagFollowsById,
   findUserUserFollowsById,
@@ -85,6 +87,28 @@ export interface UserBoardFollowsResult {
 }
 
 export interface UserUserFollowsResult {
+  items: Array<{
+    id: number
+    username: string
+    displayName: string
+    bio: string
+    avatarPath?: string | null
+    status: "ACTIVE" | "MUTED" | "BANNED" | "INACTIVE"
+    level: number
+    postCount: number
+    commentCount: number
+    likeReceivedCount: number
+    followerCount: number
+  }>
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
+  hasPrevPage: boolean
+  hasNextPage: boolean
+}
+
+export interface UserFollowersResult {
   items: Array<{
     id: number
     username: string
@@ -332,6 +356,39 @@ export async function getUserUserFollows(userId: number, options: { page?: numbe
         commentCount: follow.following.commentCount,
         likeReceivedCount: follow.following.likeReceivedCount,
         followerCount: follow.following._count.followedByUsers,
+      })),
+      ...pagination,
+    }
+  } catch (error) {
+    console.error(error)
+    return {
+      items: [],
+      ...createEmptyPageResult(pageSize),
+    }
+  }
+}
+
+export async function getUserFollowers(userId: number, options: { page?: number; pageSize?: number } = {}): Promise<UserFollowersResult> {
+  const { pageSize, requestedPage } = resolvePagination(options, 12)
+
+  try {
+    const total = await countUserFollowers(userId)
+    const pagination = resolvePagedResult(total, pageSize, requestedPage)
+    const follows = await findUserFollowersById(userId, { page: pagination.page, pageSize })
+
+    return {
+      items: follows.map((follow) => ({
+        id: follow.follower.id,
+        username: follow.follower.username,
+        displayName: getUserDisplayName(follow.follower),
+        bio: follow.follower.bio?.trim() || "这个用户还没有留下简介。",
+        avatarPath: follow.follower.avatarPath,
+        status: follow.follower.status,
+        level: follow.follower.level,
+        postCount: follow.follower.postCount,
+        commentCount: follow.follower.commentCount,
+        likeReceivedCount: follow.follower.likeReceivedCount,
+        followerCount: follow.follower._count.followedByUsers,
       })),
       ...pagination,
     }

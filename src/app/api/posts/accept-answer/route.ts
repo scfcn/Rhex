@@ -1,8 +1,9 @@
-import { ChangeType, PostStatus } from "@/db/types"
+import { PostStatus } from "@/db/types"
 
 import { prisma } from "@/db/client"
 import { apiError, apiSuccess, createUserRouteHandler, readJsonBody, requireStringField } from "@/lib/api-route"
 import { createSystemNotification } from "@/lib/notification-writes"
+import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
 import { getSiteSettings } from "@/lib/site-settings"
 
 export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
@@ -69,32 +70,42 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
       },
     })
 
+    const answerUser = await tx.user.findUnique({
+      where: { id: comment.userId },
+      select: { id: true, points: true },
+    })
+
+    if (!answerUser) {
+      apiError(404, "答题用户不存在")
+    }
+
+    const preparedReward = post.bountyPoints && post.bountyPoints > 0
+      ? await prepareScopedPointDelta({
+          scopeKey: "BOUNTY_ACCEPT_REWARD",
+          baseDelta: post.bountyPoints,
+          userId: comment.userId,
+        })
+      : null
+
     await tx.user.update({
       where: { id: comment.userId },
       data: {
         acceptedAnswerCount: {
           increment: 1,
         },
-        ...(post.bountyPoints && post.bountyPoints > 0
-          ? {
-              points: {
-                increment: post.bountyPoints,
-              },
-            }
-          : {}),
       },
     })
 
-    if (post.bountyPoints && post.bountyPoints > 0) {
-      await tx.pointLog.create({
-        data: {
-          userId: comment.userId,
-          changeType: ChangeType.INCREASE,
-          changeValue: post.bountyPoints,
-          reason: "悬赏帖答案被采纳，获得积分",
-          relatedType: "POST",
-          relatedId: postId,
-        },
+    if (preparedReward) {
+      await applyPointDelta({
+        tx,
+        userId: comment.userId,
+        beforeBalance: answerUser.points,
+        prepared: preparedReward,
+        pointName: settings.pointName,
+        reason: "悬赏帖答案被采纳，获得积分",
+        relatedType: "POST",
+        relatedId: postId,
       })
     }
 
@@ -105,10 +116,10 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
       relatedType: "POST",
       relatedId: postId,
       title: "你的回复被采纳为答案",
-      content: `你的回复已被采纳为悬赏帖答案${post.bountyPoints ? `，获得 ${post.bountyPoints} ${settings.pointName}奖励` : ""}。`,
+      content: `你的回复已被采纳为悬赏帖答案${post.bountyPoints ? `，奖励基准为 ${post.bountyPoints} ${settings.pointName}` : ""}。`,
     })
 
-    return post.bountyPoints ?? 0
+    return Math.max(0, preparedReward?.finalDelta ?? 0)
   })
 
   return apiSuccess(undefined, `已采纳答案，奖励 ${result} ${settings.pointName}`)

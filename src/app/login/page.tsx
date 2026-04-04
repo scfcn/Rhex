@@ -6,6 +6,7 @@ import { LoginForm } from "@/components/login-form"
 import { SiteHeader } from "@/components/site-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getCurrentUser } from "@/lib/auth"
+import { readSearchParam } from "@/lib/search-params"
 import { getSiteSettings } from "@/lib/site-settings"
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -17,8 +18,10 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-export default async function LoginPage() {
+export default async function LoginPage(props: PageProps<"/login">) {
+  const searchParams = await props.searchParams
   const [user, settings] = await Promise.all([getCurrentUser(), getSiteSettings()])
+  const authError = readSearchParam(searchParams?.authError) ?? ""
 
   if (user) {
     redirect("/")
@@ -33,6 +36,7 @@ export default async function LoginPage() {
             <CardTitle>登录论坛</CardTitle>
           </CardHeader>
           <CardContent>
+            {authError ? <p className="mb-4 rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">{authError}</p> : null}
             <LoginForm settings={settings} />
             <div className="mt-4 space-y-2 text-center text-sm text-muted-foreground">
               <p>

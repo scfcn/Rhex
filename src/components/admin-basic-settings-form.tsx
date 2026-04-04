@@ -1,82 +1,63 @@
 "use client"
 
-import Image from "next/image"
-import { useRouter } from "next/navigation"
-import { useMemo, useState, useTransition } from "react"
-import { Loader2, Upload } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { CircleHelp } from "lucide-react"
 
+import { useAdminMutation } from "@/hooks/use-admin-mutation"
+import { AdminModal } from "@/components/admin-modal"
 import { Button } from "@/components/ui/button"
 import { TextField } from "@/components/ui/text-field"
 import { toast } from "@/components/ui/toast"
+import {
+  buildAdminBasicSettingsPayload,
+  createAdminBasicSettingsDraft,
+  resolveHomeFeedPostListDisplayMode,
+  SiteLogoUploadCard,
+  uploadSiteLogoFile,
+  type AdminBasicSettingsInitialSettings,
+  type AdminBasicSettingsMode,
+  type AdminBasicSettingsDraft,
+} from "@/components/admin-site-settings.shared"
 import { PickerPopover, PickerTriggerField, normalizeHexColor } from "@/components/admin-picker-popover"
 import { AdminTippingGiftListEditor } from "@/components/admin-tipping-gift-list-editor"
+import { adminPost } from "@/lib/admin-client"
 import { calculatePostHeatScore, resolvePostHeatStyle } from "@/lib/post-heat"
-import { POST_LIST_DISPLAY_MODE_DEFAULT, POST_LIST_DISPLAY_MODE_GALLERY, type PostListDisplayMode } from "@/lib/post-list-display"
-import type { SiteSearchSettings, SiteTippingGiftItem } from "@/lib/site-settings"
+import { POST_LIST_DISPLAY_MODE_DEFAULT, POST_LIST_DISPLAY_MODE_GALLERY } from "@/lib/post-list-display"
 
 interface AdminBasicSettingsFormProps {
-  initialSettings: {
-    siteName: string
-    siteSlogan: string
-    siteDescription: string
-    siteLogoText: string
-    siteLogoPath?: string | null
-    siteSeoKeywords?: string[]
-    postLinkDisplayMode: "SLUG" | "ID"
-    homeFeedPostListDisplayMode: PostListDisplayMode
-    homeSidebarStatsCardEnabled: boolean
-    homeSidebarAnnouncementsEnabled: boolean
-    search: SiteSearchSettings
-    analyticsCode?: string | null
-    inviteRewardInviter: number
-    inviteRewardInvitee: number
-    registrationEnabled: boolean
-    registrationRequireInviteCode: boolean
-    registerInviteCodeEnabled: boolean
-    inviteCodePurchaseEnabled: boolean
-    registerCaptchaMode: "OFF" | "TURNSTILE" | "BUILTIN" | "POW"
-    loginCaptchaMode: "OFF" | "TURNSTILE" | "BUILTIN" | "POW"
-    turnstileSiteKey?: string | null
-    postEditableMinutes: number
-    commentEditableMinutes: number
-    tippingEnabled: boolean
-    tippingDailyLimit: number
-    tippingPerPostLimit: number
-    tippingAmounts: number[]
-    tippingGifts: SiteTippingGiftItem[]
-    postRedPacketEnabled: boolean
-    postRedPacketMaxPoints: number
-    postRedPacketDailyLimit: number
-    heatViewWeight: number
-    heatCommentWeight: number
-    heatLikeWeight: number
-    heatTipCountWeight: number
-    heatTipPointsWeight: number
-    heatStageThresholds: number[]
-    heatStageColors: string[]
-    registerEmailEnabled: boolean
-    registerEmailRequired: boolean
-    registerEmailVerification: boolean
-    registerPhoneEnabled: boolean
-    registerPhoneRequired: boolean
-    registerPhoneVerification: boolean
-    registerNicknameEnabled: boolean
-    registerNicknameRequired: boolean
-    registerGenderEnabled: boolean
-    registerGenderRequired: boolean
-    registerInviterEnabled: boolean
-    smtpEnabled: boolean
-    smtpHost?: string | null
-    smtpPort?: number | null
-    smtpUser?: string | null
-    smtpPass?: string | null
-    smtpFrom?: string | null
-    smtpSecure: boolean
-  }
-  mode?: "profile" | "registration" | "interaction"
+  initialSettings: AdminBasicSettingsInitialSettings
+  mode?: AdminBasicSettingsMode
+  initialSubTab?: string
 }
 
 const HEAT_COLOR_PRESETS = ["#4A4A4A", "#808080", "#9B8F7F", "#B87333", "#C4A777", "#E8C547", "#FFA500", "#D96C3B", "#C41E3A", "#6B7280", "#F59E0B", "#EF4444", "#8B5CF6", "#10B981"]
+const INTERNAL_SETTING_TABS: Record<AdminBasicSettingsMode, Array<{ key: string; label: string }>> = {
+  profile: [
+    { key: "branding", label: "品牌基础" },
+    { key: "homepage", label: "首页展示" },
+    { key: "seo", label: "SEO 与统计" },
+  ],
+  registration: [
+    { key: "invite", label: "注册与邀请码" },
+    { key: "captcha", label: "验证码" },
+    { key: "fields", label: "表单字段" },
+    { key: "auth", label: "第三方登录" },
+    { key: "smtp", label: "SMTP 邮件" },
+  ],
+  interaction: [
+    { key: "comment-tip", label: "评论与打赏" },
+    { key: "gates", label: "发布门槛" },
+    { key: "reward-pool", label: "红包与聚宝盆" },
+    { key: "heat", label: "热度算法" },
+    { key: "preview", label: "热度预览" },
+  ],
+}
+
+const INTERNAL_SETTING_TAB_DEFAULT: Record<AdminBasicSettingsMode, string> = {
+  profile: "branding",
+  registration: "invite",
+  interaction: "comment-tip",
+}
 
 function parseNumberList(raw: string) {
   return raw
@@ -90,206 +71,157 @@ function normalizeHeatThresholdsInput(raw: string) {
   return Array.from(new Set(values)).sort((left, right) => left - right)
 }
 
-export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: AdminBasicSettingsFormProps) {
-  const router = useRouter()
-  const [siteName, setSiteName] = useState(initialSettings.siteName)
-  const [siteSlogan, setSiteSlogan] = useState(initialSettings.siteSlogan)
-  const [siteDescription, setSiteDescription] = useState(initialSettings.siteDescription)
-  const [siteLogoText, setSiteLogoText] = useState(initialSettings.siteLogoText)
-  const [siteLogoPath, setSiteLogoPath] = useState(initialSettings.siteLogoPath ?? "")
+export function AdminBasicSettingsForm({ initialSettings, mode = "profile", initialSubTab }: AdminBasicSettingsFormProps) {
+  const [draft, setDraft] = useState(() => createAdminBasicSettingsDraft(initialSettings))
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
-  const [siteSeoKeywords, setSiteSeoKeywords] = useState((initialSettings.siteSeoKeywords ?? []).join(","))
-  const [postLinkDisplayMode, setPostLinkDisplayMode] = useState<"SLUG" | "ID">(initialSettings.postLinkDisplayMode)
-  const [homeFeedPostListDisplayMode, setHomeFeedPostListDisplayMode] = useState<PostListDisplayMode>(initialSettings.homeFeedPostListDisplayMode)
-  const [homeSidebarStatsCardEnabled, setHomeSidebarStatsCardEnabled] = useState(initialSettings.homeSidebarStatsCardEnabled)
-  const [homeSidebarAnnouncementsEnabled, setHomeSidebarAnnouncementsEnabled] = useState(initialSettings.homeSidebarAnnouncementsEnabled)
-  const [searchEnabled, setSearchEnabled] = useState(initialSettings.search.enabled)
-  const [analyticsCode, setAnalyticsCode] = useState(initialSettings.analyticsCode ?? "")
-  const [postEditableMinutes, setPostEditableMinutes] = useState(String(initialSettings.postEditableMinutes))
-  const [commentEditableMinutes, setCommentEditableMinutes] = useState(String(initialSettings.commentEditableMinutes))
-  const [inviteRewardInviter, setInviteRewardInviter] = useState(String(initialSettings.inviteRewardInviter))
-  const [inviteRewardInvitee, setInviteRewardInvitee] = useState(String(initialSettings.inviteRewardInvitee))
-  const [registrationEnabled, setRegistrationEnabled] = useState(initialSettings.registrationEnabled)
-  const [registrationRequireInviteCode, setRegistrationRequireInviteCode] = useState(initialSettings.registrationRequireInviteCode)
-  const [registerInviteCodeEnabled, setRegisterInviteCodeEnabled] = useState(initialSettings.registerInviteCodeEnabled)
-  const [inviteCodePurchaseEnabled, setInviteCodePurchaseEnabled] = useState(initialSettings.inviteCodePurchaseEnabled)
-  const [registerCaptchaMode, setRegisterCaptchaMode] = useState(initialSettings.registerCaptchaMode)
-  const [loginCaptchaMode, setLoginCaptchaMode] = useState(initialSettings.loginCaptchaMode)
-  const [turnstileSiteKey, setTurnstileSiteKey] = useState(initialSettings.turnstileSiteKey ?? "")
-  const [tippingEnabled, setTippingEnabled] = useState(initialSettings.tippingEnabled)
-  const [tippingDailyLimit, setTippingDailyLimit] = useState(String(initialSettings.tippingDailyLimit))
-  const [tippingPerPostLimit, setTippingPerPostLimit] = useState(String(initialSettings.tippingPerPostLimit))
-  const [tippingAmounts, setTippingAmounts] = useState(initialSettings.tippingAmounts.join(","))
-  const [tippingGifts, setTippingGifts] = useState(initialSettings.tippingGifts)
-  const [postRedPacketEnabled, setPostRedPacketEnabled] = useState(initialSettings.postRedPacketEnabled)
-  const [postRedPacketMaxPoints, setPostRedPacketMaxPoints] = useState(String(initialSettings.postRedPacketMaxPoints))
-  const [postRedPacketDailyLimit, setPostRedPacketDailyLimit] = useState(String(initialSettings.postRedPacketDailyLimit))
-  const [heatViewWeight, setHeatViewWeight] = useState(String(initialSettings.heatViewWeight))
-  const [heatCommentWeight, setHeatCommentWeight] = useState(String(initialSettings.heatCommentWeight))
-  const [heatLikeWeight, setHeatLikeWeight] = useState(String(initialSettings.heatLikeWeight))
-  const [heatTipCountWeight, setHeatTipCountWeight] = useState(String(initialSettings.heatTipCountWeight))
-  const [heatTipPointsWeight, setHeatTipPointsWeight] = useState(String(initialSettings.heatTipPointsWeight))
-  const [heatStageThresholds, setHeatStageThresholds] = useState(initialSettings.heatStageThresholds.join(","))
-  const [heatStageColors, setHeatStageColors] = useState(initialSettings.heatStageColors)
-  const [previewViews, setPreviewViews] = useState("120")
-  const [previewComments, setPreviewComments] = useState("18")
-  const [previewLikes, setPreviewLikes] = useState("12")
-  const [previewTipCount, setPreviewTipCount] = useState("4")
-  const [previewTipPoints, setPreviewTipPoints] = useState("160")
   const [editingHeatColorIndex, setEditingHeatColorIndex] = useState<number | null>(null)
-  const [registerEmailEnabled, setRegisterEmailEnabled] = useState(initialSettings.registerEmailEnabled)
-  const [registerEmailRequired, setRegisterEmailRequired] = useState(initialSettings.registerEmailRequired)
-  const [registerEmailVerification, setRegisterEmailVerification] = useState(initialSettings.registerEmailVerification)
-  const [registerPhoneEnabled, setRegisterPhoneEnabled] = useState(initialSettings.registerPhoneEnabled)
-  const [registerPhoneRequired, setRegisterPhoneRequired] = useState(initialSettings.registerPhoneRequired)
-  const [registerPhoneVerification, setRegisterPhoneVerification] = useState(initialSettings.registerPhoneVerification)
-  const [registerNicknameEnabled, setRegisterNicknameEnabled] = useState(initialSettings.registerNicknameEnabled)
-  const [registerNicknameRequired, setRegisterNicknameRequired] = useState(initialSettings.registerNicknameRequired)
-  const [registerGenderEnabled, setRegisterGenderEnabled] = useState(initialSettings.registerGenderEnabled)
-  const [registerGenderRequired, setRegisterGenderRequired] = useState(initialSettings.registerGenderRequired)
-  const [registerInviterEnabled, setRegisterInviterEnabled] = useState(initialSettings.registerInviterEnabled)
-  const [smtpEnabled, setSmtpEnabled] = useState(initialSettings.smtpEnabled)
-  const [smtpHost, setSmtpHost] = useState(initialSettings.smtpHost ?? "")
-  const [smtpPort, setSmtpPort] = useState(initialSettings.smtpPort ? String(initialSettings.smtpPort) : "")
-  const [smtpUser, setSmtpUser] = useState(initialSettings.smtpUser ?? "")
-  const [smtpPass, setSmtpPass] = useState(initialSettings.smtpPass ?? "")
-  const [smtpFrom, setSmtpFrom] = useState(initialSettings.smtpFrom ?? "")
-  const [smtpSecure, setSmtpSecure] = useState(initialSettings.smtpSecure)
-  const [isPending, startTransition] = useTransition()
+  const [authDocOpen, setAuthDocOpen] = useState(false)
+  const [siteOrigin, setSiteOrigin] = useState("https://your-domain.com")
+  const [activeSubTab, setActiveSubTab] = useState(() => resolveInternalSettingTab(mode, initialSubTab))
+  const { isPending, runMutation } = useAdminMutation()
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setSiteOrigin(window.location.origin)
+    }
+  }, [])
+
+  useEffect(() => {
+    setActiveSubTab(resolveInternalSettingTab(mode, initialSubTab))
+  }, [initialSubTab, mode])
+
+  function updateDraftField<Key extends keyof AdminBasicSettingsDraft>(field: Key, value: AdminBasicSettingsDraft[Key]) {
+    setDraft((current) => ({ ...current, [field]: value }))
+  }
+
+  const {
+    siteName,
+    siteSlogan,
+    siteDescription,
+    siteLogoText,
+    siteLogoPath,
+    siteSeoKeywords,
+    postLinkDisplayMode,
+    homeFeedPostListDisplayMode,
+    homeSidebarStatsCardEnabled,
+    homeSidebarAnnouncementsEnabled,
+    searchEnabled,
+    analyticsCode,
+    postEditableMinutes,
+    commentEditableMinutes,
+    guestCanViewComments,
+    postCreateRequireEmailVerified,
+    commentCreateRequireEmailVerified,
+    postCreateMinRegisteredMinutes,
+    commentCreateMinRegisteredMinutes,
+    inviteRewardInviter,
+    inviteRewardInvitee,
+    registerInitialPoints,
+    registrationEnabled,
+    registrationRequireInviteCode,
+    registerInviteCodeEnabled,
+    inviteCodePurchaseEnabled,
+    registerCaptchaMode,
+    loginCaptchaMode,
+    turnstileSiteKey,
+    turnstileSecretKey,
+    tippingEnabled,
+    tippingDailyLimit,
+    tippingPerPostLimit,
+    tippingAmounts,
+    tippingGifts,
+    postRedPacketEnabled,
+    postRedPacketMaxPoints,
+    postRedPacketDailyLimit,
+    postJackpotEnabled,
+    postJackpotMinInitialPoints,
+    postJackpotMaxInitialPoints,
+    postJackpotReplyIncrementPoints,
+    postJackpotHitProbability,
+    heatViewWeight,
+    heatCommentWeight,
+    heatLikeWeight,
+    heatTipCountWeight,
+    heatTipPointsWeight,
+    heatStageThresholds,
+    heatStageColors,
+    previewViews,
+    previewComments,
+    previewLikes,
+    previewTipCount,
+    previewTipPoints,
+    registerEmailEnabled,
+    registerEmailRequired,
+    registerEmailVerification,
+    registerPhoneEnabled,
+    registerPhoneRequired,
+    registerPhoneVerification,
+    registerNicknameEnabled,
+    registerNicknameRequired,
+    registerGenderEnabled,
+    registerGenderRequired,
+    registerInviterEnabled,
+    authGithubEnabled,
+    authGoogleEnabled,
+    authPasskeyEnabled,
+    githubClientId,
+    githubClientSecret,
+    googleClientId,
+    googleClientSecret,
+    passkeyRpId,
+    passkeyRpName,
+    passkeyOrigin,
+    smtpEnabled,
+    smtpHost,
+    smtpPort,
+    smtpUser,
+    smtpPass,
+    smtpFrom,
+    smtpSecure,
+  } = draft
 
   const previewSettings = useMemo(() => ({
-    heatViewWeight: Number(heatViewWeight) || 0,
-    heatCommentWeight: Number(heatCommentWeight) || 0,
-    heatLikeWeight: Number(heatLikeWeight) || 0,
-    heatTipCountWeight: Number(heatTipCountWeight) || 0,
-    heatTipPointsWeight: Number(heatTipPointsWeight) || 0,
-    heatStageThresholds: normalizeHeatThresholdsInput(heatStageThresholds),
-    heatStageColors,
-  }), [heatCommentWeight, heatLikeWeight, heatStageColors, heatStageThresholds, heatTipCountWeight, heatTipPointsWeight, heatViewWeight])
+    heatViewWeight: Number(draft.heatViewWeight) || 0,
+    heatCommentWeight: Number(draft.heatCommentWeight) || 0,
+    heatLikeWeight: Number(draft.heatLikeWeight) || 0,
+    heatTipCountWeight: Number(draft.heatTipCountWeight) || 0,
+    heatTipPointsWeight: Number(draft.heatTipPointsWeight) || 0,
+    heatStageThresholds: normalizeHeatThresholdsInput(draft.heatStageThresholds),
+    heatStageColors: draft.heatStageColors,
+  }), [draft.heatCommentWeight, draft.heatLikeWeight, draft.heatStageColors, draft.heatStageThresholds, draft.heatTipCountWeight, draft.heatTipPointsWeight, draft.heatViewWeight])
 
   const previewInput = useMemo(() => ({
-    views: Number(previewViews) || 0,
-    comments: Number(previewComments) || 0,
-    likes: Number(previewLikes) || 0,
-    tipCount: Number(previewTipCount) || 0,
-    tipPoints: Number(previewTipPoints) || 0,
-  }), [previewComments, previewLikes, previewTipCount, previewTipPoints, previewViews])
+    views: Number(draft.previewViews) || 0,
+    comments: Number(draft.previewComments) || 0,
+    likes: Number(draft.previewLikes) || 0,
+    tipCount: Number(draft.previewTipCount) || 0,
+    tipPoints: Number(draft.previewTipPoints) || 0,
+  }), [draft.previewComments, draft.previewLikes, draft.previewTipCount, draft.previewTipPoints, draft.previewViews])
+  const siteHost = useMemo(() => siteOrigin.replace(/^https?:\/\//, "").replace(/\/.*$/, ""), [siteOrigin])
+  const resolvedPasskeyRpId = passkeyRpId || siteHost
+  const resolvedPasskeyRpName = passkeyRpName || draft.siteName || "你的站点名称"
+  const resolvedPasskeyOrigin = passkeyOrigin || siteOrigin
 
   const previewScore = useMemo(() => calculatePostHeatScore(previewInput, previewSettings), [previewInput, previewSettings])
   const previewHeat = useMemo(() => resolvePostHeatStyle(previewInput, previewSettings), [previewInput, previewSettings])
 
   function updateHeatColor(index: number, nextColor: string) {
-    setHeatStageColors((current) => current.map((item, currentIndex) => (currentIndex === index ? nextColor : item)))
+    updateDraftField("heatStageColors", draft.heatStageColors.map((item, currentIndex) => (currentIndex === index ? nextColor : item)))
   }
 
   async function uploadSiteLogo(file: File) {
-    if (!file.type.startsWith("image/")) {
-      toast.error("请先选择图片格式的站点 Logo", "上传失败")
-      return
-    }
-
     setIsUploadingLogo(true)
 
     try {
-      const formData = new FormData()
-      formData.append("file", file)
-      formData.append("folder", "site-logo")
-
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      })
-      const result = await response.json()
-
-      if (!response.ok || result.code !== 0) {
-        toast.error(result.message ?? "站点 Logo 上传失败", "上传失败")
-        return
-      }
-
-      setSiteLogoPath(String(result.data?.urlPath ?? ""))
+      updateDraftField("siteLogoPath", await uploadSiteLogoFile(file))
       toast.success("站点 Logo 上传成功", "上传成功")
-    } catch {
-      toast.error("站点 Logo 上传失败，请稍后再试", "上传失败")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "站点 Logo 上传失败，请稍后再试", "上传失败")
     } finally {
       setIsUploadingLogo(false)
     }
   }
 
-  function buildPayload() {
-    if (mode === "profile") {
-      return {
-        siteName,
-        siteSlogan,
-        siteDescription,
-        siteLogoText,
-        siteLogoPath,
-        siteSeoKeywords,
-        postLinkDisplayMode,
-        homeFeedPostListDisplayMode,
-        homeSidebarStatsCardEnabled,
-        homeSidebarAnnouncementsEnabled,
-        searchEnabled,
-        analyticsCode,
-        postEditableMinutes: Number(postEditableMinutes),
-        commentEditableMinutes: Number(commentEditableMinutes),
-        section: "site-profile",
-      }
-    }
-
-    if (mode === "registration") {
-      return {
-        inviteRewardInviter: Number(inviteRewardInviter),
-        inviteRewardInvitee: Number(inviteRewardInvitee),
-        registrationEnabled,
-        registrationRequireInviteCode,
-        registerInviteCodeEnabled,
-        inviteCodePurchaseEnabled,
-        registerCaptchaMode,
-        loginCaptchaMode,
-        turnstileSiteKey,
-        registerEmailEnabled,
-        registerEmailRequired,
-        registerEmailVerification,
-        registerPhoneEnabled,
-        registerPhoneRequired,
-        registerPhoneVerification,
-        registerNicknameEnabled,
-        registerNicknameRequired,
-        registerGenderEnabled,
-        registerGenderRequired,
-        registerInviterEnabled,
-        smtpEnabled,
-        smtpHost,
-        smtpPort: Number(smtpPort),
-        smtpUser,
-        smtpPass,
-        smtpFrom,
-        smtpSecure,
-        section: "site-registration",
-      }
-    }
-
-    return {
-      tippingEnabled,
-      tippingDailyLimit: Number(tippingDailyLimit),
-      tippingPerPostLimit: Number(tippingPerPostLimit),
-      tippingAmounts,
-      tippingGifts,
-      postRedPacketEnabled,
-      postRedPacketMaxPoints: Number(postRedPacketMaxPoints),
-      postRedPacketDailyLimit: Number(postRedPacketDailyLimit),
-      heatViewWeight: Number(heatViewWeight),
-      heatCommentWeight: Number(heatCommentWeight),
-      heatLikeWeight: Number(heatLikeWeight),
-      heatTipCountWeight: Number(heatTipCountWeight),
-      heatTipPointsWeight: Number(heatTipPointsWeight),
-      heatStageThresholds,
-      heatStageColors: heatStageColors.join(","),
-      section: "site-interaction",
-    }
-  }
-
-  const title = mode === "profile" ? "基础信息" : mode === "registration" ? "注册与邀请" : "互动与热度"
   const submitText = mode === "profile" ? "保存基础信息" : mode === "registration" ? "保存注册与邀请" : "保存互动与热度"
 
   return (
@@ -297,41 +229,57 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
       className="space-y-5"
       onSubmit={(event) => {
         event.preventDefault()
-        startTransition(async () => {
-          const response = await fetch("/api/admin/site-settings", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(buildPayload()),
-          })
-          const result = await response.json()
-          if (!response.ok) {
-            toast.error(result.message ?? "保存失败", "保存失败")
-            return
-          }
-          toast.success(result.message ?? "保存成功", "保存成功")
-          router.refresh()
+        runMutation({
+          mutation: () => adminPost("/api/admin/site-settings", buildAdminBasicSettingsPayload(draft, mode), {
+            defaultSuccessMessage: "保存成功",
+            defaultErrorMessage: "保存失败",
+          }),
+          successTitle: "保存成功",
+          errorTitle: "保存失败",
+          refreshRouter: true,
         })
       }}
     >
-      {mode === "profile" ? (
+      <div className="rounded-[24px]  space-y-4">
+
+        <InternalSectionTabs tabs={INTERNAL_SETTING_TABS[mode]} activeTab={activeSubTab} onChange={setActiveSubTab} />
+      </div>
+
+      {mode === "profile" && activeSubTab === "branding" ? (
         <div className="rounded-[24px] border border-border p-5 space-y-4">
           <div>
-            <h3 className="text-sm font-semibold">{title}</h3>
-            <p className="mt-1 text-xs leading-6 text-muted-foreground">站点对外展示的基础品牌信息、帖子链接形式与基础编辑规则配置。</p>
+            <h3 className="text-sm font-semibold">品牌与基础信息</h3>
+            <p className="mt-1 text-xs leading-6 text-muted-foreground">站点名称、Logo 文案、Slogan 与编辑时效配置。</p>
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <TextField label="站点名称" value={siteName} onChange={setSiteName} placeholder="如 兴趣论坛" />
-            <TextField label="Logo 文案" value={siteLogoText} onChange={setSiteLogoText} placeholder="如 兴趣论坛" />
+            <TextField label="站点名称" value={siteName} onChange={(value) => updateDraftField("siteName", value)} placeholder="如 兴趣论坛" />
+            <TextField label="Logo 文案" value={siteLogoText} onChange={(value) => updateDraftField("siteLogoText", value)} placeholder="如 兴趣论坛" />
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <TextField label="帖子可编辑分钟数" value={postEditableMinutes} onChange={setPostEditableMinutes} placeholder="如 10" />
-            <TextField label="评论可编辑分钟数" value={commentEditableMinutes} onChange={setCommentEditableMinutes} placeholder="如 5" />
+            <TextField label="帖子可编辑分钟数" value={postEditableMinutes} onChange={(value) => updateDraftField("postEditableMinutes", value)} placeholder="如 10" />
+            <TextField label="评论可编辑分钟数" value={commentEditableMinutes} onChange={(value) => updateDraftField("commentEditableMinutes", value)} placeholder="如 5" />
           </div>
-  
+          <TextField label="站点 Slogan" value={siteSlogan} onChange={(value) => updateDraftField("siteSlogan", value)} placeholder="如 Waste your time on things you love" />
+          <SiteLogoUploadCard
+            value={siteLogoPath}
+            uploading={isUploadingLogo}
+            onValueChange={(value) => updateDraftField("siteLogoPath", value)}
+            onUpload={uploadSiteLogo}
+            onClear={() => updateDraftField("siteLogoPath", "")}
+          />
+        </div>
+      ) : null}
+
+      {mode === "profile" && activeSubTab === "homepage" ? (
+        <div className="rounded-[24px] border border-border p-5 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold">首页与展示规则</h3>
+            <p className="mt-1 text-xs leading-6 text-muted-foreground">帖子链接形式、首页 feed 样式、右侧栏与搜索开关。</p>
+          </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="space-y-2">
               <p className="text-sm font-medium">帖子链接显示模式</p>
-              <select value={postLinkDisplayMode} onChange={(event) => setPostLinkDisplayMode(event.target.value as "SLUG" | "ID")} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
+              <select value={postLinkDisplayMode} onChange={(event) => updateDraftField("postLinkDisplayMode", event.target.value as "SLUG" | "ID")} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
                 <option value="SLUG">slug 模式（/posts/标题-id）</option>
                 <option value="ID">id 模式（/posts/id）</option>
               </select>
@@ -339,70 +287,44 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
             </div>
             <div className="space-y-2">
               <p className="text-sm font-medium">首页帖子列表形式</p>
-              <select value={homeFeedPostListDisplayMode} onChange={(event) => setHomeFeedPostListDisplayMode(event.target.value === POST_LIST_DISPLAY_MODE_GALLERY ? POST_LIST_DISPLAY_MODE_GALLERY : POST_LIST_DISPLAY_MODE_DEFAULT)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
+              <select value={homeFeedPostListDisplayMode} onChange={(event) => updateDraftField("homeFeedPostListDisplayMode", resolveHomeFeedPostListDisplayMode(event.target.value))} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
                 <option value={POST_LIST_DISPLAY_MODE_DEFAULT}>普通列表</option>
                 <option value={POST_LIST_DISPLAY_MODE_GALLERY}>画廊模式</option>
               </select>
               <p className="text-xs leading-6 text-muted-foreground">只影响首页 feed 的普通帖子列表；置顶帖始终保持原来的普通列表样式。</p>
             </div>
-            <SwitchField label="首页右侧统计卡片" checked={homeSidebarStatsCardEnabled} onChange={setHomeSidebarStatsCardEnabled} />
-            <SwitchField label="首页右侧站点公告" checked={homeSidebarAnnouncementsEnabled} onChange={setHomeSidebarAnnouncementsEnabled} />
-            <SwitchField label="站内搜索" checked={searchEnabled} onChange={setSearchEnabled} />
+            <SwitchField label="首页右侧统计卡片" checked={homeSidebarStatsCardEnabled} onChange={(value) => updateDraftField("homeSidebarStatsCardEnabled", value)} />
+            <SwitchField label="首页右侧站点公告" checked={homeSidebarAnnouncementsEnabled} onChange={(value) => updateDraftField("homeSidebarAnnouncementsEnabled", value)} />
+            <SwitchField label="站内搜索" checked={searchEnabled} onChange={(value) => updateDraftField("searchEnabled", value)} />
           </div>
           <p className="text-xs leading-6 text-muted-foreground">关闭后，前台搜索入口输入关键词将不再跳转站内搜索，而是弹出 `Google 搜索` 和 `Bing 搜索` 两个外部搜索选项。</p>
-          <TextField label="站点 Slogan" value={siteSlogan} onChange={setSiteSlogan} placeholder="如 Waste your time on things you love" />
-          <div className="space-y-3 rounded-[24px] border border-border p-5">
-            <div>
-              <h4 className="text-sm font-semibold">站点 Logo</h4>
-              <p className="mt-1 text-xs leading-6 text-muted-foreground">支持上传图片或直接填写图片地址；未设置时，前台继续使用默认 SVG 图标。</p>
-            </div>
-            <div className="space-y-3 rounded-[18px] border border-dashed border-border bg-card/60 p-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium transition hover:bg-accent">
-                  {isUploadingLogo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                  {isUploadingLogo ? "上传中..." : "上传站点 Logo"}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    disabled={isUploadingLogo}
-                    onChange={(event) => {
-                      const file = event.target.files?.[0]
-                      if (file) {
-                        void uploadSiteLogo(file)
-                      }
-                      event.target.value = ""
-                    }}
-                  />
-                </label>
-                <Button type="button" variant="ghost" disabled={!siteLogoPath || isUploadingLogo} onClick={() => setSiteLogoPath("")}>清空图片 Logo</Button>
-              </div>
-              <input value={siteLogoPath} onChange={(event) => setSiteLogoPath(event.target.value)} className="h-10 w-full rounded-[16px] border border-border bg-background px-3 text-sm outline-none" placeholder="或直接填写站点 Logo 地址" />
-              {siteLogoPath ? (
-                <div className="relative h-16 w-40 overflow-hidden rounded-xl border border-border bg-white p-2">
-                  <Image src={siteLogoPath} alt="站点 Logo 预览" fill sizes="160px" className="object-contain" unoptimized />
-                </div>
-              ) : null}
-            </div>
+        </div>
+      ) : null}
+
+      {mode === "profile" && activeSubTab === "seo" ? (
+        <div className="rounded-[24px] border border-border p-5 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold">SEO 与统计</h3>
+            <p className="mt-1 text-xs leading-6 text-muted-foreground">站点描述、关键字与页脚统计代码。</p>
           </div>
           <div className="space-y-2">
             <p className="text-sm font-medium">站点 SEO 关键字</p>
-            <textarea value={siteSeoKeywords} onChange={(event) => setSiteSeoKeywords(event.target.value)} className="min-h-[96px] w-full rounded-[24px] border border-border bg-background px-4 py-3 text-sm outline-none" placeholder="多个关键字请用英文逗号、中文逗号或换行分隔" />
+            <textarea value={siteSeoKeywords} onChange={(event) => updateDraftField("siteSeoKeywords", event.target.value)} className="min-h-[96px] w-full rounded-[24px] border border-border bg-background px-4 py-3 text-sm outline-none" placeholder="多个关键字请用英文逗号、中文逗号或换行分隔" />
             <p className="text-xs leading-6 text-muted-foreground">这些关键字会写入站点页面的 metadata keywords，用于 SEO 基础配置。</p>
           </div>
           <div className="space-y-2">
             <p className="text-sm font-medium">页脚统计代码</p>
-            <textarea value={analyticsCode} onChange={(event) => setAnalyticsCode(event.target.value)} className="min-h-[140px] w-full rounded-[24px] border border-border bg-background px-4 py-3 font-mono text-sm outline-none" placeholder="可粘贴统计脚本、站长统计或自定义 hook 代码" />
+            <textarea value={analyticsCode} onChange={(event) => updateDraftField("analyticsCode", event.target.value)} className="min-h-[140px] w-full rounded-[24px] border border-border bg-background px-4 py-3 font-mono text-sm outline-none" placeholder="可粘贴统计脚本、站长统计或自定义 hook 代码" />
             <p className="text-xs leading-6 text-muted-foreground">这段代码会插入到全站页脚底部的统计 Hook 容器中，请仅粘贴你信任的统计脚本。</p>
           </div>
           <div className="space-y-2">
             <p className="text-sm font-medium">站点描述</p>
-            <textarea value={siteDescription} onChange={(event) => setSiteDescription(event.target.value)} className="min-h-[140px] w-full rounded-[24px] border border-border bg-background px-4 py-3 text-sm outline-none" />
+            <textarea value={siteDescription} onChange={(event) => updateDraftField("siteDescription", event.target.value)} className="min-h-[140px] w-full rounded-[24px] border border-border bg-background px-4 py-3 text-sm outline-none" />
           </div>
         </div>
       ) : null}
 
-      {mode === "registration" ? (
+      {mode === "registration" && activeSubTab === "invite" ? (
         <>
           <div className="rounded-[24px] border border-border p-5 space-y-4">
             <div>
@@ -410,30 +332,41 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
               <p className="mt-1 text-xs leading-6 text-muted-foreground">控制注册开关、邀请码策略，以及用户邀请奖励。</p>
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-              <SwitchField label="允许新用户注册" checked={registrationEnabled} onChange={setRegistrationEnabled} />
-              <SwitchField label="显示邀请码输入框" checked={registerInviteCodeEnabled} onChange={setRegisterInviteCodeEnabled} />
-              <SwitchField label="注册必须邀请码" checked={registrationRequireInviteCode} onChange={setRegistrationRequireInviteCode} />
-              <SwitchField label="开启积分购买邀请码" checked={inviteCodePurchaseEnabled} onChange={setInviteCodePurchaseEnabled} />
+              <SwitchField label="允许新用户注册" checked={registrationEnabled} onChange={(value) => updateDraftField("registrationEnabled", value)} />
+              <SwitchField label="显示邀请码输入框" checked={registerInviteCodeEnabled} onChange={(value) => updateDraftField("registerInviteCodeEnabled", value)} />
+              <SwitchField label="注册必须邀请码" checked={registrationRequireInviteCode} onChange={(value) => updateDraftField("registrationRequireInviteCode", value)} />
+              <SwitchField label="开启积分购买邀请码" checked={inviteCodePurchaseEnabled} onChange={(value) => updateDraftField("inviteCodePurchaseEnabled", value)} />
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <TextField label="邀请人奖励数量" value={inviteRewardInviter} onChange={setInviteRewardInviter} placeholder="如 10" />
-              <TextField label="被邀请人奖励数量" value={inviteRewardInvitee} onChange={setInviteRewardInvitee} placeholder="如 5" />
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <TextField label="初始注册赠送积分" value={registerInitialPoints} onChange={(value) => updateDraftField("registerInitialPoints", value)} placeholder="如 0" />
+              <TextField label="邀请人奖励数量" value={inviteRewardInviter} onChange={(value) => updateDraftField("inviteRewardInviter", value)} placeholder="如 10" />
+              <TextField label="被邀请人奖励数量" value={inviteRewardInvitee} onChange={(value) => updateDraftField("inviteRewardInvitee", value)} placeholder="如 5" />
             </div>
+            <p className="text-xs leading-6 text-muted-foreground">填写 `0` 表示新用户首次注册时不额外赠送积分；若大于 `0`，会在注册成功后单独写入一条积分审计日志。</p>
           </div>
+        </>
+      ) : null}
 
+      {mode === "registration" && activeSubTab === "captcha" ? (
+        <>
           <div className="rounded-[24px] border border-border p-5 space-y-4">
             <div>
               <h3 className="text-sm font-semibold">注册防机器人验证码</h3>
               <p className="mt-1 text-xs leading-6 text-muted-foreground">支持关闭、Cloudflare Turnstile、自建图形验证码与 PoW 工作量证明四种模式。</p>
             </div>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <CaptchaModeField label="注册验证码模式" value={registerCaptchaMode} onChange={setRegisterCaptchaMode} />
-              <CaptchaModeField label="登录验证码模式" value={loginCaptchaMode} onChange={setLoginCaptchaMode} />
-              <TextField label="Turnstile Site Key" value={turnstileSiteKey} onChange={setTurnstileSiteKey} placeholder="填写 Cloudflare Turnstile 公钥" />
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <CaptchaModeField label="注册验证码模式" value={registerCaptchaMode} onChange={(value) => updateDraftField("registerCaptchaMode", value)} />
+              <CaptchaModeField label="登录验证码模式" value={loginCaptchaMode} onChange={(value) => updateDraftField("loginCaptchaMode", value)} />
+              <TextField label="Turnstile Site Key" value={turnstileSiteKey} onChange={(value) => updateDraftField("turnstileSiteKey", value)} placeholder="填写 Cloudflare Turnstile 公钥" />
+              <TextField label="Turnstile Secret Key" type="password" value={turnstileSecretKey} onChange={(value) => updateDraftField("turnstileSecretKey", value)} placeholder="填写 Cloudflare Turnstile 私钥" />
             </div>
-            <p className="text-xs leading-6 text-muted-foreground">当模式为 `TURNSTILE` 时，需要同时配置环境变量 `TURNSTILE_SECRET_KEY`；当模式为 `BUILTIN` 时，系统会使用站点自建图形验证码；当模式为 `POW` 时，系统会下发签名挑战并要求浏览器完成一次工作量证明，默认读取 `POW_CAPTCHA_SECRET_KEY`，未设置时回退到 `CAPTCHA_SECRET_KEY` 或 `TURNSTILE_SECRET_KEY`。</p>
+            <p className="text-xs leading-6 text-muted-foreground">当模式为 `TURNSTILE` 时，需要同时填写 Site Key 和 Secret Key；当模式为 `BUILTIN` 时，系统会使用站点自建图形验证码；当模式为 `POW` 时，系统会下发签名挑战并要求浏览器完成一次工作量证明，默认读取 `POW_CAPTCHA_SECRET_KEY`，未设置时回退到 `CAPTCHA_SECRET_KEY`。</p>
           </div>
+        </>
+      ) : null}
 
+      {mode === "registration" && activeSubTab === "fields" ? (
+        <>
           <div className="rounded-[24px] border border-border p-5 space-y-4">
             <div>
               <h3 className="text-sm font-semibold">注册表单字段</h3>
@@ -441,84 +374,225 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
             </div>
             <div className="grid gap-4 xl:grid-cols-3">
               <FieldGroup title="邮箱">
-                <SwitchField label="显示邮箱输入框" checked={registerEmailEnabled} onChange={setRegisterEmailEnabled} />
-                <SwitchField label="邮箱必填" checked={registerEmailRequired} onChange={setRegisterEmailRequired} />
-                <SwitchField label="邮箱需要验证" checked={registerEmailVerification} onChange={setRegisterEmailVerification} />
+                <SwitchField label="显示邮箱输入框" checked={registerEmailEnabled} onChange={(value) => updateDraftField("registerEmailEnabled", value)} />
+                <SwitchField label="邮箱必填" checked={registerEmailRequired} onChange={(value) => updateDraftField("registerEmailRequired", value)} />
+                <SwitchField label="邮箱需要验证" checked={registerEmailVerification} onChange={(value) => updateDraftField("registerEmailVerification", value)} />
               </FieldGroup>
               <FieldGroup title="手机">
-                <SwitchField label="显示手机输入框" checked={registerPhoneEnabled} onChange={setRegisterPhoneEnabled} />
-                <SwitchField label="手机必填" checked={registerPhoneRequired} onChange={setRegisterPhoneRequired} />
-                <SwitchField label="手机需要验证" checked={registerPhoneVerification} onChange={setRegisterPhoneVerification} />
+                <SwitchField label="显示手机输入框" checked={registerPhoneEnabled} onChange={(value) => updateDraftField("registerPhoneEnabled", value)} />
+                <SwitchField label="手机必填" checked={registerPhoneRequired} onChange={(value) => updateDraftField("registerPhoneRequired", value)} />
+                <SwitchField label="手机需要验证" checked={registerPhoneVerification} onChange={(value) => updateDraftField("registerPhoneVerification", value)} />
               </FieldGroup>
               <FieldGroup title="其它字段">
-                <SwitchField label="显示昵称输入框" checked={registerNicknameEnabled} onChange={setRegisterNicknameEnabled} />
-                <SwitchField label="昵称必填" checked={registerNicknameRequired} onChange={setRegisterNicknameRequired} />
-                <SwitchField label="显示性别选项" checked={registerGenderEnabled} onChange={setRegisterGenderEnabled} />
-                <SwitchField label="性别必填" checked={registerGenderRequired} onChange={setRegisterGenderRequired} />
-                <SwitchField label="显示邀请人输入框" checked={registerInviterEnabled} onChange={setRegisterInviterEnabled} />
+                <SwitchField label="显示昵称输入框" checked={registerNicknameEnabled} onChange={(value) => updateDraftField("registerNicknameEnabled", value)} />
+                <SwitchField label="昵称必填" checked={registerNicknameRequired} onChange={(value) => updateDraftField("registerNicknameRequired", value)} />
+                <SwitchField label="显示性别选项" checked={registerGenderEnabled} onChange={(value) => updateDraftField("registerGenderEnabled", value)} />
+                <SwitchField label="性别必填" checked={registerGenderRequired} onChange={(value) => updateDraftField("registerGenderRequired", value)} />
+                <SwitchField label="显示邀请人输入框" checked={registerInviterEnabled} onChange={(value) => updateDraftField("registerInviterEnabled", value)} />
               </FieldGroup>
             </div>
           </div>
+        </>
+      ) : null}
 
+      {mode === "registration" && activeSubTab === "auth" ? (
+        <>
+          <div className="rounded-[24px] border border-border p-5 space-y-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold">第三方与 Passkey 登录</h3>
+                <button
+                  type="button"
+                  onClick={() => setAuthDocOpen(true)}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                  aria-label="查看第三方与 Passkey 对接文档"
+                  title="查看对接文档"
+                >
+                  <CircleHelp className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <p className="mt-1 text-xs leading-6 text-muted-foreground">这里同时控制登录开关与密钥配置。敏感值会写入站点设置的敏感 JSON，仅服务端读取，不向普通前台接口透出。</p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <SwitchField label="开启 GitHub 登录" checked={authGithubEnabled} onChange={(value) => updateDraftField("authGithubEnabled", value)} />
+              <SwitchField label="开启 Google 登录" checked={authGoogleEnabled} onChange={(value) => updateDraftField("authGoogleEnabled", value)} />
+              <SwitchField label="开启 Passkey 登录" checked={authPasskeyEnabled} onChange={(value) => updateDraftField("authPasskeyEnabled", value)} />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <TextField label="GitHub Client ID" value={githubClientId} onChange={(value) => updateDraftField("githubClientId", value)} placeholder="填写 GitHub OAuth App Client ID" />
+              <TextField label="GitHub Client Secret" type="password" value={githubClientSecret} onChange={(value) => updateDraftField("githubClientSecret", value)} placeholder="填写 GitHub OAuth App Client Secret" />
+              <div className="hidden xl:block" />
+              <TextField label="Google Client ID" value={googleClientId} onChange={(value) => updateDraftField("googleClientId", value)} placeholder="填写 Google OAuth Client ID" />
+              <TextField label="Google Client Secret" type="password" value={googleClientSecret} onChange={(value) => updateDraftField("googleClientSecret", value)} placeholder="填写 Google OAuth Client Secret" />
+              <div className="hidden xl:block" />
+              <TextField label="Passkey RP ID" value={passkeyRpId} onChange={(value) => updateDraftField("passkeyRpId", value)} placeholder="如 forum.example.com" />
+              <TextField label="Passkey RP Name" value={passkeyRpName} onChange={(value) => updateDraftField("passkeyRpName", value)} placeholder="如 兴趣论坛" />
+              <TextField label="Passkey Origin" value={passkeyOrigin} onChange={(value) => updateDraftField("passkeyOrigin", value)} placeholder="如 https://forum.example.com" />
+            </div>
+            <p className="text-xs leading-6 text-muted-foreground">开启对应登录方式前，请先在这里填写完整凭据；未填写时，运行时会直接报错，不再回退读取环境变量。</p>
+          </div>
+
+          <AdminModal
+            open={authDocOpen}
+            onClose={() => setAuthDocOpen(false)}
+            title="第三方与 Passkey 对接文档"
+            description="按当前站点域名生成对接信息。把回调地址填到第三方平台，把密钥与 Passkey 参数填回本页的后台表单即可。"
+            size="xl"
+          >
+            <div className="space-y-5 overflow-y-auto p-6 text-sm text-foreground">
+              <section className="space-y-3">
+                <h4 className="text-sm font-semibold">GitHub OAuth</h4>
+                <div className="rounded-[20px] border border-border bg-secondary/30 p-4 space-y-2">
+                  <p><span className="font-medium">Homepage URL：</span><code>{siteOrigin}</code></p>
+                  <p><span className="font-medium">Authorization callback URL：</span><code>{siteOrigin}/api/auth/oauth/github/callback</code></p>
+                  <p><span className="font-medium">发起登录：</span><code>{siteOrigin}/api/auth/oauth/github/start?mode=login</code></p>
+                  <p><span className="font-medium">发起注册：</span><code>{siteOrigin}/api/auth/oauth/github/start?mode=register</code></p>
+                  <p><span className="font-medium">Scope：</span><code>read:user user:email</code></p>
+                </div>
+              </section>
+
+              <section className="space-y-3">
+                <h4 className="text-sm font-semibold">Google OAuth</h4>
+                <div className="rounded-[20px] border border-border bg-secondary/30 p-4 space-y-2">
+                  <p><span className="font-medium">Authorized JavaScript origins：</span><code>{siteOrigin}</code></p>
+                  <p><span className="font-medium">Authorized redirect URIs：</span><code>{siteOrigin}/api/auth/oauth/google/callback</code></p>
+                  <p><span className="font-medium">发起登录：</span><code>{siteOrigin}/api/auth/oauth/google/start?mode=login</code></p>
+                  <p><span className="font-medium">发起注册：</span><code>{siteOrigin}/api/auth/oauth/google/start?mode=register</code></p>
+                </div>
+              </section>
+
+              <section className="space-y-3">
+                <h4 className="text-sm font-semibold">Passkey</h4>
+                <div className="rounded-[20px] border border-border bg-secondary/30 p-4 space-y-2">
+                  <p><span className="font-medium">Passkey 登录页：</span><code>{siteOrigin}/auth/passkey?mode=login</code></p>
+                  <p><span className="font-medium">Passkey 注册页：</span><code>{siteOrigin}/auth/passkey?mode=register</code></p>
+                  <p><span className="font-medium">建议 RP ID：</span><code>{resolvedPasskeyRpId}</code></p>
+                  <p><span className="font-medium">建议 RP Name：</span><code>{resolvedPasskeyRpName}</code></p>
+                  <p><span className="font-medium">建议 Origin：</span><code>{resolvedPasskeyOrigin}</code></p>
+                  <p className="text-xs leading-6 text-muted-foreground">RP ID 一般填当前主域名，不带协议与路径。若你使用子域名部署，请确保 RP ID 与实际站点域名匹配。</p>
+                </div>
+              </section>
+
+              <section className="space-y-3">
+                <h4 className="text-sm font-semibold">后台填写项</h4>
+                <div className="rounded-[20px] border border-border bg-background p-4">
+                  <pre className="overflow-x-auto text-xs leading-6 text-foreground"><code>{`GitHub Client ID = ${githubClientId || "第三方平台生成后填写"}
+GitHub Client Secret = ${githubClientSecret ? "已填写" : "第三方平台生成后填写"}
+
+Google Client ID = ${googleClientId || "第三方平台生成后填写"}
+Google Client Secret = ${googleClientSecret ? "已填写" : "第三方平台生成后填写"}
+
+Passkey RP ID = ${resolvedPasskeyRpId}
+Passkey RP Name = ${resolvedPasskeyRpName}
+Passkey Origin = ${resolvedPasskeyOrigin}`}</code></pre>
+                </div>
+                <p className="text-xs leading-6 text-muted-foreground">以上内容保存在数据库敏感配置中。第三方登录流程本身仍需服务端可用的签名密钥，例如现有的 `AUTH_FLOW_SECRET`。</p>
+              </section>
+            </div>
+          </AdminModal>
+        </>
+      ) : null}
+
+      {mode === "registration" && activeSubTab === "smtp" ? (
+        <>
           <div className="rounded-[24px] border border-border p-5 space-y-4">
             <div>
               <h3 className="text-sm font-semibold">SMTP 邮件发送</h3>
               <p className="mt-1 text-xs leading-6 text-muted-foreground">开启后，邮箱验证码会通过真实邮件发送。</p>
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <SwitchField label="启用 SMTP" checked={smtpEnabled} onChange={setSmtpEnabled} />
-              <SwitchField label="启用 SSL/TLS" checked={smtpSecure} onChange={setSmtpSecure} />
-              <TextField label="SMTP 主机" value={smtpHost} onChange={setSmtpHost} placeholder="如 smtp.qq.com" />
-              <TextField label="SMTP 端口" value={smtpPort} onChange={setSmtpPort} placeholder="如 465 / 587" />
-              <TextField label="SMTP 账号" value={smtpUser} onChange={setSmtpUser} placeholder="邮箱账号" />
-              <TextField label="SMTP 密码 / 授权码" type="password" value={smtpPass} onChange={setSmtpPass} placeholder="请输入密码或授权码" />
-              <TextField label="发件人地址" value={smtpFrom} onChange={setSmtpFrom} placeholder="如 Forum <no-reply@example.com>" />
+              <SwitchField label="启用 SMTP" checked={smtpEnabled} onChange={(value) => updateDraftField("smtpEnabled", value)} />
+              <SwitchField label="启用 SSL/TLS" checked={smtpSecure} onChange={(value) => updateDraftField("smtpSecure", value)} />
+              <TextField label="SMTP 主机" value={smtpHost} onChange={(value) => updateDraftField("smtpHost", value)} placeholder="如 smtp.qq.com" />
+              <TextField label="SMTP 端口" value={smtpPort} onChange={(value) => updateDraftField("smtpPort", value)} placeholder="如 465 / 587" />
+              <TextField label="SMTP 账号" value={smtpUser} onChange={(value) => updateDraftField("smtpUser", value)} placeholder="邮箱账号" />
+              <TextField label="SMTP 密码 / 授权码" type="password" value={smtpPass} onChange={(value) => updateDraftField("smtpPass", value)} placeholder="请输入密码或授权码" />
+              <TextField label="发件人地址" value={smtpFrom} onChange={(value) => updateDraftField("smtpFrom", value)} placeholder="如 Forum <no-reply@example.com>" />
             </div>
           </div>
         </>
       ) : null}
 
-      {mode === "interaction" ? (
+      {mode === "interaction" && activeSubTab === "comment-tip" ? (
         <>
           <div className="rounded-[24px] border border-border p-5 space-y-4">
             <div>
-              <h3 className="text-sm font-semibold">帖子打赏</h3>
-              <p className="mt-1 text-xs leading-6 text-muted-foreground">控制打赏开关、次数限制与送礼配置。礼物名称、图标和价格都可在后台维护。</p>
+              <h3 className="text-sm font-semibold">评论与帖子打赏</h3>
+              <p className="mt-1 text-xs leading-6 text-muted-foreground">控制游客评论可见性，以及帖子打赏开关、次数限制与送礼配置。礼物名称、图标和价格都可在后台维护。</p>
             </div>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <SwitchField label="开启帖子打赏" checked={tippingEnabled} onChange={setTippingEnabled} />
-              <TextField label="每日可打赏次数" value={tippingDailyLimit} onChange={setTippingDailyLimit} placeholder="如 3" />
-              <TextField label="单帖可打赏次数" value={tippingPerPostLimit} onChange={setTippingPerPostLimit} placeholder="如 1" />
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <SwitchField label="游客可查看评论" checked={guestCanViewComments} onChange={(value) => updateDraftField("guestCanViewComments", value)} />
+              <SwitchField label="开启帖子打赏" checked={tippingEnabled} onChange={(value) => updateDraftField("tippingEnabled", value)} />
+              <TextField label="每日可打赏次数" value={tippingDailyLimit} onChange={(value) => updateDraftField("tippingDailyLimit", value)} placeholder="如 3" />
+              <TextField label="单帖可打赏次数" value={tippingPerPostLimit} onChange={(value) => updateDraftField("tippingPerPostLimit", value)} placeholder="如 1" />
             </div>
-            <TextField label="裸积分打赏档位" value={tippingAmounts} onChange={setTippingAmounts} placeholder="如 10,30,50,100" />
-            <AdminTippingGiftListEditor items={tippingGifts} onChange={setTippingGifts} />
+            <TextField label="裸积分打赏档位" value={tippingAmounts} onChange={(value) => updateDraftField("tippingAmounts", value)} placeholder="如 10,30,50,100" />
+            <AdminTippingGiftListEditor items={tippingGifts} onChange={(value) => updateDraftField("tippingGifts", value)} />
           </div>
+        </>
+      ) : null}
 
+      {mode === "interaction" && activeSubTab === "gates" ? (
+        <>
           <div className="rounded-[24px] border border-border p-5 space-y-4">
             <div>
-              <h3 className="text-sm font-semibold">帖子红包</h3>
-              <p className="mt-1 text-xs leading-6 text-muted-foreground">控制帖子红包功能开关、单个红包最大积分，以及用户每日可发红包积分上限。</p>
+              <h3 className="text-sm font-semibold">发布门槛</h3>
+              <p className="mt-1 text-xs leading-6 text-muted-foreground">按发帖和回复分别控制邮箱验证与注册时长门槛。后续新的互动验证规则也会继续挂在这一层扩展，不需要再改主设置表。</p>
+            </div>
+            <div className="grid gap-4 xl:grid-cols-2">
+              <FieldGroup title="发帖">
+                <SwitchField label="发帖需已验证邮箱" checked={postCreateRequireEmailVerified} onChange={(value) => updateDraftField("postCreateRequireEmailVerified", value)} />
+                <TextField label="注册满多少分钟才能发帖" value={postCreateMinRegisteredMinutes} onChange={(value) => updateDraftField("postCreateMinRegisteredMinutes", value)} placeholder="填 0 表示不限制" />
+              </FieldGroup>
+              <FieldGroup title="回复">
+                <SwitchField label="回复需已验证邮箱" checked={commentCreateRequireEmailVerified} onChange={(value) => updateDraftField("commentCreateRequireEmailVerified", value)} />
+                <TextField label="注册满多少分钟才能回复" value={commentCreateMinRegisteredMinutes} onChange={(value) => updateDraftField("commentCreateMinRegisteredMinutes", value)} placeholder="填 0 表示不限制" />
+              </FieldGroup>
+            </div>
+            <p className="text-xs leading-6 text-muted-foreground">邮箱门槛只校验账号的 `emailVerifiedAt`；分钟门槛按注册时间到当前时间计算，`0` 表示关闭该限制。</p>
+          </div>
+        </>
+      ) : null}
+
+      {mode === "interaction" && activeSubTab === "reward-pool" ? (
+        <>
+          <div className="rounded-[24px] border border-border p-5 space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold">帖子红包与聚宝盆</h3>
+              <p className="mt-1 text-xs leading-6 text-muted-foreground">红包用于一次性预存发放；聚宝盆用于回复后给积分池注入积分，并按概率抽中奖励。</p>
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <SwitchField label="开启帖子红包" checked={postRedPacketEnabled} onChange={setPostRedPacketEnabled} />
-              <TextField label="单个红包最大积分" value={postRedPacketMaxPoints} onChange={setPostRedPacketMaxPoints} placeholder="如 100" />
-              <TextField label="每日发红包积分上限" value={postRedPacketDailyLimit} onChange={setPostRedPacketDailyLimit} placeholder="如 300" />
+              <SwitchField label="开启帖子红包" checked={postRedPacketEnabled} onChange={(value) => updateDraftField("postRedPacketEnabled", value)} />
+              <TextField label="单个红包最大积分" value={postRedPacketMaxPoints} onChange={(value) => updateDraftField("postRedPacketMaxPoints", value)} placeholder="如 100" />
+              <TextField label="每日发红包积分上限" value={postRedPacketDailyLimit} onChange={(value) => updateDraftField("postRedPacketDailyLimit", value)} placeholder="如 300" />
             </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <SwitchField label="开启聚宝盆" checked={postJackpotEnabled} onChange={(value) => updateDraftField("postJackpotEnabled", value)} />
+              <TextField label="聚宝盆最低初始积分" value={postJackpotMinInitialPoints} onChange={(value) => updateDraftField("postJackpotMinInitialPoints", value)} placeholder="如 100" />
+              <TextField label="聚宝盆最高初始积分" value={postJackpotMaxInitialPoints} onChange={(value) => updateDraftField("postJackpotMaxInitialPoints", value)} placeholder="如 1000" />
+              <TextField label="每次回复递增积分" value={postJackpotReplyIncrementPoints} onChange={(value) => updateDraftField("postJackpotReplyIncrementPoints", value)} placeholder="如 25" />
+              <TextField label="回复中奖概率（%）" value={postJackpotHitProbability} onChange={(value) => updateDraftField("postJackpotHitProbability", value)} placeholder="如 15" />
+            </div>
+            <p className="text-xs leading-6 text-muted-foreground">聚宝盆仅支持“回复帖子”触发。用户发帖时填写的初始积分必须落在这里配置的最小值和最大值之间；每次有效回复后，系统先向积分池增加设定积分，再按概率抽奖。</p>
           </div>
+        </>
+      ) : null}
 
+      {mode === "interaction" && activeSubTab === "heat" ? (
+        <>
           <div className="rounded-[24px] border border-border p-5 space-y-4">
             <div>
               <h3 className="text-sm font-semibold">帖子热度颜色算法</h3>
               <p className="mt-1 text-xs leading-6 text-muted-foreground">统一配置热度分数计算权重与颜色阶段。</p>
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-              <TextField label="浏览权重" value={heatViewWeight} onChange={setHeatViewWeight} placeholder="如 1" />
-              <TextField label="回复权重" value={heatCommentWeight} onChange={setHeatCommentWeight} placeholder="如 8" />
-              <TextField label="点赞权重" value={heatLikeWeight} onChange={setHeatLikeWeight} placeholder="如 6" />
-              <TextField label="打赏次数权重" value={heatTipCountWeight} onChange={setHeatTipCountWeight} placeholder="如 10" />
-              <TextField label="打赏积分权重" value={heatTipPointsWeight} onChange={setHeatTipPointsWeight} placeholder="如 1" />
+              <TextField label="浏览权重" value={heatViewWeight} onChange={(value) => updateDraftField("heatViewWeight", value)} placeholder="如 1" />
+              <TextField label="回复权重" value={heatCommentWeight} onChange={(value) => updateDraftField("heatCommentWeight", value)} placeholder="如 8" />
+              <TextField label="点赞权重" value={heatLikeWeight} onChange={(value) => updateDraftField("heatLikeWeight", value)} placeholder="如 6" />
+              <TextField label="打赏次数权重" value={heatTipCountWeight} onChange={(value) => updateDraftField("heatTipCountWeight", value)} placeholder="如 10" />
+              <TextField label="打赏积分权重" value={heatTipPointsWeight} onChange={(value) => updateDraftField("heatTipPointsWeight", value)} placeholder="如 1" />
             </div>
-            <TextField label="9 段热度阈值" value={heatStageThresholds} onChange={setHeatStageThresholds} placeholder="如 0,80,180,320,520,780,1100,1500,2000" />
+            <TextField label="9 段热度阈值" value={heatStageThresholds} onChange={(value) => updateDraftField("heatStageThresholds", value)} placeholder="如 0,80,180,320,520,780,1100,1500,2000" />
             <div className="space-y-2">
               <p className="text-sm font-medium">9 段颜色色板</p>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -556,18 +630,22 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
               </div>
             </div>
           </div>
+        </>
+      ) : null}
 
+      {mode === "interaction" && activeSubTab === "preview" ? (
+        <>
           <div className="rounded-[24px] border border-border p-5 space-y-4">
             <div>
               <h3 className="text-sm font-semibold">热度预览面板</h3>
               <p className="mt-1 text-xs leading-6 text-muted-foreground">调整参数后，实时预览热度分数与颜色表现。</p>
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-              <TextField label="浏览数" value={previewViews} onChange={setPreviewViews} placeholder="如 120" />
-              <TextField label="回复数" value={previewComments} onChange={setPreviewComments} placeholder="如 18" />
-              <TextField label="点赞数" value={previewLikes} onChange={setPreviewLikes} placeholder="如 12" />
-              <TextField label="打赏次数" value={previewTipCount} onChange={setPreviewTipCount} placeholder="如 4" />
-              <TextField label="打赏积分" value={previewTipPoints} onChange={setPreviewTipPoints} placeholder="如 160" />
+              <TextField label="浏览数" value={previewViews} onChange={(value) => updateDraftField("previewViews", value)} placeholder="如 120" />
+              <TextField label="回复数" value={previewComments} onChange={(value) => updateDraftField("previewComments", value)} placeholder="如 18" />
+              <TextField label="点赞数" value={previewLikes} onChange={(value) => updateDraftField("previewLikes", value)} placeholder="如 12" />
+              <TextField label="打赏次数" value={previewTipCount} onChange={(value) => updateDraftField("previewTipCount", value)} placeholder="如 4" />
+              <TextField label="打赏积分" value={previewTipPoints} onChange={(value) => updateDraftField("previewTipPoints", value)} placeholder="如 160" />
             </div>
             <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
               <div className="rounded-[20px] border border-border bg-card px-4 py-4">
@@ -593,6 +671,32 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile" }: Ad
         <Button disabled={isPending}>{isPending ? "保存中..." : submitText}</Button>
       </div>
     </form>
+  )
+}
+
+function resolveInternalSettingTab(mode: AdminBasicSettingsMode, initialSubTab?: string) {
+  const availableTabs = INTERNAL_SETTING_TABS[mode]
+  return availableTabs.some((tab) => tab.key === initialSubTab) ? initialSubTab! : INTERNAL_SETTING_TAB_DEFAULT[mode]
+}
+
+function InternalSectionTabs({ tabs, activeTab, onChange }: { tabs: Array<{ key: string; label: string }>; activeTab: string; onChange: (value: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {tabs.map((tab) => {
+        const active = activeTab === tab.key
+
+        return (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => onChange(tab.key)}
+            className={active ? "rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background" : "rounded-full bg-secondary px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"}
+          >
+            {tab.label}
+          </button>
+        )
+      })}
+    </div>
   )
 }
 

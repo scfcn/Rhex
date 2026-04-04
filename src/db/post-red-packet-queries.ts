@@ -1,8 +1,76 @@
+import { randomInt } from "node:crypto"
+
 import { prisma } from "@/db/client"
-import { ChangeType, PostRedPacketStatus, PostRedPacketTriggerType, type Prisma } from "@/db/types"
+import { upsertCommentEffectFeedback } from "@/db/comment-effect-feedback-queries"
+import { PostRedPacketStatus, PostRedPacketTriggerType, Prisma } from "@/db/types"
+import { applyPointDelta, prepareScopedPointDelta, prepareScopedProbability } from "@/lib/point-center"
+import { buildRedPacketEffectFeedback } from "@/lib/post-reward-effect-feedback-builders"
 
 interface PostRedPacketEligibleCandidate {
   userId: number
+}
+
+function pickRandomCandidate<T>(candidates: readonly T[]) {
+  if (candidates.length === 0) {
+    return null
+  }
+
+  return candidates[randomInt(0, candidates.length)] ?? null
+}
+
+function shouldHitProbability(probability: number) {
+  const normalizedProbability = Number.isFinite(probability)
+    ? Math.min(100, Math.max(0, probability))
+    : 0
+
+  return randomInt(0, 10_000) < normalizedProbability * 100
+}
+
+function resolveRandomClaimRecipient(params: {
+  eligibleCandidates: PostRedPacketEligibleCandidate[]
+  currentUserId: number
+  currentTriggerCommentId?: string
+  currentUserHitProbability?: number | null
+}) {
+  const currentUserEligible = params.eligibleCandidates.some((candidate) => candidate.userId === params.currentUserId)
+  if (!currentUserEligible) {
+    const selectedCandidate = pickRandomCandidate(params.eligibleCandidates)
+    return selectedCandidate
+      ? {
+          userId: selectedCandidate.userId,
+          triggerCommentId: undefined,
+        }
+      : null
+  }
+
+  if (params.eligibleCandidates.length <= 1) {
+    return {
+      userId: params.currentUserId,
+      triggerCommentId: params.currentTriggerCommentId,
+    }
+  }
+
+  if (typeof params.currentUserHitProbability === "number" && shouldHitProbability(params.currentUserHitProbability)) {
+    return {
+      userId: params.currentUserId,
+      triggerCommentId: params.currentTriggerCommentId,
+    }
+  }
+
+  const otherCandidates = params.eligibleCandidates.filter((candidate) => candidate.userId !== params.currentUserId)
+  const selectedCandidate = pickRandomCandidate(otherCandidates)
+
+  if (!selectedCandidate) {
+    return {
+      userId: params.currentUserId,
+      triggerCommentId: params.currentTriggerCommentId,
+    }
+  }
+
+  return {
+    userId: selectedCandidate.userId,
+    triggerCommentId: undefined,
+  }
 }
 
 async function findPostRedPacketEligibleCandidates(
@@ -78,6 +146,25 @@ async function findPostRedPacketEligibleCandidates(
   })
 }
 
+async function findExistingPostRedPacketClaim(
+  tx: Prisma.TransactionClient,
+  redPacketId: string,
+  userId: number,
+) {
+  return tx.postRedPacketClaim.findFirst({
+    where: {
+      redPacketId,
+      userId,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    select: {
+      amount: true,
+    },
+  })
+}
+
 export function sumTodayPostRedPacketPoints(senderId: number, start: Date, end: Date) {
   return prisma.postRedPacket.aggregate({
     where: {
@@ -103,15 +190,6 @@ export async function claimPostRedPacketInTransaction(input: {
   triggerCommentId?: string
   pointName: string
   buildClaimReason: (params: { amount: number; pointName: string; postId: string; triggerType: PostRedPacketTriggerType }) => string
-  resolveRecipient: (params: {
-    packet: {
-      claimOrderMode: string
-    }
-    eligibleCandidates: PostRedPacketEligibleCandidate[]
-  }) => {
-    userId: number
-    triggerCommentId?: string
-  } | null
   allocateAmount: (packet: {
     grantMode: string
     remainingPoints: number
@@ -151,17 +229,7 @@ export async function claimPostRedPacketInTransaction(input: {
       return { claimed: false as const, reason: "当前行为不满足红包领取条件" }
     }
 
-    const existingClaim = await tx.postRedPacketClaim.findUnique({
-      where: {
-        redPacketId_userId: {
-          redPacketId: packet.id,
-          userId: input.userId,
-        },
-      },
-      select: {
-        amount: true,
-      },
-    })
+    const existingClaim = await findExistingPostRedPacketClaim(tx, packet.id, input.userId)
 
     if (existingClaim) {
       return { claimed: false as const, reason: "你已经领取过该红包", amount: existingClaim.amount }
@@ -181,12 +249,27 @@ export async function claimPostRedPacketInTransaction(input: {
           triggerType: input.triggerType,
         })
 
-    const resolvedRecipient = input.resolveRecipient({
-      packet: {
-        claimOrderMode: packet.claimOrderMode,
-      },
-      eligibleCandidates,
-    })
+    const baseRandomClaimProbability = packet.claimOrderMode === "RANDOM" && eligibleCandidates.length > 1
+      ? 100 / eligibleCandidates.length
+      : null
+    const preparedRandomClaimProbability = baseRandomClaimProbability === null
+      ? null
+      : await prepareScopedProbability({
+          scopeKey: "RED_PACKET_RANDOM_CLAIM_PROBABILITY",
+          baseProbability: baseRandomClaimProbability,
+          userId: user.id,
+        })
+    const resolvedRecipient = packet.claimOrderMode === "FIRST_COME_FIRST_SERVED"
+      ? {
+          userId: user.id,
+          triggerCommentId: input.triggerCommentId,
+        }
+      : resolveRandomClaimRecipient({
+          eligibleCandidates,
+          currentUserId: user.id,
+          currentTriggerCommentId: input.triggerCommentId,
+          currentUserHitProbability: preparedRandomClaimProbability?.finalProbability ?? null,
+        })
 
     if (!resolvedRecipient) {
       return { claimed: false as const, reason: "当前暂无可领取的红包名额" }
@@ -225,17 +308,7 @@ export async function claimPostRedPacketInTransaction(input: {
     })
 
     if (updatedPacket.count === 0) {
-      const latestClaim = await tx.postRedPacketClaim.findUnique({
-        where: {
-          redPacketId_userId: {
-            redPacketId: packet.id,
-            userId: input.userId,
-          },
-        },
-        select: {
-          amount: true,
-        },
-      })
+      const latestClaim = await findExistingPostRedPacketClaim(tx, packet.id, input.userId)
 
       if (latestClaim) {
         return { claimed: false as const, reason: "你已经领取过该红包", amount: latestClaim.amount }
@@ -263,8 +336,10 @@ export async function claimPostRedPacketInTransaction(input: {
       return { claimed: false as const, reason: "红包正在被其他请求处理，请稍后重试" }
     }
 
+    let rewardClaimId: string | null = null
+
     try {
-      await tx.postRedPacketClaim.create({
+      const rewardClaim = await tx.postRedPacketClaim.create({
         data: {
           redPacketId: packet.id,
           postId: post.id,
@@ -274,6 +349,8 @@ export async function claimPostRedPacketInTransaction(input: {
           amount,
         },
       })
+
+      rewardClaimId = rewardClaim.id
     } catch (error) {
       if (error instanceof Error && "code" in error && (error as { code?: string }).code === "P2002") {
         await tx.postRedPacket.update({
@@ -287,47 +364,82 @@ export async function claimPostRedPacketInTransaction(input: {
           },
         })
 
-        const duplicatedClaim = await tx.postRedPacketClaim.findUnique({
-          where: {
-            redPacketId_userId: {
-              redPacketId: packet.id,
-              userId: recipientUser.id,
-            },
-          },
-          select: {
-            amount: true,
-          },
-        })
+        const duplicatedClaim = await findExistingPostRedPacketClaim(tx, packet.id, recipientUser.id)
+
+        const duplicatedEffectFeedback = recipientUser.id === input.userId
+          ? null
+          : buildRedPacketEffectFeedback({
+              preparedProbability: preparedRandomClaimProbability,
+              claimed: false,
+              pointName: input.pointName,
+            })
+
+        if (input.triggerCommentId && duplicatedEffectFeedback) {
+          await upsertCommentEffectFeedback({
+            tx,
+            postId: post.id,
+            commentId: input.triggerCommentId,
+            userId: input.userId,
+            scene: "RED_PACKET_REPLY",
+            feedback: duplicatedEffectFeedback,
+          })
+        }
 
         return recipientUser.id === input.userId
           ? { claimed: false as const, reason: "你已经领取过该红包", amount: duplicatedClaim?.amount }
-          : { claimed: false as const, reason: "本次随机红包未命中你" }
+          : { claimed: false as const, reason: "本次随机红包未命中你", effectFeedback: duplicatedEffectFeedback }
       }
 
       throw error
     }
 
-    await tx.user.update({
-      where: { id: recipientUser.id },
-      data: {
-        points: { increment: amount },
-      },
+    const preparedReward = await prepareScopedPointDelta({
+      scopeKey: "RED_PACKET_CLAIM",
+      baseDelta: amount,
+      userId: recipientUser.id,
     })
 
-    await tx.pointLog.create({
-      data: {
-        userId: recipientUser.id,
-        changeType: ChangeType.INCREASE,
-        changeValue: amount,
-        reason: input.buildClaimReason({ amount, pointName: input.pointName, postId: post.id, triggerType: input.triggerType }),
-        relatedType: "POST",
-        relatedId: post.id,
-      },
+    await applyPointDelta({
+      tx,
+      userId: recipientUser.id,
+      beforeBalance: recipientUser.points,
+      prepared: preparedReward,
+      pointName: input.pointName,
+      reason: input.buildClaimReason({
+        amount,
+        pointName: input.pointName,
+        postId: post.id,
+        triggerType: input.triggerType,
+      }),
+      insufficientMessage: `${input.pointName}不足，无法完成本次红包结算`,
+      relatedType: "POST",
+      relatedId: post.id,
     })
+
+    const effectFeedback = buildRedPacketEffectFeedback({
+      preparedProbability: preparedRandomClaimProbability,
+      preparedReward: recipientUser.id === input.userId ? preparedReward : null,
+      claimed: recipientUser.id === input.userId,
+      pointName: input.pointName,
+    })
+
+    if (input.triggerCommentId && effectFeedback) {
+      await upsertCommentEffectFeedback({
+        tx,
+        postId: post.id,
+        commentId: input.triggerCommentId,
+        userId: input.userId,
+        scene: "RED_PACKET_REPLY",
+        rewardClaimId: recipientUser.id === input.userId ? rewardClaimId : null,
+        feedback: effectFeedback,
+      })
+    }
 
     return recipientUser.id === input.userId
-      ? { claimed: true as const, amount, pointName: input.pointName }
-      : { claimed: false as const, reason: "本次随机红包未命中你" }
+      ? { claimed: true as const, amount: Math.abs(preparedReward.finalDelta), pointName: input.pointName, effectFeedback }
+      : { claimed: false as const, reason: "本次随机红包未命中你", effectFeedback }
+  }, {
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
   })
 }
 
@@ -337,6 +449,11 @@ export function findPostRedPacketSummaryData(postId: string, currentUserId?: num
     prisma.postRedPacket.findUnique({
       where: { postId },
       include: {
+        post: {
+          select: {
+            content: true,
+          },
+        },
         sender: {
           select: {
             id: true,
@@ -365,12 +482,15 @@ export function findPostRedPacketSummaryData(postId: string, currentUserId?: num
 }
 
 export function findCurrentUserPostRedPacketClaim(redPacketId: string, currentUserId: number) {
-  return prisma.postRedPacketClaim.findFirst({
+  return prisma.postRedPacketClaim.aggregate({
     where: {
       redPacketId,
       userId: currentUserId,
     },
-    select: {
+    _count: {
+      _all: true,
+    },
+    _sum: {
       amount: true,
     },
   })

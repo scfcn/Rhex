@@ -69,9 +69,6 @@ export default async function VerificationSystemFaqPage() {
                         </span>
                       </div>
                       <p className="mt-2 text-sm leading-7 text-muted-foreground">{type.description || "暂无说明"}</p>
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        驳回后{type.allowResubmitAfterReject ? "允许重新提交" : "不允许重新提交"}
-                      </p>
                     </div>
                   </div>
                 </div>

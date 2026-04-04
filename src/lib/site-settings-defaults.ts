@@ -97,5 +97,6 @@ export const defaultSiteSettingsCreateInput = {
   headerAppLinksJson: JSON.stringify(DEFAULT_SITE_HEADER_APP_LINKS),
   headerAppIconName: "grid",
   appStateJson: "{}",
+  sensitiveStateJson: "{}",
 
 } as const

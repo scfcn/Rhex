@@ -23,7 +23,10 @@
   "dependencies": {
     "@prisma/client": "^6.19.2",
     "@radix-ui/react-select": "^2.2.6",
+    "@simplewebauthn/browser": "^13.3.0",
+    "@simplewebauthn/server": "^13.3.0",
     "@traptitech/markdown-it-katex": "^3.6.0",
+    "arctic": "^3.7.0",
     "bcryptjs": "^3.0.3",
     "bignumber.js": "^10.0.2",
     "class-variance-authority": "^0.7.1",
@@ -48,6 +51,7 @@
     "nodemailer": "^6.10.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "react-easy-crop": "^5.5.7",
     "tailwind-merge": "^2.5.5"
   },
   "devDependencies": {

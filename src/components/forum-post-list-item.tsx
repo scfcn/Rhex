@@ -2,9 +2,11 @@ import Link from "next/link"
 
 import { LevelIcon } from "@/components/level-icon"
 import { PostListLink } from "@/components/post-list-link"
-import { getPostPinTone, getPostTitleClassName, PostAccessBadges, PostRedPacketIcon } from "@/components/post-list-shared"
+import { getPostPinTone, getPostTitleClassName, PostAccessBadges, PostRewardPoolIcon } from "@/components/post-list-shared"
+import { TimeTooltip } from "@/components/time-tooltip"
 import { Tooltip } from "@/components/ui/tooltip"
 import { VipNameTooltip } from "@/components/vip-name-tooltip"
+import type { PostRewardPoolMode } from "@/lib/post-reward-pool-config"
 
 import { MessageCircle } from "lucide-react"
 
@@ -25,6 +27,7 @@ interface ForumPostListItemProps {
     pinScope?: string | null
     pinLabel?: string | null
     hasRedPacket?: boolean
+    rewardMode?: PostRewardPoolMode
     minViewLevel?: number
     minViewVipLevel?: number
     isFeatured: boolean
@@ -47,6 +50,7 @@ interface ForumPostListItemProps {
       iconText?: string | null
     }>
     metaPrimary: string
+    metaPrimaryRaw?: string
     metaSecondary?: string | null
     commentCount: number
     commentAccentColor: string
@@ -80,9 +84,9 @@ export function ForumPostListItem({ item, showBoard = true, compactFirstItem = f
               </h2>
             </PostListLink>
             {item.hasRedPacket ? (
-              <Tooltip content="红包帖">
-                <span aria-label="红包帖">
-                  <PostRedPacketIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <Tooltip content={item.rewardMode === "JACKPOT" ? "聚宝盆帖" : "红包帖"}>
+                <span aria-label={item.rewardMode === "JACKPOT" ? "聚宝盆帖" : "红包帖"}>
+                  <PostRewardPoolIcon mode={item.rewardMode} className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </span>
               </Tooltip>
             ) : null}
@@ -119,7 +123,9 @@ export function ForumPostListItem({ item, showBoard = true, compactFirstItem = f
           </VipNameTooltip>
           {isRestrictedAuthor ? <UserStatusBadge status={item.authorStatus} compact /> : null}
           <span>•</span>
-          <span>{item.metaPrimary}</span>
+          <TimeTooltip value={item.metaPrimaryRaw}>
+            <span>{item.metaPrimary}</span>
+          </TimeTooltip>
           {item.metaSecondary ? (
             <>
               <span>•</span>

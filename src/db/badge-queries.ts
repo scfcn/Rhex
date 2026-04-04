@@ -1,5 +1,5 @@
 import { prisma } from "@/db/client"
-import type { BadgeGrantSource, Prisma } from "@/db/types"
+import { PointEffectDirection, PointEffectRuleKind, PointEffectTargetType, Prisma, type BadgeGrantSource } from "@/db/types"
 
 
 export const badgeWithRulesAndCountInclude = {
@@ -13,6 +13,36 @@ export const badgeWithRulesAndCountInclude = {
   },
 } satisfies Prisma.BadgeInclude
 
+export interface BadgeEffectRuleRecord {
+  id: string
+  badgeId: string | null
+  badgeName: string | null
+  badgeIconText: string | null
+  badgeColor: string | null
+  name: string
+  description: string | null
+  targetType: PointEffectTargetType
+  scopeKeys: string[]
+  ruleKind: PointEffectRuleKind
+  direction: PointEffectDirection
+  value: number
+  extraValue: number | null
+  startMinuteOfDay: number | null
+  endMinuteOfDay: number | null
+  sortOrder: number
+  status: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
+function mapBadgeEffectRuleRecord(row: BadgeEffectRuleRecord): BadgeEffectRuleRecord {
+  return {
+    ...row,
+    value: Number(row.value),
+    extraValue: row.extraValue === null ? null : Number(row.extraValue),
+  }
+}
+
 export function findBadgeEligibilityUserSnapshot(userId: number) {
   return Promise.all([
     prisma.user.findUnique({
@@ -20,6 +50,7 @@ export function findBadgeEligibilityUserSnapshot(userId: number) {
       select: {
         id: true,
         createdAt: true,
+        points: true,
         postCount: true,
         commentCount: true,
         likeReceivedCount: true,
@@ -27,12 +58,34 @@ export function findBadgeEligibilityUserSnapshot(userId: number) {
         acceptedAnswerCount: true,
         level: true,
         vipLevel: true,
+        _count: {
+          select: {
+            followedByUsers: true,
+          },
+        },
       },
     }),
     prisma.userLevelProgress.findUnique({
       where: { userId },
       select: { checkInDays: true },
     }),
+    Promise.all([
+      prisma.postTip.count({
+        where: { senderId: userId },
+      }),
+      prisma.postGiftEvent.count({
+        where: { senderId: userId },
+      }),
+      prisma.postTip.count({
+        where: { receiverId: userId },
+      }),
+      prisma.postGiftEvent.count({
+        where: { receiverId: userId },
+      }),
+    ]).then(([sentTipCount, sentGiftCount, receivedTipCount, receivedGiftCount]) => ({
+      sentTipCount: sentTipCount + sentGiftCount,
+      receivedTipCount: receivedTipCount + receivedGiftCount,
+    })),
   ])
 }
 
@@ -53,6 +106,41 @@ export function findAllBadgesWithRules() {
     orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
     include: badgeWithRulesAndCountInclude,
   })
+}
+
+export async function findBadgeEffectRulesByBadgeIds(badgeIds: string[]) {
+  if (badgeIds.length === 0) {
+    return []
+  }
+
+  const rows = await prisma.$queryRaw<BadgeEffectRuleRecord[]>(Prisma.sql`
+    SELECT
+      effect."id",
+      effect."badgeId",
+      badge."name" AS "badgeName",
+      badge."iconText" AS "badgeIconText",
+      badge."color" AS "badgeColor",
+      effect."name",
+      effect."description",
+      effect."targetType",
+      effect."scopeKeys",
+      effect."ruleKind",
+      effect."direction",
+      effect."value",
+      effect."extraValue",
+      effect."startMinuteOfDay",
+      effect."endMinuteOfDay",
+      effect."sortOrder",
+      effect."status",
+      effect."createdAt",
+      effect."updatedAt"
+    FROM "PointEffectRule" effect
+    INNER JOIN "Badge" badge ON badge."id" = effect."badgeId"
+    WHERE effect."badgeId" IN (${Prisma.join(badgeIds)})
+    ORDER BY effect."sortOrder" ASC, effect."createdAt" ASC
+  `)
+
+  return rows.map(mapBadgeEffectRuleRecord)
 }
 
 export function findGrantedBadgesForUserRecord(userId: number) {
@@ -131,4 +219,43 @@ export function findDisplayedUserBadges(userId: number) {
       displayOrder: true,
     },
   })
+}
+
+export async function findDisplayedBadgeEffectRules(userId: number) {
+  const rows = await prisma.$queryRaw<BadgeEffectRuleRecord[]>(Prisma.sql`
+    SELECT
+      effect."id",
+      effect."badgeId",
+      badge."name" AS "badgeName",
+      badge."iconText" AS "badgeIconText",
+      badge."color" AS "badgeColor",
+      effect."name",
+      effect."description",
+      effect."targetType",
+      effect."scopeKeys",
+      effect."ruleKind",
+      effect."direction",
+      effect."value",
+      effect."extraValue",
+      effect."startMinuteOfDay",
+      effect."endMinuteOfDay",
+      effect."sortOrder",
+      effect."status",
+      effect."createdAt",
+      effect."updatedAt"
+    FROM "UserBadge" user_badge
+    INNER JOIN "Badge" badge ON badge."id" = user_badge."badgeId"
+    INNER JOIN "PointEffectRule" effect ON effect."badgeId" = badge."id"
+    WHERE
+      user_badge."userId" = ${userId}
+      AND user_badge."isDisplayed" = true
+      AND badge."status" = true
+      AND effect."status" = true
+    ORDER BY
+      user_badge."displayOrder" ASC,
+      effect."sortOrder" ASC,
+      effect."createdAt" ASC
+  `)
+
+  return rows.map(mapBadgeEffectRuleRecord)
 }

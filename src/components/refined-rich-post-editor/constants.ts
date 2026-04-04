@@ -29,7 +29,11 @@ export const TOOLBAR_TIPS = {
   bold: { label: "加粗", shortcuts: { windows: ["Ctrl+B"], mac: ["Cmd+B"], default: ["Ctrl+B"] } },
   underline: { label: "下划线", shortcuts: { windows: ["Ctrl+U"], mac: ["Cmd+U"], default: ["Ctrl+U"] } },
   strike: { label: "删除线", shortcuts: { windows: ["Alt+Shift+5"], mac: ["Cmd+Shift+5"], default: ["Alt+Shift+5"] } },
-  highlight: { label: "高亮", description: "插入 ==高亮内容== 标记。" },
+  highlight: {
+    label: "高亮",
+    shortcuts: { windows: ["Ctrl+X"], mac: ["Cmd+X"], default: ["Ctrl+X"] },
+    description: "插入 ==高亮内容== 标记。",
+  },
   code: {
     label: "代码格式",
     shortcuts: {

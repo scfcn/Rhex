@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "fs/promises"
 import path from "path"
 
 import { getSiteSettings } from "@/lib/site-settings"
+import { normalizeUploadLocalPath } from "@/lib/upload-path"
 
 export interface SavedUploadFile {
   fileName: string
@@ -84,12 +85,13 @@ async function saveToLocal(
   const ext = path.extname(file.name) || ".bin"
   const shortHash = preparedFile.fileHash.slice(0, 16)
   const fileName = `${folder}-${shortHash}${ext}`
-  const uploadRoot = path.resolve(process.cwd(), localPath || "uploads", folder)
+  const normalizedLocalPath = normalizeUploadLocalPath(localPath)
+  const uploadRoot = path.resolve(process.cwd(), normalizedLocalPath, folder)
 
   await mkdir(uploadRoot, { recursive: true })
   await writeFile(path.join(uploadRoot, fileName), preparedFile.buffer)
 
-  const resolvedBaseUrl = baseUrl?.trim() || `/${localPath || "uploads"}`
+  const resolvedBaseUrl = baseUrl?.trim() || `/${normalizedLocalPath}`
   const urlPath = `${resolvedBaseUrl}/${folder}/${fileName}`.replace(/\\/g, "/")
 
   return {

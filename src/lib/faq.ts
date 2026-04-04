@@ -35,6 +35,11 @@ export const FAQ_TABS: FaqTabItem[] = [
     description: "说明积分来源、消耗场景和门槛用途。",
   },
   {
+    href: "/faq/red-packet-jackpot",
+    label: "红包与聚宝盆",
+    description: "说明帖子红包与聚宝盆的触发方式、限制和当前站点规则。",
+  },
+  {
     href: "/faq/verification-system",
     label: "认证系统",
     description: "说明认证类型、申请流程、审核状态与展示效果。",
@@ -43,6 +48,11 @@ export const FAQ_TABS: FaqTabItem[] = [
     href: "/faq/social-system",
     label: "关注与拉黑",
     description: "说明关注维度、拉黑边界与社交行为限制。",
+  },
+  {
+    href: "/faq/rss-guide",
+    label: "RSS 订阅",
+    description: "说明 RSS 的用途、订阅方式，以及系统当前支持的所有 RSS 地址规则。",
   },
 ]
 

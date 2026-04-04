@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { useState } from "react"
 
 import { FollowToggleButton } from "@/components/follow-toggle-button"
@@ -11,7 +12,7 @@ import { cn } from "@/lib/utils"
 import type { PublicUserStatus } from "@/lib/users"
 
 interface UserProfileOverviewCardProps {
-  title: string
+  title: ReactNode
   status?: PublicUserStatus | null
   initialFollowerCount: number
   stats: Array<{
@@ -70,7 +71,7 @@ export function UserProfileOverviewCard({
           <div className="min-w-0 flex-1">
             <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Overview</p>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              <h2 className="text-xl font-semibold text-foreground sm:text-[22px]">{title}</h2>
+              <h2 className="min-w-0 text-xl font-semibold text-foreground sm:text-[22px]">{title}</h2>
               {status ? <UserStatusBadge status={status} /> : null}
             </div>
             <div className="mt-1.5 flex flex-col gap-1.5 sm:flex-row sm:flex-nowrap sm:items-center">
@@ -125,7 +126,7 @@ export function UserProfileOverviewCard({
               ) : null}
             </div>
           </div>
-          <div className="w-full lg:w-auto lg:max-w-[520px] lg:shrink-0">
+          <div className="w-full self-start lg:w-auto lg:max-w-[520px] lg:shrink-0">
             <div className={cn("grid gap-1.5", overviewStats.length >= 5 ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" : "grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-wrap lg:justify-end")}>
               {overviewStats.map((item) => (
                 <OverviewMetric key={item.label} label={item.label} value={item.value} />

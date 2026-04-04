@@ -5,13 +5,17 @@ import { notFound } from "next/navigation"
 import { AccessDeniedCard } from "@/components/access-denied-card"
 import { ForumPostStream } from "@/components/forum-post-stream"
 import { LevelBadge } from "@/components/level-badge"
-import { LevelIcon } from "@/components/level-icon"
+import { MarkdownContent } from "@/components/markdown-content"
+import { UserProfileBadgeShowcase } from "@/components/user-profile-badge-showcase"
 import { ReportDialog } from "@/components/report-dialog"
 import { SiteHeader } from "@/components/site-header"
+import { UserRecentActivityPanel } from "@/components/user-recent-activity-panel"
+import { UserRecentRepliesList } from "@/components/user-recent-replies-list"
 import { UserAvatar } from "@/components/user-avatar"
 import { UserProfileOverviewCard } from "@/components/user-profile-overview-card"
 import { UserStatusBadge } from "@/components/user-status-badge"
 import { UserVerificationBadge } from "@/components/user-verification-badge"
+import { VipDisplayName } from "@/components/vip-display-name"
 import { VipBadge } from "@/components/vip-badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -21,8 +25,20 @@ import { isUserFollowingTarget } from "@/lib/follows"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getUserProfileAccessState } from "@/lib/user-blocks"
 import { cn } from "@/lib/utils"
-import { getUserProfile, getUserPosts } from "@/lib/users"
+import { getUserProfile, getUserPosts, getUserRecentReplies } from "@/lib/users"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
+
+const profileCardClassName = "rounded-2xl border border-[#e8e8e8] shadow-sm"
+
+const identityTagClassNames = {
+  vip: "rounded-full bg-violet-100 px-3 py-1 text-xs font-medium text-violet-700 dark:bg-violet-400/15 dark:text-violet-200",
+  level: "rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200",
+  orange: "rounded-full bg-orange-100 px-3 py-1 text-xs font-medium text-orange-700 dark:bg-orange-400/15 dark:text-orange-200",
+  sky: "rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700 dark:bg-sky-400/15 dark:text-sky-200",
+  danger: "rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700 dark:bg-red-500/15 dark:text-red-200",
+  warning: "rounded-full bg-yellow-100 px-3 py-1 text-xs font-medium text-yellow-700 dark:bg-yellow-500/15 dark:text-yellow-200",
+  plain: "rounded-full bg-secondary px-3 py-1 text-xs font-medium text-muted-foreground dark:bg-white/[0.06] dark:text-slate-300",
+} satisfies Record<"plain" | "vip" | "level" | "orange" | "sky" | "danger" | "warning", string>
 
 export async function generateMetadata(props: PageProps<"/users/[username]">): Promise<Metadata> {
   const params = await props.params;
@@ -67,8 +83,12 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
     )
   }
 
-  const [posts, badgeItems, isFollowingUser] = await Promise.all([
-    getUserPosts(params.username),
+  const canViewRecentActivity = user.activityVisibilityPublic || currentUser?.id === user.id
+  const introduction = user.introduction.trim()
+
+  const [posts, recentReplies, badgeItems, isFollowingUser] = await Promise.all([
+    canViewRecentActivity ? getUserPosts(params.username) : Promise.resolve([]),
+    canViewRecentActivity ? getUserRecentReplies(params.username) : Promise.resolve([]),
     getGrantedBadgesForUser(user.id),
     currentUser && currentUser.id !== user.id && !profileAccess.relation.isBlocked
       ? isUserFollowingTarget({
@@ -111,23 +131,40 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
     <div className="min-h-screen  text-foreground dark:bg-[#0f1115]">
       <SiteHeader />
       <main className={cn("mx-auto max-w-[1200px] px-1 py-6 lg:px-6", isRestrictedUser && "grayscale") }>
-        <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
-          <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">
-            <Card className="relative rounded-2xl border border-[#e8e8e8]  shadow-sm">
+        <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)] xl:items-start">
+          <aside className="space-y-4 xl:sticky  xl:self-start">
+            <Card className={cn("relative", profileCardClassName)}>
               <CardContent className="p-5">
-                <div className="flex flex-col items-center text-center">
+                <div className="flex flex-col text-left">
                   {isRestrictedUser ? <UserStatusBadge status={user.status} compact className="absolute right-4 top-4 shadow-sm" /> : null}
-                  <UserAvatar name={user.displayName} avatarPath={user.avatarPath} size="lg" isVip={vipActive} vipLevel={vipLevel} />
-                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-                    <UserVerificationBadge verification={user.verification ?? null} />
-                    <h1 className="text-2xl font-semibold tracking-tight text-foreground">{user.displayName}</h1>
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">@{user.username}</p>
-                  <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-                    {user.role === "ADMIN" ? <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700 dark:bg-red-500/15 dark:text-red-200">管理员</span> : null}
-                    {vipActive ? <VipBadge level={vipLevel} compact /> : null}
-                    {user.levelName && user.levelColor && user.levelIcon ? <LevelBadge level={user.level} name={user.levelName} color={user.levelColor} icon={user.levelIcon} compact /> : null}
-                    {isRestrictedUser ? <UserStatusBadge status={user.status} /> : null}
+                  <div className="flex items-start gap-4">
+                    <UserAvatar
+                      name={user.displayName || user.username}
+                      avatarPath={user.avatarPath}
+                      size="lg"
+                      isVip={vipActive}
+                      vipLevel={vipLevel}
+                    />
+                    <div className="min-w-0 flex-1 pt-0.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <UserVerificationBadge verification={user.verification ?? null} />
+                        <h1 className="min-w-0 truncate text-[22px] font-semibold leading-6 tracking-tight">
+                          <VipDisplayName
+                            name={user.displayName || user.username}
+                            isVip={vipActive}
+                            vipLevel={vipLevel}
+                            emphasize
+                            className="truncate"
+                          />
+                        </h1>
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {user.role === "ADMIN" ? <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700 dark:bg-red-500/15 dark:text-red-200">管理员</span> : null}
+                        {vipActive ? <VipBadge level={vipLevel} compact /> : null}
+                        {user.levelName && user.levelColor && user.levelIcon ? <LevelBadge level={user.level} name={user.levelName} color={user.levelColor} icon={user.levelIcon} compact /> : null}
+                        {isRestrictedUser ? <UserStatusBadge status={user.status} /> : null}
+                      </div>
+                    </div>
                   </div>
                   <p className="mt-4 text-sm leading-7 text-muted-foreground">{user.bio}</p>
                   {restrictionDescription ? <p className="mt-3 rounded-xl border border-border/70 bg-secondary/60 px-3 py-2 text-xs leading-6 text-muted-foreground">{restrictionDescription}</p> : null}
@@ -145,36 +182,21 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
               </CardContent>
             </Card>
 
-            <Card className="rounded-2xl border border-[#e8e8e8]  shadow-sm">
+            <Card className={profileCardClassName}>
               <CardContent className="p-4">
                 <h2 className="text-sm font-semibold text-foreground">勋章</h2>
-                {badgeItems.length === 0 ? (
-                  <div className="mt-3 rounded-xl border border-dashed border-[#e8e8e8] px-3 py-6 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/[0.02]">
-                    暂无可展示勋章
-                  </div>
-                ) : (
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    {badgeItems.map((badge: (typeof badgeItems)[number]) => (
-                      <div key={badge.id} className="rounded-xl p-2 text-center dark:bg-white/[0.02]">
-                        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl text-lg" style={{ backgroundColor: `${badge.color}18`, color: badge.color }}>
-                          <LevelIcon icon={badge.iconText} color={badge.color} className="h-5 w-5 text-[18px]" emojiClassName="text-inherit" svgClassName="[&>svg]:block" />
-                        </div>
-                        <p className="mt-2 line-clamp-1 text-xs font-medium" style={{ color: badge.color }}>{badge.name}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <UserProfileBadgeShowcase badges={badgeItems} />
               </CardContent>
             </Card>
 
-            <Card className="rounded-2xl border border-[#e8e8e8]  shadow-sm">
+            <Card className={profileCardClassName}>
               <CardContent className="p-4">
                 <h2 className="text-sm font-semibold text-foreground">身份标签</h2>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {identityTags.map((tag) => (
                     <span
                       key={tag.label}
-                      className={tag.tone === "vip" ? "rounded-full bg-violet-100 px-3 py-1 text-xs font-medium text-violet-700 dark:bg-violet-400/15 dark:text-violet-200" : tag.tone === "level" ? "rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-200" : tag.tone === "orange" ? "rounded-full bg-orange-100 px-3 py-1 text-xs font-medium text-orange-700 dark:bg-orange-400/15 dark:text-orange-200" : tag.tone === "sky" ? "rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700 dark:bg-sky-400/15 dark:text-sky-200" : tag.tone === "danger" ? "rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700 dark:bg-red-500/15 dark:text-red-200" : tag.tone === "warning" ? "rounded-full bg-yellow-100 px-3 py-1 text-xs font-medium text-yellow-700 dark:bg-yellow-500/15 dark:text-yellow-200" : "rounded-full bg-secondary px-3 py-1 text-xs font-medium text-muted-foreground dark:bg-white/[0.06] dark:text-slate-300"}
+                      className={identityTagClassNames[tag.tone]}
                     >
                       {tag.label}
                     </span>
@@ -184,9 +206,20 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
             </Card>
           </aside>
 
-          <section className="space-y-4">
+          <section className="space-y-4 xl:self-start">
             <UserProfileOverviewCard
-              title={`${user.displayName} 的主页`}
+              title={(
+                <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                  <VipDisplayName
+                    name={user.displayName}
+                    isVip={vipActive}
+                    vipLevel={vipLevel}
+                    emphasize
+                    className="min-w-0 truncate"
+                  />
+                  <span className="shrink-0 text-foreground">的主页</span>
+                </span>
+              )}
               status={restrictionLabel ? user.status : null}
               initialFollowerCount={user.followerCount}
               stats={statItems}
@@ -206,27 +239,57 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
               } : null}
             />
 
-            <Card className="rounded-2xl border border-[#e8e8e8]  shadow-sm">
-              <CardContent className="p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#efefef] pb-4 dark:border-white/10">
-                  <div>
-                    <h2 className="text-xl font-semibold text-foreground">最近动态</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">最近公开发布的帖子与参与内容。</p>
-                  </div>
-                  <span className="rounded-full bg-[#f5f5f5] px-3 py-1 text-xs font-medium text-muted-foreground">共 {posts.length} 条内容</span>
-                </div>
-
-                <div className="mt-2">
-                  {posts.length === 0 ? (
+            <UserRecentActivityPanel
+              description={canViewRecentActivity ? "" : ""}
+              defaultTabKey="introduction"
+              tabs={[
+                {
+                  key: "introduction",
+                  label: "介绍",
+                  content: introduction ? (
+                    <div className="rounded-2xl border border-border/70 bg-card px-4 py-4 shadow-sm">
+                      <MarkdownContent
+                        content={introduction}
+                        markdownEmojiMap={settings.markdownEmojiMap}
+                        className="markdown-body prose prose-sm max-w-none prose-p:my-3 prose-ul:my-3 prose-ol:my-3 prose-li:my-1"
+                      />
+                    </div>
+                  ) : (
                     <div className="rounded-xl border border-dashed border-[#e8e8e8] px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/[0.02]">
-                      这个用户还没有公开内容。
+                      这个用户还没有填写详细介绍。
+                    </div>
+                  ),
+                },
+                {
+                  key: "posts",
+                  label: "帖子",
+                  count: posts.length,
+                  content: !canViewRecentActivity ? (
+                    <div className="rounded-xl border border-dashed border-[#e8e8e8] px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/[0.02]">
+                      该用户未公开最近帖子。
+                    </div>
+                  ) : posts.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-[#e8e8e8] px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/[0.02]">
+                      最近还没有发布帖子。
                     </div>
                   ) : (
                     <ForumPostStream posts={posts} />
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                  ),
+                },
+                {
+                  key: "replies",
+                  label: "回复",
+                  count: recentReplies.length,
+                  content: canViewRecentActivity
+                    ? <UserRecentRepliesList replies={recentReplies} postLinkDisplayMode={settings.postLinkDisplayMode} />
+                    : (
+                      <div className="rounded-xl border border-dashed border-[#e8e8e8] px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/[0.02]">
+                        该用户未公开最近回复。
+                      </div>
+                    ),
+                },
+              ]}
+            />
           </section>
         </div>
       </main>

@@ -9,6 +9,7 @@ import { CommentThread } from "@/components/comment-thread"
 import { ForumPageShell } from "@/components/forum-page-shell"
 import { MarkdownContent } from "@/components/markdown-content"
 import { PostAppendixTimeline } from "@/components/post-appendix-timeline"
+import { PostBodyCopyMenu } from "@/components/post-body-copy-menu"
 import { PostDetailHeader } from "@/components/post-detail-header"
 
 import { PostAdminPanel } from "@/components/post-admin-panel"
@@ -130,11 +131,25 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
 
 
   const userReplyCountPromise = canViewRestrictedPost ? getUserReplyCountByPost(basePost.id, currentUser?.id) : Promise.resolve(0)
+  const canViewComments = Boolean(currentUser) || settings.guestCanViewComments
 
   const purchasedBlockIdsPromise = canViewRestrictedPost ? getPurchasedPostBlockIds(basePost.id, currentUser?.id) : Promise.resolve(new Set<string>())
   const tipSummaryPromise = canViewRestrictedPost ? getPostTipSummary(basePost.id, currentUser?.id) : Promise.resolve(undefined)
   const redPacketSummaryPromise = canViewRestrictedPost ? getPostRedPacketSummary(basePost.id, currentUser?.id) : Promise.resolve(undefined)
   const postOfflineMetaPromise = currentUser?.id === basePost.authorId ? getPostOfflineActionMeta(basePost.id) : Promise.resolve(null)
+  const commentResultPromise = canViewComments
+    ? getCommentsByPostId(basePost.id, { sort: currentSort, page: currentPage, pageSize: 15 }, {
+      userId: currentUser?.id,
+      isAdmin,
+      postAuthorId: basePost.authorId,
+      commentsVisibleToAuthorOnly: basePost.commentsVisibleToAuthorOnly,
+    })
+    : Promise.resolve({
+      items: [],
+      total: 0,
+      page: currentPage,
+      pageSize: 15,
+    })
 
 
   const [userReplyCount, purchasedBlockIds, tipSummary, redPacketSummary, postOfflineMeta, commentResult, sidebarData, boards, zones] = await Promise.all([
@@ -145,14 +160,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
     tipSummaryPromise,
     redPacketSummaryPromise,
     postOfflineMetaPromise,
-    getCommentsByPostId(basePost.id, { sort: currentSort, page: currentPage, pageSize: 15 }, {
-
-
-      userId: currentUser?.id,
-      isAdmin,
-      postAuthorId: basePost.authorId,
-      commentsVisibleToAuthorOnly: basePost.commentsVisibleToAuthorOnly,
-    }),
+    commentResultPromise,
     getPostSidebarData(basePost.id, basePost.authorUsername ?? basePost.author),
     getBoards(),
     getZones(),
@@ -275,8 +283,9 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
 
               <>
               <div className="space-y-0">
-                  <Card className={displayPost.appendices && displayPost.appendices.length > 0 ? "rounded-b-none" : undefined}>
-                    <CardContent className="pt-4 px-4 pb-4 sm:px-6 sm:pb-6 md:px-8 md:pb-8">
+                  <PostBodyCopyMenu copyPath={`/posts/${displayPost.slug}`}>
+                    <Card className={displayPost.appendices && displayPost.appendices.length > 0 ? "rounded-b-none" : undefined}>
+                      <CardContent className="pt-4 px-4 pb-4 sm:px-6 sm:pb-6 md:px-8 md:pb-8">
                       {displayPost.status === "NORMAL" && canViewRestrictedPost ? (
                         <PostReadingHistoryRecorder
                           postId={displayPost.id}
@@ -313,30 +322,30 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
 
                       </div>
 
-                      <div className="mt-8 space-y-5 text-[15px] leading-8 text-foreground/90 dark:text-foreground/85">
-                        {(displayPost.contentBlocks ?? []).map((block) => (
-                          block.type === "PUBLIC"
-                            ? <MarkdownContent key={block.id} content={block.text} markdownEmojiMap={settings.markdownEmojiMap} />
+                        <div className="mt-8 space-y-5 text-[15px] leading-8 text-foreground/90 dark:text-foreground/85">
+                          {(displayPost.contentBlocks ?? []).map((block) => (
+                            block.type === "PUBLIC"
+                              ? <MarkdownContent key={block.id} content={block.text} markdownEmojiMap={settings.markdownEmojiMap} />
 
-                            : (
-                              <RestrictedPostBlock
-                                key={block.id}
-                                type={block.type}
-                                postId={displayPost.id}
-                                blockId={block.id}
-                                text={block.text}
-                                visible={block.visible}
-                                currentUserId={currentUser?.id}
-                                pointName={settings.pointName}
-                                replyThreshold={block.replyThreshold}
-                                price={block.price}
-                                userReplyCount={userReplyCount}
-                                isOwnerOrAdmin={isOwnerOrAdmin}
+                              : (
+                                <RestrictedPostBlock
+                                  key={block.id}
+                                  type={block.type}
+                                  postId={displayPost.id}
+                                  blockId={block.id}
+                                  text={block.text}
+                                  visible={block.visible}
+                                  currentUserId={currentUser?.id}
+                                  pointName={settings.pointName}
+                                  replyThreshold={block.replyThreshold}
+                                  price={block.price}
+                                  userReplyCount={userReplyCount}
+                                  isOwnerOrAdmin={isOwnerOrAdmin}
 
-                              />
-                            )
-                        ))}
-                      </div>
+                                />
+                              )
+                          ))}
+                        </div>
 
                       <PostEngagementBar
                         postId={displayPost.id}
@@ -350,8 +359,9 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                         redPacket={displayPost.redPacket}
                         tipping={displayPost.tipping}
                       />
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  </PostBodyCopyMenu>
 
                   {displayPost.appendices && displayPost.appendices.length > 0 ? (
                     <PostAppendixTimeline appendices={displayPost.appendices} markdownEmojiMap={settings.markdownEmojiMap} />
@@ -412,29 +422,34 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                   <CardContent className="space-y-4">
                     {displayPost.status !== "NORMAL" ? (
                       <p className="text-sm text-muted-foreground">帖子还在审核阶段，暂不开放公开回复。</p>
+                    ) : !currentUser && !canViewComments ? (
+                      <p className="text-sm text-muted-foreground">当前站点已关闭游客查看评论，登录后可查看评论并参与回复讨论。</p>
                     ) : !currentUser ? (
                       <p className="text-sm text-muted-foreground">登录后可参与回复讨论。</p>
                     ) : null}
-                    {commentResult.total === 0 ? (
+                    {canViewComments && commentResult.total === 0 ? (
                       <p className="text-sm text-muted-foreground">当前还没有回复，欢迎成为第一个参与讨论的人。</p>
                     ) : null}
-                    <CommentThread
-                      threadId={displayPost.id}
-                      comments={commentResult.items}
-                      postId={displayPost.id}
-                      canReply={Boolean(currentUser && displayPost.status === "NORMAL")}
-                      currentPage={commentResult.page}
-                      pageSize={commentResult.pageSize}
-                      total={commentResult.total}
-                      currentSort={currentSort}
-                      currentUserId={currentUser?.id}
-                      canAcceptAnswer={displayPost.type === "BOUNTY" && currentUser?.id === displayPost.authorId && !displayPost.bounty?.isResolved}
-                      commentsVisibleToAuthorOnly={displayPost.commentsVisibleToAuthorOnly}
-                      isAdmin={isAdmin}
-                      canPinComment={Boolean(currentUser?.id === displayPost.authorId || isAdmin)}
-                      markdownEmojiMap={settings.markdownEmojiMap}
-                      commentEditWindowMinutes={settings.commentEditableMinutes}
-                    />
+                    {canViewComments ? (
+                      <CommentThread
+                        threadId={displayPost.id}
+                        comments={commentResult.items}
+                        postId={displayPost.id}
+                        pointName={settings.pointName}
+                        canReply={Boolean(currentUser && displayPost.status === "NORMAL")}
+                        currentPage={commentResult.page}
+                        pageSize={commentResult.pageSize}
+                        total={commentResult.total}
+                        currentSort={currentSort}
+                        currentUserId={currentUser?.id}
+                        canAcceptAnswer={displayPost.type === "BOUNTY" && currentUser?.id === displayPost.authorId && !displayPost.bounty?.isResolved}
+                        commentsVisibleToAuthorOnly={displayPost.commentsVisibleToAuthorOnly}
+                        isAdmin={isAdmin}
+                        canPinComment={Boolean(currentUser?.id === displayPost.authorId || isAdmin)}
+                        markdownEmojiMap={settings.markdownEmojiMap}
+                        commentEditWindowMinutes={settings.commentEditableMinutes}
+                      />
+                    ) : null}
 
                   </CardContent>
                 </Card>

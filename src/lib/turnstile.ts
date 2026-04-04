@@ -1,12 +1,12 @@
-export async function verifyTurnstileToken(token: string, remoteip?: string | null) {
-  const secretKey = process.env.TURNSTILE_SECRET_KEY?.trim()
+export async function verifyTurnstileToken(token: string, remoteip?: string | null, secretKey?: string | null) {
+  const resolvedSecretKey = secretKey?.trim()
 
-  if (!secretKey) {
+  if (!resolvedSecretKey) {
     throw new Error("未配置 Turnstile 服务端密钥")
   }
 
   const body = new URLSearchParams()
-  body.set("secret", secretKey)
+  body.set("secret", resolvedSecretKey)
   body.set("response", token)
   if (remoteip) {
     body.set("remoteip", remoteip)

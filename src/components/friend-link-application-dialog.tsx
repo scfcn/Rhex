@@ -4,14 +4,15 @@ import Image from "next/image"
 import { useMemo, useState } from "react"
 import { Plus } from "lucide-react"
 
-
+import { AdminFormModal } from "@/components/admin-modal"
 import { Button } from "@/components/ui/button"
-import { DialogBackdrop, DialogPanel, DialogPortal, DialogPositioner } from "@/components/ui/dialog"
 import { toast } from "@/components/ui/toast"
+import { cn } from "@/lib/utils"
 
 interface FriendLinkApplicationDialogProps {
   announcement: string
   disabled?: boolean
+  buttonClassName?: string
 }
 
 const INITIAL_FORM = {
@@ -20,7 +21,7 @@ const INITIAL_FORM = {
   logoPath: "",
 }
 
-export function FriendLinkApplicationDialog({ announcement, disabled = false }: FriendLinkApplicationDialogProps) {
+export function FriendLinkApplicationDialog({ announcement, disabled = false, buttonClassName }: FriendLinkApplicationDialogProps) {
   const [open, setOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [form, setForm] = useState(INITIAL_FORM)
@@ -72,64 +73,55 @@ export function FriendLinkApplicationDialog({ announcement, disabled = false }: 
 
   return (
     <>
-      <Button type="button" onClick={() => setOpen(true)} disabled={disabled} className="rounded-full px-5">
+      <Button type="button" onClick={() => setOpen(true)} disabled={disabled} className={cn("rounded-full px-5", buttonClassName)}>
         <Plus className="mr-2 h-4 w-4" />
         申请友情链接
       </Button>
-      <DialogPortal open={open} onClose={closeDialog} closeOnEscape={!submitting}>
-        <div className="fixed inset-0 z-[120]">
-          <DialogBackdrop onClick={closeDialog} />
-          <DialogPositioner>
-            <DialogPanel className="max-w-2xl p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="text-xl font-semibold">申请友情链接</h3>
-                <p className="mt-2 text-sm text-muted-foreground">提交后将进入后台审核，审核通过后会展示在友情链接列表中。</p>
+      <AdminFormModal
+        open={open}
+        onClose={closeDialog}
+        closeDisabled={submitting}
+        closeOnEscape={!submitting}
+        size="lg"
+        title="申请友情链接"
+        description="提交后将进入后台审核，审核通过后会展示在友情链接列表中。"
+        onSubmit={handleSubmit}
+        formClassName="space-y-4 sm:space-y-5"
+        footer={({ formId }) => (
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+            <Button type="button" variant="ghost" onClick={closeDialog} disabled={submitting} className="w-full sm:w-auto">
+              取消
+            </Button>
+            <Button type="submit" form={formId} disabled={!canSubmit} className="w-full sm:w-auto">
+              {submitting ? "提交中..." : "提交申请"}
+            </Button>
+          </div>
+        )}
+      >
+        <section className="rounded-[24px] border border-border bg-card p-4 sm:p-5">
+          <p className="text-sm font-medium">友情链接公告</p>
+          <p className="mt-2 whitespace-pre-line text-sm leading-7 text-muted-foreground">{announcement}</p>
+        </section>
+
+        <Field label="网站名称" hint="请输入您的网站名称">
+          <input value={form.name} onChange={(event) => updateField("name", event.target.value)} className="h-11 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-none" placeholder="请输入您的网站名称" maxLength={40} />
+        </Field>
+
+        <Field label="网站链接" hint="请输入您的网站地址（以 http 开头）">
+          <input value={form.url} onChange={(event) => updateField("url", event.target.value)} className="h-11 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-none" placeholder="请输入您的网站地址（以 http 开头）" />
+        </Field>
+
+        <Field label="LOGO URL" hint="仅支持填写图片 URL，例如：https://example.com/logo.png">
+          <div className="space-y-3 rounded-[24px] border border-dashed border-border bg-card/60 p-4">
+            <input value={form.logoPath} onChange={(event) => updateField("logoPath", event.target.value)} className="h-11 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-none" placeholder="请输入 LOGO 图片 URL" />
+            {form.logoPath ? (
+              <div className="relative h-16 w-32 overflow-hidden rounded-xl border border-border bg-white p-2">
+                <Image src={form.logoPath} alt={`${form.name || "友情链接"} logo`} fill unoptimized className="object-contain p-2" />
               </div>
-              <Button type="button" variant="ghost" className="h-8 px-2" onClick={closeDialog}>
-                关闭
-              </Button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="mt-6 space-y-5">
-              <section className="rounded-[24px] border border-border bg-card p-5">
-                <p className="text-sm font-medium">友情链接公告：</p>
-                <p className="mt-2 whitespace-pre-line text-sm leading-7 text-muted-foreground">{announcement}</p>
-              </section>
-
-              <Field label="网站名称" hint="请输入您的网站名称">
-                <input value={form.name} onChange={(event) => updateField("name", event.target.value)} className="h-11 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-none" placeholder="请输入您的网站名称" maxLength={40} />
-              </Field>
-
-              <Field label="网站链接" hint="请输入您的网站地址（以 http 开头）">
-                <input value={form.url} onChange={(event) => updateField("url", event.target.value)} className="h-11 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-none" placeholder="请输入您的网站地址（以 http 开头）" />
-              </Field>
-
-              <Field label="LOGO URL" hint="仅支持填写图片 URL，例如：https://example.com/logo.png">
-                <div className="space-y-3 rounded-[24px] border border-dashed border-border bg-card/60 p-4">
-                  <input value={form.logoPath} onChange={(event) => updateField("logoPath", event.target.value)} className="h-11 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-none" placeholder="请输入 LOGO 图片 URL" />
-                  {form.logoPath ? (
-                    <div className="relative h-16 w-32 overflow-hidden rounded-xl border border-border bg-white p-2">
-                      <Image src={form.logoPath} alt={`${form.name || "友情链接"} logo`} fill unoptimized className="object-contain p-2" />
-                    </div>
-                  ) : null}
-
-                </div>
-              </Field>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <Button type="submit" disabled={!canSubmit}>
-                  {submitting ? "提交中..." : "提交申请"}
-                </Button>
-                <Button type="button" variant="ghost" disabled={submitting} onClick={closeDialog}>
-                  取消
-                </Button>
-              </div>
-            </form>
-            </DialogPanel>
-          </DialogPositioner>
-        </div>
-      </DialogPortal>
+            ) : null}
+          </div>
+        </Field>
+      </AdminFormModal>
     </>
   )
 }

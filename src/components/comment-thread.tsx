@@ -3,12 +3,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 
-import { Flag, Keyboard, Minimize2 } from "lucide-react"
+import { Flag, Keyboard, Minimize2, Sparkles } from "lucide-react"
 
 import { CommentForm } from "@/components/comment-form"
 import { CommentLikeButton } from "@/components/comment-like-button"
+import { LevelIcon } from "@/components/level-icon"
 import { MarkdownContent } from "@/components/markdown-content"
+import { PostRewardPoolIcon } from "@/components/post-list-shared"
 import { ReportDialog } from "@/components/report-dialog"
+import { TimeTooltip } from "@/components/time-tooltip"
 import { UserAvatar } from "@/components/user-avatar"
 import { UserDisplayedBadges } from "@/components/user-displayed-badges"
 import { UserStatusBadge } from "@/components/user-status-badge"
@@ -16,11 +19,13 @@ import { UserVerificationBadge } from "@/components/user-verification-badge"
 import { VipNameTooltip } from "@/components/vip-name-tooltip"
 
 import { Button } from "@/components/ui/button"
+import { toast } from "@/components/ui/toast"
 import { Tooltip } from "@/components/ui/tooltip"
 
 import type { SiteCommentItem, SiteCommentReplyItem } from "@/lib/comments"
 import { COMMENT_REPLY_TOGGLE_EVENT, emitCommentReplyState, type CommentReplyTarget, type CommentReplyToggleDetail } from "@/lib/comment-reply-box-events"
 import type { MarkdownEmojiItem } from "@/lib/markdown-emoji"
+import type { PostRewardPoolEffectFeedback } from "@/lib/post-reward-effect-feedback"
 import { cn } from "@/lib/utils"
 import { getVipNameClass } from "@/lib/vip-status"
 
@@ -28,6 +33,7 @@ interface CommentThreadProps {
   threadId: string
   comments: SiteCommentItem[]
   postId: string
+  pointName?: string
   canReply: boolean
   currentPage: number
   pageSize: number
@@ -79,6 +85,93 @@ function CommentAuthorIdentityBadges({ isPostAuthor, authorRole }: { isPostAutho
   )
 }
 
+function CommentRewardBadge({
+  rewardClaim,
+  pointName = "积分",
+}: {
+  rewardClaim?: SiteCommentItem["rewardClaim"] | SiteCommentReplyItem["rewardClaim"]
+  pointName?: string
+}) {
+  if (!rewardClaim) {
+    return null
+  }
+
+  const isJackpot = rewardClaim.rewardMode === "JACKPOT"
+
+  return (
+    <Tooltip content={`${isJackpot ? "聚宝盆" : "红包"}奖励 +${rewardClaim.amount} ${pointName}`}>
+      <span
+        className={cn(
+          "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-semibold leading-none shadow-sm ring-1 ring-white/70 transition-transform duration-200 group-hover:-translate-y-0.5 motion-safe:animate-pulse",
+          isJackpot
+            ? "border-amber-200 bg-amber-50 text-amber-700 shadow-amber-100/80 dark:border-amber-400/20 dark:bg-amber-500/12 dark:text-amber-200"
+            : "border-rose-200 bg-rose-50 text-rose-600 shadow-rose-100/80 dark:border-rose-400/20 dark:bg-rose-500/12 dark:text-rose-200",
+        )}
+      >
+        <PostRewardPoolIcon mode={rewardClaim.rewardMode} className="h-3.5 w-3.5" />
+        <span>+{rewardClaim.amount}</span>
+      </span>
+    </Tooltip>
+  )
+}
+
+function CommentRewardEffectBadge({ feedback }: { feedback: PostRewardPoolEffectFeedback }) {
+  const primaryEvent = feedback.events[0]
+
+  if (!primaryEvent) {
+    return null
+  }
+
+  return (
+    <Tooltip
+      content={(
+        <div className="space-y-2.5">
+          <div className="flex items-center gap-2">
+            <span
+              className="inline-flex h-7 w-7 items-center justify-center rounded-2xl border border-current/10 bg-white/70 text-sm shadow-sm dark:bg-white/5"
+              style={feedback.badgeColor ? { color: feedback.badgeColor } : undefined}
+            >
+              <LevelIcon icon={feedback.badgeIconText} color={feedback.badgeColor ?? undefined} className="h-4 w-4 text-[16px]" emojiClassName="text-inherit" svgClassName="[&>svg]:block" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold leading-4 text-foreground">{feedback.badgeName || "勋章特效"}</p>
+              <p className="text-[10px] leading-4 text-muted-foreground">这次回复触发了勋章效果</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {feedback.events.map((event, index) => (
+              <div
+                key={`${event.kind}-${event.tone}-${index}`}
+                className={cn(
+                  "rounded-xl border px-3 py-2",
+                  event.tone === "positive"
+                    ? "border-emerald-200/80 bg-emerald-50/80 text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200"
+                    : "border-rose-200/80 bg-rose-50/80 text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200",
+                )}
+              >
+                <p className="text-[11px] font-semibold leading-4">{event.title}</p>
+                <p className="mt-1 text-[11px] leading-5 opacity-90">{event.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      contentClassName="max-w-[320px]"
+    >
+      <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-1 text-[10px] font-semibold leading-none text-sky-700 shadow-sm dark:border-sky-400/20 dark:bg-sky-500/12 dark:text-sky-200">
+        <span
+          className="inline-flex h-4 w-4 items-center justify-center rounded-full"
+          style={feedback.badgeColor ? { color: feedback.badgeColor } : undefined}
+        >
+          <LevelIcon icon={feedback.badgeIconText} color={feedback.badgeColor ?? undefined} className="h-3.5 w-3.5 text-[12px]" emojiClassName="text-inherit" svgClassName="[&>svg]:block" />
+        </span>
+        <Sparkles className="h-3 w-3" />
+        <span>{primaryEvent.title}</span>
+      </span>
+    </Tooltip>
+  )
+}
+
 function shouldIgnoreReplyShortcut(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) {
     return false
@@ -95,7 +188,23 @@ function shouldIgnoreReplyShortcut(target: EventTarget | null) {
   return ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)
 }
 
-export function CommentThread({ threadId, comments, postId, canReply, currentPage, pageSize, total, currentSort, currentUserId, canAcceptAnswer = false, commentsVisibleToAuthorOnly = false, isAdmin = false, canPinComment = false, markdownEmojiMap, commentEditWindowMinutes = 5 }: CommentThreadProps) {
+async function copyCommentPermalink(commentId: string, floor: number) {
+  if (typeof window === "undefined") {
+    return
+  }
+
+  const url = new URL(window.location.href)
+  url.hash = `comment-${commentId}`
+
+  try {
+    await navigator.clipboard.writeText(url.toString())
+    toast.success(`已复制 #${floor} 楼链接`, "复制成功")
+  } catch {
+    toast.error("复制失败，请手动复制", "复制失败")
+  }
+}
+
+export function CommentThread({ threadId, comments, postId, pointName, canReply, currentPage, pageSize, total, currentSort, currentUserId, canAcceptAnswer = false, commentsVisibleToAuthorOnly = false, isAdmin = false, canPinComment = false, markdownEmojiMap, commentEditWindowMinutes = 5 }: CommentThreadProps) {
   const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({})
   const [submittingAnswerId, setSubmittingAnswerId] = useState<string | null>(null)
   const [pinningCommentId, setPinningCommentId] = useState<string | null>(null)
@@ -501,7 +610,9 @@ export function CommentThread({ threadId, comments, postId, canReply, currentPag
                     <UserDisplayedBadges badges={comment.authorDisplayedBadges} compact appearance="plain" />
                     {isRestrictedCommentAuthor ? <UserStatusBadge status={comment.authorStatus} compact /> : null}
                     <span>·</span>
-                    <span>{comment.createdAt}</span>
+                    <TimeTooltip value={comment.createdAtRaw}>
+                      <span>{comment.createdAt}</span>
+                    </TimeTooltip>
                     {comment.isPinnedByAuthor ? <span className="rounded-full bg-amber-100 px-3 py-1 text-xs text-amber-700 dark:bg-amber-500/15 dark:text-amber-200">楼主置顶</span> : null}
                     {comment.isAcceptedAnswer ? <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">已采纳答案</span> : null}
                     {canEditCurrentComment ? (
@@ -521,7 +632,15 @@ export function CommentThread({ threadId, comments, postId, canReply, currentPag
                       editWindowMinutes={commentEditWindowMinutes}
                     />
                   ) : (
-                    <MarkdownContent content={comment.content} className="text-[13px] leading-6 text-foreground/90 dark:text-foreground/85 sm:text-sm sm:leading-7" />
+                    <>
+                      <MarkdownContent content={comment.content} className="text-[13px] leading-6 text-foreground/90 dark:text-foreground/85 sm:text-sm sm:leading-7" />
+                      {comment.rewardClaim || comment.rewardEffectFeedback ? (
+                        <div className="mt-2 flex items-center justify-start gap-2">
+                          <CommentRewardBadge rewardClaim={comment.rewardClaim} pointName={pointName} />
+                          {comment.rewardEffectFeedback ? <CommentRewardEffectBadge feedback={comment.rewardEffectFeedback} /> : null}
+                        </div>
+                      ) : null}
+                    </>
                   )}
                 </div>
               </div>
@@ -554,7 +673,17 @@ export function CommentThread({ threadId, comments, postId, canReply, currentPag
                     </Button>
                   ) : null}
                 </div>
-                <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-semibold text-foreground/80">#{comment.floor}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void copyCommentPermalink(comment.id, comment.floor)
+                  }}
+                  className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-semibold text-foreground/80 transition-colors hover:bg-accent hover:text-foreground"
+                  title={`复制 #${comment.floor} 楼链接`}
+                  aria-label={`复制 #${comment.floor} 楼链接`}
+                >
+                  #{comment.floor}
+                </button>
               </div>
             </div>
 
@@ -604,7 +733,9 @@ export function CommentThread({ threadId, comments, postId, canReply, currentPag
                               {isRestrictedReplyAuthor ? <UserStatusBadge status={reply.authorStatus} compact /> : null}
                               {reply.replyToAuthor ? <span className="rounded-full bg-background/75 px-1.5 py-0.5 text-[10px] text-muted-foreground/90">回复 @{reply.replyToAuthor}</span> : null}
                               <span>·</span>
-                              <span>{reply.createdAt}</span>
+                              <TimeTooltip value={reply.createdAtRaw}>
+                                <span>{reply.createdAt}</span>
+                              </TimeTooltip>
                               {canEditCurrentReply ? (
                                 <button type="button" className="text-[11px] transition-colors hover:text-foreground" onClick={() => editingCommentId === reply.id ? stopEdit() : startEdit(reply.id)}>
                                   {getEditButtonLabel(reply)}
@@ -624,7 +755,15 @@ export function CommentThread({ threadId, comments, postId, canReply, currentPag
                                   editWindowMinutes={commentEditWindowMinutes}
                                 />
                               ) : (
-                                <MarkdownContent content={reply.content} className="text-[13px] leading-6 text-foreground/90 dark:text-foreground/85 sm:text-sm sm:leading-7" markdownEmojiMap={markdownEmojiMap} />
+                                <>
+                                  <MarkdownContent content={reply.content} className="text-[13px] leading-6 text-foreground/90 dark:text-foreground/85 sm:text-sm sm:leading-7" markdownEmojiMap={markdownEmojiMap} />
+                                  {reply.rewardClaim || reply.rewardEffectFeedback ? (
+                                    <div className="mt-2 flex items-center justify-start gap-2">
+                                      <CommentRewardBadge rewardClaim={reply.rewardClaim} pointName={pointName} />
+                                      {reply.rewardEffectFeedback ? <CommentRewardEffectBadge feedback={reply.rewardEffectFeedback} /> : null}
+                                    </div>
+                                  ) : null}
+                                </>
                               )}
                             </div>
                           </div>

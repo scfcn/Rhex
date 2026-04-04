@@ -1,6 +1,8 @@
 import type { Metadata } from "next"
+import { Suspense } from "react"
 
 import { BackToTopButton } from "@/components/back-to-top-button"
+import { GlobalNavigationProgress } from "@/components/global-navigation-progress"
 import { SiteFooter } from "@/components/site-footer"
 import { SiteSettingsProvider } from "@/components/site-settings-provider"
 import { ConfirmProvider } from "@/components/ui/confirm-dialog"
@@ -55,6 +57,9 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       </head>
       <body>
         <SiteSettingsProvider markdownEmojiMap={settings.markdownEmojiMap} markdownImageUploadEnabled={settings.markdownImageUploadEnabled} vipLevelIcons={settings.vipLevelIcons}>
+          <Suspense fallback={null}>
+            <GlobalNavigationProgress />
+          </Suspense>
           <ToastProvider>
             <ConfirmProvider>
               {children}

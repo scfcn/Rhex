@@ -5,6 +5,7 @@ import { ForumPostStream } from "@/components/forum-post-stream"
 import { FollowToggleButton } from "@/components/follow-toggle-button"
 import { ForumPageShell } from "@/components/forum-page-shell"
 import { HomeSidebarPanels } from "@/components/home-sidebar-panels"
+import { RssSubscribeButton } from "@/components/rss-subscribe-button"
 import { SiteHeader } from "@/components/site-header"
 import { Card, CardContent } from "@/components/ui/card"
 import { getCurrentUser } from "@/lib/auth"
@@ -31,6 +32,9 @@ export async function generateMetadata(props: PageProps<"/tags/[slug]">): Promis
     description: `浏览标签 ${tag.name} 下的内容与讨论。`,
     alternates: {
       canonical: `/tags/${tag.slug}`,
+      types: {
+        "application/rss+xml": `/tags/${tag.slug}/rss.xml`,
+      },
     },
   }
 }
@@ -81,14 +85,21 @@ export default async function TagPage(props: PageProps<"/tags/[slug]">) {
                       <h1 className="mt-2 text-3xl font-semibold">#{tag.name}</h1>
                       <p className="mt-3 text-sm leading-7 text-white/75">当前标签共关联 {tag.count} 篇内容。</p>
                     </div>
-                    <FollowToggleButton
-                      targetType="tag"
-                      targetId={tag.id}
-                      initialFollowed={isFollowingTag}
-                      activeLabel="已关注标签"
-                      inactiveLabel="关注标签"
-                      className="self-start border-white/20 bg-white/10 text-white hover:border-white/30 hover:bg-white/15 hover:text-white"
-                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <RssSubscribeButton
+                        href={`/tags/${tag.slug}/rss.xml`}
+                        label="订阅标签 RSS"
+                        className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs text-white transition-colors hover:border-white/30 hover:bg-white/15"
+                      />
+                      <FollowToggleButton
+                        targetType="tag"
+                        targetId={tag.id}
+                        initialFollowed={isFollowingTag}
+                        activeLabel="已关注标签"
+                        inactiveLabel="关注标签"
+                        className="self-start border-white/20 bg-white/10 text-white hover:border-white/30 hover:bg-white/15 hover:text-white"
+                      />
+                    </div>
                   </div>
                 </CardContent>
               </Card>

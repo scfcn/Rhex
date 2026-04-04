@@ -4,6 +4,7 @@ import { formatRelativeTime } from "@/lib/formatters"
 
 import { getPublicPostContentText } from "@/lib/post-content"
 import { resolvePostCoverImage } from "@/lib/post-cover"
+import { parsePostRewardPoolConfigFromContent } from "@/lib/post-red-packets"
 import { getPostStatusLabel, getPostTypeLabel, type LocalPostType } from "@/lib/post-types"
 import { getUserDisplayName, type PublicUserStatus } from "@/lib/users"
 import { getVipLevel, isVipActive, type VipStateSource } from "@/lib/vip-status"
@@ -91,6 +92,7 @@ interface ListPostSource {
 
 export function mapListPost(post: ListPostSource) {
   const publicContent = getPublicPostContentText(post.content)
+  const rewardPoolConfig = post.redPacket ? parsePostRewardPoolConfigFromContent(post.content) : null
 
   return {
     id: post.id,
@@ -129,6 +131,7 @@ export function mapListPost(post: ListPostSource) {
         iconText: item.badge.iconText,
       })),
     publishedAt: formatRelativeTime(post.publishedAt ?? post.createdAt),
+    publishedAtRaw: (post.publishedAt ?? post.createdAt).toISOString(),
 
     excerpt: post.summary ?? publicContent.slice(0, 120),
     coverImage: resolvePostCoverImage(post.content, post.coverPath),
@@ -142,6 +145,7 @@ export function mapListPost(post: ListPostSource) {
     isPinned: post.isPinned,
     pinScope: post.pinScope ?? (post.isPinned ? "BOARD" : "NONE"),
     hasRedPacket: Boolean(post.redPacket),
+    rewardMode: rewardPoolConfig?.mode,
     minViewLevel: post.minViewLevel ?? 0,
     minViewVipLevel: post.minViewVipLevel ?? 0,
     isFeatured: post.isFeatured,
