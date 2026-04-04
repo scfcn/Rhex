@@ -424,7 +424,7 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "ç
           </div>
 
           <div className="flex items-center justify-between gap-3 rounded-[18px] border border-amber-200 bg-amber-50/70 px-3 py-2.5 dark:border-amber-400/20 dark:bg-amber-400/10">
-            <Link href="/points" className="flex min-w-0 items-center gap-2 text-amber-900 transition-opacity hover:opacity-80 dark:text-amber-100">
+            <Link href="/settings?tab=points" className="flex min-w-0 items-center gap-2 text-amber-900 transition-opacity hover:opacity-80 dark:text-amber-100">
               <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/80 text-amber-600 shadow-sm shadow-amber-950/5 dark:bg-amber-50/10 dark:text-amber-200">
                 <Wallet className="h-4 w-4" />
               </span>

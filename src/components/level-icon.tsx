@@ -37,11 +37,11 @@ function buildSvgMarkup(svg: string, color?: string) {
   }
 
   if (color) {
-    markup = markup
-      .replace(/fill=(['"])(?!none\1)(?!currentColor\1)[^'"]*\1/gi, "fill=\"currentColor\"")
-      .replace(/stroke=(['"])(?!none\1)(?!currentColor\1)[^'"]*\1/gi, "stroke=\"currentColor\"")
+    const hasExplicitPaint = /\s(fill|stroke)=(['"])(?!none\2)(?!currentColor\2)[^'"]+\2/i.test(markup)
 
-    if (!/\s(fill|stroke)=/i.test(markup)) {
+    // Preserve embedded SVG colors. Only fall back to currentColor when the SVG
+    // does not declare its own paint attributes and is intended to inherit text color.
+    if (!hasExplicitPaint && !/\s(fill|stroke)=/i.test(markup)) {
       markup = markup.replace(/^<svg\b/i, '<svg fill="currentColor"')
     }
   }

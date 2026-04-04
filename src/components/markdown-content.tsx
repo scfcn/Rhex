@@ -7,6 +7,7 @@ import { createPortal } from "react-dom"
 import { renderUserLinkTokens } from "@/lib/mentions"
 import { renderMarkdownEmojiHtml, type MarkdownEmojiItem } from "@/lib/markdown-emoji"
 import { useMarkdownEmojiMap } from "@/components/site-settings-provider"
+import { cn } from "@/lib/utils"
 
 import MarkdownIt from "markdown-it"
 import markdownItAbbr from "markdown-it-abbr"
@@ -812,7 +813,7 @@ export function MarkdownContent({ content, className, emptyText, markdownEmojiMa
     <>
       <div
         ref={containerRef}
-        className={className ?? "markdown-body prose prose-sm max-w-none prose-p:my-3 prose-ul:my-3 prose-ol:my-3 prose-li:my-1"}
+        className={cn("markdown-body prose prose-sm max-w-none prose-p:my-3 prose-ul:my-3 prose-ol:my-3 prose-li:my-1", className)}
         dangerouslySetInnerHTML={{ __html: html }}
       />
       {lightbox ? createPortal(

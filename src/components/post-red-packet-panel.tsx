@@ -124,7 +124,7 @@ export function PostRedPacketPanel({ postId, pointName, summary }: PostRedPacket
             <div className="mt-4 flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
                 {summary.currentUserPoints <= 0 ? (
-                  <Link href="/points" className="text-sm text-primary hover:opacity-80">去充值 / 兑换</Link>
+                  <Link href="/settings?tab=points" className="text-sm text-primary hover:opacity-80">去充值 / 兑换</Link>
                 ) : <span className="text-xs text-muted-foreground">{summary.rewardMode === "JACKPOT" ? "金币会随着回复数量动态增加，首次回复有概率获得金币池中部分金币奖励。" : "系统会在互动成功后自动判断并发放红包。"}</span>}
               </div>
               <div className="flex shrink-0 items-center gap-2">

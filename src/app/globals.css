@@ -92,28 +92,36 @@ a {
   @apply text-sm text-muted-foreground;
 }
 
-.markdown-body .md-emoji-svg {
-  display: inline-block;
-  width: 1em;
-  height: 1em;
-  vertical-align: -0.125em;
+.markdown-body .md-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
   line-height: 1;
   font-size: inherit;
 }
 
-.markdown-body .md-emoji-svg .md-emoji-icon,
-.markdown-body .md-emoji-svg .md-emoji-icon svg {
-  display: block;
-  width: 100%;
-  height: 100%;
+.markdown-body .md-emoji-svg {
+  width: 2em;
+  height: 2em;
+  vertical-align: -0.125em;
 }
 
-.markdown-body .md-emoji-svg svg {
-  width: auto !important;
-  height: auto !important;
-  max-width: 100%;
-  max-height: 100%;
-  fill: currentColor;
+.markdown-body .md-emoji-svg .md-emoji-icon {
+  display: inline-flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+.markdown-body .md-emoji-svg .md-emoji-icon svg {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none;
+  max-height: none;
+  flex: none;
 }
 
 .markdown-body .md-mermaid-source {
