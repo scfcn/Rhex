@@ -15,6 +15,7 @@ import { apiError, readOptionalNumberField, readOptionalStringField, type JsonOb
 import type { AdminActor } from "@/lib/moderator-permissions"
 import { ensureCanEditBoard, ensureCanEditZone, isSiteAdmin } from "@/lib/moderator-permissions"
 
+import { normalizeNullablePostListLoadMode } from "@/lib/post-list-load-mode"
 import { DEFAULT_ALLOWED_POST_TYPES_VALUE, serializePostTypes } from "@/lib/post-types"
 import { normalizeNullablePostListDisplayMode } from "@/lib/post-list-display"
 
@@ -50,6 +51,7 @@ function buildBoardAdvancedPayload(body: Record<string, unknown>) {
     minReplyVipLevel: parseNullableNumber(body.minReplyVipLevel),
     requirePostReview: body.requirePostReview === undefined ? undefined : parseBoolean(body.requirePostReview),
     postListDisplayMode: normalizeNullablePostListDisplayMode(body.postListDisplayMode) ?? undefined,
+    postListLoadMode: normalizeNullablePostListLoadMode(body.postListLoadMode) ?? undefined,
   }
 }
 
@@ -76,6 +78,7 @@ function buildZonePayload(body: Record<string, unknown>, sortOrder: number, name
     minPostVipLevel: parseNullableNumber(body.minPostVipLevel) ?? 0,
     minReplyVipLevel: parseNullableNumber(body.minReplyVipLevel) ?? 0,
     postListDisplayMode: normalizeNullablePostListDisplayMode(body.postListDisplayMode) ?? null,
+    postListLoadMode: normalizeNullablePostListLoadMode(body.postListLoadMode) ?? null,
   }
 }
 

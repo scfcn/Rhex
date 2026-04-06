@@ -73,6 +73,13 @@ function resolveRandomClaimRecipient(params: {
   }
 }
 
+function isCurrentUserEligibleForRandomClaim(params: {
+  eligibleCandidates: PostRedPacketEligibleCandidate[]
+  currentUserId: number
+}) {
+  return params.eligibleCandidates.some((candidate) => candidate.userId === params.currentUserId)
+}
+
 async function findPostRedPacketEligibleCandidates(
   tx: Prisma.TransactionClient,
   input: {
@@ -189,6 +196,7 @@ export async function claimPostRedPacketInTransaction(input: {
   triggerType: PostRedPacketTriggerType
   triggerCommentId?: string
   pointName: string
+  randomClaimProbability: number
   buildClaimReason: (params: { amount: number; pointName: string; postId: string; triggerType: PostRedPacketTriggerType }) => string
   allocateAmount: (packet: {
     grantMode: string
@@ -249,8 +257,13 @@ export async function claimPostRedPacketInTransaction(input: {
           triggerType: input.triggerType,
         })
 
-    const baseRandomClaimProbability = packet.claimOrderMode === "RANDOM" && eligibleCandidates.length > 1
-      ? 100 / eligibleCandidates.length
+    const usesFixedRandomClaimProbability = packet.claimOrderMode === "RANDOM" && input.randomClaimProbability > 0
+    const baseRandomClaimProbability = packet.claimOrderMode === "RANDOM"
+      ? usesFixedRandomClaimProbability
+        ? input.randomClaimProbability
+        : eligibleCandidates.length > 1
+          ? 100 / eligibleCandidates.length
+          : null
       : null
     const preparedRandomClaimProbability = baseRandomClaimProbability === null
       ? null
@@ -259,17 +272,62 @@ export async function claimPostRedPacketInTransaction(input: {
           baseProbability: baseRandomClaimProbability,
           userId: user.id,
         })
+
+    if (usesFixedRandomClaimProbability) {
+      const currentUserEligible = isCurrentUserEligibleForRandomClaim({
+        eligibleCandidates,
+        currentUserId: user.id,
+      })
+
+      if (!currentUserEligible) {
+        return { claimed: false as const, reason: "当前暂无可领取的红包名额" }
+      }
+
+      const hitCurrentUser = typeof preparedRandomClaimProbability?.finalProbability === "number"
+        && shouldHitProbability(preparedRandomClaimProbability.finalProbability)
+
+      if (!hitCurrentUser) {
+        const missEffectFeedback = buildRedPacketEffectFeedback({
+          preparedProbability: preparedRandomClaimProbability,
+          claimed: false,
+          pointName: input.pointName,
+        })
+
+        if (input.triggerCommentId && missEffectFeedback) {
+          await upsertCommentEffectFeedback({
+            tx,
+            postId: post.id,
+            commentId: input.triggerCommentId,
+            userId: input.userId,
+            scene: "RED_PACKET_REPLY",
+            feedback: missEffectFeedback,
+          })
+        }
+
+        return {
+          claimed: false as const,
+          reason: "本次随机红包未命中你",
+          effectFeedback: missEffectFeedback,
+        }
+      }
+    }
+
     const resolvedRecipient = packet.claimOrderMode === "FIRST_COME_FIRST_SERVED"
       ? {
           userId: user.id,
           triggerCommentId: input.triggerCommentId,
         }
-      : resolveRandomClaimRecipient({
-          eligibleCandidates,
-          currentUserId: user.id,
-          currentTriggerCommentId: input.triggerCommentId,
-          currentUserHitProbability: preparedRandomClaimProbability?.finalProbability ?? null,
-        })
+      : usesFixedRandomClaimProbability
+        ? {
+            userId: user.id,
+            triggerCommentId: input.triggerCommentId,
+          }
+        : resolveRandomClaimRecipient({
+            eligibleCandidates,
+            currentUserId: user.id,
+            currentTriggerCommentId: input.triggerCommentId,
+            currentUserHitProbability: preparedRandomClaimProbability?.finalProbability ?? null,
+          })
 
     if (!resolvedRecipient) {
       return { claimed: false as const, reason: "当前暂无可领取的红包名额" }

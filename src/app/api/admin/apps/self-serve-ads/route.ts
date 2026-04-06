@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache"
 
 import { apiSuccess, createAdminRouteHandler, readJsonBody } from "@/lib/api-route"
+import { revalidateSiteSettingsCache } from "@/lib/admin-site-settings-shared"
 
 export const dynamic = "force-dynamic"
 
@@ -22,6 +23,7 @@ export const POST = createAdminRouteHandler(async ({ request }) => {
   if (body.action === "save-config") {
     const config = body.config && typeof body.config === "object" ? body.config as Record<string, unknown> : {}
     const data = await updateSelfServeAdsAppConfig(config)
+    revalidateSiteSettingsCache()
     revalidatePath("/")
     revalidatePath("/admin/apps/self-serve-ads")
     return apiSuccess(data, "应用配置已保存")

@@ -47,12 +47,13 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function TermsPage() {
+  const settingsPromise = getSiteSettings()
   const [settings, boards, zones, currentUser, hotTopics] = await Promise.all([
-    getSiteSettings(),
+    settingsPromise,
     getBoards(),
     getZones(),
     getCurrentUser(),
-    getHomeSidebarHotTopics(5),
+    settingsPromise.then((settings) => getHomeSidebarHotTopics(settings.homeSidebarHotTopicsCount)),
   ])
   const sidebarUser = await resolveSidebarUser(currentUser, settings)
 

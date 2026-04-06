@@ -1,6 +1,7 @@
 import { CommentStatus, PostStatus, Prisma } from "@/db/types"
 
 import { prisma } from "@/db/client"
+import { getBusinessDayRange } from "@/lib/formatters"
 
 export async function findHomeSidebarStats() {
   const [postCount, replyCount, userCount] = await Promise.all([
@@ -53,21 +54,20 @@ const POST_INCLUDE = {
 
 const POST_ORDER_BY = [
   { score: "desc" as const },
+  { activityAt: "desc" as const },
   { commentCount: "desc" as const },
   { likeCount: "desc" as const },
   { createdAt: "desc" as const },
 ]
 
 export async function findHomeSidebarHotTopics(limit: number) {
-  // 今日零点（本地时间）
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
+  const { start: todayStart } = getBusinessDayRange()
 
-  // 优先取今日发布/有活动的热门帖子
+  // 优先取上海业务日内有活动的热门帖子，老帖当天被顶起也会进入今日热帖。
   const todayPosts = await prisma.post.findMany({
     where: {
       status: "NORMAL",
-      createdAt: { gte: todayStart },
+      activityAt: { gte: todayStart },
     },
     include: POST_INCLUDE,
     orderBy: POST_ORDER_BY,
@@ -106,6 +106,14 @@ export function findSidebarCurrentUser(username: string) {
       _count: {
         select: {
           followedByUsers: true,
+        },
+      },
+      levelProgress: {
+        select: {
+          checkInDays: true,
+          currentCheckInStreak: true,
+          maxCheckInStreak: true,
+          lastCheckInDate: true,
         },
       },
     },

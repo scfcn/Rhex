@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache"
 import { cache } from "react"
 
 import { listActiveGiftDefinitions } from "@/db/post-gift-queries"
@@ -12,8 +13,9 @@ import {
 } from "@/lib/shared/config-parsers"
 import { defaultSiteSettingsCreateInput } from "@/lib/site-settings-defaults"
 import { parseMarkdownEmojiMapJson } from "@/lib/markdown-emoji"
+import { normalizePostListLoadMode, type PostListLoadMode } from "@/lib/post-list-load-mode"
 import { normalizePostListDisplayMode, type PostListDisplayMode } from "@/lib/post-list-display"
-import { resolveAuthProviderSettings, resolveAvatarChangePointCostSettings, resolveCheckInMakeUpPriceSettings, resolveCheckInRewardSettings, resolveCommentAccessSettings, resolveHomeSidebarAnnouncementSettings, resolveInteractionGateSettings, resolveIntroductionChangePointCostSettings, resolveInviteCodePurchasePriceSettings, resolveMarkdownImageUploadSettings, resolveNicknameChangePointCostSettings, resolvePostJackpotSettings, resolveRegistrationRewardSettings, resolveVipLevelIconSettings, type InteractionGateSettings } from "@/lib/site-settings-app-state"
+import { resolveAuthProviderSettings, resolveAvatarChangePointCostSettings, resolveCheckInMakeUpPriceSettings, resolveCheckInRewardSettings, resolveCheckInStreakSettings, resolveCommentAccessSettings, resolveHomeFeedPostListLoadSettings, resolveHomeHotFeedSettings, resolveHomeSidebarAnnouncementSettings, resolveInteractionGateSettings, resolveIntroductionChangePointCostSettings, resolveInviteCodePurchasePriceSettings, resolveMarkdownImageUploadSettings, resolveNicknameChangePointCostSettings, resolvePostJackpotSettings, resolvePostPageSizeSettings, resolvePostRedPacketSettings, resolveRegistrationRewardSettings, resolveVipLevelIconSettings, type InteractionGateSettings } from "@/lib/site-settings-app-state"
 import { resolveAuthProviderSensitiveConfig, resolveCaptchaSensitiveConfig } from "@/lib/site-settings-sensitive-state"
 import { resolveSiteSearchSettings, type SiteSearchSettings } from "@/lib/site-search-settings"
 import { normalizePositiveInteger } from "@/lib/shared/normalizers"
@@ -38,6 +40,13 @@ export interface SiteSettingsData {
   pointName: string
   postLinkDisplayMode: PostLinkDisplayMode
   homeFeedPostListDisplayMode: PostListDisplayMode
+  homeFeedPostListLoadMode: PostListLoadMode
+  homeFeedPostPageSize: number
+  zonePostPageSize: number
+  boardPostPageSize: number
+  homeSidebarHotTopicsCount: number
+  postSidebarRelatedTopicsCount: number
+  homeHotRecentWindowHours: number
   homeSidebarStatsCardEnabled: boolean
   homeSidebarAnnouncementsEnabled: boolean
   vipLevelIcons: VipLevelIcons
@@ -59,6 +68,7 @@ export interface SiteSettingsData {
   checkInVip1MakeUpCardPrice: number
   checkInVip2MakeUpCardPrice: number
   checkInVip3MakeUpCardPrice: number
+  checkInMakeUpCountsTowardStreak: boolean
   postOfflinePrice: number
   postOfflineVip1Price: number
   postOfflineVip2Price: number
@@ -101,6 +111,7 @@ export interface SiteSettingsData {
   postRedPacketEnabled: boolean
   postRedPacketMaxPoints: number
   postRedPacketDailyLimit: number
+  postRedPacketRandomClaimProbability: number
   postJackpotEnabled: boolean
   postJackpotMinInitialPoints: number
   postJackpotMaxInitialPoints: number
@@ -189,10 +200,7 @@ async function readSiteSettingsFromDB(): Promise<ServerSiteSettingsData> {
   return mapSiteSettings(record, databaseTippingGifts)
 }
 
-export function invalidateSiteSettingsCache() {
-  // No-op: site settings are read fresh on each request.
-  // React cache below only deduplicates reads inside a single render pass.
-}
+export const SITE_SETTINGS_CACHE_TAG = "site-settings"
 
 function mapSiteSettings(record: {
   siteName: string
@@ -295,6 +303,10 @@ function mapSiteSettings(record: {
     normalPrice: record.checkInMakeUpCardPrice,
     vipFallbackPrice: record.checkInVipMakeUpCardPrice,
   })
+  const checkInStreakSettings = resolveCheckInStreakSettings({
+    appStateJson: record.appStateJson,
+    makeUpCountsTowardStreakFallback: true,
+  })
   const nicknameChangePointCosts = resolveNicknameChangePointCostSettings({
     appStateJson: record.appStateJson,
     normalPrice: record.nicknameChangePointCost,
@@ -312,6 +324,14 @@ function mapSiteSettings(record: {
   const homeSidebarAnnouncementSettings = resolveHomeSidebarAnnouncementSettings({
     appStateJson: record.appStateJson,
     enabledFallback: true,
+  })
+  const homeFeedPostListLoadSettings = resolveHomeFeedPostListLoadSettings({
+    appStateJson: record.appStateJson,
+    loadModeFallback: normalizePostListLoadMode(undefined),
+  })
+  const homeHotFeedSettings = resolveHomeHotFeedSettings({
+    appStateJson: record.appStateJson,
+    recentWindowHoursFallback: 72,
   })
   const vipLevelIcons = resolveVipLevelIconSettings({
     appStateJson: record.appStateJson,
@@ -342,6 +362,18 @@ function mapSiteSettings(record: {
     replyIncrementPointsFallback: 25,
     hitProbabilityFallback: 15,
   })
+  const postRedPacketSettings = resolvePostRedPacketSettings({
+    appStateJson: record.appStateJson,
+    randomClaimProbabilityFallback: 0,
+  })
+  const postPageSizeSettings = resolvePostPageSizeSettings({
+    appStateJson: record.appStateJson,
+    homeFeedFallback: 35,
+    zonePostsFallback: 20,
+    boardPostsFallback: 20,
+    hotTopicsFallback: 5,
+    postRelatedTopicsFallback: 5,
+  })
   const authProviderSensitiveConfig = resolveAuthProviderSensitiveConfig(record.sensitiveStateJson)
   const captchaSensitiveConfig = resolveCaptchaSensitiveConfig(record.sensitiveStateJson)
 
@@ -355,6 +387,13 @@ function mapSiteSettings(record: {
     pointName: record.pointName,
     postLinkDisplayMode: record.postLinkDisplayMode === "ID" ? "ID" : "SLUG",
     homeFeedPostListDisplayMode: normalizePostListDisplayMode(record.homeFeedPostListDisplayMode),
+    homeFeedPostListLoadMode: homeFeedPostListLoadSettings.loadMode,
+    homeFeedPostPageSize: postPageSizeSettings.homeFeed,
+    zonePostPageSize: postPageSizeSettings.zonePosts,
+    boardPostPageSize: postPageSizeSettings.boardPosts,
+    homeSidebarHotTopicsCount: postPageSizeSettings.hotTopics,
+    postSidebarRelatedTopicsCount: postPageSizeSettings.postRelatedTopics,
+    homeHotRecentWindowHours: homeHotFeedSettings.recentWindowHours,
     homeSidebarStatsCardEnabled: record.homeSidebarStatsCardEnabled,
     homeSidebarAnnouncementsEnabled: homeSidebarAnnouncementSettings.enabled,
     vipLevelIcons,
@@ -376,6 +415,7 @@ function mapSiteSettings(record: {
     checkInVip1MakeUpCardPrice: checkInMakeUpPrices.vip1,
     checkInVip2MakeUpCardPrice: checkInMakeUpPrices.vip2,
     checkInVip3MakeUpCardPrice: checkInMakeUpPrices.vip3,
+    checkInMakeUpCountsTowardStreak: checkInStreakSettings.makeUpCountsTowardStreak,
     postOfflinePrice: record.postOfflinePrice,
     postOfflineVip1Price: record.postOfflineVip1Price,
     postOfflineVip2Price: record.postOfflineVip2Price,
@@ -418,6 +458,7 @@ function mapSiteSettings(record: {
     postRedPacketEnabled: record.postRedPacketEnabled,
     postRedPacketMaxPoints: record.postRedPacketMaxPoints,
     postRedPacketDailyLimit: record.postRedPacketDailyLimit,
+    postRedPacketRandomClaimProbability: postRedPacketSettings.randomClaimProbability,
     postJackpotEnabled: postJackpotSettings.enabled,
     postJackpotMinInitialPoints: postJackpotSettings.minInitialPoints,
     postJackpotMaxInitialPoints: postJackpotSettings.maxInitialPoints,
@@ -487,8 +528,6 @@ export async function ensureSiteSettings(): Promise<SiteSettingsData> {
 
   const createdRecord = await createSiteSettingsRecord(defaultSiteSettingsCreateInput)
 
-  invalidateSiteSettingsCache()
-
   return toPublicSiteSettings(mapSiteSettings(createdRecord))
 }
 
@@ -527,8 +566,14 @@ function toPublicSiteSettings(data: ServerSiteSettingsData): SiteSettingsData {
   return rest
 }
 
+const getPersistentSiteSettings = unstable_cache(
+  async (): Promise<ServerSiteSettingsData> => readSiteSettingsFromDB(),
+  [SITE_SETTINGS_CACHE_TAG],
+  { tags: [SITE_SETTINGS_CACHE_TAG] },
+)
+
 const getCachedSiteSettings = cache(async (): Promise<ServerSiteSettingsData> => {
-  return readSiteSettingsFromDB()
+  return getPersistentSiteSettings()
 })
 
 export async function getSiteSettings(): Promise<SiteSettingsData> {

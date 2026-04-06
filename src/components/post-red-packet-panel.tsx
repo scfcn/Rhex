@@ -10,6 +10,7 @@ import { Tooltip } from "@/components/ui/tooltip"
 import { UserAvatar } from "@/components/user-avatar"
 import { Button } from "@/components/ui/button"
 import {  getPostRedPacketGrantModeLabel, type PostRedPacketSummary } from "@/lib/post-red-packets"
+import { formatNumber } from "@/lib/formatters"
 
 
 interface PostRedPacketPanelProps {
@@ -22,7 +23,7 @@ interface PostRedPacketPanelProps {
 export function PostRedPacketPanel({ postId, pointName, summary }: PostRedPacketPanelProps) {
   const [open, setOpen] = useState(false)
   const hoverSummary = summary.rewardMode === "JACKPOT"
-    ? `余 ${summary.remainingPoints} ${pointName}`
+    ? `余 ${formatNumber(summary.remainingPoints)} ${pointName}`
     : `余 ${summary.remainingCount} 个`
   const latestRecords = useMemo(() => summary.records.slice(-10).reverse(), [summary.records])
 
@@ -74,16 +75,16 @@ export function PostRedPacketPanel({ postId, pointName, summary }: PostRedPacket
     
               <div className="rounded-[20px] bg-secondary/40 px-4 py-3">
                 <p className="text-xs text-muted-foreground">{summary.rewardMode === "JACKPOT" ? "初始积分" : "红包总额"}</p>
-                <p className="mt-1 font-semibold">{summary.totalPoints} {pointName}</p>
+                <p className="mt-1 font-semibold">{formatNumber(summary.totalPoints)} {pointName}</p>
               </div>
               <div className="rounded-[20px] bg-secondary/40 px-4 py-3">
                 <p className="text-xs text-muted-foreground">{summary.rewardMode === "JACKPOT" ? "当前积分池" : "剩余数量"}</p>
-                <p className="mt-1 font-semibold">{summary.rewardMode === "JACKPOT" ? `${summary.remainingPoints} ${pointName}` : `${summary.remainingCount} / ${summary.remainingPoints} ${pointName}`}</p>
+                <p className="mt-1 font-semibold">{summary.rewardMode === "JACKPOT" ? `${formatNumber(summary.remainingPoints)} ${pointName}` : `${summary.remainingCount} / ${formatNumber(summary.remainingPoints)} ${pointName}`}</p>
               </div>
               {summary.rewardMode === "JACKPOT" ? (
                 <div className="col-span-2 rounded-[20px] bg-secondary/40 px-4 py-3">
                   <p className="text-xs text-muted-foreground">递增规则</p>
-                  <p className="mt-1 font-semibold">首回 +{summary.jackpotReplyIncrementPoints ?? 0}，复回随机小额追加</p>
+                  <p className="mt-1 font-semibold">首回 +{formatNumber(summary.jackpotReplyIncrementPoints ?? 0)}，复回随机小额追加</p>
                 </div>
               ) : (
                 <div className="col-span-2 rounded-[20px] bg-secondary/40 px-4 py-3">
@@ -105,7 +106,7 @@ export function PostRedPacketPanel({ postId, pointName, summary }: PostRedPacket
                       <div className="relative">
                         <UserAvatar name={record.nickname ?? record.username} avatarPath={record.avatarPath} size="sm" />
                         <span className="absolute -right-1 -top-1 inline-flex min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-semibold leading-4 text-white shadow-sm">
-                          +{record.amount}
+                          +{formatNumber(record.amount)}
                         </span>
                       </div>
                     </Tooltip>
@@ -125,7 +126,7 @@ export function PostRedPacketPanel({ postId, pointName, summary }: PostRedPacket
               <div className="flex min-w-0 items-center gap-3">
                 {summary.currentUserPoints <= 0 ? (
                   <Link href="/settings?tab=points" className="text-sm text-primary hover:opacity-80">去充值 / 兑换</Link>
-                ) : <span className="text-xs text-muted-foreground">{summary.rewardMode === "JACKPOT" ? "金币会随着回复数量动态增加，首次回复有概率获得金币池中部分金币奖励。" : "系统会在互动成功后自动判断并发放红包。"}</span>}
+                ) : <span className="text-xs text-muted-foreground">{summary.rewardMode === "JACKPOT" ? `${pointName}会随着回复数量动态增加，首次回复有概率获得${pointName}池中的部分${pointName}奖励。` : "系统会在互动成功后自动判断并发放红包。"}</span>}
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <Link

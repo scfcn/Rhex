@@ -20,6 +20,9 @@ export type UserLevelProgressRecord = {
   id: string
   userId: number
   checkInDays: number
+  currentCheckInStreak: number
+  maxCheckInStreak: number
+  lastCheckInDate: string | null
   receivedPostLikes: number
   receivedCommentLikes: number
   receivedLikeCount: number
@@ -38,11 +41,28 @@ type ExtendedPrismaClient = {
     create: (args: { data: Omit<LevelDefinitionRecord, "id" | "createdAt" | "updatedAt"> }) => Promise<LevelDefinitionRecord>
   }
   userLevelProgress: {
-    findUnique: (args: { where: { userId: number }; select?: { checkInDays: true } }) => Promise<Pick<UserLevelProgressRecord, "checkInDays"> | UserLevelProgressRecord | null>
+    findUnique: (args: { where: { userId: number }; select?: { checkInDays: true; currentCheckInStreak: true; maxCheckInStreak: true; lastCheckInDate: true } }) => Promise<Pick<UserLevelProgressRecord, "checkInDays" | "currentCheckInStreak" | "maxCheckInStreak" | "lastCheckInDate"> | UserLevelProgressRecord | null>
     upsert: (args: {
       where: { userId: number }
-      update: Partial<{ checkInDays: { increment: number }; receivedPostLikes: number; receivedCommentLikes: number; receivedLikeCount: number }>
-      create: { userId: number; checkInDays?: number; receivedPostLikes?: number; receivedCommentLikes?: number; receivedLikeCount?: number }
+      update: Partial<{
+        checkInDays: number | { increment: number }
+        currentCheckInStreak: number
+        maxCheckInStreak: number
+        lastCheckInDate: string | null
+        receivedPostLikes: number
+        receivedCommentLikes: number
+        receivedLikeCount: number
+      }>
+      create: {
+        userId: number
+        checkInDays?: number
+        currentCheckInStreak?: number
+        maxCheckInStreak?: number
+        lastCheckInDate?: string | null
+        receivedPostLikes?: number
+        receivedCommentLikes?: number
+        receivedLikeCount?: number
+      }
     }) => Promise<UserLevelProgressRecord>
   }
 }
@@ -85,6 +105,9 @@ export function findUserLevelProgressByUserId(userId: number) {
     where: { userId },
     select: {
       checkInDays: true,
+      currentCheckInStreak: true,
+      maxCheckInStreak: true,
+      lastCheckInDate: true,
     },
   })
 }
@@ -96,17 +119,30 @@ export function updateUserLevel(userId: number, level: number, client?: Prisma.T
   })
 }
 
-export function upsertUserCheckInGrowth(userId: number) {
-  return extendedPrisma.userLevelProgress.upsert({
+export interface SyncUserCheckInProgressInput {
+  checkInDays: number
+  currentCheckInStreak: number
+  maxCheckInStreak: number
+  lastCheckInDate: string | null
+}
+
+export function syncUserCheckInProgress(userId: number, input: SyncUserCheckInProgressInput, client?: Prisma.TransactionClient | typeof prisma) {
+  const db = (client ?? prisma) as typeof prisma & ExtendedPrismaClient
+
+  return db.userLevelProgress.upsert({
     where: { userId },
     update: {
-      checkInDays: {
-        increment: 1,
-      },
+      checkInDays: input.checkInDays,
+      currentCheckInStreak: input.currentCheckInStreak,
+      maxCheckInStreak: input.maxCheckInStreak,
+      lastCheckInDate: input.lastCheckInDate,
     },
     create: {
       userId,
-      checkInDays: 1,
+      checkInDays: input.checkInDays,
+      currentCheckInStreak: input.currentCheckInStreak,
+      maxCheckInStreak: input.maxCheckInStreak,
+      lastCheckInDate: input.lastCheckInDate,
     },
   })
 }

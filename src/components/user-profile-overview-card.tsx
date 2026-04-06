@@ -8,6 +8,7 @@ import { RssSubscribeButton } from "@/components/rss-subscribe-button"
 import { UserBlockToggleButton } from "@/components/user-block-toggle-button"
 import { UserStatusBadge } from "@/components/user-status-badge"
 import { Card, CardContent } from "@/components/ui/card"
+import { formatNumber } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
 import type { PublicUserStatus } from "@/lib/users"
 
@@ -43,7 +44,7 @@ interface OverviewMetricProps {
 function OverviewMetric({ label, value }: OverviewMetricProps) {
   return (
     <div className="min-w-0 rounded-xl px-3 py-2.5 text-center dark:bg-white/[0.04] lg:min-w-[76px]">
-      <p className="text-base font-semibold text-foreground sm:text-[17px]">{value}</p>
+      <p className="text-base font-semibold text-foreground sm:text-[17px]">{formatNumber(value)}</p>
       <p className="mt-1 text-[10px] text-muted-foreground">{label}</p>
     </div>
   )

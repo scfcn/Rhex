@@ -10,6 +10,8 @@ import type { MarkdownEmojiItem } from "@/lib/markdown-emoji"
 import { cn } from "@/lib/utils"
 import type { UploadFileResult } from "@/hooks/use-image-upload"
 
+const FLOATING_EDITOR_PANEL_CLASSNAME = "fixed z-[160] overflow-y-auto rounded-2xl border border-border bg-background shadow-2xl"
+
 type FloatingPanelBaseProps = {
   open: boolean
   isClient: boolean
@@ -116,7 +118,7 @@ export function MediaInsertPanel({
       position={position}
       ready={ready}
       panelRef={panelRef}
-      className="fixed z-[90] overflow-y-auto rounded-2xl border border-border bg-background p-4 shadow-2xl"
+      className={`${FLOATING_EDITOR_PANEL_CLASSNAME} p-4`}
     >
       <div className="mb-3 space-y-1">
         <div className="text-sm font-medium text-foreground">插入媒体</div>
@@ -184,7 +186,7 @@ export function LinkInsertPanel({
       position={position}
       ready={ready}
       panelRef={panelRef}
-      className="fixed z-[90] overflow-y-auto rounded-2xl border border-border bg-background p-4 shadow-2xl"
+      className={`${FLOATING_EDITOR_PANEL_CLASSNAME} p-4`}
     >
       <div className="mb-3 space-y-1">
         <div className="text-sm font-medium text-foreground">插入链接</div>
@@ -257,7 +259,7 @@ export function TableInsertPanel({
       position={position}
       ready={ready}
       panelRef={panelRef}
-      className="fixed z-[90] overflow-y-auto rounded-2xl border border-border bg-background p-4 shadow-2xl"
+      className={`${FLOATING_EDITOR_PANEL_CLASSNAME} p-4`}
     >
       <div className="mb-3 space-y-1">
         <div className="text-sm font-medium text-foreground">插入表格</div>
@@ -323,7 +325,7 @@ export function EmojiInsertPanel({
       position={position}
       ready={ready}
       panelRef={panelRef}
-      className="fixed z-[90] overflow-y-auto rounded-2xl border border-border bg-background p-3 shadow-2xl"
+      className={`${FLOATING_EDITOR_PANEL_CLASSNAME} p-3`}
     >
       <EmojiPicker
         items={markdownEmojiMap.map((emoji) => ({
@@ -383,7 +385,7 @@ export function ImageInsertPanel({
       position={position}
       ready={ready}
       panelRef={panelRef}
-      className="fixed z-[90] overflow-y-auto rounded-2xl border border-border bg-background p-4 shadow-2xl"
+      className={`${FLOATING_EDITOR_PANEL_CLASSNAME} p-4`}
     >
       {markdownImageUploadEnabled ? (
         <>

@@ -44,6 +44,28 @@ import { RefinedRichPostEditor } from "@/components/refined-rich-post-editor"
 import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/toast"
 
+function resolveAvailableRewardPoolMode(
+  currentMode: LocalPostDraft["redPacketMode"],
+  options: {
+    postRedPacketEnabled: boolean
+    postJackpotEnabled: boolean
+  },
+) {
+  if (currentMode === "RED_PACKET" && options.postRedPacketEnabled) {
+    return "RED_PACKET" as const
+  }
+
+  if (currentMode === "JACKPOT" && options.postJackpotEnabled) {
+    return "JACKPOT" as const
+  }
+
+  if (options.postJackpotEnabled) {
+    return "JACKPOT" as const
+  }
+
+  return "RED_PACKET" as const
+}
+
 export function CreatePostForm({
   boardOptions,
   pointName,
@@ -67,8 +89,22 @@ export function CreatePostForm({
   const storageMode = isEditMode ? "edit" : "create"
 
   const initialDraftData = useMemo(
-    () => buildInitialPostDraft(initialValues, boardOptions, pointName),
-    [boardOptions, initialValues, pointName],
+    () => {
+      const draft = buildInitialPostDraft(initialValues, boardOptions, pointName)
+
+      if (mode === "edit") {
+        return draft
+      }
+
+      return {
+        ...draft,
+        redPacketMode: resolveAvailableRewardPoolMode(draft.redPacketMode, {
+          postRedPacketEnabled,
+          postJackpotEnabled,
+        }),
+      }
+    },
+    [boardOptions, initialValues, mode, pointName, postJackpotEnabled, postRedPacketEnabled],
   )
 
   const [draft, setDraft] = useState<LocalPostDraft>(() => initialDraftData)
@@ -163,6 +199,21 @@ export function CreatePostForm({
   }, [allowedPostTypes, draft.postType])
 
   useEffect(() => {
+    if (!draft.redPacketEnabled) {
+      return
+    }
+
+    const resolvedMode = resolveAvailableRewardPoolMode(draft.redPacketMode, {
+      postRedPacketEnabled,
+      postJackpotEnabled,
+    })
+
+    if (resolvedMode !== draft.redPacketMode) {
+      updateDraftField("redPacketMode", resolvedMode)
+    }
+  }, [draft.redPacketEnabled, draft.redPacketMode, postJackpotEnabled, postRedPacketEnabled])
+
+  useEffect(() => {
     if (typeof window === "undefined" || hasPromptedDraftRef.current) {
       return
     }
@@ -221,7 +272,14 @@ export function CreatePostForm({
   }, [])
 
   function restoreDraft(nextDraft: LocalPostDraft) {
-    setDraft(normalizeDraftData(nextDraft, pointName, initialDraftData.boardSlug))
+    const normalizedDraft = normalizeDraftData(nextDraft, pointName, initialDraftData.boardSlug)
+    setDraft({
+      ...normalizedDraft,
+      redPacketMode: resolveAvailableRewardPoolMode(normalizedDraft.redPacketMode, {
+        postRedPacketEnabled,
+        postJackpotEnabled,
+      }),
+    })
     setDraftRestored(true)
     setPendingDraftToRestore(null)
     setPendingDraftUpdatedAt(null)
@@ -722,7 +780,10 @@ export function CreatePostForm({
             onOpenRewardPoolModal: () => setRewardPoolModalOpen(true),
             onClearRewardPool: () => patchDraft({
               redPacketEnabled: false,
-              redPacketMode: "RED_PACKET",
+              redPacketMode: resolveAvailableRewardPoolMode("RED_PACKET", {
+                postRedPacketEnabled,
+                postJackpotEnabled,
+              }),
               jackpotInitialPoints: String(postJackpotMinInitialPoints),
               redPacketGrantMode: "FIXED",
               redPacketClaimOrderMode: "FIRST_COME_FIRST_SERVED",
@@ -731,7 +792,17 @@ export function CreatePostForm({
               redPacketTotalPoints: "10",
               redPacketPacketCount: "1",
             }),
-            onRedPacketEnabledChange: (checked) => updateDraftField("redPacketEnabled", checked),
+            onRedPacketEnabledChange: (checked) => patchDraft({
+              redPacketEnabled: checked,
+              ...(checked
+                ? {
+                    redPacketMode: resolveAvailableRewardPoolMode(draft.redPacketMode, {
+                      postRedPacketEnabled,
+                      postJackpotEnabled,
+                    }),
+                  }
+                : {}),
+            }),
             onRedPacketModeChange: (value) => updateDraftField("redPacketMode", value),
             onRedPacketGrantModeChange: (value) => updateDraftField("redPacketGrantMode", value),
             onRedPacketClaimOrderModeChange: (value) => updateDraftField("redPacketClaimOrderMode", value),
@@ -752,7 +823,7 @@ export function CreatePostForm({
           <div>
             <PostDraftNotice
               title={pendingDraftToRestore ? "检测到本地草稿" : lastSavedDraftAt ? (draftRestored ? "已恢复草稿" : "本地草稿") : "草稿状态"}
-              description={pendingDraftToRestore ? `你在${isEditMode ? "编辑帖子" : "发帖"}页有一份未提交内容，可直接恢复继续编辑。支持 Ctrl/Cmd+S 快速保存草稿。` : "当前内容会自动暂存到本地。支持 Ctrl/Cmd+S 快速保存草稿，Ctrl/Cmd+Z 使用原生撤销。"}
+              description={pendingDraftToRestore ? `你在${isEditMode ? "编辑帖子" : "发帖"}页有一份未提交内容，可直接恢复继续编辑。支持 Ctrl/Cmd+S 快速保存草稿。` : "当前内容会自动暂存到本地。支持 Ctrl/Cmd+S 快速保存草稿。"}
               meta={draftMetaTimestamp ? `保存于 ${new Date(draftMetaTimestamp).toLocaleString()}` : undefined}
               tone={pendingDraftToRestore ? "warning" : "info"}
               size="dense"
@@ -821,7 +892,17 @@ export function CreatePostForm({
         disabled={isEditMode}
         onClose={() => setRewardPoolModalOpen(false)}
         onChange={{
-          onEnabledChange: (checked) => updateDraftField("redPacketEnabled", checked),
+          onEnabledChange: (checked) => patchDraft({
+            redPacketEnabled: checked,
+            ...(checked
+              ? {
+                  redPacketMode: resolveAvailableRewardPoolMode(draft.redPacketMode, {
+                    postRedPacketEnabled,
+                    postJackpotEnabled,
+                  }),
+                }
+              : {}),
+          }),
           onModeChange: (value) => updateDraftField("redPacketMode", value),
           onGrantModeChange: (value) => updateDraftField("redPacketGrantMode", value),
           onClaimOrderModeChange: (value) => updateDraftField("redPacketClaimOrderMode", value),

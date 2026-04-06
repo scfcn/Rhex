@@ -17,6 +17,7 @@ import { toast } from "@/components/ui/toast"
 
 
 import type { BoardItem, ZoneItem } from "@/lib/admin-structure-management"
+import { POST_LIST_LOAD_MODE_INFINITE, POST_LIST_LOAD_MODE_PAGINATION } from "@/lib/post-list-load-mode"
 import { POST_LIST_DISPLAY_MODE_DEFAULT, POST_LIST_DISPLAY_MODE_GALLERY } from "@/lib/post-list-display"
 import { DEFAULT_ALLOWED_POST_TYPES, normalizePostTypes } from "@/lib/post-types"
 
@@ -66,6 +67,7 @@ interface StructureFormState {
   minReplyVipLevel: string
   requirePostReview: boolean
   postListDisplayMode: string
+  postListLoadMode: string
   feedback: string
   feedbackTone: "error" | "success"
 }
@@ -325,7 +327,8 @@ function BoardRow({ board, canDelete, onEdit }: { board: BoardItem; canDelete: b
         <span className="rounded-full bg-secondary/50 px-2 py-1 text-center">回复 {board.replyPointDelta ?? "继承"}</span>
         <span className="rounded-full bg-secondary/50 px-2 py-1 text-center">间隔 {board.postIntervalSeconds ?? "继承"}</span>
         <span className="rounded-full bg-secondary/50 px-2 py-1 text-center">VIP {board.minPostVipLevel ?? 0}</span>
-        <span className="rounded-full bg-secondary/50 px-2 py-1 text-center md:col-span-2">列表 {board.postListDisplayMode === POST_LIST_DISPLAY_MODE_GALLERY ? "画廊" : board.postListDisplayMode === POST_LIST_DISPLAY_MODE_DEFAULT ? "普通" : "继承分区"}</span>
+        <span className="rounded-full bg-secondary/50 px-2 py-1 text-center">列表 {board.postListDisplayMode === POST_LIST_DISPLAY_MODE_GALLERY ? "画廊" : board.postListDisplayMode === POST_LIST_DISPLAY_MODE_DEFAULT ? "普通" : "继承分区"}</span>
+        <span className="rounded-full bg-secondary/50 px-2 py-1 text-center">加载 {board.postListLoadMode === POST_LIST_LOAD_MODE_INFINITE ? "无限下拉" : board.postListLoadMode === POST_LIST_LOAD_MODE_PAGINATION ? "分页" : "继承分区"}</span>
       </div>
 
       <div className="flex flex-wrap justify-end gap-1.5">
@@ -417,6 +420,7 @@ function StructureModalForm({ modal, zones, onClose }: { modal: Exclude<ModalMod
     minReplyVipLevel,
     requirePostReview,
     postListDisplayMode,
+    postListLoadMode,
     feedback,
     feedbackTone,
   } = form
@@ -466,6 +470,7 @@ function StructureModalForm({ modal, zones, onClose }: { modal: Exclude<ModalMod
       minReplyVipLevel: minReplyVipLevel === "" ? undefined : Number(minReplyVipLevel),
       requirePostReview,
       postListDisplayMode,
+      postListLoadMode,
 
     }
 
@@ -584,6 +589,15 @@ function StructureModalForm({ modal, zones, onClose }: { modal: Exclude<ModalMod
             </select>
             <p className="text-xs leading-6 text-muted-foreground">{isBoard ? "留空时自动继承分区；显式设置后优先使用节点自己的列表形式。" : "留空时使用站点默认普通列表；设置后该分区下未覆盖的节点会继承这里。"}</p>
           </div>
+          <div className="space-y-2 md:col-span-1 xl:col-span-1">
+            <p className="text-sm font-medium">帖子加载方式</p>
+            <select value={postListLoadMode} onChange={(event) => updateField("postListLoadMode", event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
+              {isBoard ? <option value="">继承分区</option> : <option value={POST_LIST_LOAD_MODE_PAGINATION}>分页加载</option>}
+              {!isBoard ? null : <option value={POST_LIST_LOAD_MODE_PAGINATION}>分页加载</option>}
+              <option value={POST_LIST_LOAD_MODE_INFINITE}>无限下拉</option>
+            </select>
+            <p className="text-xs leading-6 text-muted-foreground">{isBoard ? "留空时自动继承分区；显式设置后优先使用节点自己的加载方式。" : "分区可配置为传统分页或滚动到底自动继续加载。"}</p>
+          </div>
         </div>
 
 
@@ -632,6 +646,7 @@ function getInitialStructureFormState(modal: Exclude<ModalMode, null>, zones: Zo
       minReplyVipLevel: "0",
       requirePostReview: false,
       postListDisplayMode: "",
+      postListLoadMode: POST_LIST_LOAD_MODE_PAGINATION,
       feedback: "",
       feedbackTone: "success",
     }
@@ -661,6 +676,7 @@ function getInitialStructureFormState(modal: Exclude<ModalMode, null>, zones: Zo
       minReplyVipLevel: "",
       requirePostReview: false,
       postListDisplayMode: "",
+      postListLoadMode: "",
       feedback: "",
       feedbackTone: "success",
     }
@@ -690,6 +706,7 @@ function getInitialStructureFormState(modal: Exclude<ModalMode, null>, zones: Zo
       minReplyVipLevel: String(modal.item.minReplyVipLevel),
       requirePostReview: modal.item.requirePostReview,
       postListDisplayMode: modal.item.postListDisplayMode ?? "",
+      postListLoadMode: modal.item.postListLoadMode ?? POST_LIST_LOAD_MODE_PAGINATION,
       feedback: "",
       feedbackTone: "success",
     }
@@ -718,6 +735,7 @@ function getInitialStructureFormState(modal: Exclude<ModalMode, null>, zones: Zo
     minReplyVipLevel: modal.item.minReplyVipLevel == null ? "" : String(modal.item.minReplyVipLevel),
     requirePostReview: Boolean(modal.item.requirePostReview),
     postListDisplayMode: modal.item.postListDisplayMode ?? "",
+    postListLoadMode: modal.item.postListLoadMode ?? "",
     feedback: "",
     feedbackTone: "success",
   }

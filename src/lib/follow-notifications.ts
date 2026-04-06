@@ -8,8 +8,11 @@ import {
   findTagFollowerUserIds,
   findUserFollowerUserIds,
 } from "@/db/follow-queries"
+import { enqueueBackgroundJob, registerBackgroundJobHandler } from "@/lib/background-jobs"
 import { createNotification, createNotifications } from "@/lib/notification-writes"
 import { getUserDisplayName } from "@/lib/users"
+
+const FOLLOW_NOTIFICATION_BATCH_SIZE = 200
 
 function compactText(value: string, maxLength = 80) {
   return value.replace(/\s+/g, " ").trim().slice(0, maxLength)
@@ -36,6 +39,18 @@ function createReasonLabel(params: {
   }
 
   return reasons.join(" / ")
+}
+
+async function createNotificationsInBatches(notifications: Parameters<typeof createNotifications>[0]["notifications"]) {
+  let count = 0
+
+  for (let index = 0; index < notifications.length; index += FOLLOW_NOTIFICATION_BATCH_SIZE) {
+    const batch = notifications.slice(index, index + FOLLOW_NOTIFICATION_BATCH_SIZE)
+    const result = await createNotifications({ notifications: batch })
+    count += result.count
+  }
+
+  return { count }
 }
 
 export async function dispatchNewPostFollowNotifications(postId: string) {
@@ -119,7 +134,7 @@ export async function dispatchNewPostFollowNotifications(postId: string) {
     }
   })
 
-  return createNotifications({ notifications })
+  return createNotificationsInBatches(notifications)
 }
 
 export async function dispatchPostFollowCommentNotifications(params: {
@@ -135,20 +150,26 @@ export async function dispatchPostFollowCommentNotifications(params: {
   const excludeUserIds = new Set([context.userId, ...(params.excludeUserIds ?? [])])
   const followers = await findPostFollowerUserIds(context.post.id)
   const senderName = getUserDisplayName(context.user)
-  const notifications = followers
-    .map((item) => item.userId)
-    .filter((userId, index, list) => !excludeUserIds.has(userId) && list.indexOf(userId) === index)
-    .map((userId) => ({
-      userId,
+  const seenUserIds = new Set<number>()
+  const notifications = followers.flatMap((item) => {
+    if (excludeUserIds.has(item.userId) || seenUserIds.has(item.userId)) {
+      return []
+    }
+
+    seenUserIds.add(item.userId)
+
+    return [{
+      userId: item.userId,
       type: NotificationType.FOLLOWING_ACTIVITY,
       senderId: context.userId,
       relatedType: "COMMENT" as const,
       relatedId: context.id,
       title: "你关注的帖子有了新回复",
       content: `${senderName} 回复了《${compactText(context.post.title, 72)}》：${compactText(context.content)}`,
-    }))
+    }]
+  })
 
-  return createNotifications({ notifications })
+  return createNotificationsInBatches(notifications)
 }
 
 export async function dispatchNewPostFollowNotificationsBestEffort(postId: string) {
@@ -190,4 +211,46 @@ export async function dispatchUserFollowedNotificationBestEffort(params: {
   } catch (error) {
     console.warn("[follow-notifications] failed to dispatch user follow notification", error)
   }
+}
+
+registerBackgroundJobHandler("follow.notify-new-post", async (payload) => {
+  await dispatchNewPostFollowNotifications(payload.postId)
+})
+
+registerBackgroundJobHandler("follow.notify-post-comment", async (payload) => {
+  await dispatchPostFollowCommentNotifications({
+    commentId: payload.commentId,
+    excludeUserIds: payload.excludeUserIds,
+  })
+})
+
+registerBackgroundJobHandler("follow.notify-user-followed", async (payload) => {
+  await createNotification({
+    userId: payload.userId,
+    type: NotificationType.FOLLOWED_YOU,
+    senderId: payload.followerUserId,
+    relatedType: "USER",
+    relatedId: String(payload.followerUserId),
+    title: "你有了新粉丝",
+    content: `${payload.followerName} 关注了你`,
+  })
+})
+
+export function enqueueNewPostFollowNotifications(postId: string) {
+  return enqueueBackgroundJob("follow.notify-new-post", { postId })
+}
+
+export function enqueuePostFollowCommentNotifications(params: {
+  commentId: string
+  excludeUserIds?: number[]
+}) {
+  return enqueueBackgroundJob("follow.notify-post-comment", params)
+}
+
+export function enqueueUserFollowedNotification(params: {
+  userId: number
+  followerUserId: number
+  followerName: string
+}) {
+  return enqueueBackgroundJob("follow.notify-user-followed", params)
 }

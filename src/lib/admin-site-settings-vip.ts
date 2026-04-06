@@ -1,13 +1,16 @@
 import { updateSiteSettingsRecord } from "@/db/site-settings-write-queries"
 import { apiError, readOptionalNumberField, readOptionalStringField, type JsonObject } from "@/lib/api-route"
 import { finalizeSiteSettingsUpdate, type SiteSettingsRecord } from "@/lib/admin-site-settings-shared"
+import { enqueueRefreshAllUserCheckInStreakSummaries } from "@/lib/check-in-streak-service"
 import {
   mergeAvatarChangePointCostSettings,
   mergeCheckInMakeUpPriceSettings,
   mergeCheckInRewardSettings,
+  mergeCheckInStreakSettings,
   mergeIntroductionChangePointCostSettings,
   mergeInviteCodePurchasePriceSettings,
   mergeNicknameChangePointCostSettings,
+  resolveCheckInStreakSettings,
   mergeVipLevelIconSettings,
   resolveAvatarChangePointCostSettings,
   resolveIntroductionChangePointCostSettings,
@@ -31,6 +34,13 @@ export async function updateVipSiteSettingsSection(existing: SiteSettingsRecord,
   const checkInVip2MakeUpCardPrice = Math.max(0, readOptionalNumberField(body, "checkInVip2MakeUpCardPrice") ?? legacyVipMakeUpCardPrice)
   const checkInVip3MakeUpCardPrice = Math.max(0, readOptionalNumberField(body, "checkInVip3MakeUpCardPrice") ?? legacyVipMakeUpCardPrice)
   const checkInVipMakeUpCardPrice = Math.max(0, readOptionalNumberField(body, "checkInVipMakeUpCardPrice") ?? checkInVip1MakeUpCardPrice)
+  const existingCheckInStreakSettings = resolveCheckInStreakSettings({
+    appStateJson: existing.appStateJson,
+    makeUpCountsTowardStreakFallback: true,
+  })
+  const checkInMakeUpCountsTowardStreak = body.checkInMakeUpCountsTowardStreak === undefined
+    ? existingCheckInStreakSettings.makeUpCountsTowardStreak
+    : Boolean(body.checkInMakeUpCountsTowardStreak)
   const nicknameChangePointCost = Math.max(0, readOptionalNumberField(body, "nicknameChangePointCost") ?? existing.nicknameChangePointCost ?? 0)
   const nicknameChangeVip1PointCost = Math.max(0, readOptionalNumberField(body, "nicknameChangeVip1PointCost") ?? nicknameChangePointCost)
   const nicknameChangeVip2PointCost = Math.max(0, readOptionalNumberField(body, "nicknameChangeVip2PointCost") ?? nicknameChangePointCost)
@@ -99,7 +109,10 @@ export async function updateVipSiteSettingsSection(existing: SiteSettingsRecord,
     vip2: inviteCodeVip2Price,
     vip3: inviteCodeVip3Price,
   })
-  const appStateWithVipLevelIcons = mergeVipLevelIconSettings(appStateJson, vipLevelIcons)
+  const appStateWithCheckInStreak = mergeCheckInStreakSettings(appStateJson, {
+    makeUpCountsTowardStreak: checkInMakeUpCountsTowardStreak,
+  })
+  const appStateWithVipLevelIcons = mergeVipLevelIconSettings(appStateWithCheckInStreak, vipLevelIcons)
 
   if (existing.inviteCodePurchaseEnabled && inviteCodePrice < 1) {
     apiError(400, "开启积分购买邀请码时，普通用户价格必须大于 0")
@@ -123,9 +136,12 @@ export async function updateVipSiteSettingsSection(existing: SiteSettingsRecord,
     postOfflineVip3Price,
   })
 
+  if (existingCheckInStreakSettings.makeUpCountsTowardStreak !== checkInMakeUpCountsTowardStreak) {
+    await enqueueRefreshAllUserCheckInStreakSummaries(checkInMakeUpCountsTowardStreak)
+  }
+
   return finalizeSiteSettingsUpdate({
     settings,
     message: "积分与VIP设置已保存",
   })
 }
-

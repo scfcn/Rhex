@@ -16,6 +16,7 @@ import {
   updatePostStatus,
 } from "@/db/admin-post-action-queries"
 import { ensureCanManageBoard, ensureCanManagePost, getAvailablePinScopes } from "@/lib/moderator-permissions"
+import { createSystemNotification } from "@/lib/notification-writes"
 
 export const adminPostActionHandlers: Record<string, AdminActionDefinition> = {
   "post.feature": defineAdminAction({ targetType: "POST", revalidatePaths: ["/", "/admin"], buildDetail: () => "管理员切换推荐状态" }, async (context) => {
@@ -75,15 +76,42 @@ export const adminPostActionHandlers: Record<string, AdminActionDefinition> = {
 
   }),
   "post.approve": defineAdminAction({ targetType: "POST", revalidatePaths: ["/", "/admin"], buildDetail: () => "管理员审核通过帖子" }, async (context) => {
-    await ensureCanManagePost(context.actor, context.targetId)
+    const post = await ensureCanManagePost(context.actor, context.targetId)
     await updatePostStatus(context.targetId, PostStatus.NORMAL, context.message || null, new Date())
+
+    if (post.authorId !== context.adminUserId) {
+      void createSystemNotification({
+        userId: post.authorId,
+        senderId: context.adminUserId,
+        relatedType: "POST",
+        relatedId: post.id,
+        title: "帖子审核已通过",
+        content: `你发布的帖子《${post.title}》已通过审核，现已公开展示。${context.message ? ` 审核备注：${context.message}` : ""}`,
+      }).catch((error) => {
+        console.warn("[admin-post-actions] failed to notify post approval", error)
+      })
+    }
 
     await writeAdminActionLog(context, adminPostActionHandlers["post.approve"].metadata)
     return { message: "帖子已审核通过" }
   }),
   "post.reject": defineAdminAction({ targetType: "POST", revalidatePaths: ["/", "/admin"], buildDetail: () => "管理员驳回帖子审核" }, async (context) => {
-    await ensureCanManagePost(context.actor, context.targetId)
+    const post = await ensureCanManagePost(context.actor, context.targetId)
     await updatePostStatus(context.targetId, PostStatus.OFFLINE, context.message || "审核未通过")
+
+    if (post.authorId !== context.adminUserId) {
+      void createSystemNotification({
+        userId: post.authorId,
+        senderId: context.adminUserId,
+        relatedType: "POST",
+        relatedId: post.id,
+        title: "帖子审核未通过",
+        content: `你发布的帖子《${post.title}》未通过审核，当前不会公开展示。${context.message ? ` 驳回原因：${context.message}` : " 请根据内容规范调整后再发布。"}`,
+      }).catch((error) => {
+        console.warn("[admin-post-actions] failed to notify post rejection", error)
+      })
+    }
+
     await writeAdminActionLog(context, adminPostActionHandlers["post.reject"].metadata)
     return { message: "帖子已驳回并下线" }
   }),

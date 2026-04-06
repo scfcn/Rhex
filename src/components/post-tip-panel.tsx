@@ -11,6 +11,7 @@ import { UserAvatar } from "@/components/user-avatar"
 import { Button } from "@/components/ui/button"
 import { Tooltip } from "@/components/ui/tooltip"
 import { toast } from "@/components/ui/toast"
+import { formatNumber } from "@/lib/formatters"
 import type { SiteTippingGiftItem } from "@/lib/site-settings"
 import { cn } from "@/lib/utils"
 
@@ -191,7 +192,7 @@ export function PostTipPanel({
   )
   const totalGiftCount = useMemo(() => giftSummary.reduce((total, item) => total + item.totalCount, 0), [giftSummary])
   const triggerTooltip = tipTotalPoints > 0
-    ? `本帖已收到 ${totalGiftCount > 0 ? `${totalGiftCount} 份礼物，` : ""}${tipTotalPoints} ${pointName}`
+    ? `本帖已收到 ${totalGiftCount > 0 ? `${totalGiftCount} 份礼物，` : ""}${formatNumber(tipTotalPoints)} ${pointName}`
     : "送礼或积分打赏支持作者"
 
   const clearAnimationTimers = useCallback(() => {
@@ -333,7 +334,7 @@ export function PostTipPanel({
           syncSummary(result.data)
         }
 
-        const successMessage = result.message ?? (targetGift ? `已送出 ${targetGift.name}` : `已成功打赏 ${targetAmount} ${pointName}`)
+        const successMessage = result.message ?? (targetGift ? `已送出 ${targetGift.name}` : `已成功打赏 ${formatNumber(targetAmount)} ${pointName}`)
         setMessage(successMessage)
         toast.success(successMessage, mode === "gift" ? "送礼成功" : "打赏成功")
       } catch {
@@ -523,7 +524,7 @@ export function PostTipPanel({
                         {giftStat.totalCount}
                       </div>
                     ) : null}
-                    <Tooltip content={`${gift.name} · ${gift.price} ${pointName}${giftStat?.totalCount ? ` · 已收 ${giftStat.totalCount} 个` : ""}`}>
+                      <Tooltip content={`${gift.name} · ${formatNumber(gift.price)} ${pointName}${giftStat?.totalCount ? ` · 已收 ${giftStat.totalCount} 个` : ""}`}>
                       <button
                         ref={(node) => {
                           giftButtonRefs.current[gift.id] = node
@@ -561,7 +562,7 @@ export function PostTipPanel({
               <div className="mt-2.5 space-y-2.5 border-t border-border/70 pt-2.5">
                 <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
                   <span>积分打赏</span>
-                  <span>{pointName} {points} · 累计 {tipTotalPoints}</span>
+                  <span>{pointName} {formatNumber(points)} · 累计 {formatNumber(tipTotalPoints)}</span>
                 </div>
                 <div className="grid grid-cols-4 gap-1.5">
                   {allowedAmounts.map((amount) => (
@@ -586,7 +587,7 @@ export function PostTipPanel({
 
                 <div className="flex items-center justify-between gap-3">
                   <Button type="button" onClick={() => handleTip({ mode: "tip", amount: effectiveSelectedAmount })} disabled={!canTip || isPending} className="h-8 rounded-xl px-3.5 text-xs">
-                    {isPending ? "打赏中..." : effectiveSelectedAmount > 0 ? `打赏 ${effectiveSelectedAmount} ${pointName}` : "选择金额"}
+                    {isPending ? "打赏中..." : effectiveSelectedAmount > 0 ? `打赏 ${formatNumber(effectiveSelectedAmount)} ${pointName}` : "选择金额"}
                   </Button>
                   {points <= 0 ? (
                     <Link href="/settings?tab=points" className="text-xs text-primary hover:opacity-80">
@@ -614,7 +615,7 @@ export function PostTipPanel({
                             <p className="truncate text-[11px] font-medium leading-4">{supporter.nickname ?? supporter.username}</p>
                             <div className="flex items-center gap-1 text-[10px] font-semibold text-amber-600 dark:text-amber-300">
                               <Zap className="h-3 w-3 fill-current" />
-                              +{supporter.totalAmount}
+                              +{formatNumber(supporter.totalAmount)}
                             </div>
                           </div>
                         </div>

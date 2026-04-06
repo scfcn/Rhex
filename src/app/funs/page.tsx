@@ -23,12 +23,13 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function FunsPage() {
+  const settingsPromise = getSiteSettings()
   const [boards, zones, currentUser, hotTopics, settings] = await Promise.all([
     getBoards(),
     getZones(),
     getCurrentUser(),
-    getHomeSidebarHotTopics(5),
-    getSiteSettings(),
+    settingsPromise.then((settings) => getHomeSidebarHotTopics(settings.homeSidebarHotTopicsCount)),
+    settingsPromise,
   ])
 
   const sidebarUser = await resolveSidebarUser(currentUser, settings)

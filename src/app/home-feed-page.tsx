@@ -5,18 +5,24 @@ import type { ReactNode } from "react"
 import { ForumFeedList } from "@/components/forum-feed-list"
 import { ForumPageShell } from "@/components/forum-page-shell"
 import { HomeSidebarPanels } from "@/components/home-sidebar-panels"
+import { InfiniteForumFeed } from "@/components/infinite-forum-feed"
 import { PageNumberPagination } from "@/components/page-number-pagination"
 import { SelfServeAdsSidebar } from "@/components/self-serve-ads-sidebar"
 import { SiteHeader } from "@/components/site-header"
+import { AutoCheckInOnHomeEnter } from "@/components/auto-check-in-on-home-enter"
 import { getHomeAnnouncements } from "@/lib/announcements"
 import { getCurrentUser } from "@/lib/auth"
+import { hasHomeAutoCheckInBadgeEffect } from "@/lib/badge-functional-effects"
 import { getBoards } from "@/lib/boards"
+import { getLocalDateKey } from "@/lib/date-key"
 import { getFriendLinkListData } from "@/lib/friend-links"
 import { getLatestFeed } from "@/lib/forum-feed"
+import { mapForumFeedItemsToDisplayItems } from "@/lib/forum-feed-display"
 import { buildHomeFeedHref, type HomeFeedSort, parseHomeFeedPage } from "@/lib/home-feed-route"
 import { getHomeSidebarHotTopics, resolveSidebarUser } from "@/lib/home-sidebar"
 import { groupHomeSidebarPanels } from "@/lib/home-sidebar-layout"
 import { getHomeSidebarStats } from "@/lib/home-sidebar-stats"
+import { POST_LIST_LOAD_MODE_INFINITE } from "@/lib/post-list-load-mode"
 import { getSelfServeAdsAppConfig, getSelfServeAdsPanelData } from "@/lib/self-serve-ads"
 import { toSelfServeAdConfig } from "@/lib/self-serve-ads.shared"
 import { getSiteSettings } from "@/lib/site-settings"
@@ -33,6 +39,7 @@ interface HomeFeedPageProps {
   sort: HomeFeedSort
   searchParams?: Promise<{ page?: string | string[] }>
   mainTopSlot?: ReactNode
+  autoCheckInOnEnter?: boolean
 }
 
 export async function generateHomeFeedMetadata(sort: HomeFeedSort): Promise<Metadata> {
@@ -50,7 +57,7 @@ export async function generateHomeFeedMetadata(sort: HomeFeedSort): Promise<Meta
   }
 }
 
-export async function HomeFeedPage({ sort, searchParams, mainTopSlot }: HomeFeedPageProps) {
+export async function HomeFeedPage({ sort, searchParams, mainTopSlot, autoCheckInOnEnter = false }: HomeFeedPageProps) {
   const resolvedSearchParams = searchParams ? await searchParams : undefined
   const rawPage = resolvedSearchParams?.page
   const currentPage = parseHomeFeedPage(resolvedSearchParams?.page)
@@ -60,15 +67,19 @@ export async function HomeFeedPage({ sort, searchParams, mainTopSlot }: HomeFeed
   }
 
   const currentUserPromise = getCurrentUser()
-  const feedPromise = currentUserPromise.then((currentUser) => getLatestFeed(currentPage, 35, sort, currentUser?.id))
+  const settingsPromise = getSiteSettings()
+  const hotTopicsPromise = settingsPromise.then((settings) => getHomeSidebarHotTopics(settings.homeSidebarHotTopicsCount))
+  const feedPromise = Promise.all([currentUserPromise, settingsPromise]).then(([currentUser, settings]) => (
+    getLatestFeed(currentPage, settings.homeFeedPostPageSize, sort, currentUser?.id, settings.homeHotRecentWindowHours)
+  ))
   const [feedPage, boards, zones, currentUser, hotTopics, announcements, settings, friendLinks, selfServeAdsConfig, selfServeAdsPanelData] = await Promise.all([
     feedPromise,
     getBoards(),
     getZones(),
     currentUserPromise,
-    getHomeSidebarHotTopics(5),
+    hotTopicsPromise,
     getHomeAnnouncements(3),
-    getSiteSettings(),
+    settingsPromise,
     getFriendLinkListData(),
     getSelfServeAdsAppConfig(),
     getSelfServeAdsPanelData(),
@@ -91,6 +102,13 @@ export async function HomeFeedPage({ sort, searchParams, mainTopSlot }: HomeFeed
     resolveSidebarUser(currentUser, settings),
     settings.homeSidebarStatsCardEnabled ? getHomeSidebarStats() : Promise.resolve(null),
   ])
+  const feedDisplayItems = mapForumFeedItemsToDisplayItems(feed, sort, settings)
+  const useInfiniteFeed = settings.homeFeedPostListLoadMode === POST_LIST_LOAD_MODE_INFINITE
+  const shouldAutoCheckIn = autoCheckInOnEnter
+    && Boolean(currentUser?.id)
+    && Boolean(settings.checkInEnabled)
+    && !Boolean(sidebarUser?.checkedInToday)
+    && await hasHomeAutoCheckInBadgeEffect(currentUser?.id)
   const sidebarPanels = groupHomeSidebarPanels(
     selfServeAdsPanelData && selfServeAdsResolvedConfig.enabled && selfServeAdsResolvedConfig.visibleOnHome
       ? [{
@@ -104,6 +122,9 @@ export async function HomeFeedPage({ sort, searchParams, mainTopSlot }: HomeFeed
 
   return (
     <div className="min-h-screen bg-background">
+      {currentUser?.id && shouldAutoCheckIn ? (
+        <AutoCheckInOnHomeEnter enabled todayKey={getLocalDateKey()} userId={currentUser.id} />
+      ) : null}
       <SiteHeader />
 
       <div className="mx-auto max-w-[1200px] px-1">
@@ -113,11 +134,22 @@ export async function HomeFeedPage({ sort, searchParams, mainTopSlot }: HomeFeed
           main={(
             <div className="pb-12 py-1">
               {mainTopSlot ? <div className="mt-6 mb-4">{mainTopSlot}</div> : null}
-              <ForumFeedList items={feed} currentSort={sort} listDisplayMode={settings.homeFeedPostListDisplayMode} postLinkDisplayMode={settings.postLinkDisplayMode} />
+              {useInfiniteFeed ? (
+                <InfiniteForumFeed
+                  initialItems={feedDisplayItems}
+                  initialPage={page}
+                  initialHasNextPage={hasNextPage}
+                  currentSort={sort}
+                  listDisplayMode={settings.homeFeedPostListDisplayMode}
+                  postLinkDisplayMode={settings.postLinkDisplayMode}
+                />
+              ) : (
+                <ForumFeedList items={feed} currentSort={sort} listDisplayMode={settings.homeFeedPostListDisplayMode} postLinkDisplayMode={settings.postLinkDisplayMode} />
+              )}
 
               {feed.length === 0 ? <div className="mt-4 rounded-md border bg-background p-8 text-sm text-muted-foreground">{emptyStateText}</div> : null}
 
-              {showPagination ? (
+              {showPagination && !useInfiniteFeed ? (
                 <PageNumberPagination
                   page={page}
                   totalPages={totalPages}

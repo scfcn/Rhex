@@ -6,6 +6,7 @@ export {
   BoardStatus,
   ChangeType,
   CommentStatus,
+  ConversationKind,
   FriendLinkStatus,
   LotteryStatus,
   LotteryTriggerMode,

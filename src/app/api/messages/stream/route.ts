@@ -1,4 +1,5 @@
 import { prisma } from "@/db/client"
+import { ConversationKind } from "@/db/types"
 import { createUserRouteHandler } from "@/lib/api-route"
 import {
   buildCursorPayload,
@@ -58,8 +59,12 @@ async function findLatestCursor(userId: number): Promise<MessageStreamCursor | n
   const latest = await prisma.directMessage.findFirst({
     where: {
       conversation: {
+        kind: ConversationKind.DIRECT,
         participants: {
-          some: { userId },
+          some: {
+            userId,
+            archivedAt: null,
+          },
         },
       },
     },
@@ -81,8 +86,12 @@ async function findMessageEventsAfterCursor(userId: number, cursor: MessageStrea
   const messages = await prisma.directMessage.findMany({
     where: {
       conversation: {
+        kind: ConversationKind.DIRECT,
         participants: {
-          some: { userId },
+          some: {
+            userId,
+            archivedAt: null,
+          },
         },
       },
       ...(cursor

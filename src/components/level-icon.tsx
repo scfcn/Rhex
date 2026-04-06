@@ -1,3 +1,5 @@
+"use client"
+
 import { cn } from "@/lib/utils"
 
 interface LevelIconProps {
@@ -10,9 +12,28 @@ interface LevelIconProps {
 }
 
 const SVG_WRAPPER_PATTERN = /^<svg[\s\S]*<\/svg>$/i
+const REMOTE_URL_PATTERN = /^(https?:)?\/\//i
+const DATA_IMAGE_PATTERN = /^data:image\//i
+const BLOB_URL_PATTERN = /^blob:/i
+const LOCAL_ASSET_PATTERN = /^(\/|\.\/|\.\.\/)/
 
 function isSvgMarkup(value: string) {
   return SVG_WRAPPER_PATTERN.test(value.trim())
+}
+
+function isImageSource(value: string) {
+  const normalizedValue = value.trim()
+
+  if (!normalizedValue || isSvgMarkup(normalizedValue)) {
+    return false
+  }
+
+  return (
+    REMOTE_URL_PATTERN.test(normalizedValue) ||
+    DATA_IMAGE_PATTERN.test(normalizedValue) ||
+    BLOB_URL_PATTERN.test(normalizedValue) ||
+    LOCAL_ASSET_PATTERN.test(normalizedValue)
+  )
 }
 
 export function normalizeLevelIcon(icon?: string | null) {
@@ -27,6 +48,10 @@ export function normalizeLevelIcon(icon?: string | null) {
 
 export function isLevelSvgIcon(icon?: string | null) {
   return isSvgMarkup(normalizeLevelIcon(icon))
+}
+
+export function isLevelImageIcon(icon?: string | null) {
+  return isImageSource(normalizeLevelIcon(icon))
 }
 
 function buildSvgMarkup(svg: string, color?: string) {
@@ -64,6 +89,25 @@ export function LevelIcon({ icon, color, className, svgClassName, emojiClassName
           aria-hidden={title ? undefined : true}
           className={cn("inline-flex h-full w-full items-center justify-center [&>svg]:h-full [&>svg]:w-full", svgClassName)}
           dangerouslySetInnerHTML={{ __html: buildSvgMarkup(normalizedIcon, color) }}
+        />
+      </span>
+    )
+  }
+
+  if (isLevelImageIcon(normalizedIcon)) {
+    return (
+      <span
+        title={title}
+        aria-label={title}
+        className={cn("inline-flex shrink-0 items-center justify-center leading-none", className)}
+      >
+        {/* Dynamic icon sources may be blob/data URLs or arbitrary remote paths, so next/image is not a good fit here. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={normalizedIcon}
+          alt={title ?? ""}
+          aria-hidden={title ? undefined : true}
+          className={cn("h-full w-full object-contain", svgClassName)}
         />
       </span>
     )

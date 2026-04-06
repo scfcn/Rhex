@@ -3,6 +3,7 @@ import { Eye, MessageCircle, ThumbsUp } from "lucide-react"
 import { PostListLink } from "@/components/post-list-link"
 import { TimeTooltip } from "@/components/time-tooltip"
 import { UserDisplayedBadges } from "@/components/user-displayed-badges"
+import { formatNumber } from "@/lib/formatters"
 import { getPostPath } from "@/lib/post-links"
 import type { SitePostItem } from "@/lib/posts"
 
@@ -43,7 +44,7 @@ export function PostCardList({ posts, pointName = "积分", compact = false, sho
               {post.bounty ? (
                 <>
                   <span>·</span>
-                  <span>悬赏 {post.bounty.points} {pointName}</span>
+                  <span>悬赏 {formatNumber(post.bounty.points)} {pointName}</span>
 
                 </>
               ) : null}

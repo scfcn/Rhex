@@ -35,7 +35,7 @@ export function MessageThreadPanel({ conversation, currentUserId, usingDemoData,
           <MessageSquareMore className="mx-auto h-10 w-10 text-muted-foreground" />
           <p className="mt-4 text-sm uppercase tracking-[0.28em] text-muted-foreground">Chat Thread</p>
           <h2 className="mt-3 text-2xl font-semibold">还没有私信会话</h2>
-          <p className="mt-3 text-sm leading-7 text-muted-foreground">去用户主页点击“发私信”，或从现有会话列表中选择一个联系人，系统会直接创建真实数据库会话。</p>
+          <p className="mt-3 text-sm leading-7 text-muted-foreground">去用户主页点击“发私信”，或从现有会话列表中选择一个联系人。</p>
         </div>
       </div>
     )

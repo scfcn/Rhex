@@ -17,7 +17,7 @@ export interface SearchResultItem extends SitePostItem {
 
 export interface SearchResults {
   keyword: string
-  total: number
+  total: number | null
   items: SearchResultItem[]
   hasPrevPage: boolean
   hasNextPage: boolean
@@ -35,6 +35,9 @@ export async function searchPosts(
     pageSize?: number
     after?: string | null
     before?: string | null
+    includeTotal?: boolean
+    searchEnabled?: boolean
+    postLinkDisplayMode?: "SLUG" | "ID"
   } = {},
 ): Promise<SearchResults> {
   const normalizedKeyword = normalizeKeyword(keyword)
@@ -52,9 +55,13 @@ export async function searchPosts(
   }
 
   try {
-    const settings = await getSiteSettings()
+    const settings = options.searchEnabled === undefined || !options.postLinkDisplayMode
+      ? await getSiteSettings()
+      : null
+    const searchEnabled = options.searchEnabled ?? settings?.search.enabled ?? false
+    const postLinkDisplayMode = options.postLinkDisplayMode ?? settings?.postLinkDisplayMode ?? "SLUG"
 
-    if (!settings.search.enabled) {
+    if (!searchEnabled) {
       return {
         keyword: normalizedKeyword,
         total: 0,
@@ -69,26 +76,24 @@ export async function searchPosts(
     const where = buildPostSearchWhere(normalizedKeyword)
     const afterCursor = decodePinnedTimestampCursor(options.after)
     const beforeCursor = decodePinnedTimestampCursor(options.before)
+    const includeTotal = options.includeTotal ?? (!options.after && !options.before)
 
-    const [total, { items: posts, hasPrevPage, hasNextPage }] = await Promise.all([
-      countSearchPosts(where),
+    const [{ items: posts, hasPrevPage, hasNextPage }, total] = await Promise.all([
       findSearchPostsCursor({
         where,
         pageSize: options.pageSize ?? 10,
         after: beforeCursor ? null : afterCursor,
         before: beforeCursor,
       }),
+      includeTotal ? countSearchPosts(where) : Promise.resolve(null),
     ] as const)
-
-
-
 
     return {
       keyword: normalizedKeyword,
       total,
       items: posts.map((post: (typeof posts)[number]) => ({
         ...mapListPost(post),
-        href: getPostPath(post, { mode: settings.postLinkDisplayMode }),
+        href: getPostPath(post, { mode: postLinkDisplayMode }),
       })),
       hasPrevPage,
       hasNextPage,
@@ -99,7 +104,7 @@ export async function searchPosts(
     console.error(error)
     return {
       keyword: normalizedKeyword,
-      total: 0,
+      total: null,
       items: [],
       hasPrevPage: false,
       hasNextPage: false,

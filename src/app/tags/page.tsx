@@ -61,14 +61,15 @@ export default async function TagsPage(props: PageProps<"/tags">) {
   const searchParams = await props.searchParams;
   const currentPage = Math.max(1, Number(readSearchParam(searchParams?.page) ?? "1") || 1)
   const currentSort = normalizeSort(readSearchParam(searchParams?.sort))
+  const settingsPromise = getSiteSettings()
 
   const [tagPage, boards, zones, currentUser, hotTopics, settings] = await Promise.all([
     getTagListPage(currentPage, 24, currentSort),
     getBoards(),
     getZones(),
     getCurrentUser(),
-    getHomeSidebarHotTopics(5),
-    getSiteSettings(),
+    settingsPromise.then((settings) => getHomeSidebarHotTopics(settings.homeSidebarHotTopicsCount)),
+    settingsPromise,
   ])
 
   const sidebarUser = await resolveSidebarUser(currentUser, settings)

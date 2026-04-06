@@ -24,6 +24,7 @@ export type JsonObject = Record<string, unknown>
 
 export interface ApiRouteContext {
   request: Request
+  routeContext?: unknown
 }
 
 export interface AuthenticatedApiRouteContext extends ApiRouteContext {
@@ -159,13 +160,13 @@ function toResponse<T>(result: ApiRouteResult<T>) {
 
 export function createRouteHandler<T = unknown, C extends ApiRouteContext = ApiRouteContext>(
   handler: ApiRouteHandler<T, C>,
-  options?: { errorMessage?: string; logPrefix?: string; buildContext?: (request: Request) => Promise<C> },
+  options?: { errorMessage?: string; logPrefix?: string; buildContext?: (request: Request, routeContext?: unknown) => Promise<C> },
 ) {
-  return async function routeHandler(request: Request) {
+  return async function routeHandler(request: Request, routeContext?: unknown) {
     try {
       const context = options?.buildContext
-        ? await options.buildContext(request)
-        : ({ request } as C)
+        ? await options.buildContext(request, routeContext)
+        : ({ request, routeContext } as C)
       const result = await handler(context)
       return toResponse(result)
     } catch (error) {
@@ -240,7 +241,7 @@ export function createAdminRouteHandler<T = unknown>(
   return createRouteHandler(handler, {
     errorMessage: options?.errorMessage,
     logPrefix: options?.logPrefix,
-    buildContext: async (request) => {
+    buildContext: async (request, routeContext) => {
       const adminUser = options?.allowModerator
         ? await requireAdminActor()
         : await requireSiteAdminActor()
@@ -249,7 +250,7 @@ export function createAdminRouteHandler<T = unknown>(
         apiError(403, options?.unauthorizedMessage ?? "无权操作")
       }
 
-      return { request, adminUser }
+      return { request, adminUser, routeContext }
     },
   })
 }
@@ -265,8 +266,9 @@ export function createCustomRouteHandler<T = unknown, TContext = unknown>(
   return createRouteHandler<T, CustomApiRouteContext<TContext>>(handler, {
     errorMessage: options.errorMessage,
     logPrefix: options.logPrefix,
-    buildContext: async (request) => ({
+    buildContext: async (request, routeContext) => ({
       request,
+      routeContext,
       context: await options.buildContext(request),
     }),
   })

@@ -8,6 +8,7 @@ import { isBadgeRuleTypeValue, type BadgeRuleTypeValue } from "@/lib/badge-rule-
 import { prisma } from "@/db/client"
 import { findBadgeEffectRulesByBadgeIds } from "@/db/badge-queries"
 import {
+  isFunctionalPointEffectTargetType,
   isPointEffectScopeCompatibleWithTargetType,
   isPointEffectScopeKey,
   isPointEffectTargetTypeEnabledForBadgeEffects,
@@ -134,7 +135,6 @@ function parseEffects(input: unknown) {
     const rawScopeKeys = Array.isArray(row.scopeKeys)
       ? row.scopeKeys.map((scopeKey) => normalizeText(scopeKey))
       : null
-    const value = Number(row.value)
     const extraValue = String(row.extraValue ?? "").trim()
 
     if (!name) {
@@ -145,20 +145,20 @@ function parseEffects(input: unknown) {
       apiError(400, `${itemLabel}的作用目标无效`)
     }
 
-    if (!isPointEffectTargetTypeEnabledForBadgeEffects(targetType)) {
+    const normalizedTargetType = targetType as PointEffectTargetType
+
+    if (!isPointEffectTargetTypeEnabledForBadgeEffects(normalizedTargetType)) {
       apiError(400, `${itemLabel}的作用目标当前未开放`)
     }
 
-    if (!isPointEffectRuleKind(ruleKind)) {
+    const functionalTarget = isFunctionalPointEffectTargetType(normalizedTargetType)
+
+    if (!functionalTarget && !isPointEffectRuleKind(ruleKind)) {
       apiError(400, `${itemLabel}的生效规则无效`)
     }
 
     if (!isPointEffectDirection(direction)) {
       apiError(400, `${itemLabel}的增减方向无效`)
-    }
-
-    if (!Number.isFinite(value)) {
-      apiError(400, `${itemLabel}的基础值无效`)
     }
 
     if (!rawScopeKeys) {
@@ -174,23 +174,34 @@ function parseEffects(input: unknown) {
       apiError(400, `${itemLabel}包含无效的生效范围`)
     }
 
-    const incompatibleScopeKey = rawScopeKeys.find((scopeKey) => !isPointEffectScopeCompatibleWithTargetType(scopeKey, targetType))
+    const incompatibleScopeKey = rawScopeKeys.find((scopeKey) => !isPointEffectScopeCompatibleWithTargetType(scopeKey, normalizedTargetType))
     if (incompatibleScopeKey) {
       apiError(400, `${itemLabel}的生效范围与作用目标不兼容`)
     }
 
-    const scopeKeys = normalizePointEffectScopeKeysByTargetType(rawScopeKeys, targetType)
+    const scopeKeys = normalizePointEffectScopeKeysByTargetType(rawScopeKeys, normalizedTargetType)
     if (scopeKeys.length === 0) {
       apiError(400, `${itemLabel}至少选择一个生效范围`)
     }
 
-    const normalizedDirection = normalizePointEffectDirectionByRuleKind(direction, ruleKind)
-    if (normalizedDirection !== direction) {
+    const validatedRuleKind = functionalTarget ? PointEffectRuleKind.FIXED : ruleKind as PointEffectRuleKind
+    const normalizedRuleKind = functionalTarget
+      ? PointEffectRuleKind.FIXED
+      : validatedRuleKind
+    const normalizedDirection = functionalTarget
+      ? PointEffectDirection.BUFF
+      : normalizePointEffectDirectionByRuleKind(direction, normalizedRuleKind)
+    if (!functionalTarget && normalizedDirection !== direction) {
       apiError(400, `${itemLabel}的增减方向与生效规则不兼容`)
     }
 
-    const parsedExtraValue = extraValue === "" ? null : Number(extraValue)
-    if (extraValue !== "" && !Number.isFinite(parsedExtraValue)) {
+    const parsedValue = functionalTarget ? 1 : Number(row.value)
+    if (!functionalTarget && !Number.isFinite(parsedValue)) {
+      apiError(400, `${itemLabel}的基础值无效`)
+    }
+
+    const parsedExtraValue = functionalTarget ? null : extraValue === "" ? null : Number(extraValue)
+    if (!functionalTarget && extraValue !== "" && !Number.isFinite(parsedExtraValue)) {
       apiError(400, `${itemLabel}的额外值无效`)
     }
 
@@ -198,14 +209,14 @@ function parseEffects(input: unknown) {
       id: normalizeText(row.id) || randomUUID(),
       name,
       description: normalizeText(row.description) || null,
-      targetType,
+      targetType: normalizedTargetType,
       scopeKeys,
-      ruleKind,
+      ruleKind: normalizedRuleKind,
       direction: normalizedDirection,
-      value,
+      value: parsedValue,
       extraValue: parsedExtraValue,
-      startMinuteOfDay: parseOptionalMinute(row.startMinuteOfDay, "开始时间", itemLabel),
-      endMinuteOfDay: parseOptionalMinute(row.endMinuteOfDay, "结束时间", itemLabel),
+      startMinuteOfDay: functionalTarget ? null : parseOptionalMinute(row.startMinuteOfDay, "开始时间", itemLabel),
+      endMinuteOfDay: functionalTarget ? null : parseOptionalMinute(row.endMinuteOfDay, "结束时间", itemLabel),
       sortOrder: normalizeNumber(row.sortOrder, index),
       status: row.status === undefined ? true : normalizeBoolean(row.status),
     }

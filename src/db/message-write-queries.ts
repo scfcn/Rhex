@@ -19,33 +19,9 @@ export function findConversationParticipantByUser(conversationId: string, userId
     where: {
       conversationId,
       userId,
+      archivedAt: null,
     },
     select: { id: true },
-  })
-}
-
-export function createConversationWithParticipants(senderId: number, recipientId: number) {
-  return prisma.conversation.create({
-    data: {
-      participants: {
-        create: [
-          { userId: senderId, unreadCount: 0 },
-          { userId: recipientId, unreadCount: 0 },
-        ],
-      },
-    },
-    include: {
-      participants: true,
-    },
-  })
-}
-
-export function findConversationWithParticipants(conversationId: string) {
-  return prisma.conversation.findUnique({
-    where: { id: conversationId },
-    include: {
-      participants: true,
-    },
   })
 }
 
@@ -73,6 +49,7 @@ export async function createDirectMessageInTransaction(conversationId: string, s
       },
       data: {
         unreadCount: { increment: 1 },
+        archivedAt: null,
       },
     })
 
@@ -84,6 +61,7 @@ export async function createDirectMessageInTransaction(conversationId: string, s
       data: {
         unreadCount: 0,
         lastReadMessageId: created.id,
+        archivedAt: null,
       },
     })
 

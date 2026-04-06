@@ -1,6 +1,6 @@
 import { apiSuccess, createUserRouteHandler, readJsonBody } from "@/lib/api-route"
 import { createCommentFlow } from "@/lib/comment-create-service"
-import { dispatchPostFollowCommentNotificationsBestEffort } from "@/lib/follow-notifications"
+import { enqueuePostFollowCommentNotifications } from "@/lib/follow-notifications"
 import { handleCommentCreateSideEffects } from "@/lib/interaction-side-effects"
 import { evaluateUserLevelProgress } from "@/lib/level-system"
 import { logRequestSucceeded } from "@/lib/request-log"
@@ -25,7 +25,7 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   })
 
   if (!result.contentSafety.shouldReview) {
-    await dispatchPostFollowCommentNotificationsBestEffort({
+    await enqueuePostFollowCommentNotifications({
       commentId: result.created.id,
       excludeUserIds: [
         ...(result.isRootComment ? [result.postAuthorId] : []),

@@ -2,28 +2,21 @@ import { DbTransaction, withDbTransaction } from "@/db/helpers"
 import {
   findConversationByIdForParticipant,
   findConversationDetailById,
+  findDirectConversationByUsers,
   findConversationListItems,
-  findConversationParticipantsWithConversation,
-  findDirectConversationCandidates,
   findLatestMessageByConversationId,
   getUnreadConversationCount,
   updateConversationReadState,
 } from "@/db/message-read-queries"
 import {
-  createConversationWithParticipants,
   createDirectMessageInTransaction,
   findConversationHistoryBatch,
   findConversationParticipantByUser,
-  findConversationWithParticipants,
   findMessageHistoryAnchor,
   findMessageRecipientById,
 } from "@/db/message-write-queries"
 
-
-
-
-
-import { UserStatus } from "@/db/types"
+import { Prisma, ConversationKind, UserStatus } from "@/db/types"
 
 
 
@@ -104,236 +97,149 @@ function mapMessageBubble(
 }
 
 async function removeConversationForUser(tx: MessageTransactionClient, conversationId: string, currentUserId: number) {
-  const participant = await tx.conversationParticipant.findUnique({
+  await tx.conversationParticipant.updateMany({
     where: {
-      conversationId_userId: {
-        conversationId,
-        userId: currentUserId,
+      conversationId,
+      userId: currentUserId,
+      archivedAt: null,
+    },
+    data: {
+      archivedAt: new Date(),
+      unreadCount: 0,
+    },
+  })
+}
+
+async function restoreConversationForUser(tx: MessageTransactionClient, conversationId: string, currentUserId: number) {
+  await tx.conversationParticipant.updateMany({
+    where: {
+      conversationId,
+      userId: currentUserId,
+      archivedAt: {
+        not: null,
       },
     },
-    select: {
-      id: true,
+    data: {
+      archivedAt: null,
     },
   })
+}
 
-  if (!participant) {
-    return
+function normalizeDirectPair(userAId: number, userBId: number) {
+  return {
+    userLowId: Math.min(userAId, userBId),
+    userHighId: Math.max(userAId, userBId),
+  }
+}
+
+function isUniqueConstraintError(error: unknown, target?: string) {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+    return false
   }
 
-  await tx.conversationParticipant.delete({
-    where: { id: participant.id },
-  })
+  if (!target) {
+    return true
+  }
 
-  const remainingCount = await tx.conversationParticipant.count({
-    where: { conversationId },
-  })
+  const errorTarget = Array.isArray(error.meta?.target) ? error.meta.target.join(",") : String(error.meta?.target ?? "")
+  return errorTarget.includes(target)
+}
 
-  if (remainingCount <= 0) {
-    await tx.conversation.delete({
-      where: { id: conversationId },
+async function getOrCreateConversation(userAId: number, userBId: number) {
+  const pair = normalizeDirectPair(userAId, userBId)
+  const existing = await findDirectConversationByUsers(pair.userLowId, pair.userHighId)
+
+  if (existing) {
+    await withDbTransaction(async (tx) => {
+      await restoreConversationForUser(tx, existing.conversationId, userAId)
     })
-  }
-}
 
-async function cleanupMalformedConversations(currentUserId: number) {
-  const participants = await findConversationParticipantsWithConversation(currentUserId)
-
-
-  const invalidConversationIds = participants
-    .filter((item) => {
-      const participantUserIds = item.conversation.participants.map((participant) => participant.userId)
-      const otherUserIds = participantUserIds.filter((userId) => userId !== currentUserId)
-      return otherUserIds.length === 0
-    })
-    .map((item) => item.conversationId)
-
-  if (invalidConversationIds.length === 0) {
-    return
+    return existing.conversation
   }
 
-  await withDbTransaction(async (tx) => {
-    for (const conversationId of invalidConversationIds) {
-      await removeConversationForUser(tx, conversationId, currentUserId)
-    }
-  })
-
-}
-
-async function normalizeDirectConversations(currentUserId: number) {
-  await cleanupMalformedConversations(currentUserId)
-
-  const participants = await findConversationParticipantsWithConversation(currentUserId)
-
-
-  const partnerIds = new Set<number>()
-
-  for (const item of participants) {
-    const currentPartnerIds = item.conversation.participants.map((participant) => participant.userId).filter((userId) => userId !== currentUserId)
-
-    if (currentPartnerIds.length !== 1 || item.conversation.participants.length !== 2) {
-      continue
-    }
-
-    partnerIds.add(currentPartnerIds[0])
-  }
-
-  for (const partnerId of partnerIds) {
-    await mergeDuplicateDirectConversations(currentUserId, partnerId)
-  }
-}
-
-
-async function findDirectConversations(userAId: number, userBId: number) {
-  const candidates = await findDirectConversationCandidates(userAId, userBId)
-
-  return candidates
-    .filter((conversation) => {
-      if (conversation.participants.length !== 2) {
-        return false
-      }
-
-      const userIds = conversation.participants.map((participant) => participant.userId).sort((left, right) => left - right)
-      return userIds[0] === Math.min(userAId, userBId) && userIds[1] === Math.max(userAId, userBId)
-    })
-    .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
-}
-
-
-async function mergeDuplicateDirectConversations(userAId: number, userBId: number) {
-  const conversations = await findDirectConversations(userAId, userBId)
-
-  if (conversations.length <= 1) {
-    return conversations[0] ?? null
-  }
-
-  const canonical = conversations[0]
-  const duplicates = conversations.slice(1)
-
-  await withDbTransaction(async (tx) => {
-    for (const duplicate of duplicates) {
-
-      const duplicateMessages = await tx.directMessage.findMany({
-        where: { conversationId: duplicate.id },
-        select: { createdAt: true },
-        orderBy: { createdAt: "asc" },
-      })
-
-      await tx.directMessage.updateMany({
-        where: { conversationId: duplicate.id },
-        data: { conversationId: canonical.id },
-      })
-
-      for (const participant of duplicate.participants) {
-        const existingParticipant = canonical.participants.find((item) => item.userId === participant.userId)
-
-        if (!existingParticipant) {
-          await tx.conversationParticipant.update({
-            where: { id: participant.id },
-            data: {
-              conversationId: canonical.id,
-            },
-          })
-          continue
-        }
-
-        const mergedLastReadMessageId = existingParticipant.lastReadMessageId ?? participant.lastReadMessageId ?? null
-
-        await tx.conversationParticipant.update({
-          where: { id: existingParticipant.id },
-          data: {
-            unreadCount: Math.max(existingParticipant.unreadCount, participant.unreadCount),
-            lastReadMessageId: mergedLastReadMessageId,
+  try {
+    return await withDbTransaction(async (tx) => {
+      const conversation = await tx.conversation.create({
+        data: {
+          kind: ConversationKind.DIRECT,
+          participants: {
+            create: [
+              { userId: userAId, unreadCount: 0 },
+              { userId: userBId, unreadCount: 0 },
+            ],
           },
-        })
-      }
+        },
+        include: {
+          participants: true,
+        },
+      })
 
-      const latestMessageAt = duplicateMessages.at(-1)?.createdAt
-      if (latestMessageAt && latestMessageAt.getTime() > canonical.lastMessageAt.getTime()) {
-        await tx.conversation.update({
-          where: { id: canonical.id },
-          data: { lastMessageAt: latestMessageAt },
-        })
-      }
+      await tx.directConversation.create({
+        data: {
+          conversationId: conversation.id,
+          userLowId: pair.userLowId,
+          userHighId: pair.userHighId,
+        },
+      })
 
-      await tx.conversation.delete({ where: { id: duplicate.id } })
+      return conversation
+    })
+  } catch (error) {
+    if (!isUniqueConstraintError(error, "userLowId")) {
+      throw error
     }
-  })
 
-  return findConversationWithParticipants(canonical.id)
-}
+    const concurrentConversation = await findDirectConversationByUsers(pair.userLowId, pair.userHighId)
+    if (!concurrentConversation) {
+      throw error
+    }
 
+    await withDbTransaction(async (tx) => {
+      await restoreConversationForUser(tx, concurrentConversation.conversationId, userAId)
+    })
 
-async function getOrCreateConversation(senderId: number, recipientId: number) {
-  const merged = await mergeDuplicateDirectConversations(senderId, recipientId)
-  if (merged) {
-    return merged
+    return concurrentConversation.conversation
   }
-
-  return createConversationWithParticipants(senderId, recipientId)
 }
-
 
 async function resolveCanonicalConversationId(currentUserId: number, conversationId: string): Promise<string | undefined> {
   const conversation = await findConversationByIdForParticipant(conversationId, currentUserId)
-
-
   if (!conversation) {
     return undefined
   }
 
   const partnerIds = conversation.participants.map((participant) => participant.userId).filter((userId) => userId !== currentUserId)
 
-  if (partnerIds.length === 0) {
-    await withDbTransaction(async (tx) => {
-      await removeConversationForUser(tx, conversation.id, currentUserId)
-    })
-    return undefined
-  }
-
-
-  if (partnerIds.length === 1 && conversation.participants.length === 2) {
-    const canonical = await getOrCreateConversation(currentUserId, partnerIds[0])
-    return canonical.id
-  }
-
-  return conversation.id
+  return partnerIds.length === 1 && conversation.participants.length === 2 ? conversation.id : undefined
 }
 
 async function getDatabaseBackedConversations(currentUserId: number): Promise<MessageConversationListItem[]> {
   const items = await findConversationListItems(currentUserId)
 
+  return items
+    .map((item) => {
+      const participants = item.conversation.participants.map((participant) => mapConversationParticipant(participant, currentUserId))
+      const partner = participants.find((participant) => !participant.isCurrentUser)
 
-  const deduped = new Map<number, MessageConversationListItem & { sortAt: Date }>()
+      if (!partner) {
+        return null
+      }
 
-  for (const item of items) {
-    const participants = item.conversation.participants.map((participant) => mapConversationParticipant(participant, currentUserId))
-    const partner = participants.find((participant) => !participant.isCurrentUser)
+      const latestMessage = item.conversation.messages[0]
+      const sortAt = latestMessage?.createdAt ?? item.conversation.lastMessageAt
 
-    if (!partner) {
-      continue
-    }
-
-    const latestMessage = item.conversation.messages[0]
-    const sortAt = latestMessage?.createdAt ?? item.conversation.lastMessageAt
-    const existing = deduped.get(partner.id)
-
-    const nextItem = {
-      id: item.conversation.id,
-      title: partner.displayName,
-      subtitle: item.unreadCount > 0 ? `未读 ${item.unreadCount} 条` : latestMessage ? "最近互动" : "新会话",
-      preview: latestMessage?.body ?? "还没有消息，发一条开始聊天吧",
-      updatedAt: formatMonthDayTime(sortAt),
-      unreadCount: item.unreadCount,
-      participants,
-      sortAt,
-    }
-
-    if (!existing || sortAt.getTime() > existing.sortAt.getTime()) {
-      deduped.set(partner.id, nextItem)
-    }
-  }
-
-  return [...deduped.values()]
+      return {
+        id: item.conversation.id,
+        title: partner.displayName,
+        subtitle: item.unreadCount > 0 ? `未读 ${item.unreadCount} 条` : latestMessage ? "最近互动" : "新会话",
+        preview: latestMessage?.body ?? "还没有消息，发一条开始聊天吧",
+        updatedAt: formatMonthDayTime(sortAt),
+        unreadCount: item.unreadCount,
+        participants,
+        sortAt,
+      }
+    })
+    .filter((conversation): conversation is MessageConversationListItem & { sortAt: Date } => Boolean(conversation))
     .sort((left, right) => right.sortAt.getTime() - left.sortAt.getTime())
     .map((conversation) => ({
       id: conversation.id,
@@ -380,10 +286,6 @@ async function getDatabaseConversationDetail(currentUserId: number, conversation
   const partner = participants.find((participant) => !participant.isCurrentUser)
 
   if (!partner) {
-    await withDbTransaction(async (tx) => {
-      await removeConversationForUser(tx, conversation.id, currentUserId)
-    })
-
     return null
   }
 
@@ -533,8 +435,6 @@ export async function deleteConversationForUser(conversationId: string, currentU
 }
 
 export async function getMessageCenterData(currentUserId: number, conversationId?: string): Promise<MessageCenterData> {
-  await normalizeDirectConversations(currentUserId)
-
   const resolvedConversationId = await resolveConversationId(currentUserId, conversationId)
   const conversations = await getDatabaseBackedConversations(currentUserId)
   const activeId = resolvedConversationId

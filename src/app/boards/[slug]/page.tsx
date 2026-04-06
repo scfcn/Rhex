@@ -6,6 +6,7 @@ import { BoardFollowButton } from "@/components/board-follow-button"
 import { CollapsibleInfoCard } from "@/components/collapsible-info-card"
 import { ForumPageShell } from "@/components/forum-page-shell"
 import { ForumPostStream } from "@/components/forum-post-stream"
+import { InfiniteForumPostStream } from "@/components/infinite-forum-post-stream"
 import { PageNumberPagination } from "@/components/page-number-pagination"
 import { RssSubscribeButton } from "@/components/rss-subscribe-button"
 
@@ -17,7 +18,9 @@ import { SiteHeader } from "@/components/site-header"
 import { getCurrentUser } from "@/lib/auth"
 import { checkBoardPermission } from "@/lib/board-access"
 import { getBoardBySlug, getBoardPosts, getBoards, isUserFollowingBoard } from "@/lib/boards"
+import { mapSitePostsToDisplayItems } from "@/lib/forum-post-stream-display"
 import { getHomeSidebarHotTopics, resolveSidebarUser } from "@/lib/home-sidebar"
+import { POST_LIST_LOAD_MODE_INFINITE } from "@/lib/post-list-load-mode"
 import { DEFAULT_ALLOWED_POST_TYPES, normalizePostTypes } from "@/lib/post-types"
 import { readSearchParam } from "@/lib/search-params"
 import { buildMetadataKeywords } from "@/lib/seo"
@@ -66,7 +69,8 @@ export async function generateMetadata(props: PageProps<"/boards/[slug]">): Prom
 export default async function BoardPage(props: PageProps<"/boards/[slug]">) {
   const searchParams = await props.searchParams
   const params = await props.params
-  const [board, currentUser, settings] = await Promise.all([getBoardBySlug(params.slug), getCurrentUser(), getSiteSettings()])
+  const settingsPromise = getSiteSettings()
+  const [board, currentUser, settings] = await Promise.all([getBoardBySlug(params.slug), getCurrentUser(), settingsPromise])
 
   if (!board) {
     notFound()
@@ -95,11 +99,11 @@ export default async function BoardPage(props: PageProps<"/boards/[slug]">) {
   const currentPage = Math.max(1, Number(rawPage ?? "1") || 1)
   const [postsPage, boards, zones, hotTopics] = await Promise.all([
     permission.allowed
-      ? getBoardPosts(params.slug, currentPage, 20)
-      : Promise.resolve({ items: [], page: 1, pageSize: 20, total: 0, totalPages: 1, hasPrevPage: false, hasNextPage: false }),
+      ? getBoardPosts(params.slug, currentPage, settings.boardPostPageSize)
+      : Promise.resolve({ items: [], page: 1, pageSize: settings.boardPostPageSize, total: 0, totalPages: 1, hasPrevPage: false, hasNextPage: false }),
     getBoards(),
     getZones(),
-    getHomeSidebarHotTopics(5),
+    settingsPromise.then((settings) => getHomeSidebarHotTopics(settings.homeSidebarHotTopicsCount)),
   ])
   const { items: posts, page, totalPages, hasPrevPage, hasNextPage } = postsPage
 
@@ -116,6 +120,8 @@ export default async function BoardPage(props: PageProps<"/boards/[slug]">) {
     ? await isUserFollowingBoard(currentUser.id, board.id)
     : false
   const sidebarUser = await resolveSidebarUser(currentUser, settings)
+  const postDisplayItems = mapSitePostsToDisplayItems(posts, settings, ["GLOBAL", "ZONE", "BOARD"])
+  const useInfinitePostList = board.postListLoadMode === POST_LIST_LOAD_MODE_INFINITE
 
 
 
@@ -166,19 +172,34 @@ export default async function BoardPage(props: PageProps<"/boards/[slug]">) {
                 <>
          
 
-                  <ForumPostStream posts={posts} listDisplayMode={board.postListDisplayMode} showBoard={false} showPinnedDivider={page === 1} />
+                  {useInfinitePostList ? (
+                    <InfiniteForumPostStream
+                      apiPath={`/api/boards/${encodeURIComponent(params.slug)}/posts`}
+                      initialItems={postDisplayItems}
+                      initialPage={page}
+                      initialHasNextPage={hasNextPage}
+                      listDisplayMode={board.postListDisplayMode}
+                      showBoard={false}
+                      showPinnedDivider={page === 1}
+                      postLinkDisplayMode={settings.postLinkDisplayMode}
+                    />
+                  ) : (
+                    <ForumPostStream posts={posts} listDisplayMode={board.postListDisplayMode} showBoard={false} showPinnedDivider={page === 1} />
+                  )}
 
 
 
                   {posts.length === 0 ? <div className="rounded-md border bg-background p-8 text-sm text-muted-foreground">当前节点还没有内容。</div> : null}
 
-                  <PageNumberPagination
-                    page={page}
-                    totalPages={totalPages}
-                    hasPrevPage={hasPrevPage}
-                    hasNextPage={hasNextPage}
-                    buildHref={(targetPage) => buildBoardPageHref(params.slug, targetPage)}
-                  />
+                  {useInfinitePostList ? null : (
+                    <PageNumberPagination
+                      page={page}
+                      totalPages={totalPages}
+                      hasPrevPage={hasPrevPage}
+                      hasNextPage={hasNextPage}
+                      buildHref={(targetPage) => buildBoardPageHref(params.slug, targetPage)}
+                    />
+                  )}
                 </>
               )}
             </div>

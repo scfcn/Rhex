@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import type { RefObject } from "react"
 import { Keyboard, Minimize2, Sparkles } from "lucide-react"
 
@@ -57,10 +58,24 @@ export function CommentRewardBadge({ rewardClaim, pointName = "积分" }: { rewa
   const isJackpot = rewardClaim.rewardMode === "JACKPOT"
 
   return (
-    <Tooltip content={`${isJackpot ? "聚宝盆" : "红包"}奖励 +${rewardClaim.amount} ${pointName}`}>
+    <Tooltip enableMobileTap content={`${isJackpot ? "聚宝盆" : "红包"}奖励 +${rewardClaim.amount} ${pointName},财源滚滚!`}>
       <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-semibold leading-none shadow-sm ring-1 ring-white/70 transition-transform duration-200 group-hover:-translate-y-0.5 motion-safe:animate-pulse", isJackpot ? "border-amber-200 bg-amber-50 text-amber-700 shadow-amber-100/80 dark:border-amber-400/20 dark:bg-amber-500/12 dark:text-amber-200" : "border-rose-200 bg-rose-50 text-rose-600 shadow-rose-100/80 dark:border-rose-400/20 dark:bg-rose-500/12 dark:text-rose-200")}>
         <PostRewardPoolIcon mode={rewardClaim.rewardMode} className="h-3.5 w-3.5" />
         <span>+{rewardClaim.amount}</span>
+      </span>
+    </Tooltip>
+  )
+}
+
+export function CommentJackpotDepositBadge({ feedback, pointName = "积分" }: { feedback?: PostRewardPoolEffectFeedback | null; pointName?: string }) {
+  const jackpotDepositPoints = feedback?.jackpotDepositPoints
+  if (typeof jackpotDepositPoints !== "number" || jackpotDepositPoints < 0) return null
+
+  return (
+    <Tooltip enableMobileTap content={`添砖加瓦:此评论为聚宝盆加了 ${jackpotDepositPoints} ${pointName}`}>
+      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-semibold leading-none text-emerald-700 shadow-sm dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
+        <Image src="/apps/redpacked/z.svg" alt="" width={14} height={14} className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        <span>+ {jackpotDepositPoints}</span>
       </span>
     </Tooltip>
   )
@@ -81,6 +96,7 @@ export function CommentRewardEffectBadge({ feedback }: { feedback: PostRewardPoo
 
   return (
     <Tooltip
+      enableMobileTap
       content={(
         <div className="space-y-2.5">
           <div className="space-y-2">

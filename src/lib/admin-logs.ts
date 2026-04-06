@@ -4,14 +4,16 @@ import {
   countAdminLogs,
   countAdminLogTabs,
   countPointLogs,
+  countUploadLogs,
   countUserCheckInLogs,
   countUserLoginLogs,
+  countVipOrders,
   findAdminLogsPage,
   findPointLogsPage,
+  findUploadLogsPage,
   findUserCheckInLogsPage,
-  findUploadLogs,
   findUserLoginLogsPage,
-  findVipOrders,
+  findVipOrdersPage,
 } from "@/db/admin-log-queries"
 import { serializeDate, serializeDateTime } from "@/lib/formatters"
 
@@ -107,15 +109,6 @@ function buildPagination(total: number, requestedPage: number, pageSize: number)
     hasPrevPage: page > 1,
     hasNextPage: page < totalPages,
   }
-}
-
-function includesKeyword(values: Array<string | null | undefined>, keyword: string) {
-  if (!keyword) {
-    return true
-  }
-
-  const normalized = keyword.toLowerCase()
-  return values.some((value) => String(value ?? "").toLowerCase().includes(normalized))
 }
 
 function resolveAdminTone(action: string) {
@@ -330,17 +323,24 @@ export async function getAdminLogCenter(options: GetAdminLogCenterOptions = {}):
   }
 
   if (activeTab === "uploads") {
-    const rawRows = await findUploadLogs()
+    const where: Prisma.UploadWhereInput = {
+      ...(bucketType !== "ALL" ? { bucketType } : {}),
+      ...(keyword
+        ? {
+            OR: [
+              { originalName: { contains: keyword, mode: "insensitive" } },
+              { fileName: { contains: keyword, mode: "insensitive" } },
+              { mimeType: { contains: keyword, mode: "insensitive" } },
+              { user: { username: { contains: keyword, mode: "insensitive" } } },
+              { user: { nickname: { contains: keyword, mode: "insensitive" } } },
+            ],
+          }
+        : {}),
+    }
 
-
-    const filteredRows = rawRows.filter((item) => {
-      const bucketMatched = bucketType === "ALL" || item.bucketType === bucketType
-      const keywordMatched = includesKeyword([item.originalName, item.fileName, item.mimeType, item.user.username, item.user.nickname], keyword)
-      return bucketMatched && keywordMatched
-    })
-
-    const pagination = buildPagination(filteredRows.length, requestedPage, pageSize)
-    const rows = filteredRows.slice((pagination.page - 1) * pagination.pageSize, pagination.page * pagination.pageSize)
+    const total = await countUploadLogs(where)
+    const pagination = buildPagination(total, requestedPage, pageSize)
+    const rows = await findUploadLogsPage(where, (pagination.page - 1) * pagination.pageSize, pagination.pageSize)
 
     return {
       activeTab,
@@ -364,14 +364,19 @@ export async function getAdminLogCenter(options: GetAdminLogCenterOptions = {}):
     }
   }
 
-  const rawRows = await findVipOrders()
-
-
-  const filteredRows = rawRows.filter((item) => {
-    return includesKeyword([item.orderType, item.user.username, item.user.nickname, item.remark], keyword)
-  })
-  const pagination = buildPagination(filteredRows.length, requestedPage, pageSize)
-  const rows = filteredRows.slice((pagination.page - 1) * pagination.pageSize, pagination.page * pagination.pageSize)
+  const where: Prisma.VipOrderWhereInput = keyword
+    ? {
+        OR: [
+          { orderType: { contains: keyword, mode: "insensitive" } },
+          { remark: { contains: keyword, mode: "insensitive" } },
+          { user: { username: { contains: keyword, mode: "insensitive" } } },
+          { user: { nickname: { contains: keyword, mode: "insensitive" } } },
+        ],
+      }
+    : {}
+  const total = await countVipOrders(where)
+  const pagination = buildPagination(total, requestedPage, pageSize)
+  const rows = await findVipOrdersPage(where, (pagination.page - 1) * pagination.pageSize, pagination.pageSize)
 
   return {
     activeTab,

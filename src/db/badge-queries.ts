@@ -67,7 +67,11 @@ export function findBadgeEligibilityUserSnapshot(userId: number) {
     }),
     prisma.userLevelProgress.findUnique({
       where: { userId },
-      select: { checkInDays: true },
+      select: {
+        checkInDays: true,
+        currentCheckInStreak: true,
+        maxCheckInStreak: true,
+      },
     }),
     Promise.all([
       prisma.postTip.count({
@@ -105,6 +109,15 @@ export function findAllBadgesWithRules() {
   return prisma.badge.findMany({
     orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
     include: badgeWithRulesAndCountInclude,
+  })
+}
+
+export function findGrantedBadgeIdsForUser(userId: number) {
+  return prisma.userBadge.findMany({
+    where: { userId },
+    select: {
+      badgeId: true,
+    },
   })
 }
 
@@ -286,4 +299,22 @@ export async function findDisplayedBadgeEffectRules(userId: number) {
   `)
 
   return rows.map(mapBadgeEffectRuleRecord)
+}
+
+export async function hasDisplayedBadgeEffectScope(userId: number, scopeKey: string) {
+  const rows = await prisma.$queryRaw<Array<{ matched: number }>>(Prisma.sql`
+    SELECT 1 AS "matched"
+    FROM "UserBadge" user_badge
+    INNER JOIN "Badge" badge ON badge."id" = user_badge."badgeId"
+    INNER JOIN "PointEffectRule" effect ON effect."badgeId" = badge."id"
+    WHERE
+      user_badge."userId" = ${userId}
+      AND user_badge."isDisplayed" = true
+      AND badge."status" = true
+      AND effect."status" = true
+      AND ${scopeKey} = ANY(effect."scopeKeys")
+    LIMIT 1
+  `)
+
+  return rows.length > 0
 }

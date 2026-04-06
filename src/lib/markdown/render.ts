@@ -23,6 +23,14 @@ interface MarkdownHeadingToken {
 }
 
 const CALLOUT_TYPES = ["info", "tip", "warning", "danger", "success"] as const
+const CALLOUT_ICON_SYMBOLS: Record<CalloutType, string> = {
+  info: "i",
+  tip: "✦",
+  warning: "!",
+  danger: "×",
+  success: "✓",
+}
+
 const ALLOWED_MARKDOWN_HTML_ALIGNMENTS = new Set(["left", "center", "right", "justify"])
 const ALLOWED_MARKDOWN_HTML_INLINE_TAGS = new Set(["ruby", "rt", "rp", "span"])
 const RUBY_SYNTAX_PATTERN = /\[([^\]\n]+)\](?:\^\(([^)\n]+)\)|\{([^}\n]+)\})/g
@@ -33,6 +41,8 @@ const HTML_CODE_BLOCK_TAG_LINE_PATTERN = /^\s*(?:<!doctype[^>]*>|<!--.*?-->|<\/?
 const HTML_CODE_BLOCK_INLINE_TAG_PATTERN = /^\s*<([a-zA-Z][\w:-]*)(?:\s+[^>]*)?>.*<\/\1>\s*$/i
 
 type CalloutType = (typeof CALLOUT_TYPES)[number]
+const MARKDOWN_RENDERER_CACHE_LIMIT = 8
+const markdownRendererCache = new Map<string, MarkdownIt>()
 
 function slugify(text: string) {
   return text
@@ -107,7 +117,24 @@ function renderMediaToken(token: string) {
 
 function parseContainerTitle(info: string, type: CalloutType) {
   const suffix = info.slice(type.length).trim()
-  return suffix || type.toUpperCase()
+  return suffix || ""
+}
+
+function getCalloutTypeTitle(type: CalloutType) {
+  switch (type) {
+    case "info":
+      return "说明"
+    case "tip":
+      return "技巧"
+    case "warning":
+      return "注意"
+    case "danger":
+      return "危险"
+    case "success":
+      return "成功"
+    default:
+      return ""
+  }
 }
 
 function applyMarkdownEmojiShortcodes(input: string, emojiItems: MarkdownEmojiItem[]) {
@@ -412,8 +439,9 @@ function createMarkdownRenderer(emojiItems: MarkdownEmojiItem[]) {
       render(tokens: Array<{ info: string; nesting: number }>, index: number) {
         const token = tokens[index]
         if (token.nesting === 1) {
-          const title = escapeHtml(parseContainerTitle(token.info, calloutType))
-          return `<div class="md-callout md-callout-${calloutType}"><div class="md-callout-title">${title}</div><div class="md-callout-body">`
+          const iconSymbol = CALLOUT_ICON_SYMBOLS[calloutType]
+          const title = escapeHtml(parseContainerTitle(token.info, calloutType) || getCalloutTypeTitle(calloutType))
+          return `<div class="md-callout md-callout-${calloutType} relative my-6 overflow-hidden rounded-[24px] border px-4 py-4"><div class="md-callout-head"><span class="md-callout-icon" aria-hidden="true">${iconSymbol}</span><div class="md-callout-title">${title}</div></div><div class="md-callout-body">`
         }
 
         return "</div></div>"
@@ -447,8 +475,29 @@ function createMarkdownRenderer(emojiItems: MarkdownEmojiItem[]) {
   return md
 }
 
-export function renderMarkdown(input: string, emojiItems: MarkdownEmojiItem[]) {
+function getMarkdownRenderer(emojiItems: MarkdownEmojiItem[]) {
+  const cacheKey = JSON.stringify(emojiItems)
+  const cached = markdownRendererCache.get(cacheKey)
+
+  if (cached) {
+    return cached
+  }
+
   const markdown = createMarkdownRenderer(emojiItems)
+  markdownRendererCache.set(cacheKey, markdown)
+
+  if (markdownRendererCache.size > MARKDOWN_RENDERER_CACHE_LIMIT) {
+    const oldestKey = markdownRendererCache.keys().next().value
+    if (oldestKey) {
+      markdownRendererCache.delete(oldestKey)
+    }
+  }
+
+  return markdown
+}
+
+export function renderMarkdown(input: string, emojiItems: MarkdownEmojiItem[]) {
+  const markdown = getMarkdownRenderer(emojiItems)
   const normalizedInput = renderWavySyntax(renderRubySyntax(wrapHtmlDocumentBlocks(renderUserLinkTokens(input))))
   const sanitizedInput = sanitizeMarkdownInlineHtml(normalizedInput)
   const lines = sanitizedInput.split("\n")
@@ -483,9 +532,9 @@ export function renderMarkdown(input: string, emojiItems: MarkdownEmojiItem[]) {
     .replace(/<p align="left">/g, '<p align="left" class="my-3 leading-7 text-left text-foreground">')
     .replace(/<p align="center">/g, '<p align="center" class="my-3 leading-7 text-center text-foreground">')
     .replace(/<p align="right">/g, '<p align="right" class="my-3 leading-7 text-right text-foreground">')
-    .replace(/<ul>/g, '<ul class="my-4 list-disc space-y-2 pl-6 text-foreground">')
-    .replace(/<ol>/g, '<ol class="my-4 list-decimal space-y-2 pl-6 text-foreground">')
-    .replace(/<li>/g, '<li class="leading-7">')
+    .replace(/<ul>/g, '<ul class="md-list md-list-unordered">')
+    .replace(/<ol>/g, '<ol class="md-list md-list-ordered">')
+    .replace(/<li>/g, '<li class="md-list-item">')
     .replace(/<a /g, '<a class="font-medium text-primary underline underline-offset-4 break-all" target="_blank" rel="noreferrer nofollow ugc" ')
     .replace(/<strong>/g, '<strong class="font-semibold text-foreground">')
     .replace(/<em>/g, '<em class="italic text-foreground">')
@@ -523,9 +572,8 @@ export function renderMarkdown(input: string, emojiItems: MarkdownEmojiItem[]) {
     .replace(/<ol class="footnotes-list">/g, '<ol class="footnotes-list list-decimal space-y-2 pl-6 text-sm text-muted-foreground">')
     .replace(/<a class="footnote-ref"/g, '<a class="footnote-ref align-super text-[0.7em] text-primary no-underline"')
     .replace(/<a class="footnote-backref"/g, '<a class="footnote-backref ml-1 text-primary no-underline"')
+    .replace(/<ul class="contains-task-list">/g, '<ul class="md-list md-task-list contains-task-list">')
     .replace(/<input class="task-list-item-checkbox" /g, '<input class="task-list-item-checkbox mr-2 mt-1 size-4 rounded border-border accent-primary" disabled ')
     .replace(/<li class="task-list-item">/g, '<li class="task-list-item flex items-start gap-2 leading-7">')
-    .replace(/<div class="md-callout/g, '<div class="my-5 rounded-2xl border p-4 shadow-sm md-callout')
-    .replace(/<div class="md-callout-title">/g, '<div class="mb-2 text-sm font-semibold uppercase tracking-[0.2em]">')
-    .replace(/<div class="md-callout-body">/g, '<div class="space-y-3 text-sm leading-7">')
+    .replace(/<li class="task-list-item enabled">/g, '<li class="task-list-item enabled flex items-start gap-2 leading-7">')
 }

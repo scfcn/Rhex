@@ -4,6 +4,7 @@ import { findFollowRecord } from "@/db/follow-queries"
 import { resolvePagination } from "@/db/helpers"
 import { countBoardNormalPosts, findBoardNormalPosts, findBoardPinnedPosts, findZoneBoardIdsById } from "@/db/taxonomy-queries"
 import { resolveBoardSettings } from "@/lib/board-settings"
+import { resolvePostListLoadMode, type PostListLoadMode } from "@/lib/post-list-load-mode"
 import { resolvePostListDisplayMode, type PostListDisplayMode } from "@/lib/post-list-display"
 import { dedupeAndMapPinnedPosts, extractPinnedPostIds } from "@/lib/pinned-posts"
 import { mapListPost } from "@/lib/post-map"
@@ -34,6 +35,7 @@ export interface SiteBoardItem {
   minPostVipLevel?: number
   minReplyVipLevel?: number
   postListDisplayMode: PostListDisplayMode
+  postListLoadMode: PostListLoadMode
 }
 
 
@@ -65,6 +67,7 @@ const getCachedBoards = cache(async (): Promise<SiteBoardItem[]> => {
       minPostVipLevel: settings.minPostVipLevel,
       minReplyVipLevel: settings.minReplyVipLevel,
       postListDisplayMode: resolvePostListDisplayMode(board.zone?.postListDisplayMode, board.postListDisplayMode),
+      postListLoadMode: resolvePostListLoadMode(board.zone?.postListLoadMode, board.postListLoadMode),
     }
   })
 })
@@ -108,6 +111,7 @@ const getCachedBoardBySlug = cache(async (slug: string): Promise<SiteBoardItem |
     minReplyVipLevel: settings.minReplyVipLevel,
     requirePostReview: settings.requirePostReview,
     postListDisplayMode: resolvePostListDisplayMode(board.zone?.postListDisplayMode, board.postListDisplayMode),
+    postListLoadMode: resolvePostListLoadMode(board.zone?.postListLoadMode, board.postListLoadMode),
   }
 })
 

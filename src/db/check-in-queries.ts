@@ -1,5 +1,8 @@
 import { prisma } from "@/db/client"
 import { withDbTransaction } from "@/db/helpers"
+import { syncUserCheckInProgress } from "@/db/level-system-queries"
+import { calculateCheckInStreakSummary } from "@/lib/check-in-streak"
+import { getLocalDateKey } from "@/lib/date-key"
 import { applyPointDelta, type PreparedPointDelta } from "@/lib/point-center"
 
 export interface UserCheckInCalendarEntryRow {
@@ -18,6 +21,12 @@ export interface ExecuteUserCheckInParams {
   pointName: string
   makeUpCost: number
   makeUpCostDelta: PreparedPointDelta
+  isMakeUp: boolean
+  makeUpCountsTowardStreak: boolean
+}
+
+export interface UserCheckInStreakEntryRow {
+  checkedInOn: string
   isMakeUp: boolean
 }
 
@@ -118,6 +127,37 @@ export async function executeUserCheckIn(params: ExecuteUserCheckInParams): Prom
       pointBalanceCursor = rewardResult.afterBalance
     }
 
+    const streakEntries = await tx.userCheckInLog.findMany({
+      where: { userId: dbUser.id },
+      orderBy: [{ checkedInOn: "asc" }],
+      select: {
+        checkedInOn: true,
+        isMakeUp: true,
+      },
+    })
+    const streakSummary = calculateCheckInStreakSummary(streakEntries, {
+      includeMakeUps: params.makeUpCountsTowardStreak,
+      todayKey: getLocalDateKey(),
+    })
+
+    await syncUserCheckInProgress(dbUser.id, {
+      checkInDays: streakEntries.length,
+      currentCheckInStreak: streakSummary.currentStreak,
+      maxCheckInStreak: streakSummary.maxStreak,
+      lastCheckInDate: streakSummary.lastCheckInDate,
+    }, tx)
+
     return { alreadyCheckedIn: false, points: pointBalanceCursor }
+  })
+}
+
+export async function listUserCheckInStreakEntries(userId: number): Promise<UserCheckInStreakEntryRow[]> {
+  return prisma.userCheckInLog.findMany({
+    where: { userId },
+    orderBy: [{ checkedInOn: "asc" }],
+    select: {
+      checkedInOn: true,
+      isMakeUp: true,
+    },
   })
 }

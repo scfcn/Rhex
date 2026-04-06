@@ -1,3 +1,5 @@
+"use client"
+
 import Image from "next/image"
 
 import { Tooltip } from "@/components/ui/tooltip"

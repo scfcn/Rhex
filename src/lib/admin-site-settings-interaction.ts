@@ -4,9 +4,13 @@ import { apiError, readOptionalNumberField, readOptionalStringField, type JsonOb
 import { finalizeSiteSettingsUpdate, type SiteSettingsRecord } from "@/lib/admin-site-settings-shared"
 import {
   mergeCommentAccessSettings,
+  mergeHomeHotFeedSettings,
   mergeInteractionGateSettings,
   mergePostJackpotSettings,
+  mergePostRedPacketSettings,
+  resolveHomeHotFeedSettings,
   resolvePostJackpotSettings,
+  resolvePostRedPacketSettings,
 } from "@/lib/site-settings-app-state"
 import { normalizeHeatColors, normalizeHeatThresholds, normalizeTippingAmounts } from "@/lib/shared/normalizers"
 import { getDefaultTippingGiftItemsFromAmounts, normalizeTippingGiftItems } from "@/lib/tipping-gifts"
@@ -30,6 +34,17 @@ export async function updateInteractionSiteSettingsSection(existing: SiteSetting
     const postRedPacketEnabled = Boolean(body.postRedPacketEnabled)
     const postRedPacketMaxPoints = Math.max(1, readOptionalNumberField(body, "postRedPacketMaxPoints") ?? 1)
     const postRedPacketDailyLimit = Math.max(1, readOptionalNumberField(body, "postRedPacketDailyLimit") ?? 1)
+    const existingPostRedPacketSettings = resolvePostRedPacketSettings({
+      appStateJson: existing.appStateJson,
+      randomClaimProbabilityFallback: 0,
+    })
+    const postRedPacketRandomClaimProbability = Math.max(
+      0,
+      Math.min(
+        100,
+        readOptionalNumberField(body, "postRedPacketRandomClaimProbability") ?? existingPostRedPacketSettings.randomClaimProbability,
+      ),
+    )
     const existingPostJackpotSettings = resolvePostJackpotSettings({
       appStateJson: existing.appStateJson,
       enabledFallback: false,
@@ -50,6 +65,14 @@ export async function updateInteractionSiteSettingsSection(existing: SiteSetting
     const heatLikeWeight = Math.max(0, readOptionalNumberField(body, "heatLikeWeight") ?? 0)
     const heatTipCountWeight = Math.max(0, readOptionalNumberField(body, "heatTipCountWeight") ?? 0)
     const heatTipPointsWeight = Math.max(0, readOptionalNumberField(body, "heatTipPointsWeight") ?? 0)
+    const existingHomeHotFeedSettings = resolveHomeHotFeedSettings({
+      appStateJson: existing.appStateJson,
+      recentWindowHoursFallback: 72,
+    })
+    const homeHotRecentWindowHours = Math.min(
+      720,
+      Math.max(1, readOptionalNumberField(body, "homeHotRecentWindowHours") ?? existingHomeHotFeedSettings.recentWindowHours),
+    )
     const heatStageThresholds = normalizeHeatThresholds(body.heatStageThresholds)
     const heatStageColors = normalizeHeatColors(body.heatStageColors)
 
@@ -85,12 +108,18 @@ export async function updateInteractionSiteSettingsSection(existing: SiteSetting
       },
     })
 
-    const appStateJson = mergePostJackpotSettings(appStateWithInteractionGates, {
+    const appStateWithJackpot = mergePostJackpotSettings(appStateWithInteractionGates, {
       enabled: postJackpotEnabled,
       minInitialPoints: postJackpotMinInitialPoints,
       maxInitialPoints: postJackpotMaxInitialPoints,
       replyIncrementPoints: postJackpotReplyIncrementPoints,
       hitProbability: postJackpotHitProbability,
+    })
+    const appStateWithHomeHotFeed = mergeHomeHotFeedSettings(appStateWithJackpot, {
+      recentWindowHours: homeHotRecentWindowHours,
+    })
+    const appStateJson = mergePostRedPacketSettings(appStateWithHomeHotFeed, {
+      randomClaimProbability: postRedPacketRandomClaimProbability,
     })
 
     if (heatStageThresholds.length !== 9) {
@@ -144,4 +173,3 @@ export async function updateInteractionSiteSettingsSection(existing: SiteSetting
 
   return null
 }
-

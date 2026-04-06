@@ -164,7 +164,8 @@ function matchesPointEffectRule(params: {
     return true
   }
 
-  return rule.scopeKeys.includes(getPointEffectAllScopeKeyByTargetType(targetType))
+  const allScopeKey = getPointEffectAllScopeKeyByTargetType(targetType)
+  return allScopeKey ? rule.scopeKeys.includes(allScopeKey) : false
 }
 
 function resolveRuleRawAdjustment(rule: PointEffectRuleItem, currentValue: number) {

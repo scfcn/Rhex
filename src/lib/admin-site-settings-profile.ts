@@ -6,8 +6,9 @@ import {
 import { apiError, readOptionalNumberField, readOptionalStringField, type JsonObject } from "@/lib/api-route"
 import { finalizeSiteSettingsUpdate, type SiteSettingsRecord } from "@/lib/admin-site-settings-shared"
 import { normalizeMarkdownEmojiItems, serializeMarkdownEmojiItems } from "@/lib/markdown-emoji"
+import { normalizePostListLoadMode } from "@/lib/post-list-load-mode"
 import { normalizePostListDisplayMode } from "@/lib/post-list-display"
-import { mergeHomeSidebarAnnouncementSettings, resolveHomeSidebarAnnouncementSettings } from "@/lib/site-settings-app-state"
+import { mergeHomeFeedPostListLoadSettings, mergeHomeSidebarAnnouncementSettings, mergePostPageSizeSettings, resolveHomeFeedPostListLoadSettings, resolveHomeSidebarAnnouncementSettings, resolvePostPageSizeSettings } from "@/lib/site-settings-app-state"
 import { normalizeHeaderAppIconName, normalizeSiteHeaderAppLinks } from "@/lib/site-header-app-links"
 import { mergeSiteSearchSettings, resolveSiteSearchSettings } from "@/lib/site-search-settings"
 import { normalizeFooterLinks } from "@/lib/shared/config-parsers"
@@ -31,10 +32,28 @@ export async function updateProfileSiteSettingsSection(existing: SiteSettingsRec
     const homeSidebarAnnouncementsEnabled = body.homeSidebarAnnouncementsEnabled === undefined
       ? existingHomeSidebarAnnouncementSettings.enabled
       : Boolean(body.homeSidebarAnnouncementsEnabled)
+    const existingHomeFeedPostListLoadSettings = resolveHomeFeedPostListLoadSettings({
+      appStateJson: existing.appStateJson,
+      loadModeFallback: normalizePostListLoadMode(undefined),
+    })
+    const homeFeedPostListLoadMode = normalizePostListLoadMode(body.homeFeedPostListLoadMode, existingHomeFeedPostListLoadSettings.loadMode)
     const postEditableMinutes = Math.max(0, readOptionalNumberField(body, "postEditableMinutes") ?? 10)
     const commentEditableMinutes = Math.max(0, readOptionalNumberField(body, "commentEditableMinutes") ?? 5)
     const existingSearchSettings = resolveSiteSearchSettings(existing.appStateJson)
     const searchEnabled = body.searchEnabled === undefined ? existingSearchSettings.enabled : Boolean(body.searchEnabled)
+    const existingPostPageSizeSettings = resolvePostPageSizeSettings({
+      appStateJson: existing.appStateJson,
+      homeFeedFallback: 35,
+      zonePostsFallback: 20,
+      boardPostsFallback: 20,
+      hotTopicsFallback: 5,
+      postRelatedTopicsFallback: 5,
+    })
+    const homeFeedPostPageSize = Math.min(100, Math.max(1, readOptionalNumberField(body, "homeFeedPostPageSize") ?? existingPostPageSizeSettings.homeFeed))
+    const zonePostPageSize = Math.min(100, Math.max(1, readOptionalNumberField(body, "zonePostPageSize") ?? existingPostPageSizeSettings.zonePosts))
+    const boardPostPageSize = Math.min(100, Math.max(1, readOptionalNumberField(body, "boardPostPageSize") ?? existingPostPageSizeSettings.boardPosts))
+    const homeSidebarHotTopicsCount = Math.min(30, Math.max(1, readOptionalNumberField(body, "homeSidebarHotTopicsCount") ?? existingPostPageSizeSettings.hotTopics))
+    const postSidebarRelatedTopicsCount = Math.min(30, Math.max(1, readOptionalNumberField(body, "postSidebarRelatedTopicsCount") ?? existingPostPageSizeSettings.postRelatedTopics))
 
     if (!siteName || !siteDescription) {
       apiError(400, "站点名称和描述不能为空")
@@ -44,7 +63,19 @@ export async function updateProfileSiteSettingsSection(existing: SiteSettingsRec
       enabled: homeSidebarAnnouncementsEnabled,
     })
 
-    const appStateJson = mergeSiteSearchSettings(appStateWithHomeSidebarAnnouncement, {
+    const appStateWithPostPageSizes = mergePostPageSizeSettings(appStateWithHomeSidebarAnnouncement, {
+      homeFeed: homeFeedPostPageSize,
+      zonePosts: zonePostPageSize,
+      boardPosts: boardPostPageSize,
+      hotTopics: homeSidebarHotTopicsCount,
+      postRelatedTopics: postSidebarRelatedTopicsCount,
+    })
+
+    const appStateWithHomeFeedPostListLoadMode = mergeHomeFeedPostListLoadSettings(appStateWithPostPageSizes, {
+      loadMode: homeFeedPostListLoadMode,
+    })
+
+    const appStateJson = mergeSiteSearchSettings(appStateWithHomeFeedPostListLoadMode, {
       enabled: searchEnabled,
       externalEngines: existingSearchSettings.externalEngines,
     })

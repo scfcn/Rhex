@@ -18,4 +18,5 @@ export interface PostRewardPoolEffectFeedback {
   badgeColor: string | null
   badges?: PostRewardPoolEffectFeedbackBadge[]
   events: PostRewardPoolEffectFeedbackEvent[]
+  jackpotDepositPoints?: number
 }

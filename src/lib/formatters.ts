@@ -1,5 +1,6 @@
 const BUSINESS_TIME_ZONE = "Asia/Shanghai"
 const BUSINESS_TIME_ZONE_OFFSET_MINUTES = 8 * 60
+const NUMBER_FORMATTER = new Intl.NumberFormat("zh-CN")
 
 type SupportedDateInput = string | Date
 
@@ -264,6 +265,10 @@ export function formatRelativeTime(input: SupportedDateInput, locale = "zh-CN") 
 
 export function formatBusinessMonthDayTime(input: SupportedDateInput, locale = "zh-CN") {
   return formatMonthDayTime(input, locale)
+}
+
+export function formatNumber(value: number) {
+  return NUMBER_FORMATTER.format(value)
 }
 
 export { BUSINESS_TIME_ZONE }

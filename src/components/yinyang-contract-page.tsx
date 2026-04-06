@@ -8,6 +8,7 @@ import { toast } from "@/components/ui/toast"
 import { useContentSafety } from "@/hooks/use-content-safety"
 import type { YinYangChallengeCard, YinYangLobbyData, YinYangLeaderboardUser } from "@/lib/yinyang-contract"
 
+import { formatNumber } from "@/lib/formatters"
 import { formatYinYangChallengeTime } from "@/lib/yinyang-contract"
 
 type ApiResponse<T> = { code: number; message?: string; data?: T }
@@ -112,9 +113,9 @@ export function YinYangContractPage({ initialData, canPlay }: YinYangContractPag
       if (action === "accept") {
         setSelectedChallenge(null)
         if (pointsDelta > 0) {
-          setResultFx({ type: "win", title: "挑战胜利", detail: `本局净赚 ${pointsDelta} ${result.data.summary.pointName}` })
+          setResultFx({ type: "win", title: "挑战胜利", detail: `本局净赚 ${formatNumber(pointsDelta)} ${result.data.summary.pointName}` })
         } else if (pointsDelta < 0) {
-          setResultFx({ type: "lose", title: "挑战失利", detail: `本局亏损 ${Math.abs(pointsDelta)} ${result.data.summary.pointName}` })
+          setResultFx({ type: "lose", title: "挑战失利", detail: `本局亏损 ${formatNumber(Math.abs(pointsDelta))} ${result.data.summary.pointName}` })
         }
       }
 
@@ -222,12 +223,12 @@ export function YinYangContractPage({ initialData, canPlay }: YinYangContractPag
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
               <div className="grid grid-cols-2 gap-3">
-                <StatCard label="当前积分" value={`${data.summary.points} ${data.summary.pointName}`} />
+                <StatCard label="当前积分" value={`${formatNumber(data.summary.points)} ${data.summary.pointName}`} />
                 <StatCard label="胜 / 负" value={`${data.summary.winCount} / ${data.summary.loseCount}`} />
-                <StatCard label="今日盈利" value={`${data.summary.todayProfitPoints}`} tone="green" />
-                <StatCard label="今日亏损" value={`${data.summary.todayLossPoints}`} tone="red" />
-                <StatCard label="总盈利" value={`${data.summary.totalProfitPoints}`} tone="green" />
-                <StatCard label="总亏损" value={`${data.summary.totalLossPoints}`} tone="red" />
+                <StatCard label="今日盈利" value={formatNumber(data.summary.todayProfitPoints)} tone="green" />
+                <StatCard label="今日亏损" value={formatNumber(data.summary.todayLossPoints)} tone="red" />
+                <StatCard label="总盈利" value={formatNumber(data.summary.totalProfitPoints)} tone="green" />
+                <StatCard label="总亏损" value={formatNumber(data.summary.totalLossPoints)} tone="red" />
               </div>
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <Button type="button" variant="outline" className="rounded-full" onClick={() => setWinnerLeaderboardOpen(true)}>赢家排行榜</Button>
@@ -282,7 +283,7 @@ function ChallengeListItem({ challenge, pointName, isMine, onOpen }: {
           <div className="mt-1 text-xs text-muted-foreground">发起人：{challenge.creatorName} · {formatYinYangChallengeTime(challenge.createdAt)}</div>
         </div>
         <div className="flex flex-col items-end gap-2">
-          <div className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">彩头 {challenge.stakePoints} {pointName}</div>
+          <div className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">彩头 {formatNumber(challenge.stakePoints)} {pointName}</div>
           <span className={`text-xs ${isMine ? "text-amber-600" : "text-muted-foreground"}`}>{isMine ? "这是你发起的挑战" : "点击进入应战"}</span>
         </div>
       </div>
@@ -376,8 +377,8 @@ function ChallengeAcceptModal({ challenge, pointName, disabled, onClose, onAccep
           <div className="font-medium text-foreground">{challenge.question}</div>
           <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
             <span>发起人：{challenge.creatorName}</span>
-            <span>彩头：{challenge.stakePoints} {pointName}</span>
-            <span>奖励：{challenge.rewardPoints} {pointName}</span>
+            <span>彩头：{formatNumber(challenge.stakePoints)} {pointName}</span>
+            <span>奖励：{formatNumber(challenge.rewardPoints)} {pointName}</span>
           </div>
         </div>
         <div className="grid gap-3">
@@ -411,8 +412,8 @@ function RecentChallengesModal({ open, challenges, onClose, currentUserId }: { o
               <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
                 <span>对方：{opponentName}</span>
                 <span>状态：{resolveStatusText(challenge.status)}</span>
-                <span>彩头：{challenge.stakePoints}</span>
-                <span>奖励：{challenge.rewardPoints}</span>
+                <span>彩头：{formatNumber(challenge.stakePoints)}</span>
+                <span>奖励：{formatNumber(challenge.rewardPoints)}</span>
                 {challenge.selectedOption ? <span>应战选择：{challenge.selectedOption}</span> : null}
                 {challenge.correctOption ? <span>正确答案：{challenge.correctOption}</span> : null}
               </div>

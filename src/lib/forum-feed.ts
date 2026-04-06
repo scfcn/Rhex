@@ -143,7 +143,13 @@ function mapFeedPost(post: FeedPostRecord | PinnedFeedPostRecord): ForumFeedItem
   }
 }
 
-export async function getLatestFeed(page = 1, pageSize = 20, sort: FeedSort = "latest", currentUserId?: number): Promise<ForumFeedPageResult> {
+export async function getLatestFeed(
+  page = 1,
+  pageSize = 20,
+  sort: FeedSort = "latest",
+  currentUserId?: number,
+  hotRecentWindowHours = 72,
+): Promise<ForumFeedPageResult> {
   if (sort === "following") {
     if (!currentUserId) {
       return {
@@ -173,7 +179,7 @@ export async function getLatestFeed(page = 1, pageSize = 20, sort: FeedSort = "l
 
     const total = await countFollowingFeedPosts({ boardIds, authorIds })
     const pagination = resolvePagination({ page, pageSize }, total, [pageSize], pageSize)
-    const posts = await findFollowingFeedPosts(pagination.page, pagination.pageSize, sort, { boardIds, authorIds })
+    const posts = await findFollowingFeedPosts(pagination.page, pagination.pageSize, sort, { boardIds, authorIds }, hotRecentWindowHours)
 
     return {
       items: posts.map((post) => mapFeedPost(post)),
@@ -190,7 +196,7 @@ export async function getLatestFeed(page = 1, pageSize = 20, sort: FeedSort = "l
   const pinnedPostIds = extractPinnedPostIds(globalPinnedPosts)
   const total = await countLatestFeedPosts(pinnedPostIds)
   const pagination = resolvePagination({ page, pageSize }, total, [pageSize], pageSize)
-  const normalPosts = await findLatestFeedPosts(pagination.page, pagination.pageSize, sort, pinnedPostIds)
+  const normalPosts = await findLatestFeedPosts(pagination.page, pagination.pageSize, sort, pinnedPostIds, hotRecentWindowHours)
 
   return {
     items: pagination.page === 1

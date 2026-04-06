@@ -74,6 +74,7 @@ export function findManagedPostContext(postId: string) {
     where: { id: postId },
     select: {
       id: true,
+      title: true,
       slug: true,
       authorId: true,
       status: true,

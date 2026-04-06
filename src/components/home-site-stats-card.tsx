@@ -1,12 +1,11 @@
 import { BarChart3 } from "lucide-react"
 
 import type { HomeSidebarStatsData } from "@/lib/home-sidebar-stats"
+import { formatNumber } from "@/lib/formatters"
 
 interface HomeSiteStatsCardProps {
   stats: HomeSidebarStatsData
 }
-
-const numberFormatter = new Intl.NumberFormat("zh-CN")
 
 export function HomeSiteStatsCard({ stats }: HomeSiteStatsCardProps) {
   const items = [
@@ -25,7 +24,7 @@ export function HomeSiteStatsCard({ stats }: HomeSiteStatsCardProps) {
         {items.map((item) => (
           <div key={item.label} className="rounded-[18px] bg-secondary/40 px-3 py-3 text-center">
             <p className="text-[11px] text-muted-foreground">{item.label}</p>
-            <p className="mt-1 text-base font-semibold text-foreground sm:text-lg">{numberFormatter.format(item.value)}</p>
+            <p className="mt-1 text-base font-semibold text-foreground sm:text-lg">{formatNumber(item.value)}</p>
           </div>
         ))}
       </div>

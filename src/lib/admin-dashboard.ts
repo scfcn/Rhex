@@ -103,6 +103,7 @@ export interface AdminStructureData {
     minReplyVipLevel: number
     requirePostReview: boolean
     postListDisplayMode: string | null
+    postListLoadMode: string | null
     canEditSettings: boolean
   }>
   boardStatus: Array<{
@@ -135,6 +136,7 @@ export interface AdminStructureData {
     minReplyVipLevel: number | null
     requirePostReview: boolean | null
     postListDisplayMode: string | null
+    postListLoadMode: string | null
     canEditSettings: boolean
   }>
   permissions: {
@@ -188,10 +190,25 @@ export function mapAdminDashboardData(data: AdminDashboardRawData): AdminDashboa
 }
 
 export function mapAdminStructureData(data: AdminStructureRawData, actor: AdminActor): AdminStructureData {
+  const boardsByZoneId = new Map<string, Array<(typeof data.boards)[number]>>()
+  for (const board of data.boards) {
+    if (!board.zoneId) {
+      continue
+    }
+
+    const current = boardsByZoneId.get(board.zoneId) ?? []
+    current.push(board)
+    boardsByZoneId.set(board.zoneId, current)
+  }
+
+  const todayBoardPostCountMap = new Map(
+    data.todayBoardPostStats.map((item) => [item.boardId, item._count.boardId]),
+  )
+
   return {
     zones: data.zones.map((zone) => {
       const settings = resolveBoardSettings(zone, null)
-      const relatedBoards = data.boards.filter((board) => board.zoneId === zone.id)
+      const relatedBoards = boardsByZoneId.get(zone.id) ?? []
 
       return {
         id: zone.id,
@@ -219,6 +236,7 @@ export function mapAdminStructureData(data: AdminStructureRawData, actor: AdminA
         minReplyVipLevel: settings.minReplyVipLevel,
         requirePostReview: settings.requirePostReview,
         postListDisplayMode: zone.postListDisplayMode ?? null,
+        postListLoadMode: zone.postListLoadMode ?? null,
         canEditSettings: canEditZoneSettings(actor, zone.id),
       }
     }),
@@ -230,7 +248,7 @@ export function mapAdminStructureData(data: AdminStructureRawData, actor: AdminA
       status: board.status,
       postCount: board.postCount,
       followerCount: board.followerCount,
-      todayPostCount: data.todayBoardPostStats.find((item) => item.boardId === board.id)?._count.boardId ?? 0,
+      todayPostCount: todayBoardPostCountMap.get(board.id) ?? 0,
       allowPost: board.allowPost,
       zoneId: board.zoneId ?? null,
       zoneName: board.zone?.name ?? null,
@@ -252,6 +270,7 @@ export function mapAdminStructureData(data: AdminStructureRawData, actor: AdminA
       minReplyVipLevel: board.minReplyVipLevel ?? null,
       requirePostReview: board.requirePostReview ?? null,
       postListDisplayMode: board.postListDisplayMode ?? null,
+      postListLoadMode: board.postListLoadMode ?? null,
       canEditSettings: canEditBoardSettings(actor, board.id, board.zoneId),
     })),
     permissions: {

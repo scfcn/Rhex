@@ -1,6 +1,8 @@
+import { revalidateTag } from "next/cache"
+
 import { findSiteSettingsRecordForUpdate } from "@/db/site-settings-write-queries"
 
-import { invalidateSiteSettingsCache } from "@/lib/site-settings"
+import { SITE_SETTINGS_CACHE_TAG } from "@/lib/site-settings"
 
 export type SiteSettingsRecord = NonNullable<Awaited<ReturnType<typeof findSiteSettingsRecordForUpdate>>>
 
@@ -10,8 +12,11 @@ export interface SiteSettingsSectionUpdateResult {
   revalidatePaths?: string[]
 }
 
-export function finalizeSiteSettingsUpdate(result: SiteSettingsSectionUpdateResult) {
-  invalidateSiteSettingsCache()
-  return result
+export function revalidateSiteSettingsCache() {
+  revalidateTag(SITE_SETTINGS_CACHE_TAG, "max")
 }
 
+export function finalizeSiteSettingsUpdate(result: SiteSettingsSectionUpdateResult) {
+  revalidateSiteSettingsCache()
+  return result
+}

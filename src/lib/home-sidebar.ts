@@ -1,12 +1,30 @@
 import type { SidebarUserCardData } from "@/components/sidebar-user-card"
 import { countSidebarUserBoardFollows, countSidebarUserFavorites, findHomeSidebarHotTopics, findSidebarCurrentUser, findSidebarUserCheckInRecord } from "@/db/home-sidebar-queries"
 import type { getCurrentUser } from "@/lib/auth"
+import { getUserCheckInStreakSummary } from "@/lib/check-in-streak-service"
 import { getLocalDateKey } from "@/lib/date-key"
 import { formatMonthDayTime } from "@/lib/formatters"
 import { getLevelBadgeData } from "@/lib/level-badge"
 import type { SiteSettingsData } from "@/lib/site-settings"
 import { getUserDisplayName } from "@/lib/users"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
+
+function hasPersistedCheckInStreakSummary(progress: {
+  checkInDays: number
+  currentCheckInStreak: number
+  maxCheckInStreak: number
+  lastCheckInDate: string | null
+} | null | undefined) {
+  if (!progress) {
+    return false
+  }
+
+  if (progress.checkInDays === 0) {
+    return true
+  }
+
+  return progress.maxCheckInStreak > 0 || progress.lastCheckInDate !== null
+}
 
 export async function getHomeSidebarHotTopics(limit = 5) {
   const posts = await findHomeSidebarHotTopics(limit)
@@ -24,6 +42,7 @@ export async function getHomeSidebarHotTopics(limit = 5) {
 
 export async function getSidebarCurrentUserStats(username: string) {
   const user = await findSidebarCurrentUser(username)
+  const todayKey = getLocalDateKey()
 
   if (!user) {
     return {
@@ -34,13 +53,21 @@ export async function getSidebarCurrentUserStats(username: string) {
       receivedLikeCount: 0,
       points: 0,
       checkedInToday: false,
+      currentCheckInStreak: 0,
+      maxCheckInStreak: 0,
     }
   }
 
+  const streakSummary = hasPersistedCheckInStreakSummary(user.levelProgress)
+    ? {
+        currentStreak: user.levelProgress?.currentCheckInStreak ?? 0,
+        maxStreak: user.levelProgress?.maxCheckInStreak ?? 0,
+      }
+    : await getUserCheckInStreakSummary(user.id)
   const [boardCount, favoriteCount, checkInRecord] = await Promise.all([
     countSidebarUserBoardFollows(user.id),
     countSidebarUserFavorites(user.id),
-    findSidebarUserCheckInRecord(user.id, getLocalDateKey()),
+    findSidebarUserCheckInRecord(user.id, todayKey),
   ])
 
   return {
@@ -51,6 +78,8 @@ export async function getSidebarCurrentUserStats(username: string) {
     receivedLikeCount: user.likeReceivedCount,
     points: user.points,
     checkedInToday: Boolean(checkInRecord),
+    currentCheckInStreak: streakSummary.currentStreak,
+    maxCheckInStreak: streakSummary.maxStreak,
   }
 }
 
@@ -99,7 +128,10 @@ export async function buildSidebarUser(user: SidebarUserSource, stats: SidebarUs
     checkInVip1MakeUpCardPrice: settings.checkInVip1MakeUpCardPrice,
     checkInVip2MakeUpCardPrice: settings.checkInVip2MakeUpCardPrice,
     checkInVip3MakeUpCardPrice: settings.checkInVip3MakeUpCardPrice,
+    checkInMakeUpCountsTowardStreak: settings.checkInMakeUpCountsTowardStreak,
     checkedInToday: stats?.checkedInToday ?? false,
+    currentCheckInStreak: stats?.currentCheckInStreak ?? 0,
+    maxCheckInStreak: stats?.maxCheckInStreak ?? 0,
   }
 }
 
@@ -111,4 +143,3 @@ export async function resolveSidebarUser(user: SidebarUserSource, settings: Site
   const stats = await getSidebarCurrentUserStats(user.username)
   return buildSidebarUser(user, stats, settings)
 }
-

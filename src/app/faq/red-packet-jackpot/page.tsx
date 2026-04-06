@@ -31,6 +31,9 @@ export default async function RedPacketJackpotFaqPage() {
     `固定红包单个最高不能超过 ${settings.postRedPacketMaxPoints} ${settings.pointName}。`,
     `拼手气红包总额最高不能超过 ${settings.postRedPacketMaxPoints} ${settings.pointName}，且总积分不能小于份数。`,
     `同一发帖人每日发红包累计上限为 ${settings.postRedPacketDailyLimit} ${settings.pointName}。`,
+    settings.postRedPacketRandomClaimProbability > 0
+      ? `当红包使用“随机名额”模式时，当前触发用户的基础命中概率固定为 ${settings.postRedPacketRandomClaimProbability}%，未命中则本次无人领取。`
+      : "当红包使用“随机名额”模式时，当前触发用户的基础命中概率按候选人数均分。",
     "普通红包仍然遵循“一人一次”的领取逻辑，已经领过同一帖红包的用户不会再次领取。",
   ]
 

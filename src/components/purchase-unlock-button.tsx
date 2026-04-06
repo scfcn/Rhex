@@ -4,6 +4,7 @@ import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/toast"
+import { formatNumber } from "@/lib/formatters"
 
 
 interface PurchaseUnlockButtonProps {
@@ -43,7 +44,7 @@ export function PurchaseUnlockButton({ postId, blockId, price, pointName }: Purc
   return (
     <div className="space-y-3">
       <Button type="button" onClick={handlePurchase} disabled={loading}>
-        {loading ? "购买中..." : `使用 ${price} ${pointName} 解锁`}
+        {loading ? "购买中..." : `使用 ${formatNumber(price)} ${pointName} 解锁`}
       </Button>
     </div>
 

@@ -19,6 +19,7 @@ import { UserRecentRepliesList } from "@/components/user-recent-replies-list"
 import { UserBlockToggleButton } from "@/components/user-block-toggle-button"
 import { VerificationCenter } from "@/components/verification-center"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { formatNumber } from "@/lib/formatters"
 import { getPostPath } from "@/lib/post-links"
 import type { SettingsPageData } from "@/app/settings/settings-page-loader"
 import { followTabs, postManagementTabs, profileTabs } from "@/app/settings/settings-page-loader"
@@ -165,7 +166,7 @@ function InvitePanel({
             <p className="mt-1 text-sm text-muted-foreground">邀请人</p>
           </div>
           <div className="rounded-[20px] bg-secondary/60 p-4">
-            <p className="text-2xl font-semibold">{inviteRewardInviter}</p>
+            <p className="text-2xl font-semibold">{formatNumber(inviteRewardInviter)}</p>
             <p className="mt-1 text-sm text-muted-foreground">邀请成功可得 {pointName}</p>
           </div>
         </div>
@@ -383,6 +384,21 @@ function LevelPanel({ levelView, pointName }: { levelView: SettingsPageData["lev
         <StatCard title="累计回复" value={levelView.snapshot.commentCount} hint="公开回复数量" icon={<MessageSquareText className="h-4 w-4" />} />
         <StatCard title="累计获赞" value={levelView.snapshot.likeReceivedCount} hint="收到的点赞总数" icon={<Heart className="h-4 w-4" />} />
         <StatCard title="累计签到" value={levelView.snapshot.checkInDays} hint="已完成签到天数" icon={<CheckCircle2 className="h-4 w-4" />} />
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2">
+        <StatCard
+          title="当前连续签到"
+          value={levelView.snapshot.currentCheckInStreak}
+          hint={levelView.streakSettings.makeUpCountsTowardStreak ? "补签会计入连续签到" : "补签不会计入连续签到"}
+          icon={<Sparkles className="h-4 w-4" />}
+        />
+        <StatCard
+          title="最长连续签到"
+          value={levelView.snapshot.maxCheckInStreak}
+          hint="历史最佳连续签到纪录"
+          icon={<Crown className="h-4 w-4" />}
+        />
       </section>
 
       <Card>
@@ -905,11 +921,13 @@ function PointsPanel({ pointLogs, currentPoints, pointName }: { pointLogs: Setti
 
   return (
     <div className="space-y-4">
+            <RedeemCodeCard pointName={pointName} currentPoints={currentPoints} />
+
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle>{pointName}明细</CardTitle>
-            <span className="text-sm text-muted-foreground">当前余额：{currentPoints}</span>
+            <span className="text-sm text-muted-foreground">当前余额：{formatNumber(currentPoints)}</span>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -925,13 +943,13 @@ function PointsPanel({ pointLogs, currentPoints, pointName }: { pointLogs: Setti
                     <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(log.createdAt)}</p>
                     {typeof log.beforeBalance === "number" && typeof log.afterBalance === "number" ? (
                       <p className="mt-2 text-xs text-muted-foreground">
-                        更改前：{log.beforeBalance} · 更改后：{log.afterBalance}
+                        更改前：{formatNumber(log.beforeBalance)} · 更改后：{formatNumber(log.afterBalance)}
                       </p>
                     ) : null}
                   </div>
                   <span className={positive ? "rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-700" : "rounded-full bg-rose-100 px-3 py-1 text-sm font-medium text-rose-700"}>
                     {positive ? "+" : "-"}
-                    {log.changeValue}
+                    {formatNumber(log.changeValue)}
                   </span>
                 </div>
                 {log.pointEffect ? (
@@ -941,9 +959,9 @@ function PointsPanel({ pointLogs, currentPoints, pointName }: { pointLogs: Setti
                         <Sparkles className="h-3.5 w-3.5" />
                         勋章特效
                       </span>
-                      <span className="text-muted-foreground">初始：{log.pointEffect.baseValue}</span>
+                      <span className="text-muted-foreground">初始：{formatNumber(Number(log.pointEffect.baseValue) || 0)}</span>
                       <span className={String(log.pointEffect.deltaValue).startsWith("-") ? "text-rose-700" : "text-emerald-700"}>
-                        特效：{log.pointEffect.deltaValue}
+                        特效：{String(log.pointEffect.deltaValue).startsWith("-") ? "-" : "+"}{formatNumber(Math.abs(Number(log.pointEffect.deltaValue) || 0))}
                       </span>
                     </div>
                     {effectItems.length > 0 ? (
@@ -988,7 +1006,6 @@ function PointsPanel({ pointLogs, currentPoints, pointName }: { pointLogs: Setti
         </CardContent>
       </Card>
 
-      <RedeemCodeCard pointName={pointName} currentPoints={currentPoints} />
     </div>
   )
 }

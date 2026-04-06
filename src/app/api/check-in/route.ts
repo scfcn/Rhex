@@ -58,6 +58,8 @@ export const POST = createCustomRouteHandler(async ({ request, context: user }) 
     points: result.points,
     alreadyCheckedIn: result.alreadyCheckedIn,
     date: result.date,
+    currentStreak: result.currentStreak,
+    maxStreak: result.maxStreak,
     ...(typeof result.makeUpCost === "number" ? { makeUpCost: result.makeUpCost } : {}),
   }, result.message)
 }, {

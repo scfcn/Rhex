@@ -20,6 +20,7 @@ interface AdminVipSettingsFormProps {
     checkInVip1MakeUpCardPrice: number
     checkInVip2MakeUpCardPrice: number
     checkInVip3MakeUpCardPrice: number
+    checkInMakeUpCountsTowardStreak: boolean
     nicknameChangePointCost: number
     nicknameChangeVip1PointCost: number
     nicknameChangeVip2PointCost: number
@@ -63,6 +64,7 @@ export function AdminVipSettingsForm({ initialSettings }: AdminVipSettingsFormPr
   const [checkInVip1MakeUpCardPrice, setCheckInVip1MakeUpCardPrice] = useState(String(initialSettings.checkInVip1MakeUpCardPrice))
   const [checkInVip2MakeUpCardPrice, setCheckInVip2MakeUpCardPrice] = useState(String(initialSettings.checkInVip2MakeUpCardPrice))
   const [checkInVip3MakeUpCardPrice, setCheckInVip3MakeUpCardPrice] = useState(String(initialSettings.checkInVip3MakeUpCardPrice))
+  const [checkInMakeUpCountsTowardStreak, setCheckInMakeUpCountsTowardStreak] = useState(initialSettings.checkInMakeUpCountsTowardStreak)
   const [nicknameChangePointCost, setNicknameChangePointCost] = useState(String(initialSettings.nicknameChangePointCost))
   const [nicknameChangeVip1PointCost, setNicknameChangeVip1PointCost] = useState(String(initialSettings.nicknameChangeVip1PointCost))
   const [nicknameChangeVip2PointCost, setNicknameChangeVip2PointCost] = useState(String(initialSettings.nicknameChangeVip2PointCost))
@@ -112,6 +114,7 @@ export function AdminVipSettingsForm({ initialSettings }: AdminVipSettingsFormPr
             checkInVip1MakeUpCardPrice: Number(checkInVip1MakeUpCardPrice),
             checkInVip2MakeUpCardPrice: Number(checkInVip2MakeUpCardPrice),
             checkInVip3MakeUpCardPrice: Number(checkInVip3MakeUpCardPrice),
+            checkInMakeUpCountsTowardStreak,
             nicknameChangePointCost: Number(nicknameChangePointCost),
             nicknameChangeVip1PointCost: Number(nicknameChangeVip1PointCost),
             nicknameChangeVip2PointCost: Number(nicknameChangeVip2PointCost),
@@ -162,6 +165,7 @@ export function AdminVipSettingsForm({ initialSettings }: AdminVipSettingsFormPr
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <TextField label="积分名称" value={pointName} onChange={setPointName} placeholder="如 积分 / 金币 / 钻石" />
           <SwitchField label="签到开关" checked={checkInEnabled} onChange={setCheckInEnabled} />
+          <SwitchField label="补签计入连续签到" checked={checkInMakeUpCountsTowardStreak} onChange={setCheckInMakeUpCountsTowardStreak} />
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <TextField label="普通用户改昵称积分" value={nicknameChangePointCost} onChange={setNicknameChangePointCost} placeholder="0 表示免费" />

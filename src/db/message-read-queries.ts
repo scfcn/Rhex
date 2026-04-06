@@ -1,40 +1,18 @@
 import { prisma } from "@/db/client"
+import { ConversationKind } from "@/db/types"
 
-export function findConversationParticipantsWithConversation(userId: number) {
-  return prisma.conversationParticipant.findMany({
-    where: { userId },
+export function findDirectConversationByUsers(userLowId: number, userHighId: number) {
+  return prisma.directConversation.findUnique({
+    where: {
+      userLowId_userHighId: {
+        userLowId,
+        userHighId,
+      },
+    },
     include: {
       conversation: {
         include: {
-          participants: {
-            select: {
-              userId: true,
-            },
-          },
-        },
-      },
-    },
-  })
-}
-
-export function findDirectConversationCandidates(userAId: number, userBId: number) {
-  return prisma.conversation.findMany({
-    where: {
-      participants: {
-        some: {
-          userId: {
-            in: [userAId, userBId],
-          },
-        },
-      },
-    },
-    include: {
-      participants: {
-        select: {
-          id: true,
-          userId: true,
-          unreadCount: true,
-          lastReadMessageId: true,
+          participants: true,
         },
       },
     },
@@ -45,9 +23,11 @@ export function findConversationByIdForParticipant(conversationId: string, curre
   return prisma.conversation.findFirst({
     where: {
       id: conversationId,
+      kind: ConversationKind.DIRECT,
       participants: {
         some: {
           userId: currentUserId,
+          archivedAt: null,
         },
       },
     },
@@ -63,7 +43,13 @@ export function findConversationByIdForParticipant(conversationId: string, curre
 
 export function findConversationListItems(currentUserId: number) {
   return prisma.conversationParticipant.findMany({
-    where: { userId: currentUserId },
+    where: {
+      userId: currentUserId,
+      archivedAt: null,
+      conversation: {
+        kind: ConversationKind.DIRECT,
+      },
+    },
     include: {
       conversation: {
         include: {
@@ -94,6 +80,10 @@ export async function getUnreadConversationCount(currentUserId: number) {
   const result = await prisma.conversationParticipant.aggregate({
     where: {
       userId: currentUserId,
+      archivedAt: null,
+      conversation: {
+        kind: ConversationKind.DIRECT,
+      },
       unreadCount: {
         gt: 0,
       },
@@ -119,6 +109,7 @@ export function updateConversationReadState(conversationId: string, currentUserI
     where: {
       conversationId,
       userId: currentUserId,
+      archivedAt: null,
     },
     data: {
       unreadCount: 0,
@@ -131,9 +122,11 @@ export function findConversationDetailById(conversationId: string, currentUserId
   return prisma.conversation.findFirst({
     where: {
       id: conversationId,
+      kind: ConversationKind.DIRECT,
       participants: {
         some: {
           userId: currentUserId,
+          archivedAt: null,
         },
       },
     },

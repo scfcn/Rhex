@@ -1,5 +1,6 @@
 import { getLevelBadgeData } from "@/lib/level-badge"
 import { getCurrentUser } from "@/lib/auth"
+import { getUserCheckInStreakSummary } from "@/lib/check-in-streak-service"
 import { getLevelDefinitions, getLevelGrowthSnapshot } from "@/lib/level-system"
 
 export interface UserLevelProgressView {
@@ -24,6 +25,11 @@ export interface UserLevelProgressView {
     commentCount: number
     likeReceivedCount: number
     checkInDays: number
+    currentCheckInStreak: number
+    maxCheckInStreak: number
+  }
+  streakSettings: {
+    makeUpCountsTowardStreak: boolean
   }
   completion: {
     checkInDays: { current: number; required: number; remaining: number; completed: boolean }
@@ -40,10 +46,11 @@ export async function getCurrentUserLevelProgressView(): Promise<UserLevelProgre
     return null
   }
 
-  const [snapshot, levels, currentBadge] = await Promise.all([
+  const [snapshot, levels, currentBadge, streakSummary] = await Promise.all([
     getLevelGrowthSnapshot(user.id),
     getLevelDefinitions(),
     getLevelBadgeData(user.level),
+    getUserCheckInStreakSummary(user.id),
   ])
 
   if (!snapshot) {
@@ -65,6 +72,11 @@ export async function getCurrentUserLevelProgressView(): Promise<UserLevelProgre
       commentCount: snapshot.commentCount,
       likeReceivedCount: snapshot.likeReceivedCount,
       checkInDays: snapshot.checkInDays,
+      currentCheckInStreak: streakSummary.currentStreak,
+      maxCheckInStreak: streakSummary.maxStreak,
+    },
+    streakSettings: {
+      makeUpCountsTowardStreak: streakSummary.makeUpCountsTowardStreak,
     },
     completion: nextLevel
       ? {

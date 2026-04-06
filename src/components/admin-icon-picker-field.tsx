@@ -1,9 +1,11 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { Loader2, Upload } from "lucide-react"
 
 import { LevelIcon } from "@/components/level-icon"
 import { PickerPopover } from "@/components/admin-picker-popover"
+import { toast } from "@/components/ui/toast"
 
 interface AdminIconPickerFieldProps {
   label: string
@@ -17,6 +19,7 @@ interface AdminIconPickerFieldProps {
   textareaRows?: number
   description?: string
   popoverTitle?: string
+  uploadFolder?: "avatars" | "posts" | "comments" | "friend-links" | "site-logo" | "icon"
 }
 
 const DEFAULT_ICON_PRESETS = ["🌱", "⭐", "🔥", "⚡", "💎", "👑", "🛡️", "🚀", "🎯", "🏆", "🌈", "🧠", "📚", "💬", "📷", "🌿"]
@@ -25,18 +28,58 @@ export function AdminIconPickerField({
   label,
   value,
   onChange,
-  placeholder = "输入 emoji、符号，或粘贴完整 <svg>...</svg>",
+  placeholder = "输入 emoji、SVG、图片 URL，或上传后的本地路径",
   presets = DEFAULT_ICON_PRESETS,
   previewColor,
   triggerClassName,
   containerClassName,
   textareaRows = 4,
-  description = "预设支持快速选择 emoji，自定义输入同时支持内联 SVG。",
+  description = "支持 emoji、内联 SVG、远程图片 URL 和上传后的本地资源路径。",
   popoverTitle,
+  uploadFolder = "icon",
 }: AdminIconPickerFieldProps) {
   const [open, setOpen] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const normalizedValue = useMemo(() => value?.trim() || "", [value])
   const title = popoverTitle ?? `选择${label}`
+
+  async function uploadIcon(file: File) {
+    if (!file.type.startsWith("image/")) {
+      toast.error("请选择图片文件后再上传", `${label}上传失败`)
+      return
+    }
+
+    setUploading(true)
+    const formData = new FormData()
+    formData.append("file", file)
+    formData.append("folder", uploadFolder)
+
+    try {
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      })
+      const result = await response.json()
+
+      if (!response.ok || result.code !== 0) {
+        toast.error(result.message ?? `${label}上传失败`, `${label}上传失败`)
+        return
+      }
+
+      const uploadedPath = String(result.data?.urlPath ?? "").trim()
+      if (!uploadedPath) {
+        toast.error("上传成功，但未返回可用地址", `${label}上传失败`)
+        return
+      }
+
+      onChange(uploadedPath)
+      toast.success("图片已上传并回填到当前图标", `${label}上传成功`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : `${label}上传失败，请稍后重试`, `${label}上传失败`)
+    } finally {
+      setUploading(false)
+    }
+  }
 
   return (
     <div className={containerClassName ?? "space-y-1"}>
@@ -60,6 +103,26 @@ export function AdminIconPickerField({
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-[11px] font-medium text-muted-foreground">自定义图标</p>
                   <LevelIcon icon={normalizedValue} color={previewColor} className="h-4 w-4 text-sm" emojiClassName="text-inherit" svgClassName="[&>svg]:block" />
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-border px-3 py-1.5 text-[11px] font-medium transition hover:bg-accent">
+                    {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                    {uploading ? "上传中..." : "上传图片"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploading}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0]
+                        if (file) {
+                          void uploadIcon(file)
+                        }
+                        event.target.value = ""
+                      }}
+                    />
+                  </label>
+                  <p className="text-[11px] text-muted-foreground">上传后会自动回填资源路径，也可继续手动改成 emoji、SVG 或 URL。</p>
                 </div>
                 <textarea
                   value={value}

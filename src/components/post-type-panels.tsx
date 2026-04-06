@@ -6,7 +6,7 @@ import { CheckCircle2, Clock3, Gift, Sparkles, Trophy } from "lucide-react"
 import { useMemo, useState } from "react"
 
 import { Button } from "@/components/ui/button"
-import { formatDateTime, formatRelativeTime } from "@/lib/formatters"
+import { formatDateTime, formatNumber, formatRelativeTime } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
 
 interface BountyPanelProps {
@@ -87,7 +87,7 @@ export function BountyPanel({ points, pointName = "积分", isResolved, accepted
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-semibold text-amber-950 dark:text-amber-100">悬赏帖</p>
-          <p className="mt-1 text-sm leading-6 text-amber-900/90 dark:text-amber-100/85">当前悬赏 {points} {pointName}，发帖人可在回复中选择一个答案进行采纳。</p>
+          <p className="mt-1 text-sm leading-6 text-amber-900/90 dark:text-amber-100/85">当前悬赏 {formatNumber(points)} {pointName}，发帖人可在回复中选择一个答案进行采纳。</p>
         </div>
 
         <span className={isResolved ? "w-fit rounded-full bg-emerald-100 px-3 py-1 text-xs text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "w-fit rounded-full bg-amber-100 px-3 py-1 text-xs text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"}>

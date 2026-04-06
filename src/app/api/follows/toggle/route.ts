@@ -1,6 +1,6 @@
 import { toggleFollowTarget } from "@/db/follow-queries"
 import { apiError, apiSuccess, createUserRouteHandler, readJsonBody, requireStringField } from "@/lib/api-route"
-import { dispatchUserFollowedNotificationBestEffort } from "@/lib/follow-notifications"
+import { enqueueUserFollowedNotification } from "@/lib/follow-notifications"
 import { getFollowTargetCopy, normalizeFollowTargetType } from "@/lib/follows"
 import { ensureUsersCanInteract } from "@/lib/user-blocks"
 import { getUserDisplayName } from "@/lib/users"
@@ -49,7 +49,7 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   }
 
   if (targetType === "user" && result.followed && result.changed) {
-    await dispatchUserFollowedNotificationBestEffort({
+    await enqueueUserFollowedNotification({
       userId: Number(targetId),
       followerUserId: currentUser.id,
       followerName: getUserDisplayName(currentUser),

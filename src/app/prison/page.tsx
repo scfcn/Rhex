@@ -43,6 +43,7 @@ export default async function PrisonPage(props: PageProps<"/prison">) {
   const where = activeStatus === "ALL"
     ? { status: { in: [UserStatus.BANNED, UserStatus.MUTED] } }
     : { status: activeStatus === "BANNED" ? UserStatus.BANNED : UserStatus.MUTED }
+  const settingsPromise = getSiteSettings()
 
   const [users, mutedCount, bannedCount, boards, zones, currentUser, hotTopics, settings] = await Promise.all([
     prisma.user.findMany({
@@ -63,8 +64,8 @@ export default async function PrisonPage(props: PageProps<"/prison">) {
     getBoards(),
     getZones(),
     getCurrentUser(),
-    getHomeSidebarHotTopics(5),
-    getSiteSettings(),
+    settingsPromise.then((settings) => getHomeSidebarHotTopics(settings.homeSidebarHotTopicsCount)),
+    settingsPromise,
   ])
 
   const sidebarUser = await resolveSidebarUser(currentUser, settings)

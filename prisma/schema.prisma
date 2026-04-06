@@ -141,6 +141,7 @@ enum ChangeType {
 enum PointEffectTargetType {
   POINTS
   PROBABILITY
+  FUNCTION
 }
 
 enum PointEffectRuleKind {
@@ -194,6 +195,8 @@ enum BadgeRuleType {
   USER_ID
   LEVEL
   CHECK_IN_DAYS
+  CURRENT_CHECK_IN_STREAK
+  MAX_CHECK_IN_STREAK
   VIP_LEVEL
 }
 
@@ -388,6 +391,9 @@ model UserLevelProgress {
   id                   String   @id @default(cuid())
   userId               Int      @unique
   checkInDays          Int      @default(0)
+  currentCheckInStreak Int      @default(0)
+  maxCheckInStreak     Int      @default(0)
+  lastCheckInDate      String?
   receivedPostLikes    Int      @default(0)
   receivedCommentLikes Int      @default(0)
   receivedLikeCount    Int      @default(0)
@@ -552,6 +558,7 @@ model Zone {
   minPostVipLevel      Int                  @default(0)
   minReplyVipLevel     Int                  @default(0)
   postListDisplayMode  String?
+  postListLoadMode     String?
   createdAt            DateTime             @default(now()) @db.Timestamptz(3)
   updatedAt            DateTime             @updatedAt @db.Timestamptz(3)
   boards               Board[]
@@ -587,6 +594,7 @@ model Board {
   minPostVipLevel      Int?
   minReplyVipLevel     Int?
   postListDisplayMode  String?
+  postListLoadMode     String?
   postCount            Int                   @default(0)
   followerCount        Int                   @default(0)
   createdAt            DateTime              @default(now()) @db.Timestamptz(3)
@@ -1014,13 +1022,16 @@ model Notification {
 
 model Conversation {
   id            String                    @id @default(cuid())
+  kind          ConversationKind          @default(DIRECT)
   lastMessageAt DateTime                  @default(now()) @db.Timestamptz(3)
   createdAt     DateTime                  @default(now()) @db.Timestamptz(3)
   updatedAt     DateTime                  @updatedAt @db.Timestamptz(3)
+  directConversation DirectConversation?
   participants  ConversationParticipant[]
   messages      DirectMessage[]
 
   @@index([lastMessageAt])
+  @@index([kind, lastMessageAt])
 }
 
 model ConversationParticipant {
@@ -1029,6 +1040,7 @@ model ConversationParticipant {
   userId            Int
   unreadCount       Int            @default(0)
   lastReadMessageId String?
+  archivedAt        DateTime?      @db.Timestamptz(3)
   joinedAt          DateTime       @default(now()) @db.Timestamptz(3)
   updatedAt         DateTime       @updatedAt @db.Timestamptz(3)
   conversation      Conversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -1036,8 +1048,21 @@ model ConversationParticipant {
   lastReadMessage   DirectMessage? @relation("LastReadMessage", fields: [lastReadMessageId], references: [id], onDelete: SetNull)
 
   @@unique([conversationId, userId])
-  @@index([userId, updatedAt])
+  @@index([userId, archivedAt, updatedAt])
   @@index([conversationId, unreadCount])
+}
+
+model DirectConversation {
+  conversationId String   @id
+  userLowId      Int
+  userHighId     Int
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([userLowId, userHighId])
+  @@index([userLowId])
+  @@index([userHighId])
 }
 
 model DirectMessage {
@@ -1052,6 +1077,11 @@ model DirectMessage {
 
   @@index([conversationId, createdAt])
   @@index([senderId, createdAt])
+}
+
+enum ConversationKind {
+  DIRECT
+  GROUP
 }
 
 model Report {

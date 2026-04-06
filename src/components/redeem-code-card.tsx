@@ -4,6 +4,7 @@ import { useState, useTransition } from "react"
 
 import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/toast"
+import { formatNumber } from "@/lib/formatters"
 
 
 interface RedeemCodeCardProps {
@@ -23,7 +24,7 @@ export function RedeemCodeCard({ pointName, currentPoints }: RedeemCodeCardProps
         <p className="text-sm text-muted-foreground">输入兑换码即可领取 {pointName}。兑换成功后请刷新当前页面查看最新余额与明细。</p>
       </div>
       <div className="mt-4 rounded-[20px] bg-secondary/40 p-4 text-sm text-muted-foreground">
-        当前账户余额：<span className="font-semibold text-foreground">{currentPoints}</span> {pointName}
+        当前账户余额：<span className="font-semibold text-foreground">{formatNumber(currentPoints)}</span> {pointName}
       </div>
       <form
         className="mt-4 flex flex-col gap-3 md:flex-row"

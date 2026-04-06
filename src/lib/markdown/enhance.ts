@@ -139,7 +139,20 @@ function createBrokenImagePlaceholder(image: HTMLImageElement) {
     ? `图片“${image.getAttribute("alt")?.trim()}”暂时无法显示，可能已被删除或链接失效。`
     : "该图片暂时无法显示，可能已被删除或链接失效。"
 
+  const source = image.currentSrc || image.getAttribute("src")?.trim()
+
   placeholder.append(title, description)
+
+  if (source) {
+    const link = document.createElement("a")
+    link.className = "mt-3 inline-flex text-xs font-medium text-amber-900 underline underline-offset-4 transition-opacity hover:opacity-80 dark:text-amber-100"
+    link.href = source
+    link.target = "_blank"
+    link.rel = "noreferrer noopener"
+    link.textContent = "打开图片链接"
+    placeholder.append(link)
+  }
+
   return placeholder
 }
 

@@ -1,7 +1,7 @@
 import { findPostSidebarData } from "@/db/post-sidebar-queries"
 
-export async function getPostSidebarData(postId: string, authorUsername: string) {
-  const { author, postTags, relatedPosts } = await findPostSidebarData(postId, authorUsername)
+export async function getPostSidebarData(postId: string, authorUsername: string, relatedPostsLimit = 5) {
+  const { author, postTags, relatedPosts } = await findPostSidebarData(postId, authorUsername, relatedPostsLimit)
 
   return {
     author: author

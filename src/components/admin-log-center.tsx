@@ -35,6 +35,7 @@ const bucketTypeOptions = [
   { value: "ALL", label: "全部目录" },
   { value: "avatars", label: "头像" },
   { value: "posts", label: "帖子图片" },
+  { value: "icon", label: "图标" },
 ]
 
 const tabIcons = {

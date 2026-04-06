@@ -8,7 +8,7 @@ import { VipBadge } from "@/components/vip-badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getCurrentUser } from "@/lib/auth"
-import { formatDateTime } from "@/lib/formatters"
+import { formatDateTime, formatNumber } from "@/lib/formatters"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
 
@@ -22,17 +22,17 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 function formatPointValue(value: number, pointName: string, suffix: string) {
-  return value > 0 ? `${value} ${pointName}${suffix}` : `免费${suffix}`
+  return value > 0 ? `${formatNumber(value)} ${pointName}${suffix}` : `免费${suffix}`
 }
 
 const vipMilestones = (settings: Awaited<ReturnType<typeof getSiteSettings>>) => [
   {
     level: 1,
     title: "VIP 1",
-    requirement: `使用 ${settings.vipMonthlyPrice} ${settings.pointName} 购买月卡，生效 30 天`,
+    requirement: `使用 ${formatNumber(settings.vipMonthlyPrice)} ${settings.pointName} 购买月卡，生效 30 天`,
     privileges: [
       "可访问 VIP 专属节点、帖子与回复区域",
-      `签到奖励：${settings.checkInVip1Reward} ${settings.pointName} / 次`,
+      `签到奖励：${formatNumber(settings.checkInVip1Reward)} ${settings.pointName} / 次`,
       `补签价格：${formatPointValue(settings.checkInVip1MakeUpCardPrice, settings.pointName, " / 次")}`,
       `修改昵称：${formatPointValue(settings.nicknameChangeVip1PointCost, settings.pointName, " / 次")}`,
       `购买邀请码：${settings.inviteCodePurchaseEnabled ? formatPointValue(settings.inviteCodeVip1Price, settings.pointName, " / 个") : "未开启"}`,
@@ -42,10 +42,10 @@ const vipMilestones = (settings: Awaited<ReturnType<typeof getSiteSettings>>) =>
   {
     level: 2,
     title: "VIP 2",
-    requirement: `使用 ${settings.vipQuarterlyPrice} ${settings.pointName} 购买季卡，生效 90 天`,
+    requirement: `使用 ${formatNumber(settings.vipQuarterlyPrice)} ${settings.pointName} 购买季卡，生效 90 天`,
     privileges: [
       "包含 VIP1 全部权益，并可进入更高等级权限节点",
-      `签到奖励：${settings.checkInVip2Reward} ${settings.pointName} / 次`,
+      `签到奖励：${formatNumber(settings.checkInVip2Reward)} ${settings.pointName} / 次`,
       `补签价格：${formatPointValue(settings.checkInVip2MakeUpCardPrice, settings.pointName, " / 次")}`,
       `修改昵称：${formatPointValue(settings.nicknameChangeVip2PointCost, settings.pointName, " / 次")}`,
       `购买邀请码：${settings.inviteCodePurchaseEnabled ? formatPointValue(settings.inviteCodeVip2Price, settings.pointName, " / 个") : "未开启"}`,
@@ -55,10 +55,10 @@ const vipMilestones = (settings: Awaited<ReturnType<typeof getSiteSettings>>) =>
   {
     level: 3,
     title: "VIP 3",
-    requirement: `使用 ${settings.vipYearlyPrice} ${settings.pointName} 购买年卡，生效 365 天`,
+    requirement: `使用 ${formatNumber(settings.vipYearlyPrice)} ${settings.pointName} 购买年卡，生效 365 天`,
     privileges: [
       "包含 VIP1、VIP2 全部权益，并享受最高档位身份能力",
-      `签到奖励：${settings.checkInVip3Reward} ${settings.pointName} / 次`,
+      `签到奖励：${formatNumber(settings.checkInVip3Reward)} ${settings.pointName} / 次`,
       `补签价格：${formatPointValue(settings.checkInVip3MakeUpCardPrice, settings.pointName, " / 次")}`,
       `修改昵称：${formatPointValue(settings.nicknameChangeVip3PointCost, settings.pointName, " / 次")}`,
       `购买邀请码：${settings.inviteCodePurchaseEnabled ? formatPointValue(settings.inviteCodeVip3Price, settings.pointName, " / 个") : "未开启"}`,

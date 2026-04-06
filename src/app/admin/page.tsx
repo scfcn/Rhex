@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import Link from "next/link"
 import { AlertTriangle, Ban, Bookmark, CheckCircle2, Eye, FileText, Heart, Info, LayoutGrid, Megaphone, MessageSquare, Settings2, Shield, TrendingUp, Users } from "lucide-react"
 
+import { formatNumber } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
 
 import { AdminAnnouncementManager } from "@/components/admin-announcement-manager"
@@ -389,7 +390,7 @@ export default async function AdminPage(props: PageProps<"/admin">) {
         {tab === "posts" ? <AdminPostList data={filteredPosts!} /> : null}
         {tab === "structure" ? <StructureManager zones={structureData!.zones} boards={structureData!.boardStatus} permissions={structureData!.permissions} initialFilters={{ keyword: currentStructureKeyword, zoneId: currentStructureZoneId, boardStatus: currentStructureBoardStatus, posting: currentStructurePosting }} /> : null}
         {tab === "levels" ? <AdminLevelSettingsForm initialLevels={levelDefinitions} /> : null}
-        {tab === "badges" ? <AdminBadgeManager initialBadges={badges.map((badge: BadgeItem) => ({
+        {tab === "badges" ? <AdminBadgeManager initialLevelDefinitions={levelDefinitions} initialBadges={badges.map((badge: BadgeItem) => ({
           id: badge.id,
           name: badge.name,
           code: badge.code,
@@ -687,8 +688,4 @@ function getCommentStatusBadgeClassName(status: string) {
     return "rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-500/15 dark:text-slate-200"
   }
   return "rounded-full bg-rose-100 px-2 py-0.5 text-[11px] text-rose-700 dark:bg-rose-500/15 dark:text-rose-200"
-}
-
-function formatNumber(value: number) {
-  return new Intl.NumberFormat("zh-CN").format(value)
 }

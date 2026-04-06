@@ -1,6 +1,7 @@
 import { parseNonNegativeSafeInteger } from "@/lib/shared/safe-integer"
 import { getDefaultTippingGiftItemsFromAmounts, normalizeTippingGiftItems, type SiteTippingGiftItem } from "@/lib/tipping-gifts"
 import { normalizeVipLevelIcons, type VipLevelIcons } from "@/lib/vip-level-icons"
+import { normalizePostListLoadMode, type PostListLoadMode } from "@/lib/post-list-load-mode"
 
 const SITE_SETTINGS_STATE_KEY = "__siteSettings"
 
@@ -81,6 +82,22 @@ export interface HomeSidebarAnnouncementSettings {
   enabled: boolean
 }
 
+export interface HomeFeedPostListLoadSettings {
+  loadMode: PostListLoadMode
+}
+
+export interface HomeHotFeedSettings {
+  recentWindowHours: number
+}
+
+export interface PostPageSizeSettings {
+  homeFeed: number
+  zonePosts: number
+  boardPosts: number
+  hotTopics: number
+  postRelatedTopics: number
+}
+
 export interface CommentAccessSettings {
   guestCanView: boolean
 }
@@ -119,12 +136,20 @@ export interface RegistrationRewardSettings {
   initialPoints: number
 }
 
+export interface CheckInStreakSettings {
+  makeUpCountsTowardStreak: boolean
+}
+
 export interface PostJackpotSettings {
   enabled: boolean
   minInitialPoints: number
   maxInitialPoints: number
   replyIncrementPoints: number
   hitProbability: number
+}
+
+export interface PostRedPacketSettings {
+  randomClaimProbability: number
 }
 
 export function resolveTippingGiftSettings(options: {
@@ -454,6 +479,114 @@ export function mergeHomeSidebarAnnouncementSettings(
   return JSON.stringify(root)
 }
 
+export function resolveHomeFeedPostListLoadSettings(options: {
+  appStateJson?: string | null
+  loadModeFallback?: PostListLoadMode
+} = {}): HomeFeedPostListLoadSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const homeFeedPostList = isRecord(siteSettingsState.homeFeedPostList)
+    ? siteSettingsState.homeFeedPostList
+    : {}
+
+  return {
+    loadMode: normalizePostListLoadMode(homeFeedPostList.loadMode, options.loadModeFallback),
+  }
+}
+
+export function mergeHomeFeedPostListLoadSettings(
+  appStateJson: string | null | undefined,
+  input: HomeFeedPostListLoadSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    homeFeedPostList: {
+      loadMode: normalizePostListLoadMode(input.loadMode),
+    },
+  }
+
+  return JSON.stringify(root)
+}
+
+export function resolveHomeHotFeedSettings(options: {
+  appStateJson?: string | null
+  recentWindowHoursFallback?: number
+} = {}): HomeHotFeedSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const homeHotFeed = isRecord(siteSettingsState.homeHotFeed)
+    ? siteSettingsState.homeHotFeed
+    : {}
+
+  return {
+    recentWindowHours: Math.min(
+      720,
+      Math.max(1, normalizeNonNegativeInteger(homeHotFeed.recentWindowHours, normalizeNonNegativeInteger(options.recentWindowHoursFallback, 72))),
+    ),
+  }
+}
+
+export function mergeHomeHotFeedSettings(
+  appStateJson: string | null | undefined,
+  input: HomeHotFeedSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    homeHotFeed: {
+      recentWindowHours: Math.min(720, Math.max(1, normalizeNonNegativeInteger(input.recentWindowHours, 72))),
+    },
+  }
+
+  return JSON.stringify(root)
+}
+
+export function resolvePostPageSizeSettings(options: {
+  appStateJson?: string | null
+  homeFeedFallback?: number
+  zonePostsFallback?: number
+  boardPostsFallback?: number
+  hotTopicsFallback?: number
+  postRelatedTopicsFallback?: number
+} = {}): PostPageSizeSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const postPageSizes = isRecord(siteSettingsState.postPageSizes)
+    ? siteSettingsState.postPageSizes
+    : {}
+
+  return {
+    homeFeed: Math.min(100, Math.max(1, normalizeNonNegativeInteger(postPageSizes.homeFeed, normalizeNonNegativeInteger(options.homeFeedFallback, 35)))),
+    zonePosts: Math.min(100, Math.max(1, normalizeNonNegativeInteger(postPageSizes.zonePosts, normalizeNonNegativeInteger(options.zonePostsFallback, 20)))),
+    boardPosts: Math.min(100, Math.max(1, normalizeNonNegativeInteger(postPageSizes.boardPosts, normalizeNonNegativeInteger(options.boardPostsFallback, 20)))),
+    hotTopics: Math.min(30, Math.max(1, normalizeNonNegativeInteger(postPageSizes.hotTopics, normalizeNonNegativeInteger(options.hotTopicsFallback, 5)))),
+    postRelatedTopics: Math.min(30, Math.max(1, normalizeNonNegativeInteger(postPageSizes.postRelatedTopics, normalizeNonNegativeInteger(options.postRelatedTopicsFallback, 5)))),
+  }
+}
+
+export function mergePostPageSizeSettings(
+  appStateJson: string | null | undefined,
+  input: PostPageSizeSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    postPageSizes: {
+      homeFeed: Math.min(100, Math.max(1, normalizeNonNegativeInteger(input.homeFeed, 35))),
+      zonePosts: Math.min(100, Math.max(1, normalizeNonNegativeInteger(input.zonePosts, 20))),
+      boardPosts: Math.min(100, Math.max(1, normalizeNonNegativeInteger(input.boardPosts, 20))),
+      hotTopics: Math.min(30, Math.max(1, normalizeNonNegativeInteger(input.hotTopics, 5))),
+      postRelatedTopics: Math.min(30, Math.max(1, normalizeNonNegativeInteger(input.postRelatedTopics, 5))),
+    },
+  }
+
+  return JSON.stringify(root)
+}
+
 export function resolveCommentAccessSettings(options: {
   appStateJson?: string | null
   guestCanViewFallback?: boolean
@@ -690,6 +823,46 @@ export function mergePostJackpotSettings(
   return JSON.stringify(root)
 }
 
+export function resolvePostRedPacketSettings(options: {
+  appStateJson?: string | null
+  randomClaimProbabilityFallback?: number
+} = {}): PostRedPacketSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const postRedPacket = isRecord(siteSettingsState.postRedPacket)
+    ? siteSettingsState.postRedPacket
+    : {}
+
+  return {
+    randomClaimProbability: Math.max(
+      0,
+      Math.min(
+        100,
+        normalizeNonNegativeInteger(
+          postRedPacket.randomClaimProbability,
+          normalizeNonNegativeInteger(options.randomClaimProbabilityFallback, 0),
+        ),
+      ),
+    ),
+  }
+}
+
+export function mergePostRedPacketSettings(
+  appStateJson: string | null | undefined,
+  input: PostRedPacketSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    postRedPacket: {
+      randomClaimProbability: Math.max(0, Math.min(100, normalizeNonNegativeInteger(input.randomClaimProbability, 0))),
+    },
+  }
+
+  return JSON.stringify(root)
+}
+
 export function resolveRegistrationRewardSettings(options: {
   appStateJson?: string | null
   initialPointsFallback?: number
@@ -718,6 +891,39 @@ export function mergeRegistrationRewardSettings(
     ...siteSettingsState,
     registrationRewards: {
       initialPoints: normalizeNonNegativeInteger(input.initialPoints, 0),
+    },
+  }
+
+  return JSON.stringify(root)
+}
+
+export function resolveCheckInStreakSettings(options: {
+  appStateJson?: string | null
+  makeUpCountsTowardStreakFallback?: boolean
+} = {}): CheckInStreakSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const checkInStreak = isRecord(siteSettingsState.checkInStreak)
+    ? siteSettingsState.checkInStreak
+    : {}
+
+  return {
+    makeUpCountsTowardStreak: typeof checkInStreak.makeUpCountsTowardStreak === "boolean"
+      ? checkInStreak.makeUpCountsTowardStreak
+      : options.makeUpCountsTowardStreakFallback ?? true,
+  }
+}
+
+export function mergeCheckInStreakSettings(
+  appStateJson: string | null | undefined,
+  input: CheckInStreakSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    checkInStreak: {
+      makeUpCountsTowardStreak: input.makeUpCountsTowardStreak,
     },
   }
 

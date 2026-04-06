@@ -5,7 +5,7 @@ import { Flag } from "lucide-react"
 
 import { CommentForm } from "@/components/comment-form"
 import { CommentLikeButton } from "@/components/comment-like-button"
-import { AdminCommentStatusNotice, buildCommentAdminActions, CommentAuthorIdentityBadges, CommentRewardBadge, CommentRewardEffectBadge, CommentUnavailablePlaceholder, copyCommentPermalink, getCommentUnavailableMessage, type CommentAdminAction } from "@/components/comment-thread-shared"
+import { AdminCommentStatusNotice, buildCommentAdminActions, CommentAuthorIdentityBadges, CommentJackpotDepositBadge, CommentRewardBadge, CommentRewardEffectBadge, CommentUnavailablePlaceholder, copyCommentPermalink, getCommentUnavailableMessage, type CommentAdminAction } from "@/components/comment-thread-shared"
 import { MarkdownContent } from "@/components/markdown-content"
 import { ReportDialog } from "@/components/report-dialog"
 import { TimeTooltip } from "@/components/time-tooltip"
@@ -157,8 +157,10 @@ function CommentThreadReplyItem({
                   )}
                   {!replyUnavailableMessage && (reply.rewardClaim || reply.rewardEffectFeedback) ? (
                     <div className="mt-2 flex items-center justify-start gap-2">
+                   
                       <CommentRewardBadge rewardClaim={reply.rewardClaim} pointName={pointName} />
                       {reply.rewardEffectFeedback ? <CommentRewardEffectBadge feedback={reply.rewardEffectFeedback} /> : null}
+                         <CommentJackpotDepositBadge feedback={reply.rewardEffectFeedback} pointName={pointName} />
                     </div>
                   ) : null}
                 </>
@@ -309,8 +311,10 @@ export function CommentThreadCommentItem({
                 )}
                 {!commentUnavailableMessage && (comment.rewardClaim || comment.rewardEffectFeedback) ? (
                   <div className="mt-2 flex items-center justify-start gap-2">
+        
                     <CommentRewardBadge rewardClaim={comment.rewardClaim} pointName={pointName} />
                     {comment.rewardEffectFeedback ? <CommentRewardEffectBadge feedback={comment.rewardEffectFeedback} /> : null}
+                    <CommentJackpotDepositBadge feedback={comment.rewardEffectFeedback} pointName={pointName} />
                   </div>
                 ) : null}
               </>

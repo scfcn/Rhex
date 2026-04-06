@@ -1,6 +1,6 @@
 import { BadgeRuleOperator, BadgeRuleType, BadgeGrantSource, PointEffectDirection, PointEffectRuleKind, PointEffectTargetType } from "@/db/types"
 
-import { createSelfClaimUserBadge, findAllBadgesWithRules, findBadgeEffectRulesByBadgeIds, findBadgeEligibilityUserSnapshot, findBadgeUserPoints, findDisplayedUserBadges, findGrantedBadgesForUserRecord, findGrantedUserBadge, findGrantedUserBadgeWithTx, findUserBadgeDisplayStates, findUserBadgeWithBadge, runBadgeTransaction, updateUserBadgeDisplayById } from "@/db/badge-queries"
+import { createSelfClaimUserBadge, findAllBadgesWithRules, findBadgeEffectRulesByBadgeIds, findBadgeEligibilityUserSnapshot, findBadgeUserPoints, findDisplayedUserBadges, findGrantedBadgeIdsForUser, findGrantedBadgesForUserRecord, findGrantedUserBadgeWithTx, findUserBadgeDisplayStates, findUserBadgeWithBadge, runBadgeTransaction, updateUserBadgeDisplayById } from "@/db/badge-queries"
 import { apiError } from "./api-route"
 import type { BadgeRuleTypeValue } from "@/lib/badge-rule-definitions"
 import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
@@ -71,6 +71,8 @@ export interface BadgeEligibilitySnapshot {
   followerCount: number
   level: number
   checkInDays: number
+  currentCheckInStreak: number
+  maxCheckInStreak: number
   vipLevel: number
 }
 
@@ -84,6 +86,11 @@ export interface BadgeEligibilityResult {
   pointsCost: number
   purchaseRequired: boolean
   canAffordPurchase: boolean
+}
+
+interface BadgeEligibilityLookup {
+  snapshot: BadgeEligibilitySnapshot | null
+  grantedBadgeIds: Set<string>
 }
 
 const MAX_DISPLAYED_BADGES = 3
@@ -103,6 +110,8 @@ const RULE_LABELS: Record<string, string> = {
   USER_ID: "UID",
   LEVEL: "等级",
   CHECK_IN_DAYS: "签到天数",
+  CURRENT_CHECK_IN_STREAK: "连续签到天数",
+  MAX_CHECK_IN_STREAK: "最高连续签到天数",
   VIP_LEVEL: "VIP 等级",
 }
 
@@ -246,8 +255,21 @@ export async function getBadgeEligibilitySnapshot(userId: number): Promise<Badge
     followerCount: user._count.followedByUsers,
     level: user.level,
     checkInDays: progress?.checkInDays ?? 0,
-
+    currentCheckInStreak: progress?.currentCheckInStreak ?? 0,
+    maxCheckInStreak: progress?.maxCheckInStreak ?? 0,
     vipLevel: user.vipLevel,
+  }
+}
+
+async function createBadgeEligibilityLookup(userId: number): Promise<BadgeEligibilityLookup> {
+  const [snapshot, grantedBadges] = await Promise.all([
+    getBadgeEligibilitySnapshot(userId),
+    findGrantedBadgeIdsForUser(userId),
+  ])
+
+  return {
+    snapshot,
+    grantedBadgeIds: new Set(grantedBadges.map((item) => item.badgeId)),
   }
 }
 
@@ -267,6 +289,8 @@ function evaluateSingleRule(snapshot: BadgeEligibilitySnapshot, rule: BadgeRuleI
 
     LEVEL: snapshot.level,
     CHECK_IN_DAYS: snapshot.checkInDays,
+    CURRENT_CHECK_IN_STREAK: snapshot.currentCheckInStreak,
+    MAX_CHECK_IN_STREAK: snapshot.maxCheckInStreak,
     VIP_LEVEL: snapshot.vipLevel,
   }
 
@@ -299,13 +323,12 @@ function evaluateSingleRule(snapshot: BadgeEligibilitySnapshot, rule: BadgeRuleI
 }
 
 export async function getBadgeEligibilityResult(userId: number, badge: BadgeItem): Promise<BadgeEligibilityResult> {
-  const [snapshot, existing] = await Promise.all([
-    getBadgeEligibilitySnapshot(userId),
-    findGrantedUserBadge(userId, badge.id),
-  ])
+  const lookup = await createBadgeEligibilityLookup(userId)
+  return buildBadgeEligibilityResult(badge, lookup)
+}
 
-
-  if (!snapshot) {
+function buildBadgeEligibilityResult(badge: BadgeItem, lookup: BadgeEligibilityLookup): BadgeEligibilityResult {
+  if (!lookup.snapshot) {
     return {
       badgeId: badge.id,
       eligible: false,
@@ -318,12 +341,13 @@ export async function getBadgeEligibilityResult(userId: number, badge: BadgeItem
     }
   }
 
+  const snapshot = lookup.snapshot
   const failedRules = badge.rules
     .filter((rule) => !evaluateSingleRule(snapshot, rule))
     .map((rule) => describeBadgeRule(rule))
 
   const eligible = failedRules.length === 0
-  const alreadyGranted = Boolean(existing)
+  const alreadyGranted = lookup.grantedBadgeIds.has(badge.id)
 
   return {
     badgeId: badge.id,
@@ -442,13 +466,14 @@ export async function getBadgeCenterData(userId: number | null) {
     }))
   }
 
-  const [results, userBadgeStates] = await Promise.all([
-    Promise.all(badges.map(async (badge) => ({
-      ...badge,
-      eligibility: await getBadgeEligibilityResult(userId, badge),
-    }))),
+  const [lookup, userBadgeStates] = await Promise.all([
+    createBadgeEligibilityLookup(userId),
     findUserBadgeDisplayStates(userId),
   ])
+  const results = badges.map((badge) => ({
+    ...badge,
+    eligibility: buildBadgeEligibilityResult(badge, lookup),
+  }))
 
 
   const stateMap = new Map(userBadgeStates.map((item) => [item.badgeId, item]))

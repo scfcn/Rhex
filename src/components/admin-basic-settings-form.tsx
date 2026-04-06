@@ -22,6 +22,7 @@ import { PickerPopover, PickerTriggerField, normalizeHexColor } from "@/componen
 import { AdminTippingGiftListEditor } from "@/components/admin-tipping-gift-list-editor"
 import { adminPost } from "@/lib/admin-client"
 import { calculatePostHeatScore, resolvePostHeatStyle } from "@/lib/post-heat"
+import { POST_LIST_LOAD_MODE_INFINITE, POST_LIST_LOAD_MODE_PAGINATION } from "@/lib/post-list-load-mode"
 import { POST_LIST_DISPLAY_MODE_DEFAULT, POST_LIST_DISPLAY_MODE_GALLERY } from "@/lib/post-list-display"
 
 interface AdminBasicSettingsFormProps {
@@ -103,6 +104,12 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile", init
     siteSeoKeywords,
     postLinkDisplayMode,
     homeFeedPostListDisplayMode,
+    homeFeedPostListLoadMode,
+    homeFeedPostPageSize,
+    zonePostPageSize,
+    boardPostPageSize,
+    homeSidebarHotTopicsCount,
+    postSidebarRelatedTopicsCount,
     homeSidebarStatsCardEnabled,
     homeSidebarAnnouncementsEnabled,
     searchEnabled,
@@ -133,6 +140,7 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile", init
     postRedPacketEnabled,
     postRedPacketMaxPoints,
     postRedPacketDailyLimit,
+    postRedPacketRandomClaimProbability,
     postJackpotEnabled,
     postJackpotMinInitialPoints,
     postJackpotMaxInitialPoints,
@@ -143,6 +151,7 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile", init
     heatLikeWeight,
     heatTipCountWeight,
     heatTipPointsWeight,
+    homeHotRecentWindowHours,
     heatStageThresholds,
     heatStageColors,
     previewViews,
@@ -293,9 +302,24 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile", init
               </select>
               <p className="text-xs leading-6 text-muted-foreground">只影响首页 feed 的普通帖子列表；置顶帖始终保持原来的普通列表样式。</p>
             </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">首页帖子加载方式</p>
+              <select value={homeFeedPostListLoadMode} onChange={(event) => updateDraftField("homeFeedPostListLoadMode", event.target.value as typeof POST_LIST_LOAD_MODE_PAGINATION | typeof POST_LIST_LOAD_MODE_INFINITE)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
+                <option value={POST_LIST_LOAD_MODE_PAGINATION}>分页加载</option>
+                <option value={POST_LIST_LOAD_MODE_INFINITE}>无限下拉</option>
+              </select>
+              <p className="text-xs leading-6 text-muted-foreground">首页可在传统分页和滚动到底部自动加载之间切换。</p>
+            </div>
             <SwitchField label="首页右侧统计卡片" checked={homeSidebarStatsCardEnabled} onChange={(value) => updateDraftField("homeSidebarStatsCardEnabled", value)} />
             <SwitchField label="首页右侧站点公告" checked={homeSidebarAnnouncementsEnabled} onChange={(value) => updateDraftField("homeSidebarAnnouncementsEnabled", value)} />
             <SwitchField label="站内搜索" checked={searchEnabled} onChange={(value) => updateDraftField("searchEnabled", value)} />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <TextField label="首页帖子显示数量" value={homeFeedPostPageSize} onChange={(value) => updateDraftField("homeFeedPostPageSize", value)} placeholder="如 35" />
+            <TextField label="分区帖子显示数量" value={zonePostPageSize} onChange={(value) => updateDraftField("zonePostPageSize", value)} placeholder="如 20" />
+            <TextField label="节点帖子显示数量" value={boardPostPageSize} onChange={(value) => updateDraftField("boardPostPageSize", value)} placeholder="如 20" />
+            <TextField label="今日热帖显示数量" value={homeSidebarHotTopicsCount} onChange={(value) => updateDraftField("homeSidebarHotTopicsCount", value)} placeholder="如 5" />
+            <TextField label="帖子相关主题显示数量" value={postSidebarRelatedTopicsCount} onChange={(value) => updateDraftField("postSidebarRelatedTopicsCount", value)} placeholder="如 5" />
           </div>
           <p className="text-xs leading-6 text-muted-foreground">关闭后，前台搜索入口输入关键词将不再跳转站内搜索，而是弹出 `Google 搜索` 和 `Bing 搜索` 两个外部搜索选项。</p>
         </div>
@@ -567,13 +591,21 @@ Passkey Origin = ${resolvedPasskeyOrigin}`}</code></pre>
               <TextField label="每日发红包积分上限" value={postRedPacketDailyLimit} onChange={(value) => updateDraftField("postRedPacketDailyLimit", value)} placeholder="如 300" />
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <TextField
+                label="红包随机命中概率（%）"
+                value={postRedPacketRandomClaimProbability}
+                onChange={(value) => updateDraftField("postRedPacketRandomClaimProbability", value)}
+                placeholder="填 0 按候选人数均分，如 25"
+              />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <SwitchField label="开启聚宝盆" checked={postJackpotEnabled} onChange={(value) => updateDraftField("postJackpotEnabled", value)} />
               <TextField label="聚宝盆最低初始积分" value={postJackpotMinInitialPoints} onChange={(value) => updateDraftField("postJackpotMinInitialPoints", value)} placeholder="如 100" />
               <TextField label="聚宝盆最高初始积分" value={postJackpotMaxInitialPoints} onChange={(value) => updateDraftField("postJackpotMaxInitialPoints", value)} placeholder="如 1000" />
               <TextField label="每次回复递增积分" value={postJackpotReplyIncrementPoints} onChange={(value) => updateDraftField("postJackpotReplyIncrementPoints", value)} placeholder="如 25" />
-              <TextField label="回复中奖概率（%）" value={postJackpotHitProbability} onChange={(value) => updateDraftField("postJackpotHitProbability", value)} placeholder="如 15" />
+              <TextField label="聚宝盆回复中奖概率（%）" value={postJackpotHitProbability} onChange={(value) => updateDraftField("postJackpotHitProbability", value)} placeholder="如 15" />
             </div>
-            <p className="text-xs leading-6 text-muted-foreground">聚宝盆仅支持“回复帖子”触发。用户发帖时填写的初始积分必须落在这里配置的最小值和最大值之间；每次有效回复后，系统先向积分池增加设定积分，再按概率抽奖。</p>
+            <p className="text-xs leading-6 text-muted-foreground">红包随机命中概率仅在“随机名额”模式下生效：填 `0` 时沿用当前候选人数均分概率；填大于 `0` 的值时，按“当前触发用户单次命中率”处理，未命中则本次无人领取。聚宝盆仅支持“回复帖子”触发，用户发帖时填写的初始积分必须落在允许范围内；每次有效回复后，系统先向积分池增加设定积分，再按概率抽奖。</p>
           </div>
         </>
       ) : null}
@@ -583,8 +615,17 @@ Passkey Origin = ${resolvedPasskeyOrigin}`}</code></pre>
           <div className="rounded-[24px] border border-border p-5 space-y-4">
             <div>
               <h3 className="text-sm font-semibold">帖子热度颜色算法</h3>
-              <p className="mt-1 text-xs leading-6 text-muted-foreground">统一配置热度分数计算权重与颜色阶段。</p>
+              <p className="mt-1 text-xs leading-6 text-muted-foreground">统一配置热度分数计算权重、首页热门近活跃窗口与颜色阶段。</p>
             </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <TextField
+                label="首页热门近活跃窗口（小时）"
+                value={homeHotRecentWindowHours}
+                onChange={(value) => updateDraftField("homeHotRecentWindowHours", value)}
+                placeholder="如 72"
+              />
+            </div>
+            <p className="text-xs leading-6 text-muted-foreground">首页“热门”会优先显示近 N 小时内有活动的帖子，再按历史热度补位。建议保持在 `24-168` 小时之间；填写 `72` 即当前默认策略。</p>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
               <TextField label="浏览权重" value={heatViewWeight} onChange={(value) => updateDraftField("heatViewWeight", value)} placeholder="如 1" />
               <TextField label="回复权重" value={heatCommentWeight} onChange={(value) => updateDraftField("heatCommentWeight", value)} placeholder="如 8" />

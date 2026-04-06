@@ -9,7 +9,6 @@ import { normalizePageSize, normalizePositiveInteger } from "@/lib/shared/normal
 import type { AdminUserListResult } from "@/lib/admin-user-management"
 import { apiError } from "@/lib/api-route"
 import { requireSiteAdminActor } from "@/lib/moderator-permissions"
-import { isVipActive } from "@/lib/vip-status"
 
 
 interface GetAdminUsersOptions {
@@ -90,10 +89,10 @@ export async function getAdminUsers(options: GetAdminUsersOptions = {}): Promise
               ? [{ points: "desc" }, { createdAt: "desc" }]
               : [{ createdAt: "desc" }]
 
-  const userSummary = await buildAdminUserSummary(where)
+  const userSummary = await buildAdminUserSummary(where, now)
 
 
-  const { total, active, muted, banned, inactive, admin, moderator } = userSummary
+  const { total, active, muted, banned, inactive, admin, moderator, vip: vipCount } = userSummary
 
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
@@ -158,7 +157,7 @@ export async function getAdminUsers(options: GetAdminUsersOptions = {}): Promise
       admin,
       moderator,
       inactive,
-      vip: mappedUsers.filter((user) => isVipActive({ vipLevel: user.vipLevel, vipExpiresAt: user.vipExpiresAt })).length,
+      vip: vipCount,
     },
     filters: {
       keyword,

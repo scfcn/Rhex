@@ -8,12 +8,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { AdminModal } from "@/components/admin-modal"
 import { LevelBadge } from "@/components/level-badge"
+import { Tooltip } from "@/components/ui/tooltip"
 import { UserAvatar } from "@/components/user-avatar"
 import { UserStatusBadge } from "@/components/user-status-badge"
 import { VipBadge } from "@/components/vip-badge"
 import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/toast"
 import { getLocalDateKey, getMonthKey, getMonthTitle } from "@/lib/date-key"
+import { formatNumber } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
 
@@ -28,6 +30,9 @@ interface CheckInCalendarEntry {
 interface CheckInCalendarResponse {
   month: string
   pointName: string
+  currentStreak: number
+  maxStreak: number
+  makeUpCountsTowardStreak: boolean
   checkInReward: number
   makeUpPrice: number
   vipMakeUpPrice: number
@@ -64,7 +69,10 @@ export interface SidebarUserCardData {
   checkInVip1MakeUpCardPrice?: number
   checkInVip2MakeUpCardPrice?: number
   checkInVip3MakeUpCardPrice?: number
+  checkInMakeUpCountsTowardStreak?: boolean
   checkedInToday?: boolean
+  currentCheckInStreak?: number
+  maxCheckInStreak?: number
 }
 
 function resolveCurrentMakeUpPrice(user: SidebarUserCardData) {
@@ -140,6 +148,8 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
   const [checkInState, setCheckInState] = useState(() => ({
     points: user?.points ?? 0,
     checkedInToday: Boolean(user?.checkedInToday),
+    currentCheckInStreak: user?.currentCheckInStreak ?? 0,
+    maxCheckInStreak: user?.maxCheckInStreak ?? 0,
   }))
   const [loading, setLoading] = useState(false)
   const [calendarOpen, setCalendarOpen] = useState(false)
@@ -149,7 +159,13 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
   const calendarRequestIdRef = useRef(0)
   const calendarEntries = useMemo(() => new Map((calendarData?.entries ?? []).map((item) => [item.date, item])), [calendarData?.entries])
   const calendarDays = useMemo(() => buildCalendarDays(calendarMonth), [calendarMonth])
-  const { points, checkedInToday } = checkInState
+  const { points, checkedInToday, currentCheckInStreak, maxCheckInStreak } = checkInState
+  const syncCheckInState = useCallback((next: Partial<typeof checkInState>) => {
+    setCheckInState((current) => ({
+      ...current,
+      ...next,
+    }))
+  }, [])
 
   const loadCalendar = useCallback(async (targetMonth: string) => {
     const requestId = calendarRequestIdRef.current + 1
@@ -173,6 +189,13 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
       if (!response.ok) {
         toast.error(result.message ?? "签到日历加载失败", "加载失败")
         return
+      }
+
+      if (result.data) {
+        syncCheckInState({
+          currentCheckInStreak: result.data.currentStreak ?? currentCheckInStreak,
+          maxCheckInStreak: result.data.maxStreak ?? maxCheckInStreak,
+        })
       }
 
       setCalendarData((current) => {
@@ -208,14 +231,16 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
         setCalendarLoading(false)
       }
     }
-  }, [])
+  }, [currentCheckInStreak, maxCheckInStreak, syncCheckInState])
 
   useEffect(() => {
     setCheckInState({
       points: user?.points ?? 0,
       checkedInToday: Boolean(user?.checkedInToday),
+      currentCheckInStreak: user?.currentCheckInStreak ?? 0,
+      maxCheckInStreak: user?.maxCheckInStreak ?? 0,
     })
-  }, [user?.points, user?.checkedInToday])
+  }, [user?.currentCheckInStreak, user?.checkedInToday, user?.maxCheckInStreak, user?.points])
 
   useEffect(() => {
     if (!calendarOpen || !currentUser?.checkInEnabled) {
@@ -258,13 +283,6 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
   const pointName = safeUser.pointName ?? "积分"
   const vipActive = isVipActive(safeUser)
 
-  function syncCheckInState(next: Partial<typeof checkInState>) {
-    setCheckInState((current) => ({
-      ...current,
-      ...next,
-    }))
-  }
-
   function upsertCalendarEntry(entry: CheckInCalendarEntry) {
     setCalendarData((current) => {
       const entryMonth = entry.date.slice(0, 7)
@@ -294,9 +312,15 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
     ? `当前按 VIP${getVipLevel(safeUser)} 奖励发放`
     : "当前按普通用户奖励发放"
   const makeUpPriceDescription = vipActive
-    ? `当前按 VIP${getVipLevel(safeUser)} 价结算，普通 ${normalMakeUpPrice} / VIP1 ${vip1MakeUpPrice} / VIP2 ${vip2MakeUpPrice} / VIP3 ${vip3MakeUpPrice}`
-    : `普通账号价 ${normalMakeUpPrice}，VIP1 ${vip1MakeUpPrice} / VIP2 ${vip2MakeUpPrice} / VIP3 ${vip3MakeUpPrice}`
+    ? `当前按 VIP${getVipLevel(safeUser)} 价结算，普通 ${formatNumber(normalMakeUpPrice)} / VIP1 ${formatNumber(vip1MakeUpPrice)} / VIP2 ${formatNumber(vip2MakeUpPrice)} / VIP3 ${formatNumber(vip3MakeUpPrice)}`
+    : `普通账号价 ${formatNumber(normalMakeUpPrice)}，VIP1 ${formatNumber(vip1MakeUpPrice)} / VIP2 ${formatNumber(vip2MakeUpPrice)} / VIP3 ${formatNumber(vip3MakeUpPrice)}`
+  const checkInStreakDescription = (calendarData?.makeUpCountsTowardStreak ?? safeUser.checkInMakeUpCountsTowardStreak)
+    ? "补签会计入连续签到"
+    : "补签不会计入连续签到"
   const todayKey = getLocalDateKey()
+  const checkInButtonTooltip = checkedInToday
+    ? `今日已完成签到，${checkInRewardDescription}`
+    : `点击可获得 ${formatNumber(calendarData?.checkInReward ?? safeUser.checkInReward ?? 0)} ${pointName}，${checkInRewardDescription}`
 
   async function handleCheckIn() {
     if (!safeUser.checkInEnabled || checkedInToday || loading) {
@@ -321,6 +345,8 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
       syncCheckInState({
         points: result.data?.points ?? points,
         checkedInToday: true,
+        currentCheckInStreak: result.data?.currentStreak ?? currentCheckInStreak,
+        maxCheckInStreak: result.data?.maxStreak ?? maxCheckInStreak,
       })
       upsertCalendarEntry({
         date: checkedInDate,
@@ -363,6 +389,8 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
       syncCheckInState({
         points: result.data?.points ?? points,
         checkedInToday: checkedInDate === todayKey ? true : checkedInToday,
+        currentCheckInStreak: result.data?.currentStreak ?? currentCheckInStreak,
+        maxCheckInStreak: result.data?.maxStreak ?? maxCheckInStreak,
       })
       upsertCalendarEntry({
         date: checkedInDate,
@@ -430,7 +458,7 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
               </span>
               <div className="min-w-0">
                 <p className="text-xs text-amber-800/80 dark:text-amber-200/80">{pointName}</p>
-                <p className="truncate text-sm font-semibold">{points}</p>
+                <p className="truncate text-sm font-semibold">{formatNumber(points)}</p>
               </div>
             </Link>
 
@@ -461,14 +489,10 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
         onClose={() => setCalendarOpen(false)}
         size="md"
         title="签到日历"
-        description="在日历中查看签到记录，今天可直接签到，未签到的可使用补签卡。"
+        description={`在日历中查看签到记录。连续签到:${currentCheckInStreak}天，最长连续:${Math.max(maxCheckInStreak, currentCheckInStreak)}天，${checkInStreakDescription}`}
       >
         <div className="space-y-3">
-          <div className="grid gap-2.5 md:grid-cols-3">
-            <InfoPanel title="今日签到" value={`${currentUser.checkInReward ?? 0} ${pointName}`} description={checkedInToday ? `今日已完成签到，${checkInRewardDescription}` : `${checkInRewardDescription}，点击下方按钮立即领取`} />
-            <InfoPanel title="补签卡价格" value={`${calendarData?.makeUpPrice ?? effectiveMakeUpPrice} ${pointName}`} description={makeUpPriceDescription} />
-            <InfoPanel title="账户余额" value={`${points} ${pointName}`} description="补签时将自动从余额中扣除" />
-          </div>
+  
 
           <div className="flex flex-col gap-3 rounded-[20px] border border-border p-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-2">
@@ -482,16 +506,21 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" className="h-9 rounded-lg px-4 text-xs" onClick={handleCheckIn} disabled={checkedInToday || loading}>
-                {checkedInToday ? (
-                  <span className="inline-flex items-center gap-1">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    今日已签到
-                  </span>
-                ) : loading ? "签到中..." : "立即签到"}
-              </Button>
+              <Tooltip
+                content={checkInButtonTooltip}
+                align="center"
+              >
+                <Button type="button" className="h-9 rounded-lg px-4 text-xs" onClick={handleCheckIn} disabled={checkedInToday || loading}>
+                  {checkedInToday ? (
+                    <span className="inline-flex items-center gap-1">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      已签到
+                    </span>
+                  ) : loading ? "签到中..." : "签到"}
+                </Button>
+              </Tooltip>
               <Button type="button" variant="outline" className="h-9 rounded-lg px-4 text-xs" onClick={() => void loadCalendar(calendarMonth)} disabled={calendarLoading}>
-                {calendarLoading ? "加载中..." : "刷新日历"}
+                {calendarLoading ? "加载中..." : "刷新"}
               </Button>
             </div>
           </div>
@@ -514,49 +543,53 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
                 const isToday = activeDate === todayKey
                 const isPast = activeDate < todayKey
                 const canMakeUp = !entry && isPast && Boolean(currentUser.checkInEnabled)
+                const makeUpTooltip = canMakeUp
+                  ? `${activeDate} 可补签，需 ${formatNumber(calendarData?.makeUpPrice ?? effectiveMakeUpPrice)} ${pointName}。${makeUpPriceDescription}`
+                  : undefined
 
                 return (
-                  <button
-                    key={activeDate}
-                    type="button"
-                    disabled={!canMakeUp || loading}
-                    onClick={() => {
-                      if (canMakeUp) {
-                        void handleMakeUp(activeDate)
-                      }
-                    }}
-                    className={cn(
-                      "aspect-square rounded-2xl border p-2 text-left transition",
-                      entry ? "border-emerald-200 bg-emerald-50/70 text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100" : "border-border bg-background",
-                      canMakeUp ? "hover:border-amber-300 hover:bg-amber-50/60 dark:hover:border-amber-400/30 dark:hover:bg-amber-400/10" : "cursor-default",
-                      isToday && !entry ? "border-amber-300 bg-amber-50/70 dark:border-amber-400/30 dark:bg-amber-400/10" : null,
-                      !canMakeUp && !entry ? "opacity-80" : null,
-                    )}
-                  >
-                    <div className="flex h-full flex-col justify-between">
-                      <div className="flex items-start justify-between gap-1">
-                        <span className="text-sm font-semibold">{cell.day}</span>
-                        {entry ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : null}
+                  <Tooltip key={activeDate} content={makeUpTooltip} disabled={!makeUpTooltip} align="center">
+                    <button
+                      type="button"
+                      disabled={!canMakeUp || loading}
+                      onClick={() => {
+                        if (canMakeUp) {
+                          void handleMakeUp(activeDate)
+                        }
+                      }}
+                      className={cn(
+                        "aspect-square rounded-2xl border p-2 text-left transition",
+                        entry ? "border-emerald-200 bg-emerald-50/70 text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100" : "border-border bg-background",
+                        canMakeUp ? "hover:border-amber-300 hover:bg-amber-50/60 dark:hover:border-amber-400/30 dark:hover:bg-amber-400/10" : "cursor-default",
+                        isToday && !entry ? "border-amber-300 bg-amber-50/70 dark:border-amber-400/30 dark:bg-amber-400/10" : null,
+                        !canMakeUp && !entry ? "opacity-80" : null,
+                      )}
+                    >
+                      <div className="flex h-full flex-col justify-between">
+                        <div className="flex items-start justify-between gap-1">
+                          <span className="text-sm font-semibold">{cell.day}</span>
+                          {entry ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : null}
+                        </div>
+                        <div className="space-y-1 text-[10px] leading-4">
+                          {entry ? (
+                            <>
+                              <div>{entry.isMakeUp ? "已补签" : "已签到"}</div>
+                            </>
+                          ) : canMakeUp ? (
+                            <>
+                              <div className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-200">
+                                <Wallet className="h-2.5 w-2.5" /> 补签
+                              </div>
+                            </>
+                          ) : isToday ? (
+                            <div>可签到</div>
+                          ) : (
+                            <div className="text-muted-foreground">未签到</div>
+                          )}
+                        </div>
                       </div>
-                      <div className="space-y-1 text-[10px] leading-4">
-                        {entry ? (
-                          <>
-                            <div>{entry.isMakeUp ? "已补签" : "已签到"}</div>
-                          </>
-                        ) : canMakeUp ? (
-                          <>
-                            <div className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-200">
-                              <Wallet className="h-2.5 w-2.5" /> 补签
-                            </div>
-                          </>
-                        ) : isToday ? (
-                          <div>可签到</div>
-                        ) : (
-                          <div className="text-muted-foreground">未签到</div>
-                        )}
-                      </div>
-                    </div>
-                  </button>
+                    </button>
+                  </Tooltip>
                 )
               })}
             </div>
@@ -591,16 +624,6 @@ function InlineStatBlock({ label, value, icon, href }: { label: string; value: n
   return (
     <div className="rounded-[12px] border border-border bg-secondary/25 px-2 py-1.5 text-center dark:bg-secondary/50">
       {content}
-    </div>
-  )
-}
-
-function InfoPanel({ title, value, description }: { title: string; value: string; description: string }) {
-  return (
-    <div className="rounded-[16px] border border-border bg-secondary/20 p-2.5">
-      <p className="text-[11px] text-muted-foreground">{title}</p>
-      <p className="mt-1 text-sm font-semibold sm:text-[15px]">{value}</p>
-      <p className="mt-1 text-[10px] leading-4 text-muted-foreground">{description}</p>
     </div>
   )
 }

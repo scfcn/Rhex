@@ -4,6 +4,7 @@ import Image from "next/image"
 import { Loader2, Upload } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { POST_LIST_LOAD_MODE_PAGINATION, type PostListLoadMode } from "@/lib/post-list-load-mode"
 import { POST_LIST_DISPLAY_MODE_DEFAULT, POST_LIST_DISPLAY_MODE_GALLERY, type PostListDisplayMode } from "@/lib/post-list-display"
 import type { InteractionGateCondition, InteractionGateSettings } from "@/lib/site-settings"
 import type { SiteSearchSettings, SiteTippingGiftItem } from "@/lib/site-settings"
@@ -17,6 +18,12 @@ export interface AdminBasicSettingsInitialSettings {
   siteSeoKeywords?: string[]
   postLinkDisplayMode: "SLUG" | "ID"
   homeFeedPostListDisplayMode: PostListDisplayMode
+  homeFeedPostListLoadMode: PostListLoadMode
+  homeFeedPostPageSize: number
+  zonePostPageSize: number
+  boardPostPageSize: number
+  homeSidebarHotTopicsCount: number
+  postSidebarRelatedTopicsCount: number
   homeSidebarStatsCardEnabled: boolean
   homeSidebarAnnouncementsEnabled: boolean
   search: SiteSearchSettings
@@ -44,6 +51,7 @@ export interface AdminBasicSettingsInitialSettings {
   postRedPacketEnabled: boolean
   postRedPacketMaxPoints: number
   postRedPacketDailyLimit: number
+  postRedPacketRandomClaimProbability: number
   postJackpotEnabled: boolean
   postJackpotMinInitialPoints: number
   postJackpotMaxInitialPoints: number
@@ -54,6 +62,7 @@ export interface AdminBasicSettingsInitialSettings {
   heatLikeWeight: number
   heatTipCountWeight: number
   heatTipPointsWeight: number
+  homeHotRecentWindowHours: number
   heatStageThresholds: number[]
   heatStageColors: string[]
   registerEmailEnabled: boolean
@@ -97,6 +106,12 @@ export interface AdminBasicSettingsDraft {
   siteSeoKeywords: string
   postLinkDisplayMode: "SLUG" | "ID"
   homeFeedPostListDisplayMode: PostListDisplayMode
+  homeFeedPostListLoadMode: PostListLoadMode
+  homeFeedPostPageSize: string
+  zonePostPageSize: string
+  boardPostPageSize: string
+  homeSidebarHotTopicsCount: string
+  postSidebarRelatedTopicsCount: string
   homeSidebarStatsCardEnabled: boolean
   homeSidebarAnnouncementsEnabled: boolean
   searchEnabled: boolean
@@ -127,6 +142,7 @@ export interface AdminBasicSettingsDraft {
   postRedPacketEnabled: boolean
   postRedPacketMaxPoints: string
   postRedPacketDailyLimit: string
+  postRedPacketRandomClaimProbability: string
   postJackpotEnabled: boolean
   postJackpotMinInitialPoints: string
   postJackpotMaxInitialPoints: string
@@ -137,6 +153,7 @@ export interface AdminBasicSettingsDraft {
   heatLikeWeight: string
   heatTipCountWeight: string
   heatTipPointsWeight: string
+  homeHotRecentWindowHours: string
   heatStageThresholds: string
   heatStageColors: string[]
   previewViews: string
@@ -196,6 +213,12 @@ export function createAdminBasicSettingsDraft(initialSettings: AdminBasicSetting
     siteSeoKeywords: (initialSettings.siteSeoKeywords ?? []).join(","),
     postLinkDisplayMode: initialSettings.postLinkDisplayMode,
     homeFeedPostListDisplayMode: initialSettings.homeFeedPostListDisplayMode,
+    homeFeedPostListLoadMode: initialSettings.homeFeedPostListLoadMode,
+    homeFeedPostPageSize: String(initialSettings.homeFeedPostPageSize),
+    zonePostPageSize: String(initialSettings.zonePostPageSize),
+    boardPostPageSize: String(initialSettings.boardPostPageSize),
+    homeSidebarHotTopicsCount: String(initialSettings.homeSidebarHotTopicsCount),
+    postSidebarRelatedTopicsCount: String(initialSettings.postSidebarRelatedTopicsCount),
     homeSidebarStatsCardEnabled: initialSettings.homeSidebarStatsCardEnabled,
     homeSidebarAnnouncementsEnabled: initialSettings.homeSidebarAnnouncementsEnabled,
     searchEnabled: initialSettings.search.enabled,
@@ -226,6 +249,7 @@ export function createAdminBasicSettingsDraft(initialSettings: AdminBasicSetting
     postRedPacketEnabled: initialSettings.postRedPacketEnabled,
     postRedPacketMaxPoints: String(initialSettings.postRedPacketMaxPoints),
     postRedPacketDailyLimit: String(initialSettings.postRedPacketDailyLimit),
+    postRedPacketRandomClaimProbability: String(initialSettings.postRedPacketRandomClaimProbability),
     postJackpotEnabled: initialSettings.postJackpotEnabled,
     postJackpotMinInitialPoints: String(initialSettings.postJackpotMinInitialPoints),
     postJackpotMaxInitialPoints: String(initialSettings.postJackpotMaxInitialPoints),
@@ -236,6 +260,7 @@ export function createAdminBasicSettingsDraft(initialSettings: AdminBasicSetting
     heatLikeWeight: String(initialSettings.heatLikeWeight),
     heatTipCountWeight: String(initialSettings.heatTipCountWeight),
     heatTipPointsWeight: String(initialSettings.heatTipPointsWeight),
+    homeHotRecentWindowHours: String(initialSettings.homeHotRecentWindowHours),
     heatStageThresholds: initialSettings.heatStageThresholds.join(","),
     heatStageColors: initialSettings.heatStageColors,
     previewViews: "120",
@@ -285,6 +310,12 @@ export function buildAdminBasicSettingsPayload(draft: AdminBasicSettingsDraft, m
       siteSeoKeywords: draft.siteSeoKeywords,
       postLinkDisplayMode: draft.postLinkDisplayMode,
       homeFeedPostListDisplayMode: draft.homeFeedPostListDisplayMode,
+      homeFeedPostListLoadMode: draft.homeFeedPostListLoadMode ?? POST_LIST_LOAD_MODE_PAGINATION,
+      homeFeedPostPageSize: Number(draft.homeFeedPostPageSize),
+      zonePostPageSize: Number(draft.zonePostPageSize),
+      boardPostPageSize: Number(draft.boardPostPageSize),
+      homeSidebarHotTopicsCount: Number(draft.homeSidebarHotTopicsCount),
+      postSidebarRelatedTopicsCount: Number(draft.postSidebarRelatedTopicsCount),
       homeSidebarStatsCardEnabled: draft.homeSidebarStatsCardEnabled,
       homeSidebarAnnouncementsEnabled: draft.homeSidebarAnnouncementsEnabled,
       searchEnabled: draft.searchEnabled,
@@ -354,6 +385,7 @@ export function buildAdminBasicSettingsPayload(draft: AdminBasicSettingsDraft, m
     postRedPacketEnabled: draft.postRedPacketEnabled,
     postRedPacketMaxPoints: Number(draft.postRedPacketMaxPoints),
     postRedPacketDailyLimit: Number(draft.postRedPacketDailyLimit),
+    postRedPacketRandomClaimProbability: Number(draft.postRedPacketRandomClaimProbability),
     postJackpotEnabled: draft.postJackpotEnabled,
     postJackpotMinInitialPoints: Number(draft.postJackpotMinInitialPoints),
     postJackpotMaxInitialPoints: Number(draft.postJackpotMaxInitialPoints),
@@ -364,6 +396,7 @@ export function buildAdminBasicSettingsPayload(draft: AdminBasicSettingsDraft, m
     heatLikeWeight: Number(draft.heatLikeWeight),
     heatTipCountWeight: Number(draft.heatTipCountWeight),
     heatTipPointsWeight: Number(draft.heatTipPointsWeight),
+    homeHotRecentWindowHours: Number(draft.homeHotRecentWindowHours),
     heatStageThresholds: draft.heatStageThresholds,
     heatStageColors: draft.heatStageColors.join(","),
     section: "site-interaction",

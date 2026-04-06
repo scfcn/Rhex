@@ -6,6 +6,10 @@ export interface MarkdownEmojiItem {
 
 const SHORTCODE_PATTERN = /^[a-z0-9][a-z0-9_-]{0,31}$/i
 const SVG_WRAPPER_PATTERN = /^<svg[\s\S]*<\/svg>$/i
+const REMOTE_URL_PATTERN = /^(https?:)?\/\//i
+const DATA_IMAGE_PATTERN = /^data:image\//i
+const BLOB_URL_PATTERN = /^blob:/i
+const LOCAL_ASSET_PATTERN = /^(\/|\.\/|\.\.\/)/
 
 export const DEFAULT_MARKDOWN_EMOJI_ITEMS: MarkdownEmojiItem[] = [
   { shortcode: "smile", label: "微笑", icon: "😀" },
@@ -24,8 +28,27 @@ function isSvgMarkup(value: string) {
   return SVG_WRAPPER_PATTERN.test(value.trim())
 }
 
+function isImageSource(value: string) {
+  const normalizedValue = value.trim()
+
+  if (!normalizedValue || isSvgMarkup(normalizedValue)) {
+    return false
+  }
+
+  return (
+    REMOTE_URL_PATTERN.test(normalizedValue) ||
+    DATA_IMAGE_PATTERN.test(normalizedValue) ||
+    BLOB_URL_PATTERN.test(normalizedValue) ||
+    LOCAL_ASSET_PATTERN.test(normalizedValue)
+  )
+}
+
 export function isMarkdownEmojiSvg(icon?: string | null) {
   return !!icon && isSvgMarkup(icon)
+}
+
+export function isMarkdownEmojiImage(icon?: string | null) {
+  return !!icon && isImageSource(icon)
 }
 
 function escapeHtml(value: string) {
@@ -102,6 +125,10 @@ export function renderMarkdownEmojiHtml(shortcode: string, items: MarkdownEmojiI
 
   if (isSvgMarkup(matched.icon)) {
     return `<span class="md-emoji md-emoji-svg" data-shortcode="${matched.shortcode}" title="${title}" aria-label="${title}"><span class="md-emoji-icon">${buildSvgMarkup(matched.icon)}</span></span>`
+  }
+
+  if (isImageSource(matched.icon)) {
+    return `<span class="md-emoji md-emoji-image" data-shortcode="${matched.shortcode}" title="${title}" aria-label="${title}"><img class="md-emoji-icon" src="${escapeHtml(matched.icon)}" alt="${title}" loading="lazy" decoding="async" /></span>`
   }
 
   return `<span class="md-emoji md-emoji-text" data-shortcode="${matched.shortcode}" title="${title}" aria-label="${title}">${escapeHtml(matched.icon)}</span>`

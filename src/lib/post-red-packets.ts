@@ -2,6 +2,7 @@ import { upsertCommentEffectFeedback } from "@/db/comment-effect-feedback-querie
 import { PostRedPacketClaimOrderMode, PostRedPacketGrantMode, PostRedPacketStatus, PostRedPacketTriggerType } from "@/db/types"
 
 import type { Prisma } from "@/db/types"
+import type { PostRewardPoolEffectFeedback } from "@/lib/post-reward-effect-feedback"
 import {
   createJackpotRewardClaim,
   claimPostRedPacketInTransaction,
@@ -52,6 +53,20 @@ export {
   parsePostRewardPoolConfigFromContent,
 }
 export type { NormalizedPostRedPacketConfig, PostRewardPoolClaimResult }
+
+function attachJackpotDepositFeedback(
+  feedback: PostRewardPoolEffectFeedback | null,
+  jackpotDepositPoints: number,
+): PostRewardPoolEffectFeedback {
+  return {
+    badgeName: feedback?.badgeName ?? null,
+    badgeIconText: feedback?.badgeIconText ?? null,
+    badgeColor: feedback?.badgeColor ?? null,
+    badges: feedback?.badges ?? [],
+    events: feedback?.events ?? [],
+    jackpotDepositPoints,
+  }
+}
 
 export interface PostRedPacketClaimRecord {
   id: string
@@ -151,6 +166,7 @@ export async function tryClaimPostRedPacket(input: {
     triggerType: input.triggerType,
     triggerCommentId: input.triggerCommentId,
     pointName: settings.pointName,
+    randomClaimProbability: settings.postRedPacketRandomClaimProbability,
     buildClaimReason: buildRedPacketClaimReason,
     allocateAmount: (packet) => allocateRedPacketAmount({
       grantMode: packet.grantMode as PostRedPacketGrantMode,
@@ -229,23 +245,24 @@ async function tryClaimPostJackpot(input: {
       claimed: false,
       pointName: settings.pointName,
     })
+    const storedMissFeedback = attachJackpotDepositFeedback(missEffectFeedback, preparedIncrement.finalDelta)
 
     if (!shouldHitJackpot(preparedProbability.finalProbability)) {
-      if (input.triggerCommentId && missEffectFeedback) {
+      if (input.triggerCommentId) {
         await upsertCommentEffectFeedback({
           tx,
           postId: post.id,
           commentId: input.triggerCommentId,
           userId: user.id,
           scene: "JACKPOT_REPLY",
-          feedback: missEffectFeedback,
+          feedback: storedMissFeedback,
         })
       }
 
       return {
         claimed: false as const,
         reason: "本次未命中聚宝盆",
-        effectFeedback: missEffectFeedback,
+        effectFeedback: storedMissFeedback,
       }
     }
 
@@ -261,6 +278,7 @@ async function tryClaimPostJackpot(input: {
       claimed: true,
       pointName: settings.pointName,
     })
+    const storedSuccessFeedback = attachJackpotDepositFeedback(successEffectFeedback, preparedIncrement.finalDelta)
     const nextRemainingPoints = subtractSafeIntegers(depositedPoolPoints, amount)
     if (nextRemainingPoints === null) {
       return { claimed: false as const, reason: "聚宝盆结算失败" }
@@ -282,7 +300,7 @@ async function tryClaimPostJackpot(input: {
         amount,
       })
 
-      if (input.triggerCommentId && successEffectFeedback) {
+      if (input.triggerCommentId) {
         await upsertCommentEffectFeedback({
           tx,
           postId: post.id,
@@ -290,7 +308,7 @@ async function tryClaimPostJackpot(input: {
           userId: user.id,
           scene: "JACKPOT_REPLY",
           rewardClaimId: rewardClaim.id,
-          feedback: successEffectFeedback,
+          feedback: storedSuccessFeedback,
         })
       }
     } catch (error) {
@@ -320,7 +338,7 @@ async function tryClaimPostJackpot(input: {
       amount: Math.abs(preparedReward.finalDelta),
       pointName: settings.pointName,
       rewardMode: "JACKPOT" as const,
-      effectFeedback: successEffectFeedback,
+      effectFeedback: storedSuccessFeedback,
     }
   })
 }

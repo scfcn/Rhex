@@ -47,13 +47,14 @@ export default async function TagPage(props: PageProps<"/tags/[slug]">) {
     notFound()
   }
 
+  const settingsPromise = getSiteSettings()
   const [posts, boards, zones, currentUser, hotTopics, settings] = await Promise.all([
     getTagPosts(params.slug),
     getBoards(),
     getZones(),
     getCurrentUser(),
-    getHomeSidebarHotTopics(5),
-    getSiteSettings(),
+    settingsPromise.then((settings) => getHomeSidebarHotTopics(settings.homeSidebarHotTopicsCount)),
+    settingsPromise,
   ])
 
   const sidebarUser = await resolveSidebarUser(currentUser, settings)

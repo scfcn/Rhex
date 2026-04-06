@@ -1,6 +1,7 @@
 "use client"
 
 import type { AccessThresholdOption } from "@/lib/access-threshold-options"
+import { ConditionValueField, type ConditionValueFieldMode } from "@/components/condition-value-field"
 import { getLotteryConditionPlaceholder } from "@/components/create-post-form.shared"
 
 interface LotteryConditionValueFieldProps {
@@ -13,20 +14,16 @@ interface LotteryConditionValueFieldProps {
   disabled?: boolean
 }
 
-function getConditionSelectOptions(
-  conditionType: string,
-  userLevelOptions: AccessThresholdOption[],
-  vipLevelOptions: AccessThresholdOption[],
-) {
+function getLotteryConditionValueMode(conditionType: string): ConditionValueFieldMode {
   if (conditionType === "USER_LEVEL") {
-    return userLevelOptions.filter((option) => option.value !== "0")
+    return "user-level"
   }
 
   if (conditionType === "VIP_LEVEL") {
-    return vipLevelOptions.filter((option) => option.value !== "0")
+    return "vip-level"
   }
 
-  return null
+  return "text"
 }
 
 export function LotteryConditionValueField({
@@ -38,29 +35,15 @@ export function LotteryConditionValueField({
   onChange,
   disabled = false,
 }: LotteryConditionValueFieldProps) {
-  const selectOptions = getConditionSelectOptions(conditionType, userLevelOptions, vipLevelOptions)
-
-  if (selectOptions && selectOptions.length > 0) {
-    return (
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-11 rounded-full border border-border bg-background px-4 text-sm outline-none"
-        disabled={disabled}
-      >
-        {selectOptions.map((option) => (
-          <option key={option.value} value={option.value}>{option.label}</option>
-        ))}
-      </select>
-    )
-  }
-
   return (
-    <input
+    <ConditionValueField
+      mode={getLotteryConditionValueMode(conditionType)}
       value={value}
-      onChange={(event) => onChange(event.target.value)}
       className="h-11 rounded-full border border-border bg-background px-4 text-sm outline-none"
       placeholder={getLotteryConditionPlaceholder(conditionType, pointName)}
+      userLevelOptions={userLevelOptions}
+      vipLevelOptions={vipLevelOptions}
+      onChange={onChange}
       disabled={disabled}
     />
   )

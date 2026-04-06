@@ -168,7 +168,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
     redPacketSummaryPromise,
     postOfflineMetaPromise,
     commentResultPromise,
-    getPostSidebarData(basePost.id, basePost.authorUsername ?? basePost.author),
+    getPostSidebarData(basePost.id, basePost.authorUsername ?? basePost.author, settings.postSidebarRelatedTopicsCount),
     getBoards(),
     getZones(),
   ])

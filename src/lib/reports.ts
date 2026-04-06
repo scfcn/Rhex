@@ -1,7 +1,20 @@
 import { RelatedType, TargetType } from "@/db/types"
 
 
-import { countReportsByStatus, createReportRecord, createReportResultNotification, findAdminReportsPage, findDuplicatedPendingReport, findReportById, findReportTargetComment, findReportTargetPost, findReportTargetUser } from "@/db/report-queries"
+import {
+  countReportsByStatus,
+  createReportRecord,
+  createReportResultNotification,
+  findAdminReportsPage,
+  findDuplicatedPendingReport,
+  findReportById,
+  findReportTargetComment,
+  findReportTargetComments,
+  findReportTargetPost,
+  findReportTargetPosts,
+  findReportTargetUser,
+  findReportTargetUsers,
+} from "@/db/report-queries"
 import { resolvePagination } from "@/db/helpers"
 import { apiError } from "@/lib/api-route"
 
@@ -10,7 +23,7 @@ import { apiError } from "@/lib/api-route"
 
 import type { AdminReportListResult } from "@/lib/admin-report-management"
 import { getPostCommentPath, getPostPath } from "@/lib/post-links"
-import { getSiteSettings } from "@/lib/site-settings"
+import { getSiteSettings, type PostLinkDisplayMode } from "@/lib/site-settings"
 import { getUserDisplayName } from "@/lib/users"
 
 
@@ -37,6 +50,52 @@ export interface CreateReportInput {
 
 async function resolveReportTarget(targetType: TargetType, targetId: string) {
   const settings = await getSiteSettings()
+  return resolveReportTargetWithMode(targetType, targetId, settings.postLinkDisplayMode)
+}
+
+function mapPostReportTarget(
+  post: NonNullable<Awaited<ReturnType<typeof findReportTargetPost>>>,
+  postLinkDisplayMode: PostLinkDisplayMode,
+) {
+  return {
+    title: post.title,
+    description: `帖子作者：${getUserDisplayName(post.author)}`,
+    href: getPostPath({ id: post.id, slug: post.slug }, { mode: postLinkDisplayMode }),
+    ownerUserId: null as number | null,
+    relatedType: RelatedType.POST,
+    relatedId: post.id,
+  }
+}
+
+function mapCommentReportTarget(
+  comment: NonNullable<Awaited<ReturnType<typeof findReportTargetComment>>>,
+  postLinkDisplayMode: PostLinkDisplayMode,
+) {
+  return {
+    title: `评论：${comment.post.title}`,
+    description: `评论人：${getUserDisplayName(comment.user)} · ${comment.content.slice(0, 56) || "无内容"}`,
+    href: getPostCommentPath({ id: comment.post.id, slug: comment.post.slug, title: comment.post.title }, comment.id, { mode: postLinkDisplayMode }),
+    ownerUserId: comment.userId,
+    relatedType: RelatedType.COMMENT,
+    relatedId: comment.id,
+  }
+}
+
+function mapUserReportTarget(
+  user: NonNullable<Awaited<ReturnType<typeof findReportTargetUser>>>,
+  targetId: string,
+) {
+  return {
+    title: `用户：${getUserDisplayName(user)}`,
+    description: user.bio?.slice(0, 72) || `账号 @${user.username}`,
+    href: `/users/${user.username}`,
+    ownerUserId: user.id,
+    relatedType: RelatedType.REPORT,
+    relatedId: targetId,
+  }
+}
+
+async function resolveReportTargetWithMode(targetType: TargetType, targetId: string, postLinkDisplayMode: PostLinkDisplayMode) {
 
   if (targetType === TargetType.POST) {
 
@@ -47,16 +106,7 @@ async function resolveReportTarget(targetType: TargetType, targetId: string) {
       return null
     }
 
-    return {
-      title: post.title,
-      description: `帖子作者：${getUserDisplayName(post.author)}`,
-      href: getPostPath({ id: post.id, slug: post.slug }, { mode: settings.postLinkDisplayMode }),
-
-
-      ownerUserId: null as number | null,
-      relatedType: RelatedType.POST,
-      relatedId: post.id,
-    }
+    return mapPostReportTarget(post, postLinkDisplayMode)
   }
 
   if (targetType === TargetType.COMMENT) {
@@ -67,16 +117,7 @@ async function resolveReportTarget(targetType: TargetType, targetId: string) {
       return null
     }
 
-    return {
-      title: `评论：${comment.post.title}`,
-      description: `评论人：${getUserDisplayName(comment.user)} · ${comment.content.slice(0, 56) || "无内容"}`,
-      href: getPostCommentPath({ id: comment.post.id, slug: comment.post.slug, title: comment.post.title }, comment.id, { mode: settings.postLinkDisplayMode }),
-
-
-      ownerUserId: comment.userId,
-      relatedType: RelatedType.COMMENT,
-      relatedId: comment.id,
-    }
+    return mapCommentReportTarget(comment, postLinkDisplayMode)
   }
 
   const user = await findReportTargetUser(targetId)
@@ -86,14 +127,38 @@ async function resolveReportTarget(targetType: TargetType, targetId: string) {
     return null
   }
 
-  return {
-    title: `用户：${getUserDisplayName(user)}`,
-    description: user.bio?.slice(0, 72) || `账号 @${user.username}`,
-    href: `/users/${user.username}`,
-    ownerUserId: user.id,
-    relatedType: RelatedType.REPORT,
-    relatedId: targetId,
-  }
+  return mapUserReportTarget(user, targetId)
+}
+
+async function resolveReportTargets(
+  reports: Array<{ targetType: TargetType; targetId: string }>,
+  postLinkDisplayMode: PostLinkDisplayMode,
+) {
+  const postIds = reports.filter((report) => report.targetType === TargetType.POST).map((report) => report.targetId)
+  const commentIds = reports.filter((report) => report.targetType === TargetType.COMMENT).map((report) => report.targetId)
+  const userIds = reports.filter((report) => report.targetType === TargetType.USER).map((report) => report.targetId)
+
+  const [posts, comments, users] = await Promise.all([
+    findReportTargetPosts(postIds),
+    findReportTargetComments(commentIds),
+    findReportTargetUsers(userIds),
+  ])
+
+  const postMap = new Map(posts.map((post) => [post.id, mapPostReportTarget(post, postLinkDisplayMode)]))
+  const commentMap = new Map(comments.map((comment) => [comment.id, mapCommentReportTarget(comment, postLinkDisplayMode)]))
+  const userMap = new Map(users.map((user) => [String(user.id), mapUserReportTarget(user, String(user.id))]))
+
+  return reports.map((report) => {
+    if (report.targetType === TargetType.POST) {
+      return postMap.get(report.targetId) ?? null
+    }
+
+    if (report.targetType === TargetType.COMMENT) {
+      return commentMap.get(report.targetId) ?? null
+    }
+
+    return userMap.get(report.targetId) ?? null
+  })
 }
 
 export async function createReport(input: CreateReportInput) {
@@ -135,9 +200,9 @@ export async function getAdminReports(options: { page?: number; pageSize?: numbe
   const [total, pending, processing, resolved, rejected] = await countReportsByStatus()
   const pagination = resolvePagination(options, total)
 
+  const settings = await getSiteSettings()
   const reports = await findAdminReportsPage(pagination.skip, pagination.pageSize)
-
-  const targetSummaries = await Promise.all(reports.map((report) => resolveReportTarget(report.targetType, report.targetId)))
+  const targetSummaries = await resolveReportTargets(reports, settings.postLinkDisplayMode)
 
 
   return {

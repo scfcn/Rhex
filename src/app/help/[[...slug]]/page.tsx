@@ -40,13 +40,14 @@ export async function generateMetadata({ params }: HelpPageProps): Promise<Metad
 export default async function HelpPage({ params }: HelpPageProps) {
   const { slug } = await params
   const currentUserPromise = getCurrentUser()
+  const settingsPromise = getSiteSettings()
   const [helpData, settings, boards, zones, currentUser, hotTopics, announcements] = await Promise.all([
     getHelpDocumentPageData(slug),
-    getSiteSettings(),
+    settingsPromise,
     getBoards(),
     getZones(),
     currentUserPromise,
-    getHomeSidebarHotTopics(5),
+    settingsPromise.then((settings) => getHomeSidebarHotTopics(settings.homeSidebarHotTopicsCount)),
     getHomeAnnouncements(3),
   ])
 

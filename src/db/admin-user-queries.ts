@@ -3,18 +3,61 @@ import { UserRole, UserStatus } from "@/db/types"
 import type { Prisma } from "@/db/types"
 
 import { prisma } from "@/db/client"
-import { resolveCountMap } from "@/db/helpers"
 
-export function buildAdminUserSummary(where: Prisma.UserWhereInput) {
-  return resolveCountMap([
-    ["total", prisma.user.count({ where })],
-    ["active", prisma.user.count({ where: { ...where, status: UserStatus.ACTIVE } })],
-    ["muted", prisma.user.count({ where: { ...where, status: UserStatus.MUTED } })],
-    ["banned", prisma.user.count({ where: { ...where, status: UserStatus.BANNED } })],
-    ["inactive", prisma.user.count({ where: { ...where, status: UserStatus.INACTIVE } })],
-    ["admin", prisma.user.count({ where: { ...where, role: UserRole.ADMIN } })],
-    ["moderator", prisma.user.count({ where: { ...where, role: UserRole.MODERATOR } })],
-  ] as const)
+export async function buildAdminUserSummary(where: Prisma.UserWhereInput, now: Date) {
+  const [total, groupedRows, vip] = await Promise.all([
+    prisma.user.count({ where }),
+    prisma.user.groupBy({
+      by: ["status", "role"],
+      where,
+      _count: {
+        _all: true,
+      },
+    }),
+    prisma.user.count({
+      where: {
+        AND: [
+          where,
+          {
+            vipExpiresAt: {
+              gt: now,
+            },
+          },
+        ],
+      },
+    }),
+  ])
+
+  const summary = {
+    total,
+    active: 0,
+    muted: 0,
+    banned: 0,
+    inactive: 0,
+    admin: 0,
+    moderator: 0,
+    vip,
+  }
+
+  for (const row of groupedRows) {
+    if (row.status === UserStatus.ACTIVE) {
+      summary.active += row._count._all
+    } else if (row.status === UserStatus.MUTED) {
+      summary.muted += row._count._all
+    } else if (row.status === UserStatus.BANNED) {
+      summary.banned += row._count._all
+    } else if (row.status === UserStatus.INACTIVE) {
+      summary.inactive += row._count._all
+    }
+
+    if (row.role === UserRole.ADMIN) {
+      summary.admin += row._count._all
+    } else if (row.role === UserRole.MODERATOR) {
+      summary.moderator += row._count._all
+    }
+  }
+
+  return summary
 }
 
 export function findAdminUsersPage(where: Prisma.UserWhereInput, orderBy: Prisma.UserOrderByWithRelationInput[], skip: number, take: number) {

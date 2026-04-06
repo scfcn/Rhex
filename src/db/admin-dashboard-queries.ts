@@ -1,93 +1,154 @@
-import { PostStatus, ReportStatus, UserStatus } from "@/db/types"
+import { unstable_cache } from "next/cache"
 
 import { countPendingSelfServeOrders } from "@/db/self-serve-ads"
 
 
 import { prisma } from "@/db/client"
-import type { Prisma } from "@/db/types"
-import { getBusinessDayRange } from "@/lib/formatters"
+import { Prisma, type Prisma as PrismaType } from "@/db/types"
+import { BUSINESS_TIME_ZONE, getBusinessDayRange, getLocalDateKey } from "@/lib/formatters"
 
-export async function getAdminDashboardRawData() {
-  const { start: todayStart, dayKey: todayKey } = getBusinessDayRange()
+const ADMIN_DASHBOARD_CACHE_REVALIDATE_SECONDS = 30
+
+type NumericLike = bigint | number | null | undefined
+
+function toNumber(value: NumericLike) {
+  if (typeof value === "bigint") {
+    return Number(value)
+  }
+
+  return Number(value ?? 0)
+}
+
+function buildTrendDates(todayStart: Date) {
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(todayStart)
+    date.setUTCDate(date.getUTCDate() - (6 - index))
+    return date
+  })
+}
+
+function getTrendDateKey(date: Date) {
+  return getLocalDateKey(date)
+}
+
+async function findDailyCreatedTrendCounts(tableName: "User" | "Post" | "Comment" | "Report", rangeStart: Date, rangeEnd: Date) {
+  const rows = await prisma.$queryRaw<Array<{ dayKey: string; count: NumericLike }>>(Prisma.sql`
+    SELECT
+      TO_CHAR(timezone(${BUSINESS_TIME_ZONE}, "createdAt"), 'YYYY-MM-DD') AS "dayKey",
+      COUNT(*) AS "count"
+    FROM ${Prisma.raw(`"${tableName}"`)}
+    WHERE "createdAt" >= ${rangeStart} AND "createdAt" < ${rangeEnd}
+    GROUP BY 1
+    ORDER BY 1 ASC
+  `)
+
+  return new Map(rows.map((row) => [row.dayKey, toNumber(row.count)]))
+}
+
+async function getAdminDashboardRawDataUncached() {
+  const { start: todayStart, end: todayEnd, dayKey: todayKey } = getBusinessDayRange()
 
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  const trendDates = buildTrendDates(todayStart)
+  const trendRangeStart = trendDates[0] ?? todayStart
 
   const [
-    userCount,
-    postCount,
-    commentCount,
-    boardCount,
-    zoneCount,
-    reportCount,
-    pendingReportCount,
-    processingReportCount,
-    resolvedReportCount,
-    pendingPostCount,
-    offlinePostCount,
-    pendingVerificationCount,
-    pendingFriendLinkCount,
+    userStats,
+    postStats,
+    commentStats,
+    reportStats,
+    siteStats,
     pendingAdOrderCount,
-    activeUserCount7d,
-    mutedUserCount,
-    bannedUserCount,
-
-    newUserCount7d,
-    newPostCount7d,
-    newCommentCount7d,
-    todayPostCount,
-    todayCommentCount,
-    todayReportCount,
-    postAggregates,
-    boardAggregates,
-    todayCheckInUserCount,
     recentPosts,
     recentComments,
+    userTrendMap,
+    postTrendMap,
+    commentTrendMap,
+    reportTrendMap,
   ] = await Promise.all([
-    prisma.user.count(),
-    prisma.post.count(),
-    prisma.comment.count(),
-    prisma.board.count(),
-    prisma.zone.count(),
-    prisma.report.count(),
-    prisma.report.count({ where: { status: ReportStatus.PENDING } }),
-    prisma.report.count({ where: { status: ReportStatus.PROCESSING } }),
-    prisma.report.count({ where: { status: ReportStatus.RESOLVED } }),
-    prisma.post.count({ where: { status: PostStatus.PENDING } }),
-    prisma.post.count({ where: { status: PostStatus.OFFLINE } }),
-    prisma.userVerification.count({ where: { status: "PENDING" } }),
-    prisma.friendLink.count({ where: { status: "PENDING" } }),
+    prisma.$queryRaw<Array<{
+      userCount: NumericLike
+      mutedUserCount: NumericLike
+      bannedUserCount: NumericLike
+      newUserCount7d: NumericLike
+      activeUserCount7d: NumericLike
+    }>>(Prisma.sql`
+      SELECT
+        COUNT(*) AS "userCount",
+        COUNT(*) FILTER (WHERE status = 'MUTED') AS "mutedUserCount",
+        COUNT(*) FILTER (WHERE status = 'BANNED') AS "bannedUserCount",
+        COUNT(*) FILTER (WHERE "createdAt" >= ${sevenDaysAgo}) AS "newUserCount7d",
+        COUNT(*) FILTER (
+          WHERE "lastLoginAt" >= ${sevenDaysAgo}
+            OR "lastPostAt" >= ${sevenDaysAgo}
+            OR "lastCommentAt" >= ${sevenDaysAgo}
+        ) AS "activeUserCount7d"
+      FROM "User"
+    `),
+    prisma.$queryRaw<Array<{
+      postCount: NumericLike
+      pendingPostCount: NumericLike
+      offlinePostCount: NumericLike
+      newPostCount7d: NumericLike
+      todayPostCount: NumericLike
+      totalViewCount: NumericLike
+      totalLikeCount: NumericLike
+      totalFavoriteCount: NumericLike
+    }>>(Prisma.sql`
+      SELECT
+        COUNT(*) AS "postCount",
+        COUNT(*) FILTER (WHERE status = 'PENDING') AS "pendingPostCount",
+        COUNT(*) FILTER (WHERE status = 'OFFLINE') AS "offlinePostCount",
+        COUNT(*) FILTER (WHERE "createdAt" >= ${sevenDaysAgo}) AS "newPostCount7d",
+        COUNT(*) FILTER (WHERE "createdAt" >= ${todayStart}) AS "todayPostCount",
+        COALESCE(SUM("viewCount"), 0) AS "totalViewCount",
+        COALESCE(SUM("likeCount"), 0) AS "totalLikeCount",
+        COALESCE(SUM("favoriteCount"), 0) AS "totalFavoriteCount"
+      FROM "Post"
+    `),
+    prisma.$queryRaw<Array<{
+      commentCount: NumericLike
+      newCommentCount7d: NumericLike
+      todayCommentCount: NumericLike
+    }>>(Prisma.sql`
+      SELECT
+        COUNT(*) AS "commentCount",
+        COUNT(*) FILTER (WHERE "createdAt" >= ${sevenDaysAgo}) AS "newCommentCount7d",
+        COUNT(*) FILTER (WHERE "createdAt" >= ${todayStart}) AS "todayCommentCount"
+      FROM "Comment"
+    `),
+    prisma.$queryRaw<Array<{
+      reportCount: NumericLike
+      pendingReportCount: NumericLike
+      processingReportCount: NumericLike
+      resolvedReportCount: NumericLike
+      todayReportCount: NumericLike
+    }>>(Prisma.sql`
+      SELECT
+        COUNT(*) AS "reportCount",
+        COUNT(*) FILTER (WHERE status = 'PENDING') AS "pendingReportCount",
+        COUNT(*) FILTER (WHERE status = 'PROCESSING') AS "processingReportCount",
+        COUNT(*) FILTER (WHERE status = 'RESOLVED') AS "resolvedReportCount",
+        COUNT(*) FILTER (WHERE "createdAt" >= ${todayStart}) AS "todayReportCount"
+      FROM "Report"
+    `),
+    prisma.$queryRaw<Array<{
+      boardCount: NumericLike
+      zoneCount: NumericLike
+      pendingVerificationCount: NumericLike
+      pendingFriendLinkCount: NumericLike
+      totalFollowerCount: NumericLike
+      todayCheckInUserCount: NumericLike
+    }>>(Prisma.sql`
+      SELECT
+        (SELECT COUNT(*) FROM "Board") AS "boardCount",
+        (SELECT COUNT(*) FROM "Zone") AS "zoneCount",
+        (SELECT COUNT(*) FROM "UserVerification" WHERE status = 'PENDING') AS "pendingVerificationCount",
+        (SELECT COUNT(*) FROM "FriendLink" WHERE status = 'PENDING') AS "pendingFriendLinkCount",
+        (SELECT COALESCE(SUM("followerCount"), 0) FROM "Board") AS "totalFollowerCount",
+        (SELECT COUNT(*) FROM "UserCheckInLog" WHERE "checkedInOn" = ${todayKey}) AS "todayCheckInUserCount"
+    `),
     countPendingSelfServeOrders("self-serve-ads"),
-    prisma.user.count({
-
-      where: {
-        OR: [
-          { lastLoginAt: { gte: sevenDaysAgo } },
-          { lastPostAt: { gte: sevenDaysAgo } },
-          { lastCommentAt: { gte: sevenDaysAgo } },
-        ],
-      },
-    }),
-    prisma.user.count({ where: { status: UserStatus.MUTED } }),
-    prisma.user.count({ where: { status: UserStatus.BANNED } }),
-    prisma.user.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
-    prisma.post.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
-    prisma.comment.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
-    prisma.post.count({ where: { createdAt: { gte: todayStart } } }),
-    prisma.comment.count({ where: { createdAt: { gte: todayStart } } }),
-    prisma.report.count({ where: { createdAt: { gte: todayStart } } }),
-    prisma.post.aggregate({
-      _sum: {
-        viewCount: true,
-        likeCount: true,
-        favoriteCount: true,
-      },
-    }),
-    prisma.board.aggregate({
-      _sum: {
-        followerCount: true,
-      },
-    }),
-    prisma.userCheckInLog.count({ where: { checkedInOn: todayKey } }),
     prisma.post.findMany({
       orderBy: { createdAt: "desc" },
       take: 8,
@@ -118,69 +179,75 @@ export async function getAdminDashboardRawData() {
         },
       },
     }),
+    findDailyCreatedTrendCounts("User", trendRangeStart, todayEnd),
+    findDailyCreatedTrendCounts("Post", trendRangeStart, todayEnd),
+    findDailyCreatedTrendCounts("Comment", trendRangeStart, todayEnd),
+    findDailyCreatedTrendCounts("Report", trendRangeStart, todayEnd),
   ])
-
-  const trendDates = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(todayStart)
-    date.setUTCDate(date.getUTCDate() - (6 - index))
-    return date
-  })
-
-  const [userTrend, postTrend, commentTrend, reportTrend] = await Promise.all([
-    Promise.all(trendDates.map((date) => prisma.user.count({ where: { createdAt: { gte: date, lt: new Date(date.getTime() + 24 * 60 * 60 * 1000) } } }))),
-    Promise.all(trendDates.map((date) => prisma.post.count({ where: { createdAt: { gte: date, lt: new Date(date.getTime() + 24 * 60 * 60 * 1000) } } }))),
-    Promise.all(trendDates.map((date) => prisma.comment.count({ where: { createdAt: { gte: date, lt: new Date(date.getTime() + 24 * 60 * 60 * 1000) } } }))),
-    Promise.all(trendDates.map((date) => prisma.report.count({ where: { createdAt: { gte: date, lt: new Date(date.getTime() + 24 * 60 * 60 * 1000) } } }))),
-  ])
+  const resolvedUserStats = userStats[0]
+  const resolvedPostStats = postStats[0]
+  const resolvedCommentStats = commentStats[0]
+  const resolvedReportStats = reportStats[0]
+  const resolvedSiteStats = siteStats[0]
 
   return {
     overview: {
-      userCount,
-      postCount,
-      commentCount,
-      boardCount,
-      zoneCount,
-      reportCount,
-      pendingReportCount,
-      processingReportCount,
-      resolvedReportCount,
-      pendingPostCount,
-      offlinePostCount,
-      pendingVerificationCount,
-      pendingFriendLinkCount,
+      userCount: toNumber(resolvedUserStats?.userCount),
+      postCount: toNumber(resolvedPostStats?.postCount),
+      commentCount: toNumber(resolvedCommentStats?.commentCount),
+      boardCount: toNumber(resolvedSiteStats?.boardCount),
+      zoneCount: toNumber(resolvedSiteStats?.zoneCount),
+      reportCount: toNumber(resolvedReportStats?.reportCount),
+      pendingReportCount: toNumber(resolvedReportStats?.pendingReportCount),
+      processingReportCount: toNumber(resolvedReportStats?.processingReportCount),
+      resolvedReportCount: toNumber(resolvedReportStats?.resolvedReportCount),
+      pendingPostCount: toNumber(resolvedPostStats?.pendingPostCount),
+      offlinePostCount: toNumber(resolvedPostStats?.offlinePostCount),
+      pendingVerificationCount: toNumber(resolvedSiteStats?.pendingVerificationCount),
+      pendingFriendLinkCount: toNumber(resolvedSiteStats?.pendingFriendLinkCount),
       pendingAdOrderCount,
-      activeUserCount7d,
-      mutedUserCount,
-      bannedUserCount,
+      activeUserCount7d: toNumber(resolvedUserStats?.activeUserCount7d),
+      mutedUserCount: toNumber(resolvedUserStats?.mutedUserCount),
+      bannedUserCount: toNumber(resolvedUserStats?.bannedUserCount),
 
-      newUserCount7d,
-      newPostCount7d,
-      newCommentCount7d,
-      todayPostCount,
-      todayCommentCount,
-      todayReportCount,
-      totalViewCount: postAggregates._sum.viewCount ?? 0,
-      totalLikeCount: postAggregates._sum.likeCount ?? 0,
-      totalFavoriteCount: postAggregates._sum.favoriteCount ?? 0,
-      totalFollowerCount: boardAggregates._sum.followerCount ?? 0,
-      todayCheckInUserCount,
+      newUserCount7d: toNumber(resolvedUserStats?.newUserCount7d),
+      newPostCount7d: toNumber(resolvedPostStats?.newPostCount7d),
+      newCommentCount7d: toNumber(resolvedCommentStats?.newCommentCount7d),
+      todayPostCount: toNumber(resolvedPostStats?.todayPostCount),
+      todayCommentCount: toNumber(resolvedCommentStats?.todayCommentCount),
+      todayReportCount: toNumber(resolvedReportStats?.todayReportCount),
+      totalViewCount: toNumber(resolvedPostStats?.totalViewCount),
+      totalLikeCount: toNumber(resolvedPostStats?.totalLikeCount),
+      totalFavoriteCount: toNumber(resolvedPostStats?.totalFavoriteCount),
+      totalFollowerCount: toNumber(resolvedSiteStats?.totalFollowerCount),
+      todayCheckInUserCount: toNumber(resolvedSiteStats?.todayCheckInUserCount),
     },
 
-    trends: trendDates.map((date, index) => ({
+    trends: trendDates.map((date) => ({
       date,
-      userCount: userTrend[index] ?? 0,
-      postCount: postTrend[index] ?? 0,
-      commentCount: commentTrend[index] ?? 0,
-      reportCount: reportTrend[index] ?? 0,
+      userCount: userTrendMap.get(getTrendDateKey(date)) ?? 0,
+      postCount: postTrendMap.get(getTrendDateKey(date)) ?? 0,
+      commentCount: commentTrendMap.get(getTrendDateKey(date)) ?? 0,
+      reportCount: reportTrendMap.get(getTrendDateKey(date)) ?? 0,
     })),
     recentPosts,
     recentComments,
   }
 }
 
+const getCachedAdminDashboardRawData = unstable_cache(
+  async () => getAdminDashboardRawDataUncached(),
+  ["admin-dashboard-raw-data"],
+  { revalidate: ADMIN_DASHBOARD_CACHE_REVALIDATE_SECONDS },
+)
+
+export async function getAdminDashboardRawData() {
+  return getCachedAdminDashboardRawData()
+}
+
 export async function getAdminStructureRawData(options?: {
-  zoneWhere?: Prisma.ZoneWhereInput
-  boardWhere?: Prisma.BoardWhereInput
+  zoneWhere?: PrismaType.ZoneWhereInput
+  boardWhere?: PrismaType.BoardWhereInput
 }) {
   const { start: todayStart } = getBusinessDayRange()
 
@@ -211,6 +278,7 @@ export async function getAdminStructureRawData(options?: {
         minPostVipLevel: true,
         minReplyVipLevel: true,
         postListDisplayMode: true,
+        postListLoadMode: true,
         _count: { select: { boards: true } },
       },
     }),
@@ -244,9 +312,10 @@ export async function getAdminStructureRawData(options?: {
         minPostVipLevel: true,
         minReplyVipLevel: true,
         postListDisplayMode: true,
+        postListLoadMode: true,
         zoneId: true,
         zone: {
-          select: { id: true, name: true, postListDisplayMode: true },
+          select: { id: true, name: true, postListDisplayMode: true, postListLoadMode: true },
         },
       },
     }),

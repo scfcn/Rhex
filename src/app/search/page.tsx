@@ -26,7 +26,16 @@ export default async function SearchPage(props: PageProps<"/search">) {
   const keyword = readSearchParam(searchParams?.q)?.trim() ?? ""
   const after = readSearchParam(searchParams?.after) ?? null
   const before = readSearchParam(searchParams?.before) ?? null
-  const results = settings.search.enabled ? await searchPosts(keyword, { pageSize: 10, after, before }) : null
+  const results = settings.search.enabled
+    ? await searchPosts(keyword, {
+        pageSize: 10,
+        after,
+        before,
+        includeTotal: !after && !before,
+        searchEnabled: settings.search.enabled,
+        postLinkDisplayMode: settings.postLinkDisplayMode,
+      })
+    : null
 
   function buildSearchHref(params: { before?: string | null; after?: string | null }) {
     const query = new URLSearchParams()
@@ -73,7 +82,9 @@ export default async function SearchPage(props: PageProps<"/search">) {
                 <p className="text-sm text-muted-foreground">没有找到相关内容，试试更短的关键词或其他表达方式。</p>
               ) : (
                 <>
-                  <p className="text-sm text-muted-foreground">共找到 {results!.total} 条结果</p>
+                  <p className="text-sm text-muted-foreground">
+                    {results!.total === null ? `当前页返回 ${results!.items.length} 条结果` : `共找到 ${results!.total} 条结果`}
+                  </p>
                   <ForumPostStream posts={results!.items} />
                   <div className="flex items-center justify-between pt-2">
                     <a href={results!.hasPrevPage && results!.prevCursor ? buildSearchHref({ before: results!.prevCursor }) : "#"} className={results!.hasPrevPage ? "" : "pointer-events-none opacity-50"}>

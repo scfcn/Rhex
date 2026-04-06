@@ -99,8 +99,13 @@ export function findPointLogsPage(where: Prisma.PointLogWhereInput, skip: number
   })
 }
 
-export function findUploadLogs() {
+export function countUploadLogs(where: Prisma.UploadWhereInput) {
+  return prisma.upload.count({ where })
+}
+
+export function findUploadLogsPage(where: Prisma.UploadWhereInput, skip: number, take: number) {
   return prisma.upload.findMany({
+    where,
     orderBy: { createdAt: "desc" },
     include: {
       user: {
@@ -110,11 +115,18 @@ export function findUploadLogs() {
         },
       },
     },
+    skip,
+    take,
   })
 }
 
-export function findVipOrders() {
+export function countVipOrders(where: Prisma.VipOrderWhereInput) {
+  return prisma.vipOrder.count({ where })
+}
+
+export function findVipOrdersPage(where: Prisma.VipOrderWhereInput, skip: number, take: number) {
   return prisma.vipOrder.findMany({
+    where,
     orderBy: { createdAt: "desc" },
     include: {
       user: {
@@ -124,6 +136,8 @@ export function findVipOrders() {
         },
       },
     },
+    skip,
+    take,
   })
 }
 

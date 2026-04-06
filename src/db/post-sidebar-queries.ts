@@ -1,6 +1,6 @@
 import { prisma } from "@/db/client"
 
-export async function findPostSidebarData(postId: string, authorUsername: string) {
+export async function findPostSidebarData(postId: string, authorUsername: string, relatedPostsLimit = 5) {
   const [author, postTags, relatedPosts] = await Promise.all([
     prisma.user.findUnique({
       where: { username: authorUsername },
@@ -32,7 +32,7 @@ export async function findPostSidebarData(postId: string, authorUsername: string
         slug: true,
         title: true,
       },
-      take: 5,
+      take: relatedPostsLimit,
       orderBy: [{ createdAt: "desc" }],
     }),
   ])

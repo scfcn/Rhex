@@ -25,6 +25,7 @@ export interface ZoneItem {
   minPostVipLevel: number
   minReplyVipLevel: number
   postListDisplayMode: string | null
+  postListLoadMode: string | null
   canEditSettings: boolean
 }
 
@@ -59,6 +60,7 @@ export interface BoardItem {
   minPostVipLevel: number | null
   minReplyVipLevel: number | null
   postListDisplayMode: string | null
+  postListLoadMode: string | null
   canEditSettings: boolean
 }
 

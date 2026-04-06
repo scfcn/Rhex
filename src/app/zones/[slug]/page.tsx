@@ -5,6 +5,7 @@ import { AccessDeniedCard } from "@/components/access-denied-card"
 import { CollapsibleInfoCard } from "@/components/collapsible-info-card"
 import { ForumPageShell } from "@/components/forum-page-shell"
 import { ForumPostStream } from "@/components/forum-post-stream"
+import { InfiniteForumPostStream } from "@/components/infinite-forum-post-stream"
 import { PageNumberPagination } from "@/components/page-number-pagination"
 
 import { HomeSidebarPanels } from "@/components/home-sidebar-panels"
@@ -14,9 +15,11 @@ import { SiteHeader } from "@/components/site-header"
 import { getCurrentUser } from "@/lib/auth"
 import { checkBoardPermission } from "@/lib/board-access"
 import { getBoards } from "@/lib/boards"
+import { mapSitePostsToDisplayItems } from "@/lib/forum-post-stream-display"
 import { getHomeSidebarHotTopics, resolveSidebarUser } from "@/lib/home-sidebar"
 
 import { DEFAULT_ALLOWED_POST_TYPES } from "@/lib/post-types"
+import { POST_LIST_LOAD_MODE_INFINITE } from "@/lib/post-list-load-mode"
 import { readSearchParam } from "@/lib/search-params"
 import { buildMetadataKeywords } from "@/lib/seo"
 import { getSiteSettings } from "@/lib/site-settings"
@@ -56,7 +59,8 @@ export async function generateMetadata(props: PageProps<"/zones/[slug]">): Promi
 export default async function ZonePage(props: PageProps<"/zones/[slug]">) {
   const searchParams = await props.searchParams
   const params = await props.params
-  const [zone, currentUser, settings] = await Promise.all([getZoneBySlug(params.slug), getCurrentUser(), getSiteSettings()])
+  const settingsPromise = getSiteSettings()
+  const [zone, currentUser, settings] = await Promise.all([getZoneBySlug(params.slug), getCurrentUser(), settingsPromise])
 
   if (!zone) {
     notFound()
@@ -86,11 +90,11 @@ export default async function ZonePage(props: PageProps<"/zones/[slug]">) {
   const [zoneBoards, postsPage, allBoards, allZones, hotTopics] = await Promise.all([
     getZoneBoards(params.slug),
     permission.allowed
-      ? getZonePosts(params.slug, currentPage, 20)
-      : Promise.resolve({ items: [], page: 1, pageSize: 20, total: 0, totalPages: 1, hasPrevPage: false, hasNextPage: false }),
+      ? getZonePosts(params.slug, currentPage, settings.zonePostPageSize)
+      : Promise.resolve({ items: [], page: 1, pageSize: settings.zonePostPageSize, total: 0, totalPages: 1, hasPrevPage: false, hasNextPage: false }),
     getBoards(),
     getZones(),
-    getHomeSidebarHotTopics(5),
+    settingsPromise.then((settings) => getHomeSidebarHotTopics(settings.homeSidebarHotTopicsCount)),
   ])
   const { items: posts, page, totalPages, hasPrevPage, hasNextPage } = postsPage
 
@@ -102,6 +106,8 @@ export default async function ZonePage(props: PageProps<"/zones/[slug]">) {
     redirect(buildZonePageHref(params.slug, page))
   }
   const sidebarUser = await resolveSidebarUser(currentUser, settings)
+  const postDisplayItems = mapSitePostsToDisplayItems(posts, settings, ["GLOBAL", "ZONE"])
+  const useInfinitePostList = zone.postListLoadMode === POST_LIST_LOAD_MODE_INFINITE
 
 
 
@@ -151,17 +157,31 @@ export default async function ZonePage(props: PageProps<"/zones/[slug]">) {
               ) : (
                 <>
 
-                  <ForumPostStream posts={posts} listDisplayMode={zone.postListDisplayMode} visiblePinScopes={["GLOBAL", "ZONE"]} showPinnedDivider={page === 1} />
+                  {useInfinitePostList ? (
+                    <InfiniteForumPostStream
+                      apiPath={`/api/zones/${encodeURIComponent(params.slug)}/posts`}
+                      initialItems={postDisplayItems}
+                      initialPage={page}
+                      initialHasNextPage={hasNextPage}
+                      listDisplayMode={zone.postListDisplayMode}
+                      showPinnedDivider={page === 1}
+                      postLinkDisplayMode={settings.postLinkDisplayMode}
+                    />
+                  ) : (
+                    <ForumPostStream posts={posts} listDisplayMode={zone.postListDisplayMode} visiblePinScopes={["GLOBAL", "ZONE"]} showPinnedDivider={page === 1} />
+                  )}
 
                   {posts.length === 0 ? <div className="rounded-md border bg-background p-8 text-sm text-muted-foreground">当前分区下还没有公开内容。</div> : null}
 
-                  <PageNumberPagination
-                    page={page}
-                    totalPages={totalPages}
-                    hasPrevPage={hasPrevPage}
-                    hasNextPage={hasNextPage}
-                    buildHref={(targetPage) => buildZonePageHref(params.slug, targetPage)}
-                  />
+                  {useInfinitePostList ? null : (
+                    <PageNumberPagination
+                      page={page}
+                      totalPages={totalPages}
+                      hasPrevPage={hasPrevPage}
+                      hasNextPage={hasNextPage}
+                      buildHref={(targetPage) => buildZonePageHref(params.slug, targetPage)}
+                    />
+                  )}
                 </>
               )}
             </div>

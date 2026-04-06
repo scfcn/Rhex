@@ -26,6 +26,7 @@ interface TooltipProps {
   disabled?: boolean
   className?: string
   contentClassName?: string
+  enableMobileTap?: boolean
 }
 
 const VIEWPORT_PADDING = 12
@@ -42,6 +43,7 @@ export function Tooltip({
   disabled = false,
   className,
   contentClassName,
+  enableMobileTap = false,
 }: TooltipProps) {
   const tooltipId = useId()
   const mounted = useSyncExternalStore(
@@ -126,7 +128,7 @@ export function Tooltip({
     })
   }, [align, clearAnimationFrame, offset, side])
 
-  function openTooltip(delay = openDelay) {
+  const openTooltip = useCallback((delay = openDelay) => {
     if (disabled || !content) {
       return
     }
@@ -142,7 +144,7 @@ export function Tooltip({
     openTimerRef.current = window.setTimeout(() => {
       setOpen(true)
     }, delay)
-  }
+  }, [content, disabled, openDelay])
 
   const closeTooltip = useCallback((delay = closeDelay) => {
     clearTimer(openTimerRef)
@@ -160,6 +162,15 @@ export function Tooltip({
     }, delay)
   }, [closeDelay])
 
+  const toggleTooltip = useCallback(() => {
+    if (open) {
+      closeTooltip(0)
+      return
+    }
+
+    openTooltip(0)
+  }, [closeTooltip, open, openTooltip])
+
   useEffect(() => {
     if (!mounted || !open || disabled || !content) {
       return
@@ -175,6 +186,14 @@ export function Tooltip({
 
     const handleWindowChange = () => {
       schedulePositionUpdate()
+    }
+    const handlePointerDownOutside = (event: PointerEvent) => {
+      const target = event.target as Node | null
+      if (triggerRef.current?.contains(target) || contentRef.current?.contains(target)) {
+        return
+      }
+
+      closeTooltip(0)
     }
 
     const resizeObserver = typeof ResizeObserver === "undefined"
@@ -194,12 +213,14 @@ export function Tooltip({
     window.addEventListener("resize", handleWindowChange)
     window.addEventListener("scroll", handleWindowChange, true)
     window.addEventListener("keydown", handleEscape)
+    window.addEventListener("pointerdown", handlePointerDownOutside, true)
 
     return () => {
       resizeObserver?.disconnect()
       window.removeEventListener("resize", handleWindowChange)
       window.removeEventListener("scroll", handleWindowChange, true)
       window.removeEventListener("keydown", handleEscape)
+      window.removeEventListener("pointerdown", handlePointerDownOutside, true)
       clearAnimationFrame()
     }
   }, [align, clearAnimationFrame, closeDelay, closeTooltip, content, disabled, mounted, offset, open, openDelay, schedulePositionUpdate, side])
@@ -228,6 +249,14 @@ export function Tooltip({
           }
         }}
         onPointerLeave={() => closeTooltip()}
+        onPointerDown={(event) => {
+          if (!enableMobileTap || event.pointerType !== "touch") {
+            return
+          }
+
+          event.preventDefault()
+          toggleTooltip()
+        }}
         onFocusCapture={() => openTooltip(0)}
         onBlurCapture={(event) => {
           if (event.currentTarget.contains(event.relatedTarget as Node | null)) {

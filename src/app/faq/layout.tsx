@@ -12,12 +12,13 @@ import { getZones } from "@/lib/zones"
 export const dynamic = "force-dynamic"
 
 export default async function FaqLayout({ children }: { children: ReactNode }) {
+  const settingsPromise = getSiteSettings()
   const [boards, zones, currentUser, hotTopics, settings] = await Promise.all([
     getBoards(),
     getZones(),
     getCurrentUser(),
-    getHomeSidebarHotTopics(5),
-    getSiteSettings(),
+    settingsPromise.then((settings) => getHomeSidebarHotTopics(settings.homeSidebarHotTopicsCount)),
+    settingsPromise,
   ])
   const sidebarUser = await resolveSidebarUser(currentUser, settings)
 

@@ -2,14 +2,16 @@ import type { CurrentUserRecord } from "@/db/current-user"
 import { executeUserCheckIn, listUserCheckInLogsInRange } from "@/db/check-in-queries"
 
 import { apiError } from "@/lib/api-route"
+import { getUserCheckInStreakSummary } from "@/lib/check-in-streak-service"
 import { getLocalDateKey, getMonthKey } from "@/lib/date-key"
-import { recordUserCheckInGrowth } from "@/lib/level-system"
+import { evaluateUserLevelProgress } from "@/lib/level-system"
 import { prepareScopedPointDelta, type PreparedPointDelta } from "@/lib/point-center"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
 
 interface CheckInSettingsSnapshot {
   pointName: string
+  checkInMakeUpCountsTowardStreak: boolean
   checkInReward: number
   checkInVip1Reward: number
   checkInVip2Reward: number
@@ -34,6 +36,7 @@ interface ExecuteCheckInOptions {
   makeUpCost: number
   makeUpCostDelta: PreparedPointDelta
   isMakeUp: boolean
+  makeUpCountsTowardStreak: boolean
 }
 
 interface CheckInActionPayload {
@@ -52,6 +55,9 @@ export interface CheckInCalendarEntry {
 export interface CheckInOverview {
   month: string
   pointName: string
+  currentStreak: number
+  maxStreak: number
+  makeUpCountsTowardStreak: boolean
   checkInReward: number
   vip1CheckInReward: number
   vip2CheckInReward: number
@@ -69,6 +75,8 @@ export interface CheckInActionResult {
   points: number
   alreadyCheckedIn: boolean
   date: string
+  currentStreak: number
+  maxStreak: number
   makeUpCost?: number
   message: string
 }
@@ -112,6 +120,7 @@ function assertCheckInEnabled(settings: { checkInEnabled: boolean }) {
 function readCheckInSettingsSnapshot(settings: CheckInSettingsSnapshot) {
   return {
     pointName: settings.pointName,
+    checkInMakeUpCountsTowardStreak: settings.checkInMakeUpCountsTowardStreak,
     normalReward: Math.max(0, settings.checkInReward),
     vip1Reward: Math.max(0, settings.checkInVip1Reward),
     vip2Reward: Math.max(0, settings.checkInVip2Reward),
@@ -192,7 +201,7 @@ async function executeCheckIn(options: ExecuteCheckInOptions) {
   }
 
   if (!result.alreadyCheckedIn) {
-    await recordUserCheckInGrowth(options.userId)
+    await evaluateUserLevelProgress(options.userId)
   }
 
   return result
@@ -217,11 +226,17 @@ export async function getCheckInOverview(user: CurrentUserRecord, month = getMon
   assertCheckInEnabled(settings)
 
   const snapshot = readCheckInSettingsSnapshot(settings)
-  const entries = await buildCalendarData({ userId: user.id, month })
+  const [entries, streakSummary] = await Promise.all([
+    buildCalendarData({ userId: user.id, month }),
+    getUserCheckInStreakSummary(user.id),
+  ])
 
   return {
     month,
     pointName: snapshot.pointName,
+    currentStreak: streakSummary.currentStreak,
+    maxStreak: streakSummary.maxStreak,
+    makeUpCountsTowardStreak: streakSummary.makeUpCountsTowardStreak,
     checkInReward: resolveUserCheckInReward(snapshot, user),
     vip1CheckInReward: snapshot.vip1Reward,
     vip2CheckInReward: snapshot.vip2Reward,
@@ -265,12 +280,16 @@ export async function submitCheckInAction(user: CurrentUserRecord, body: unknown
         appliedRules: [],
       },
       isMakeUp: false,
+      makeUpCountsTowardStreak: snapshot.checkInMakeUpCountsTowardStreak,
     })
+    const streakSummary = await getUserCheckInStreakSummary(user.id)
 
     return {
       points: result.points,
       alreadyCheckedIn: result.alreadyCheckedIn,
       date: todayKey,
+      currentStreak: streakSummary.currentStreak,
+      maxStreak: streakSummary.maxStreak,
       message: result.alreadyCheckedIn
         ? "今天已经签到过了"
         : rewardDelta.finalDelta !== 0
@@ -308,16 +327,20 @@ export async function submitCheckInAction(user: CurrentUserRecord, body: unknown
     makeUpCost,
     makeUpCostDelta,
     isMakeUp: true,
+    makeUpCountsTowardStreak: snapshot.checkInMakeUpCountsTowardStreak,
   })
 
   if (result.alreadyCheckedIn) {
     apiError(409, "该日期已经签到过了")
   }
+  const streakSummary = await getUserCheckInStreakSummary(user.id)
 
   return {
     points: result.points,
     alreadyCheckedIn: false,
     date: targetDateKey,
+    currentStreak: streakSummary.currentStreak,
+    maxStreak: streakSummary.maxStreak,
     makeUpCost,
     message: makeUpCostDelta.finalDelta !== 0 || rewardDelta.finalDelta !== 0
       ? `补签成功，相关${snapshot.pointName}已结算`

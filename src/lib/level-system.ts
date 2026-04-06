@@ -1,4 +1,6 @@
-import { countLevelDefinitions, countUserCommentLikes, countUserPostLikes, createManyLevelDefinitions, findAllLevelDefinitions, findAllUserIdsForLevelRefresh, findLevelDefinitionByLevel, findUserLevelGrowthUser, findUserLevelProgressByUserId, saveLevelDefinitionsInTransaction, syncUserReceivedLikesInTransaction, updateUserLevel, upsertUserCheckInGrowth } from "@/db/level-system-queries"
+import { countLevelDefinitions, countUserCommentLikes, countUserPostLikes, createManyLevelDefinitions, findAllLevelDefinitions, findAllUserIdsForLevelRefresh, findLevelDefinitionByLevel, findUserLevelGrowthUser, findUserLevelProgressByUserId, saveLevelDefinitionsInTransaction, syncUserReceivedLikesInTransaction, updateUserLevel } from "@/db/level-system-queries"
+import { processInBatches } from "@/lib/async-batch"
+import { enqueueBackgroundJob, registerBackgroundJobHandler } from "@/lib/background-jobs"
 
 
 type LevelDefinitionRecord = {
@@ -131,6 +133,9 @@ export interface UserLevelGrowthSnapshot {
   commentCount: number
   likeReceivedCount: number
   checkInDays: number
+  currentCheckInStreak: number
+  maxCheckInStreak: number
+  lastCheckInDate: string | null
 }
 
 export async function ensureLevelDefinitions() {
@@ -185,6 +190,9 @@ export async function getLevelGrowthSnapshot(userId: number): Promise<UserLevelG
     commentCount: user.commentCount,
     likeReceivedCount: user.likeReceivedCount,
     checkInDays: progress?.checkInDays ?? 0,
+    currentCheckInStreak: progress?.currentCheckInStreak ?? 0,
+    maxCheckInStreak: progress?.maxCheckInStreak ?? 0,
+    lastCheckInDate: progress?.lastCheckInDate ?? null,
   }
 }
 
@@ -231,12 +239,6 @@ export async function evaluateUserLevelProgress(userId: number) {
   }
 }
 
-export async function recordUserCheckInGrowth(userId: number) {
-  await upsertUserCheckInGrowth(userId)
-
-  return evaluateUserLevelProgress(userId)
-}
-
 export async function syncUserReceivedLikes(userId: number) {
   const [postLikes, commentLikes] = await Promise.all([
     countUserPostLikes(userId),
@@ -246,6 +248,21 @@ export async function syncUserReceivedLikes(userId: number) {
   await syncUserReceivedLikesInTransaction(userId, postLikes, commentLikes)
 
   return evaluateUserLevelProgress(userId)
+}
+
+export async function refreshAllUserLevelProgress() {
+  const users = await findAllUserIdsForLevelRefresh()
+  await processInBatches(users, 100, async (user) => {
+    await evaluateUserLevelProgress(user.id)
+  })
+}
+
+registerBackgroundJobHandler("level.refresh-all-users", async () => {
+  await refreshAllUserLevelProgress()
+})
+
+export function enqueueRefreshAllUserLevelProgress() {
+  return enqueueBackgroundJob("level.refresh-all-users", {})
 }
 
 
@@ -288,9 +305,7 @@ export async function saveLevelDefinitions(input: Array<{
   }
 
   await saveLevelDefinitionsInTransaction(normalized)
-
-  const users = await findAllUserIdsForLevelRefresh()
-  await Promise.all(users.map((user) => evaluateUserLevelProgress(user.id)))
+  await enqueueRefreshAllUserLevelProgress()
 
   return getLevelDefinitions()
 }

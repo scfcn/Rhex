@@ -252,8 +252,7 @@ async function ensureAcceptAllowance(userId: number, config: AppConfig) {
   return acceptedToday
 }
 async function bumpDailyStats(userId: number, patch: { winCount?: number; loseCount?: number; todayProfitPoints?: number; todayLossPoints?: number }) {
-  const { start } = getBusinessDayRange()
-  const dateKey = start.toISOString().slice(0, 10)
+  const { dayKey: dateKey } = getBusinessDayRange()
   const existing = await getOrCreateDailyStat(userId, dateKey)
   if (!existing) {
     await createDailyStatRecord({
@@ -275,12 +274,12 @@ async function bumpDailyStats(userId: number, patch: { winCount?: number; loseCo
 }
 
 async function buildSummary(user: CurrentUser): Promise<YinYangMyStats> {
-  const todayDateKey = getBusinessDayRange().start.toISOString().slice(0, 10)
+  const todayRange = getBusinessDayRange()
   const [{ pointName, config }, createdToday, acceptedToday, summaryStats] = await Promise.all([
     getConfigAndSettings(),
-    countUserCreatedChallengesInRange(user.id, getBusinessDayRange().start, getBusinessDayRange().end),
-    countUserAcceptedChallengesInRange(user.id, getBusinessDayRange().start, getBusinessDayRange().end),
-    getYinYangUserSummaryStats(user.id, todayDateKey),
+    countUserCreatedChallengesInRange(user.id, todayRange.start, todayRange.end),
+    countUserAcceptedChallengesInRange(user.id, todayRange.start, todayRange.end),
+    getYinYangUserSummaryStats(user.id, todayRange.dayKey),
   ])
 
   return {
@@ -309,7 +308,7 @@ async function buildLeaderboards() {
     listTopYinYangWinners(10),
     listTopYinYangEarners(10),
     listTopTodayKings(1),
-    getTopKingByDateKey(yesterdayRange.start.toISOString().slice(0, 10)),
+    getTopKingByDateKey(yesterdayRange.dayKey),
   ])
 
   const kingUserId = todayKings[0]?.userId ?? null

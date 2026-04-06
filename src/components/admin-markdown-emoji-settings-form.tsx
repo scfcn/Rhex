@@ -4,12 +4,12 @@ import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 
 import { AdminIconPickerField } from "@/components/admin-icon-picker-field"
+import { LevelIcon } from "@/components/level-icon"
 import { Button } from "@/components/ui/button"
 import { TextField } from "@/components/ui/text-field"
 import { toast } from "@/components/ui/toast"
 import { saveAdminSiteSettings } from "@/lib/admin-site-settings-client"
-import { cn } from "@/lib/utils"
-import { DEFAULT_MARKDOWN_EMOJI_ITEMS, type MarkdownEmojiItem, isMarkdownEmojiSvg, normalizeMarkdownEmojiItems } from "@/lib/markdown-emoji"
+import { DEFAULT_MARKDOWN_EMOJI_ITEMS, type MarkdownEmojiItem, normalizeMarkdownEmojiItems } from "@/lib/markdown-emoji"
 
 interface AdminMarkdownEmojiSettingsFormProps {
   initialItems: MarkdownEmojiItem[]
@@ -105,17 +105,5 @@ export function AdminMarkdownEmojiSettingsForm({ initialItems }: AdminMarkdownEm
 }
 
 function EmojiPreview({ icon, label }: { icon: string; label: string }) {
-  if (isMarkdownEmojiSvg(icon)) {
-    return (
-      <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center leading-none" title={label} aria-label={label}>
-        <span
-          aria-hidden={label ? undefined : true}
-          className={cn("inline-flex h-full w-full items-center justify-center [&>svg]:h-full [&>svg]:w-full [&>svg]:block")}
-          dangerouslySetInnerHTML={{ __html: icon.trim() }}
-        />
-      </span>
-    )
-  }
-
-  return <span className="inline-flex shrink-0 items-center justify-center leading-none">{icon}</span>
+  return <LevelIcon icon={icon} title={label} className="h-4 w-4 text-sm" emojiClassName="text-inherit" svgClassName="[&>svg]:block" />
 }

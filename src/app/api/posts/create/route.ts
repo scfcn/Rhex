@@ -1,5 +1,5 @@
 import { apiSuccess, createUserRouteHandler, readJsonBody } from "@/lib/api-route"
-import { dispatchNewPostFollowNotificationsBestEffort } from "@/lib/follow-notifications"
+import { enqueueNewPostFollowNotifications } from "@/lib/follow-notifications"
 import { evaluateUserLevelProgress } from "@/lib/level-system"
 import { createPostFlow } from "@/lib/post-create-service"
 import { logRouteWriteSuccess } from "@/lib/route-metadata"
@@ -11,7 +11,7 @@ export const POST = createUserRouteHandler(async ({ request }) => {
   await evaluateUserLevelProgress(result.author.id)
 
   if (!result.shouldPending) {
-    await dispatchNewPostFollowNotificationsBestEffort(result.post.id)
+    await enqueueNewPostFollowNotifications(result.post.id)
   }
 
   logRouteWriteSuccess({

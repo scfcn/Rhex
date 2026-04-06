@@ -18,7 +18,7 @@ export default async function HomePage(props: PageProps<"/">) {
     redirect(buildHomeFeedHref(normalizeHomeFeedSort(rawSort), parseHomeFeedPage(rawPage)))
   }
 
-  return <HomeFeedPage sort="latest" />
+  return <HomeFeedPage sort="latest" autoCheckInOnEnter />
 }
 
 

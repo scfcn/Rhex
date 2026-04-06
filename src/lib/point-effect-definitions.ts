@@ -1,5 +1,7 @@
 import { PointEffectDirection, PointEffectRuleKind, PointEffectTargetType } from "@/db/types"
 
+export const BADGE_EFFECT_SCOPE_HOME_AUTO_CHECK_IN = "HOME_AUTO_CHECK_IN"
+
 export const POINT_EFFECT_SCOPE_OPTIONS = [
   { value: "ALL_POINT_CHANGES", label: "所有积分增减", targetTypes: [PointEffectTargetType.POINTS], badgeEffectEnabled: true, badgeEffectRuntimeMatchable: false },
   { value: "ALL_PROBABILITIES", label: "所有概率", targetTypes: [PointEffectTargetType.PROBABILITY], badgeEffectEnabled: true, badgeEffectRuntimeMatchable: false },
@@ -7,6 +9,7 @@ export const POINT_EFFECT_SCOPE_OPTIONS = [
   { value: "COMMENT_CREATE", label: "回帖积分", targetTypes: [PointEffectTargetType.POINTS], badgeEffectEnabled: true, badgeEffectRuntimeMatchable: true },
   { value: "CHECK_IN_REWARD", label: "签到奖励", targetTypes: [PointEffectTargetType.POINTS], badgeEffectEnabled: true, badgeEffectRuntimeMatchable: true },
   { value: "CHECK_IN_MAKE_UP_COST", label: "补签消耗", targetTypes: [PointEffectTargetType.POINTS], badgeEffectEnabled: true, badgeEffectRuntimeMatchable: true },
+  { value: BADGE_EFFECT_SCOPE_HOME_AUTO_CHECK_IN, label: "首页自动签到", targetTypes: [PointEffectTargetType.FUNCTION], badgeEffectEnabled: true, badgeEffectRuntimeMatchable: false },
   { value: "TIP_OUTGOING", label: "打赏支出", targetTypes: [PointEffectTargetType.POINTS], badgeEffectEnabled: false, badgeEffectRuntimeMatchable: false },
   { value: "TIP_INCOMING", label: "被打赏收入", targetTypes: [PointEffectTargetType.POINTS], badgeEffectEnabled: true, badgeEffectRuntimeMatchable: true },
   { value: "GIFT_OUTGOING", label: "礼物支出", targetTypes: [PointEffectTargetType.POINTS], badgeEffectEnabled: false, badgeEffectRuntimeMatchable: false },
@@ -48,6 +51,7 @@ const POINT_EFFECT_SCOPE_VALUE_SET = new Set<string>(POINT_EFFECT_SCOPE_OPTIONS.
 export const POINT_EFFECT_TARGET_OPTIONS = [
   { value: PointEffectTargetType.POINTS, label: "积分" },
   { value: PointEffectTargetType.PROBABILITY, label: "概率" },
+  { value: PointEffectTargetType.FUNCTION, label: "功能" },
 ] as const
 
 export const POINT_EFFECT_RULE_KIND_OPTIONS = [
@@ -77,7 +81,15 @@ export function getPointEffectScopeOptionsByTargetType(targetType: PointEffectTa
 }
 
 export function getPointEffectAllScopeKeyByTargetType(targetType: PointEffectTargetType) {
-  return targetType === PointEffectTargetType.POINTS ? "ALL_POINT_CHANGES" : "ALL_PROBABILITIES"
+  if (targetType === PointEffectTargetType.POINTS) {
+    return "ALL_POINT_CHANGES"
+  }
+
+  if (targetType === PointEffectTargetType.PROBABILITY) {
+    return "ALL_PROBABILITIES"
+  }
+
+  return null
 }
 
 export function getPointEffectTargetOptionsForBadgeEffects() {
@@ -104,11 +116,15 @@ export function normalizePointEffectScopeKeysByTargetType(scopeKeys: string[], t
   const filteredScopeKeys = Array.from(new Set(filterPointEffectScopeKeysByTargetType(scopeKeys, targetType)))
   const allScopeKey = getPointEffectAllScopeKeyByTargetType(targetType)
 
-  if (filteredScopeKeys.includes(allScopeKey)) {
+  if (allScopeKey && filteredScopeKeys.includes(allScopeKey)) {
     return [allScopeKey]
   }
 
   return filteredScopeKeys
+}
+
+export function isFunctionalPointEffectTargetType(targetType: PointEffectTargetType) {
+  return targetType === PointEffectTargetType.FUNCTION
 }
 
 export function getDefaultPointEffectScopeKeysByTargetType(targetType: PointEffectTargetType) {
