@@ -18,18 +18,7 @@ export default async function BadgeSystemFaqPage() {
     }, new Map<string, number>()),
   )
 
-  const supportedRules = [
-    "注册天数",
-    "注册时间范围",
-    "发帖数",
-    "回复数",
-    "获赞数",
-    "邀请人数",
-    "指定 UID",
-    "等级",
-    "签到天数",
-    "VIP 等级",
-  ]
+
 
   return (
     <FaqPageFrame
@@ -74,18 +63,7 @@ export default async function BadgeSystemFaqPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>支持的领取条件</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          {supportedRules.map((rule) => (
-            <span key={rule} className="rounded-full bg-secondary px-3 py-1.5 text-sm text-secondary-foreground">
-              {rule}
-            </span>
-          ))}
-        </CardContent>
-      </Card>
+
 
       <Card>
         <CardHeader>

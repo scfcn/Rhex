@@ -195,7 +195,7 @@ export function BadgeCenter({ badges, isLoggedIn }: BadgeCenterProps) {
                 <div className="rounded-[22px] bg-secondary/40 p-4 text-sm text-muted-foreground">
                   <p className="font-medium text-foreground">领取条件</p>
                   <ul className="mt-2 space-y-1.5">
-                    {badge.rules.length === 0 ? <li>无门槛，登录即可领取</li> : badge.rules.map((rule) => <li key={rule.id}>- {rule.value}{rule.extraValue ? ` ~ ${rule.extraValue}` : ""} · {rule.ruleType}</li>)}
+                    {badge.rules.length === 0 ? <li>无门槛，登录即可领取</li> : badge.rules.map((rule) => <li key={rule.id}>- {rule.value}{rule.extraValue ? ` ~ ${rule.extraValue}` : ""}</li>)}
                   </ul>
                   {badge.pointsCost > 0 ? <p className="mt-3">领取时需额外支付 {badge.pointsCost} 积分。</p> : null}
                 </div>
