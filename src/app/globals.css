@@ -230,8 +230,8 @@ a {
   max-height: none;
   flex: none;
 }
-.my-3,
-img.my-4 {
+.markdown-body img.my-3,
+.markdown-body img.my-4 {
   max-width: 20em;
   height: auto;
 }
