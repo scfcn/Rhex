@@ -26,6 +26,7 @@ interface AdminUserModalProps {
 interface EditableScopeItem {
   id: string
   canEditSettings: boolean
+  canWithdrawTreasury: boolean
 }
 
 interface ApiEnvelope<T> {
@@ -34,10 +35,20 @@ interface ApiEnvelope<T> {
   data?: T
 }
 
-function toEditableScopes<T extends { canEditSettings: boolean }>(items: T[], key: keyof T) {
+type AdminUserPanel = "detail" | "account" | "permissions" | "operations"
+
+const ADMIN_USER_PANELS: Array<{ key: AdminUserPanel; label: string }> = [
+  { key: "detail", label: "详情" },
+  { key: "account", label: "账号状态" },
+  { key: "permissions", label: "权限身份" },
+  { key: "operations", label: "运营发放" },
+]
+
+function toEditableScopes<T extends { canEditSettings: boolean; canWithdrawTreasury: boolean }>(items: T[], key: keyof T) {
   return items.map((item) => ({
     id: String(item[key]),
     canEditSettings: item.canEditSettings,
+    canWithdrawTreasury: item.canWithdrawTreasury,
   }))
 }
 
@@ -58,6 +69,7 @@ async function parseResponse<T>(response: Response) {
 
 export function AdminUserModal({ user, moderatorScopeOptions }: AdminUserModalProps) {
   const [open, setOpen] = useState(false)
+  const [activePanel, setActivePanel] = useState<AdminUserPanel>("detail")
   const [detail, setDetail] = useState<AdminUserDetailResult | null>(null)
   const [detailError, setDetailError] = useState("")
   const [isLoadingDetail, setIsLoadingDetail] = useState(false)
@@ -68,6 +80,23 @@ export function AdminUserModal({ user, moderatorScopeOptions }: AdminUserModalPr
   const [pointsFeedback, setPointsFeedback] = useState("")
   const [adminNote, setAdminNote] = useState("")
   const [noteFeedback, setNoteFeedback] = useState("")
+  const [operationMessage, setOperationMessage] = useState("")
+  const [operationFeedback, setOperationFeedback] = useState("")
+  const [vipLevelDraft, setVipLevelDraft] = useState(String(user.vipLevel || 1))
+  const [vipExpiresAtDraft, setVipExpiresAtDraft] = useState(user.vipExpiresAt ? user.vipExpiresAt.slice(0, 16) : "")
+  const [vipMessage, setVipMessage] = useState("")
+  const [vipFeedback, setVipFeedback] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [passwordMessage, setPasswordMessage] = useState("")
+  const [passwordFeedback, setPasswordFeedback] = useState("")
+  const [badgeId, setBadgeId] = useState("")
+  const [badgeMessage, setBadgeMessage] = useState("")
+  const [badgeFeedback, setBadgeFeedback] = useState("")
+  const [notificationTitle, setNotificationTitle] = useState("")
+  const [notificationContent, setNotificationContent] = useState("")
+  const [notificationMessage, setNotificationMessage] = useState("")
+  const [notificationFeedback, setNotificationFeedback] = useState("")
   const [scopeFeedback, setScopeFeedback] = useState("")
   const [zoneScopes, setZoneScopes] = useState<EditableScopeItem[]>(() => toEditableScopes(user.moderatedZoneScopes, "zoneId"))
   const [boardScopes, setBoardScopes] = useState<EditableScopeItem[]>(() => toEditableScopes(user.moderatedBoardScopes, "boardId"))
@@ -77,9 +106,22 @@ export function AdminUserModal({ user, moderatorScopeOptions }: AdminUserModalPr
   const activeUser = detail ?? user
   const vipActive = isVipActive({ vipLevel: activeUser.vipLevel, vipExpiresAt: activeUser.vipExpiresAt })
   const isModerator = activeUser.role === "MODERATOR"
+  const grantedBadgeIds = useMemo(() => new Set(detail?.grantedBadges.map((item) => item.badgeId) ?? []), [detail?.grantedBadges])
+  const grantableBadges = useMemo(
+    () => (detail?.availableBadges ?? []).filter((item) => !grantedBadgeIds.has(item.id)),
+    [detail?.availableBadges, grantedBadgeIds],
+  )
+  const activePanelTitle = activePanel === "account"
+    ? "账号状态"
+    : activePanel === "permissions"
+      ? "权限身份"
+      : activePanel === "operations"
+        ? "运营发放"
+        : "用户详情"
 
   const metrics = useMemo(
     () => [
+      { label: "UID", value: String(activeUser.id) },
       { label: "角色", value: activeUser.role },
       { label: "状态", value: activeUser.status },
       { label: "等级", value: `Lv.${activeUser.level}` },
@@ -106,8 +148,13 @@ export function AdminUserModal({ user, moderatorScopeOptions }: AdminUserModalPr
     setDetail(data)
     setProfileDraft(data.editableProfile)
     setPoints(String(data.points))
+    setVipLevelDraft(String(data.vipLevel || 1))
+    setVipExpiresAtDraft(data.vipExpiresAt ? data.vipExpiresAt.slice(0, 16) : "")
     setZoneScopes(toEditableScopes(data.moderatedZoneScopes, "zoneId"))
     setBoardScopes(toEditableScopes(data.moderatedBoardScopes, "boardId"))
+    const nextGrantedIds = new Set(data.grantedBadges.map((item) => item.badgeId))
+    const defaultBadgeId = data.availableBadges.find((item) => !nextGrantedIds.has(item.id))?.id ?? ""
+    setBadgeId((current) => current && !nextGrantedIds.has(current) ? current : defaultBadgeId)
   }
 
   async function loadDetail() {
@@ -163,11 +210,15 @@ export function AdminUserModal({ user, moderatorScopeOptions }: AdminUserModalPr
   function toggleScope(setter: Dispatch<SetStateAction<EditableScopeItem[]>>, id: string) {
     setter((current) => current.some((item) => item.id === id)
       ? current.filter((item) => item.id !== id)
-      : [...current, { id, canEditSettings: false }])
+      : [...current, { id, canEditSettings: false, canWithdrawTreasury: true }])
   }
 
   function toggleScopeEdit(setter: Dispatch<SetStateAction<EditableScopeItem[]>>, id: string) {
     setter((current) => current.map((item) => item.id === id ? { ...item, canEditSettings: !item.canEditSettings } : item))
+  }
+
+  function toggleScopeWithdraw(setter: Dispatch<SetStateAction<EditableScopeItem[]>>, id: string) {
+    setter((current) => current.map((item) => item.id === id ? { ...item, canWithdrawTreasury: !item.canWithdrawTreasury } : item))
   }
 
   function saveProfile() {
@@ -230,8 +281,8 @@ export function AdminUserModal({ user, moderatorScopeOptions }: AdminUserModalPr
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.id,
-          zoneScopes: zoneScopes.map((scope) => ({ zoneId: scope.id, canEditSettings: scope.canEditSettings })),
-          boardScopes: boardScopes.map((scope) => ({ boardId: scope.id, canEditSettings: scope.canEditSettings })),
+          zoneScopes: zoneScopes.map((scope) => ({ zoneId: scope.id, canEditSettings: scope.canEditSettings, canWithdrawTreasury: scope.canWithdrawTreasury })),
+          boardScopes: boardScopes.map((scope) => ({ boardId: scope.id, canEditSettings: scope.canEditSettings, canWithdrawTreasury: scope.canWithdrawTreasury })),
         }),
       })
       const result = await parseResponse(response)
@@ -242,16 +293,462 @@ export function AdminUserModal({ user, moderatorScopeOptions }: AdminUserModalPr
     })
   }
 
+  function runQuickAction(action: string, confirmText?: string) {
+    setOperationFeedback("")
+    if (confirmText && typeof window !== "undefined" && !window.confirm(confirmText)) {
+      return
+    }
+
+    startTransition(async () => {
+      const result = await submitAdminAction({
+        action,
+        targetId: String(user.id),
+        message: operationMessage,
+      })
+
+      setOperationFeedback(result.message)
+      if (result.ok) {
+        setOperationMessage("")
+        refreshData()
+      }
+    })
+  }
+
+  function saveVip() {
+    setVipFeedback("")
+    startTransition(async () => {
+      const result = await submitAdminAction({
+        action: "user.vip.configure",
+        targetId: String(user.id),
+        vipLevel: Math.max(1, Number(vipLevelDraft) || 1),
+        vipExpiresAt: vipExpiresAtDraft || null,
+        message: vipMessage,
+      })
+
+      setVipFeedback(result.message)
+      if (result.ok) {
+        setVipMessage("")
+        refreshData()
+      }
+    })
+  }
+
+  function savePassword() {
+    setPasswordFeedback("")
+
+    if (!newPassword || !confirmPassword) {
+      setPasswordFeedback("请完整填写新密码与确认密码")
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordFeedback("两次输入的新密码不一致")
+      return
+    }
+    if (newPassword.length < 6 || newPassword.length > 64) {
+      setPasswordFeedback("新密码长度需为 6-64 位")
+      return
+    }
+
+    startTransition(async () => {
+      const result = await submitAdminAction({
+        action: "user.password.update",
+        targetId: String(user.id),
+        newPassword,
+        message: passwordMessage,
+      })
+
+      setPasswordFeedback(result.message)
+      if (result.ok) {
+        setNewPassword("")
+        setConfirmPassword("")
+        setPasswordMessage("")
+      }
+    })
+  }
+
+  function grantBadge() {
+    setBadgeFeedback("")
+    if (!badgeId) {
+      setBadgeFeedback("请先选择要颁发的勋章")
+      return
+    }
+
+    const selectedBadge = detail?.availableBadges.find((item) => item.id === badgeId)
+    startTransition(async () => {
+      const result = await submitAdminAction({
+        action: "user.badge.grant",
+        targetId: String(user.id),
+        badgeId,
+        badgeName: selectedBadge?.name ?? "",
+        message: badgeMessage,
+      })
+
+      setBadgeFeedback(result.message)
+      if (result.ok) {
+        setBadgeMessage("")
+        refreshData()
+      }
+    })
+  }
+
+  function sendNotification() {
+    setNotificationFeedback("")
+    if (!notificationTitle.trim()) {
+      setNotificationFeedback("请填写通知标题")
+      return
+    }
+    if (!notificationContent.trim()) {
+      setNotificationFeedback("请填写通知内容")
+      return
+    }
+
+    startTransition(async () => {
+      const result = await submitAdminAction({
+        action: "user.notification.send",
+        targetId: String(user.id),
+        title: notificationTitle,
+        content: notificationContent,
+        message: notificationMessage,
+      })
+
+      setNotificationFeedback(result.message)
+      if (result.ok) {
+        setNotificationTitle("")
+        setNotificationContent("")
+        setNotificationMessage("")
+      }
+    })
+  }
+
+  function openPanel(panel: AdminUserPanel) {
+    setActivePanel(panel)
+    setOpen(true)
+  }
+
+  function renderDetailPanel() {
+    return (
+      <div className="grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
+        <div className="space-y-4">
+          <section className="rounded-[20px] border border-border p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h4 className="text-sm font-semibold">基础资料</h4>
+                <p className="mt-1 text-xs text-muted-foreground">运营可直接维护昵称、邮箱、手机号、简介与介绍。</p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <Field label="昵称" value={profileDraft.nickname} onChange={(value) => setProfileDraft((current) => ({ ...current, nickname: value }))} />
+              <Field label="邮箱" value={profileDraft.email} onChange={(value) => setProfileDraft((current) => ({ ...current, email: value }))} placeholder="可留空" />
+              <Field label="手机号" value={profileDraft.phone} onChange={(value) => setProfileDraft((current) => ({ ...current, phone: value }))} placeholder="11 位手机号，可留空" />
+              <label className="space-y-1">
+                <span className="text-xs font-medium text-muted-foreground">性别</span>
+                <select
+                  value={profileDraft.gender}
+                  onChange={(event) => setProfileDraft((current) => ({ ...current, gender: event.target.value }))}
+                  className="h-10 w-full rounded-full border border-border bg-background px-3 text-sm outline-none"
+                >
+                  <option value="unknown">未知</option>
+                  <option value="male">男</option>
+                  <option value="female">女</option>
+                </select>
+              </label>
+              <TextAreaField label="个人简介" value={profileDraft.bio} onChange={(value) => setProfileDraft((current) => ({ ...current, bio: value }))} className="md:col-span-2" />
+              <TextAreaField label="个人介绍" value={profileDraft.introduction} onChange={(value) => setProfileDraft((current) => ({ ...current, introduction: value }))} className="md:col-span-2" rows={5} />
+            </div>
+            {profileFeedback ? <p className="mt-3 text-xs text-muted-foreground">{profileFeedback}</p> : null}
+            <Button type="button" disabled={isPending} className="mt-3 h-9 rounded-full px-4 text-xs" onClick={saveProfile}>
+              {isPending ? "保存中..." : "保存基础资料"}
+            </Button>
+          </section>
+
+          <section className="rounded-[20px] border border-border p-4">
+            <h4 className="text-sm font-semibold">管理员备注</h4>
+            <p className="mt-1 text-xs text-muted-foreground">备注会写入后台操作日志，方便交接班和工单追溯。</p>
+            <div className="mt-3 space-y-3">
+              <TextAreaField label="备注内容" value={adminNote} onChange={setAdminNote} placeholder="例如：邮箱申诉通过，已人工核验历史工单" rows={4} />
+              {noteFeedback ? <p className="text-xs text-muted-foreground">{noteFeedback}</p> : null}
+              <Button type="button" variant="outline" disabled={isPending} className="h-9 rounded-full px-4 text-xs" onClick={saveNote}>
+                {isPending ? "记录中..." : "保存备注"}
+              </Button>
+            </div>
+          </section>
+        </div>
+
+        <div className="space-y-4">
+          {detail ? (
+            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {detail.logSections.map((section) => (
+                <LogSummaryCard key={section.key} section={section} />
+              ))}
+            </section>
+          ) : null}
+
+          {detail?.logSections.map((section) => (
+            <LogSectionCard key={section.key} section={section} />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  function renderAccountPanel() {
+    const canMute = activeUser.status === "ACTIVE"
+    const canActivate = activeUser.status !== "ACTIVE"
+    const activateLabel = activeUser.status === "BANNED" ? "解除拉黑" : "恢复状态"
+
+    return (
+      <div className="grid gap-4 xl:grid-cols-2">
+        <section className="rounded-[20px] border border-border p-4">
+          <h4 className="text-sm font-semibold">账号状态</h4>
+          <p className="mt-1 text-xs text-muted-foreground">禁言、恢复、拉黑等状态操作集中在这里，备注会进入后台日志。</p>
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            <Info label="当前状态" value={activeUser.status} compact />
+            <Info label="注册时间" value={formatDateTime(activeUser.createdAt)} compact />
+            <Info label="最近登录" value={activeUser.lastLoginAt ? formatDateTime(activeUser.lastLoginAt) : "从未登录"} compact />
+          </div>
+          <div className="mt-4 space-y-3">
+            <TextAreaField label="操作备注" value={operationMessage} onChange={setOperationMessage} placeholder="记录禁言、恢复或拉黑原因" rows={4} />
+            <div className="flex flex-wrap gap-2">
+              {canMute ? (
+                <Button type="button" variant="outline" disabled={isPending} className="h-8 rounded-full px-3 text-xs" onClick={() => runQuickAction("user.mute")}>
+                  {isPending ? "处理中..." : "禁言"}
+                </Button>
+              ) : null}
+              {canActivate ? (
+                <Button type="button" variant="outline" disabled={isPending} className="h-8 rounded-full px-3 text-xs" onClick={() => runQuickAction("user.activate")}>
+                  {isPending ? "处理中..." : activateLabel}
+                </Button>
+              ) : null}
+              {activeUser.status !== "BANNED" ? (
+                <Button type="button" disabled={isPending} className="h-8 rounded-full bg-red-600 px-3 text-xs text-white hover:bg-red-500" onClick={() => runQuickAction("user.ban", `确认拉黑 @${activeUser.username} 吗？`)}>
+                  {isPending ? "处理中..." : "拉黑"}
+                </Button>
+              ) : null}
+            </div>
+            {operationFeedback ? <p className="text-xs text-muted-foreground">{operationFeedback}</p> : null}
+          </div>
+        </section>
+
+        <section className="rounded-[20px] border border-border p-4">
+          <h4 className="text-sm font-semibold">重置密码</h4>
+          <p className="mt-1 text-xs text-muted-foreground">用于人工核验后的账号找回或安全处置。</p>
+          <div className="mt-4 space-y-3">
+            <Field type="password" label="新密码" value={newPassword} onChange={setNewPassword} placeholder="请输入 6-64 位新密码" />
+            <Field type="password" label="确认新密码" value={confirmPassword} onChange={setConfirmPassword} placeholder="请再次输入新密码" />
+            <TextAreaField label="操作备注" value={passwordMessage} onChange={setPasswordMessage} placeholder="记录重置原因、工单号或核验说明" rows={4} />
+            {passwordFeedback ? <p className="text-xs text-muted-foreground">{passwordFeedback}</p> : null}
+            <Button type="button" variant="outline" disabled={isPending} className="h-8 rounded-full px-3 text-xs" onClick={savePassword}>
+              {isPending ? "保存中..." : "确认修改密码"}
+            </Button>
+          </div>
+        </section>
+      </div>
+    )
+  }
+
+  function renderPermissionsPanel() {
+    const canPromoteModerator = activeUser.role === "USER"
+    const canSetAdmin = activeUser.role !== "ADMIN"
+    const canDemote = activeUser.role !== "USER"
+
+    return (
+      <div className="space-y-4">
+        <section className="rounded-[20px] border border-border p-4">
+          <h4 className="text-sm font-semibold">权限身份</h4>
+          <p className="mt-1 text-xs text-muted-foreground">提权、降权和版主管辖范围配置集中在这里。</p>
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            <Info label="当前角色" value={activeUser.role} compact />
+            <Info label="分区授权" value={`${activeUser.moderatedZoneScopes.length} 个`} compact />
+            <Info label="节点授权" value={`${activeUser.moderatedBoardScopes.length} 个`} compact />
+          </div>
+          <div className="mt-4 space-y-3">
+            <TextAreaField label="操作备注" value={operationMessage} onChange={setOperationMessage} placeholder="记录提权、降权或权限调整原因" rows={4} />
+            <div className="flex flex-wrap gap-2">
+              {canPromoteModerator ? (
+                <Button type="button" variant="outline" disabled={isPending} className="h-8 rounded-full px-3 text-xs" onClick={() => runQuickAction("user.promoteModerator")}>
+                  {isPending ? "处理中..." : "设为版主"}
+                </Button>
+              ) : null}
+              {canSetAdmin ? (
+                <Button type="button" variant="outline" disabled={isPending} className="h-8 rounded-full px-3 text-xs" onClick={() => runQuickAction("user.setAdmin", `确认将 @${activeUser.username} 提升为管理员吗？`)}>
+                  {isPending ? "处理中..." : "设为管理员"}
+                </Button>
+              ) : null}
+              {canDemote ? (
+                <Button type="button" variant="outline" disabled={isPending} className="h-8 rounded-full px-3 text-xs" onClick={() => runQuickAction("user.demoteToUser", `确认将 @${activeUser.username} 降为普通用户吗？`)}>
+                  {isPending ? "处理中..." : "降为普通用户"}
+                </Button>
+              ) : null}
+            </div>
+            {operationFeedback ? <p className="text-xs text-muted-foreground">{operationFeedback}</p> : null}
+          </div>
+        </section>
+
+        {isModerator && moderatorScopeOptions ? (
+          <section className="rounded-[20px] border border-border p-4">
+            <h4 className="text-sm font-semibold">版主管辖范围</h4>
+            <p className="mt-1 text-xs text-muted-foreground">分区授权自动覆盖分区下全部节点；“可改设置”控制结构编辑，“可提金库”控制节点金库提取权限。</p>
+            <div className="mt-4 space-y-4">
+              <ScopeBlock
+                title="分区授权"
+                items={moderatorScopeOptions.zones.map((zone) => ({
+                  id: zone.id,
+                  label: zone.name,
+                  description: `/${zone.slug}`,
+                }))}
+                activeScopes={zoneScopes}
+                onToggle={(id) => toggleScope(setZoneScopes, id)}
+                onToggleEdit={(id) => toggleScopeEdit(setZoneScopes, id)}
+                onToggleWithdraw={(id) => toggleScopeWithdraw(setZoneScopes, id)}
+              />
+              <ScopeBlock
+                title="节点授权"
+                items={moderatorScopeOptions.boards.map((board) => ({
+                  id: board.id,
+                  label: board.name,
+                  description: `${board.zoneName ? `${board.zoneName} / ` : ""}/${board.slug}`,
+                }))}
+                activeScopes={boardScopes}
+                onToggle={(id) => toggleScope(setBoardScopes, id)}
+                onToggleEdit={(id) => toggleScopeEdit(setBoardScopes, id)}
+                onToggleWithdraw={(id) => toggleScopeWithdraw(setBoardScopes, id)}
+              />
+              {scopeFeedback ? <p className="text-xs text-muted-foreground">{scopeFeedback}</p> : null}
+              <Button type="button" disabled={isPending} className="h-9 rounded-full px-4 text-xs" onClick={saveModeratorScopes}>
+                {isPending ? "保存中..." : "保存版主管辖范围"}
+              </Button>
+            </div>
+          </section>
+        ) : (
+          <section className="rounded-[20px] border border-dashed border-border bg-secondary/20 p-4 text-sm text-muted-foreground">
+            当前用户不是版主，无需配置版主管辖范围。
+          </section>
+        )}
+      </div>
+    )
+  }
+
+  function renderOperationsPanel() {
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-4 xl:grid-cols-2">
+          <section className="rounded-[20px] border border-border p-4">
+            <h4 className="text-sm font-semibold">积分校正</h4>
+            <p className="mt-1 text-xs text-muted-foreground">支持手动修正积分，并记录发放或扣减原因。</p>
+            <div className="mt-4 space-y-3">
+              <Field label="积分值" value={points} onChange={setPoints} />
+              <TextAreaField label="操作备注" value={pointsMessage} onChange={setPointsMessage} placeholder="记录调整原因、工单号或审核说明" rows={4} />
+              {pointsFeedback ? <p className="text-xs text-muted-foreground">{pointsFeedback}</p> : null}
+              <Button type="button" disabled={isPending} className="h-9 rounded-full px-4 text-xs" onClick={savePoints}>
+                {isPending ? "保存中..." : "保存积分"}
+              </Button>
+            </div>
+          </section>
+
+          <section className="rounded-[20px] border border-border p-4">
+            <h4 className="text-sm font-semibold">VIP 配置</h4>
+            <p className="mt-1 text-xs text-muted-foreground">支持人工开通、续期或修正 VIP 到期时间。</p>
+            <div className="mt-4 space-y-3">
+              <Field label="VIP 等级" value={vipLevelDraft} onChange={setVipLevelDraft} placeholder="如 1 / 2 / 3" />
+              <label className="space-y-1">
+                <span className="text-xs font-medium text-muted-foreground">到期时间</span>
+                <input type="datetime-local" value={vipExpiresAtDraft} onChange={(event) => setVipExpiresAtDraft(event.target.value)} className="h-10 w-full rounded-full border border-border bg-background px-3 text-sm outline-none" />
+              </label>
+              <TextAreaField label="操作备注" value={vipMessage} onChange={setVipMessage} placeholder="记录套餐来源、补偿原因或工单号" rows={4} />
+              {vipFeedback ? <p className="text-xs text-muted-foreground">{vipFeedback}</p> : null}
+              <Button type="button" disabled={isPending} className="h-8 rounded-full px-3 text-xs" onClick={saveVip}>
+                {isPending ? "保存中..." : "保存 VIP 设置"}
+              </Button>
+            </div>
+          </section>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-2">
+          <section className="rounded-[20px] border border-border p-4">
+            <h4 className="text-sm font-semibold">手动颁发勋章</h4>
+            <p className="mt-1 text-xs text-muted-foreground">可按用户当前持有情况筛掉重复勋章，并在发放后发通知。</p>
+            <div className="mt-4 space-y-3">
+              <label className="space-y-1">
+                <span className="text-xs font-medium text-muted-foreground">选择勋章</span>
+                <select value={badgeId} onChange={(event) => setBadgeId(event.target.value)} className="h-10 w-full rounded-full border border-border bg-background px-3 text-sm outline-none">
+                  <option value="">请选择勋章</option>
+                  {grantableBadges.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                      {item.category ? ` · ${item.category}` : ""}
+                      {!item.status ? " · 已停用" : ""}
+                      {item.isHidden ? " · 隐藏" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <TextAreaField label="操作备注" value={badgeMessage} onChange={setBadgeMessage} placeholder="记录发放理由、活动来源或补发说明" rows={4} />
+              {detail?.grantedBadges.length ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">已持有勋章</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {detail.grantedBadges.map((item) => (
+                      <span key={`${item.badgeId}-${item.grantedAt}`} className="rounded-full border border-border px-2.5 py-1 text-[11px]" style={{ color: item.color, borderColor: `${item.color}55`, backgroundColor: `${item.color}12` }}>
+                        {item.name}
+                        {item.isDisplayed ? ` · 展示第 ${item.displayOrder || 1} 位` : ""}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {badgeFeedback ? <p className="text-xs text-muted-foreground">{badgeFeedback}</p> : null}
+              <Button type="button" variant="outline" disabled={isPending || grantableBadges.length === 0} className="h-8 rounded-full px-3 text-xs" onClick={grantBadge}>
+                {isPending ? "处理中..." : grantableBadges.length === 0 ? "无可颁发勋章" : "颁发勋章"}
+              </Button>
+            </div>
+          </section>
+
+          <section className="rounded-[20px] border border-border p-4">
+            <h4 className="text-sm font-semibold">手动发送通知</h4>
+            <p className="mt-1 text-xs text-muted-foreground">用于人工补发说明、活动通知或申诉处理结果通知。</p>
+            <div className="mt-4 space-y-3">
+              <Field label="通知标题" value={notificationTitle} onChange={setNotificationTitle} placeholder="如 资料申诉已通过" />
+              <TextAreaField label="通知内容" value={notificationContent} onChange={setNotificationContent} placeholder="填写要发给用户的通知正文" rows={4} />
+              <TextAreaField label="操作备注" value={notificationMessage} onChange={setNotificationMessage} placeholder="记录通知背景、工单号或内部说明" rows={4} />
+              {notificationFeedback ? <p className="text-xs text-muted-foreground">{notificationFeedback}</p> : null}
+              <Button type="button" variant="outline" disabled={isPending} className="h-8 rounded-full px-3 text-xs" onClick={sendNotification}>
+                {isPending ? "发送中..." : "发送通知"}
+              </Button>
+            </div>
+          </section>
+        </div>
+      </div>
+    )
+  }
+
+  function renderPanelContent() {
+    switch (activePanel) {
+      case "account":
+        return renderAccountPanel()
+      case "permissions":
+        return renderPermissionsPanel()
+      case "operations":
+        return renderOperationsPanel()
+      case "detail":
+      default:
+        return renderDetailPanel()
+    }
+  }
+
   return (
     <>
-      <Button type="button" variant="outline" className="h-7 rounded-full px-2.5 text-xs" onClick={() => setOpen(true)}>
-        详情
-      </Button>
+      <div className="flex flex-wrap justify-end gap-1.5">
+        {ADMIN_USER_PANELS.map((panel) => (
+          <Button key={panel.key} type="button" variant="outline" className="h-7 rounded-full px-2.5 text-xs" onClick={() => openPanel(panel.key)}>
+            {panel.label}
+          </Button>
+        ))}
+      </div>
       <AdminModal
         open={open}
         onClose={() => setOpen(false)}
         size="xl"
-        title={`${activeUser.displayName} · @${activeUser.username}`}
+        title={`${activeUser.displayName} · @${activeUser.username} · UID ${activeUser.id} · ${activePanelTitle}`}
         description={`角色 ${activeUser.role} · 状态 ${activeUser.status} · ${vipActive ? `VIP${activeUser.vipLevel}` : "非 VIP"}`}
         footer={(
           <div className="flex items-center justify-end">
@@ -277,120 +774,30 @@ export function AdminUserModal({ user, moderatorScopeOptions }: AdminUserModalPr
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {metrics.map((item) => (
-                <Info key={item.label} label={item.label} value={item.value} compact />
+            <div className="flex flex-wrap gap-2">
+              {ADMIN_USER_PANELS.map((panel) => (
+                <Button key={panel.key} type="button" variant={activePanel === panel.key ? "default" : "outline"} className="h-8 rounded-full px-3 text-xs" onClick={() => setActivePanel(panel.key)}>
+                  {panel.label}
+                </Button>
               ))}
             </div>
 
-            <div className="grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
-              <div className="space-y-4">
-                <section className="rounded-[20px] border border-border p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <h4 className="text-sm font-semibold">基础资料</h4>
-                      <p className="mt-1 text-xs text-muted-foreground">运营可直接维护昵称、邮箱、手机号、简介与介绍。</p>
-                    </div>
-                  </div>
-                  <div className="mt-4 grid gap-3 md:grid-cols-2">
-                    <Field label="昵称" value={profileDraft.nickname} onChange={(value) => setProfileDraft((current) => ({ ...current, nickname: value }))} />
-                    <Field label="邮箱" value={profileDraft.email} onChange={(value) => setProfileDraft((current) => ({ ...current, email: value }))} placeholder="可留空" />
-                    <Field label="手机号" value={profileDraft.phone} onChange={(value) => setProfileDraft((current) => ({ ...current, phone: value }))} placeholder="11 位手机号，可留空" />
-                    <label className="space-y-1">
-                      <span className="text-xs font-medium text-muted-foreground">性别</span>
-                      <select
-                        value={profileDraft.gender}
-                        onChange={(event) => setProfileDraft((current) => ({ ...current, gender: event.target.value }))}
-                        className="h-10 w-full rounded-full border border-border bg-background px-3 text-sm outline-none"
-                      >
-                        <option value="unknown">未知</option>
-                        <option value="male">男</option>
-                        <option value="female">女</option>
-                      </select>
-                    </label>
-                    <TextAreaField label="个人简介" value={profileDraft.bio} onChange={(value) => setProfileDraft((current) => ({ ...current, bio: value }))} className="md:col-span-2" />
-                    <TextAreaField label="个人介绍" value={profileDraft.introduction} onChange={(value) => setProfileDraft((current) => ({ ...current, introduction: value }))} className="md:col-span-2" rows={5} />
-                  </div>
-                  {profileFeedback ? <p className="mt-3 text-xs text-muted-foreground">{profileFeedback}</p> : null}
-                  <Button type="button" disabled={isPending} className="mt-3 h-9 rounded-full px-4 text-xs" onClick={saveProfile}>
-                    {isPending ? "保存中..." : "保存基础资料"}
-                  </Button>
-                </section>
-
-                <section className="rounded-[20px] border border-border p-4">
-                  <h4 className="text-sm font-semibold">积分校正</h4>
-                  <div className="mt-3 space-y-3">
-                    <Field label="积分值" value={points} onChange={setPoints} />
-                    <TextAreaField label="操作备注" value={pointsMessage} onChange={setPointsMessage} placeholder="记录调整原因、工单号或审核说明" rows={4} />
-                    {pointsFeedback ? <p className="text-xs text-muted-foreground">{pointsFeedback}</p> : null}
-                    <Button type="button" disabled={isPending} className="h-9 rounded-full px-4 text-xs" onClick={savePoints}>
-                      {isPending ? "保存中..." : "保存积分"}
-                    </Button>
-                  </div>
-                </section>
-
-                <section className="rounded-[20px] border border-border p-4">
-                  <h4 className="text-sm font-semibold">管理员备注</h4>
-                  <p className="mt-1 text-xs text-muted-foreground">备注会写入后台操作日志，方便交接班和工单追溯。</p>
-                  <div className="mt-3 space-y-3">
-                    <TextAreaField label="备注内容" value={adminNote} onChange={setAdminNote} placeholder="例如：邮箱申诉通过，已人工核验历史工单" rows={4} />
-                    {noteFeedback ? <p className="text-xs text-muted-foreground">{noteFeedback}</p> : null}
-                    <Button type="button" variant="outline" disabled={isPending} className="h-9 rounded-full px-4 text-xs" onClick={saveNote}>
-                      {isPending ? "记录中..." : "保存备注"}
-                    </Button>
-                  </div>
-                </section>
-
-                {isModerator && moderatorScopeOptions ? (
-                  <section className="rounded-[20px] border border-border p-4">
-                    <h4 className="text-sm font-semibold">版主管辖范围</h4>
-                    <p className="mt-1 text-xs text-muted-foreground">分区授权自动覆盖分区下全部节点；勾选“可改设置”后，版主才能编辑对应分区或节点设置。</p>
-                    <div className="mt-4 space-y-4">
-                      <ScopeBlock
-                        title="分区授权"
-                        items={moderatorScopeOptions.zones.map((zone) => ({
-                          id: zone.id,
-                          label: zone.name,
-                          description: `/${zone.slug}`,
-                        }))}
-                        activeScopes={zoneScopes}
-                        onToggle={(id) => toggleScope(setZoneScopes, id)}
-                        onToggleEdit={(id) => toggleScopeEdit(setZoneScopes, id)}
-                      />
-                      <ScopeBlock
-                        title="节点授权"
-                        items={moderatorScopeOptions.boards.map((board) => ({
-                          id: board.id,
-                          label: board.name,
-                          description: `${board.zoneName ? `${board.zoneName} / ` : ""}/${board.slug}`,
-                        }))}
-                        activeScopes={boardScopes}
-                        onToggle={(id) => toggleScope(setBoardScopes, id)}
-                        onToggleEdit={(id) => toggleScopeEdit(setBoardScopes, id)}
-                      />
-                      {scopeFeedback ? <p className="text-xs text-muted-foreground">{scopeFeedback}</p> : null}
-                      <Button type="button" disabled={isPending} className="h-9 rounded-full px-4 text-xs" onClick={saveModeratorScopes}>
-                        {isPending ? "保存中..." : "保存版主管辖范围"}
-                      </Button>
-                    </div>
-                  </section>
-                ) : null}
-              </div>
-
-              <div className="space-y-4">
-                {detail ? (
-                  <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                    {detail.logSections.map((section) => (
-                      <LogSummaryCard key={section.key} section={section} />
-                    ))}
-                  </section>
-                ) : null}
-
-                {detail?.logSections.map((section) => (
-                  <LogSectionCard key={section.key} section={section} />
+            {activePanel === "detail" ? (
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {metrics.map((item) => (
+                  <Info key={item.label} label={item.label} value={item.value} compact />
                 ))}
               </div>
-            </div>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                <Info label="角色" value={activeUser.role} compact />
+                <Info label="状态" value={activeUser.status} compact />
+                <Info label="等级 / VIP" value={vipActive ? `Lv.${activeUser.level} · VIP${activeUser.vipLevel}` : `Lv.${activeUser.level} · 非 VIP`} compact />
+                <Info label="最近登录" value={activeUser.lastLoginAt ? formatDateTime(activeUser.lastLoginAt) : "从未登录"} compact />
+              </div>
+            )}
+
+            {renderPanelContent()}
           </div>
         )}
       </AdminModal>
@@ -403,16 +810,19 @@ function Field({
   value,
   onChange,
   placeholder,
+  type = "text",
 }: {
   label: string
   value: string
   onChange: (value: string) => void
   placeholder?: string
+  type?: "text" | "password"
 }) {
   return (
     <label className="space-y-1">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
       <input
+        type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
@@ -457,12 +867,14 @@ function ScopeBlock({
   activeScopes,
   onToggle,
   onToggleEdit,
+  onToggleWithdraw,
 }: {
   title: string
   items: Array<{ id: string; label: string; description: string }>
   activeScopes: EditableScopeItem[]
   onToggle: (id: string) => void
   onToggleEdit: (id: string) => void
+  onToggleWithdraw: (id: string) => void
 }) {
   return (
     <div className="space-y-2">
@@ -478,13 +890,22 @@ function ScopeBlock({
               </span>
               <span className="flex items-center gap-3">
                 {active ? (
-                  <button
-                    type="button"
-                    className={active.canEditSettings ? "rounded-full bg-foreground px-2.5 py-1 text-[11px] text-background" : "rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground"}
-                    onClick={() => onToggleEdit(item.id)}
-                  >
-                    可改设置
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className={active.canEditSettings ? "rounded-full bg-foreground px-2.5 py-1 text-[11px] text-background" : "rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground"}
+                      onClick={() => onToggleEdit(item.id)}
+                    >
+                      可改设置
+                    </button>
+                    <button
+                      type="button"
+                      className={active.canWithdrawTreasury ? "rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] text-white" : "rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground"}
+                      onClick={() => onToggleWithdraw(item.id)}
+                    >
+                      可提金库
+                    </button>
+                  </>
                 ) : null}
                 <input type="checkbox" checked={Boolean(active)} onChange={() => onToggle(item.id)} />
               </span>

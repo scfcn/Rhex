@@ -1,12 +1,13 @@
 "use client"
 
-import { ArrowDown, ArrowUp, CheckCircle2, ChevronRight, Crown, GripVertical, Plus, Save, Trash2 } from "lucide-react"
+import { ArrowDown, ArrowUp, CheckCircle2, ChevronRight, Crown, GripVertical, Plus, RotateCw, Save, Trash2 } from "lucide-react"
 import { useMemo, useRef, useState, useTransition } from "react"
 
 import { AdminIconPickerField } from "@/components/admin-icon-picker-field"
 import { LevelIcon } from "@/components/level-icon"
 import { PickerPopover, PickerTriggerField, normalizeHexColor } from "@/components/admin-picker-popover"
 import { Button } from "@/components/ui/button"
+import { showConfirm } from "@/components/ui/confirm-dialog"
 
 
 
@@ -75,7 +76,8 @@ function clampToNonNegative(value: string) {
 export function AdminLevelSettingsForm({ initialLevels }: AdminLevelSettingsFormProps) {
   const [levels, setLevels] = useState<LevelDefinitionFormItem[]>(initialLevels)
   const [feedback, setFeedback] = useState("")
-  const [isPending, startTransition] = useTransition()
+  const [isSaving, startSaveTransition] = useTransition()
+  const [isRefreshing, startRefreshTransition] = useTransition()
   const [picker, setPicker] = useState<PickerState>(null)
   const pickerContainerRef = useRef<HTMLDivElement | null>(null)
 
@@ -115,7 +117,7 @@ export function AdminLevelSettingsForm({ initialLevels }: AdminLevelSettingsForm
       onSubmit={(event) => {
         event.preventDefault()
         setFeedback("")
-        startTransition(async () => {
+        startSaveTransition(async () => {
           const response = await fetch("/api/admin/levels", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -132,16 +134,47 @@ export function AdminLevelSettingsForm({ initialLevels }: AdminLevelSettingsForm
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-[20px] border border-border bg-card px-4 py-3">
         <div>
           <h4 className="text-sm font-semibold">等级规则</h4>
-          <p className="mt-0.5 text-xs text-muted-foreground">满足下面条件则自动升级等级</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">满足下面条件则自动升级等级。修改规则后不会自动重算全站用户等级，如需按新规则批量同步，请手动触发。</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 rounded-full px-3"
+            disabled={isSaving || isRefreshing}
+            onClick={async () => {
+              const confirmed = await showConfirm({
+                title: "确认重算全站等级",
+                description: "这会按当前等级规则批量重算全站用户等级，可能持续一段时间。确认现在开始吗？",
+                confirmText: "确认重算",
+              })
+
+              if (!confirmed) {
+                return
+              }
+
+              setFeedback("")
+              startRefreshTransition(async () => {
+                const response = await fetch("/api/admin/levels", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ action: "refresh-all-users" }),
+                })
+                const result = await response.json()
+                setFeedback(result.message ?? (response.ok ? "已开始重算全站用户等级" : "触发重算失败"))
+              })
+            }}
+          >
+            <RotateCw className={`mr-1 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+            {isRefreshing ? "重算触发中..." : "重算全站等级"}
+          </Button>
           <Button type="button" variant="outline" className="h-9 rounded-full px-3" onClick={appendLevel}>
             <Plus className="mr-1 h-4 w-4" />
             新增
           </Button>
-          <Button disabled={isPending} className="h-9 rounded-full px-4">
+          <Button disabled={isSaving || isRefreshing} className="h-9 rounded-full px-4">
             <Save className="mr-1.5 h-4 w-4" />
-            {isPending ? "保存中..." : "保存"}
+            {isSaving ? "保存中..." : "保存"}
           </Button>
         </div>
       </div>
@@ -287,9 +320,9 @@ export function AdminLevelSettingsForm({ initialLevels }: AdminLevelSettingsForm
           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
           <span>{feedback || ""}</span>
         </div>
-        <Button disabled={isPending} className="h-9 rounded-full px-4">
+        <Button disabled={isSaving || isRefreshing} className="h-9 rounded-full px-4">
           <Save className="mr-1.5 h-4 w-4" />
-          {isPending ? "保存中..." : "保存"}
+          {isSaving ? "保存中..." : "保存"}
         </Button>
       </div>
     </form>

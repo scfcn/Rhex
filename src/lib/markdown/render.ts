@@ -44,6 +44,10 @@ type CalloutType = (typeof CALLOUT_TYPES)[number]
 const MARKDOWN_RENDERER_CACHE_LIMIT = 8
 const markdownRendererCache = new Map<string, MarkdownIt>()
 
+interface MarkdownRenderEnv {
+  __usedHeadingSlugs?: Map<string, number>
+}
+
 function slugify(text: string) {
   return text
     .trim()
@@ -484,12 +488,14 @@ function createMarkdownRenderer(emojiItems: MarkdownEmojiItem[]) {
     })
   }
 
-  const usedSlugs = new Map<string, number>()
-  md.renderer.rules.heading_open = (tokens: unknown[], index: number, options: unknown, _env: unknown, self: { renderToken: (tokens: unknown[], index: number, options: unknown) => string }) => {
+  md.renderer.rules.heading_open = (tokens: unknown[], index: number, options: unknown, env: unknown, self: { renderToken: (tokens: unknown[], index: number, options: unknown) => string }) => {
     const typedTokens = tokens as MarkdownHeadingToken[]
     const headingToken = typedTokens[index]
     const inlineToken = typedTokens[index + 1]
     const rawText = inlineToken?.content ?? ""
+    const renderEnv = (typeof env === "object" && env !== null ? env : {}) as MarkdownRenderEnv
+    const usedSlugs = renderEnv.__usedHeadingSlugs ?? new Map<string, number>()
+    renderEnv.__usedHeadingSlugs = usedSlugs
     const baseSlug = slugify(rawText) || `${headingToken.tag}-${index}`
     const seen = usedSlugs.get(baseSlug) ?? 0
     usedSlugs.set(baseSlug, seen + 1)
@@ -531,6 +537,25 @@ function getMarkdownRenderer(emojiItems: MarkdownEmojiItem[]) {
   return markdown
 }
 
+function renderMarkdownChunk(markdown: MarkdownIt, source: string, env: MarkdownRenderEnv) {
+  return (markdown as MarkdownIt & { render: (input: string, renderEnv?: MarkdownRenderEnv) => string }).render(source, env)
+}
+
+export function isImageOnlyMarkdownHtml(html: string) {
+  const normalized = html
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<(\/)?(?:p|div|figure|span|a|picture)\b[^>]*>/gi, "")
+    .replace(/<br\s*\/?>/gi, "")
+    .replace(/<img\b[^>]*>/gi, "__MD_IMG__")
+    .replace(/(?:&nbsp;|&#160;|\s)+/gi, "")
+
+  if (!normalized.includes("__MD_IMG__")) {
+    return false
+  }
+
+  return normalized.replace(/__MD_IMG__/g, "") === ""
+}
+
 export function renderMarkdown(input: string, emojiItems: MarkdownEmojiItem[]) {
   const markdown = getMarkdownRenderer(emojiItems)
   const normalizedInput = renderWavySyntax(renderRubySyntax(wrapHtmlDocumentBlocks(renderUserLinkTokens(input))))
@@ -538,13 +563,16 @@ export function renderMarkdown(input: string, emojiItems: MarkdownEmojiItem[]) {
   const lines = sanitizedInput.split("\n")
   const htmlChunks: string[] = []
   const markdownBuffer: string[] = []
+  const renderEnv: MarkdownRenderEnv = {
+    __usedHeadingSlugs: new Map<string, number>(),
+  }
 
   function flushMarkdownBuffer() {
     if (markdownBuffer.length === 0) {
       return
     }
 
-    htmlChunks.push(markdown.render(markdownBuffer.join("\n")))
+    htmlChunks.push(renderMarkdownChunk(markdown, markdownBuffer.join("\n"), renderEnv))
     markdownBuffer.length = 0
   }
 
@@ -612,4 +640,12 @@ export function renderMarkdown(input: string, emojiItems: MarkdownEmojiItem[]) {
     .replace(/<li class="task-list-item enabled">/g, '<li class="task-list-item enabled flex items-start gap-2 leading-7">')
 
   return decorateMarkdownImages(html)
+}
+
+export function isImageOnlyMarkdown(input: string, emojiItems: MarkdownEmojiItem[]) {
+  if (!input.trim()) {
+    return false
+  }
+
+  return isImageOnlyMarkdownHtml(renderMarkdown(input, emojiItems))
 }

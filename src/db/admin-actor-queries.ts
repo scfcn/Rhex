@@ -12,6 +12,7 @@ export const moderatorScopeSelect = {
     select: {
       zoneId: true,
       canEditSettings: true,
+      canWithdrawTreasury: true,
       zone: {
         select: {
           name: true,
@@ -28,6 +29,7 @@ export const moderatorScopeSelect = {
     select: {
       boardId: true,
       canEditSettings: true,
+      canWithdrawTreasury: true,
       board: {
         select: {
           name: true,
@@ -110,15 +112,21 @@ export function findManagedCommentContext(commentId: string) {
       postId: true,
       userId: true,
       parentId: true,
+      content: true,
       status: true,
+      reviewNote: true,
       post: {
         select: {
           id: true,
+          title: true,
+          slug: true,
           authorId: true,
           boardId: true,
           board: {
             select: {
               id: true,
+              slug: true,
+              name: true,
               zoneId: true,
             },
           },

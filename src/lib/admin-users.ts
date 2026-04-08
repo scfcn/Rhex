@@ -134,6 +134,7 @@ export async function getAdminUsers(options: GetAdminUsersOptions = {}): Promise
       zoneName: scope.zone.name,
       zoneSlug: scope.zone.slug,
       canEditSettings: scope.canEditSettings,
+      canWithdrawTreasury: scope.canWithdrawTreasury,
     })),
     moderatedBoardScopes: user.moderatedBoardScopes.map((scope) => ({
       boardId: scope.boardId,
@@ -143,6 +144,7 @@ export async function getAdminUsers(options: GetAdminUsersOptions = {}): Promise
       zoneName: scope.board.zone?.name ?? null,
       zoneSlug: scope.board.zone?.slug ?? null,
       canEditSettings: scope.canEditSettings,
+      canWithdrawTreasury: scope.canWithdrawTreasury,
     })),
   }))
 

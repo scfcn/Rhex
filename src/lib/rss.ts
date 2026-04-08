@@ -1,20 +1,12 @@
+import { Feed } from "feed"
+
 import { findBoardRssPosts, findRssPosts, RSS_POST_LIMIT, type RssPostRecord, findTagRssPosts, findUserRssPosts, findZoneRssPosts } from "@/db/rss-queries"
 import { getAnonymousMaskDisplayIdentity } from "@/lib/post-anonymous"
 import { getCanonicalPostPath } from "@/lib/post-links"
 import { getPublicPostContentText } from "@/lib/post-content"
 import { getSiteSettings } from "@/lib/site-settings"
-import { resolveSiteOrigin, toAbsoluteSiteUrl } from "@/lib/site-origin"
+import { toAbsoluteSiteUrl } from "@/lib/site-origin"
 import { getUserDisplayName } from "@/lib/users"
-
-interface RssFeedItem {
-  title: string
-  link: string
-  guid: string
-  description: string
-  author: string
-  category: string
-  pubDate: string
-}
 
 interface RssFeedChannel {
   title: string
@@ -26,19 +18,6 @@ interface RssFeedChannel {
 interface RssFeedSource {
   channel: RssFeedChannel
   posts: RssPostRecord[]
-}
-
-function escapeXml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
-    .replace(/'/g, "&apos;")
-}
-
-function wrapCdata(value: string) {
-  return `<![CDATA[${value.replace(/]]>/g, "]]><![CDATA[>") }]]>`
 }
 
 function normalizeText(value: string | null | undefined) {
@@ -60,30 +39,25 @@ function buildDescription(summary: string | null, content: string) {
     .slice(0, 200)
 }
 
-function formatRssDate(value: Date | string) {
-  return new Date(value).toUTCString()
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
 }
 
-async function buildRssItems(posts: RssPostRecord[]): Promise<RssFeedItem[]> {
-  const anonymousMaskIdentity = await getAnonymousMaskDisplayIdentity()
+function buildContent(summary: string | null, content: string) {
+  const normalizedSummary = normalizeText(summary)
+  const plainTextContent = normalizeText(getPublicPostContentText(content))
+  const source = normalizedSummary || plainTextContent
 
-  return Promise.all(posts.map(async (post) => {
-    const author = post.isAnonymous
-      ? (anonymousMaskIdentity?.name ?? anonymousMaskIdentity?.username ?? "匿名用户")
-      : getUserDisplayName(post.author)
-    const link = await toAbsoluteSiteUrl(getCanonicalPostPath(post))
-    const publishedAt = post.publishedAt ?? post.createdAt
-
-    return {
-      title: normalizeText(post.title),
-      link,
-      guid: link,
-      description: buildDescription(post.summary, post.content),
-      author,
-      category: normalizeText(post.board.name),
-      pubDate: formatRssDate(publishedAt),
-    }
-  }))
+  return source
+    .split("\n")
+    .filter(Boolean)
+    .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
+    .join("")
 }
 
 async function buildDefaultChannel(): Promise<RssFeedChannel> {
@@ -97,47 +71,59 @@ async function buildDefaultChannel(): Promise<RssFeedChannel> {
   }
 }
 
+async function buildFeed(sourcePromise: Promise<RssFeedSource>) {
+  const [source, anonymousMaskIdentity, settings] = await Promise.all([
+    sourcePromise,
+    getAnonymousMaskDisplayIdentity(),
+    getSiteSettings(),
+  ])
+  const feedUrl = await toAbsoluteSiteUrl(source.channel.feedPath)
+  const updated = source.posts[0]?.publishedAt ?? source.posts[0]?.createdAt ?? new Date()
+
+  const feed = new Feed({
+    id: source.channel.link,
+    title: source.channel.title,
+    description: source.channel.description,
+    link: source.channel.link,
+    language: "zh-CN",
+    updated,
+    feedLinks: {
+      rss: feedUrl,
+    },
+  })
+
+  for (const post of source.posts) {
+    const author = post.isAnonymous
+      ? (anonymousMaskIdentity?.name ?? anonymousMaskIdentity?.username ?? "匿名用户")
+      : getUserDisplayName(post.author)
+    const link = await toAbsoluteSiteUrl(getCanonicalPostPath(post, { mode: settings.postLinkDisplayMode }))
+    const publishedAt = post.publishedAt ?? post.createdAt
+    const description = buildDescription(post.summary, post.content)
+
+    feed.addItem({
+      title: normalizeText(post.title),
+      id: link,
+      guid: link,
+      link,
+      description,
+      content: buildContent(post.summary, post.content),
+      author: [{ name: author }],
+      category: [{ name: normalizeText(post.board.name) }],
+      date: publishedAt,
+      published: publishedAt,
+    })
+  }
+
+  return feed
+}
+
 export async function getRssFeedUrl() {
   return toAbsoluteSiteUrl("/rss.xml")
 }
 
 async function generateRssXmlBySource(sourcePromise: Promise<RssFeedSource>) {
-  await resolveSiteOrigin()
-  const source = await sourcePromise
-  const items = await buildRssItems(source.posts)
-  const feedUrl = await toAbsoluteSiteUrl(source.channel.feedPath)
-  const lastBuildDate = items[0]?.pubDate ?? new Date().toUTCString()
-
-  const itemXml = items
-    .map((item) => [
-      "    <item>",
-      `      <title>${escapeXml(item.title)}</title>`,
-      `      <link>${escapeXml(item.link)}</link>`,
-      `      <guid isPermaLink=\"true\">${escapeXml(item.guid)}</guid>`,
-      `      <description>${wrapCdata(item.description)}</description>`,
-      `      <dc:creator>${wrapCdata(item.author)}</dc:creator>`,
-      `      <category>${wrapCdata(item.category)}</category>`,
-      `      <pubDate>${escapeXml(item.pubDate)}</pubDate>`,
-      "    </item>",
-    ].join("\n"))
-    .join("\n")
-
-  return [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">',
-    "  <channel>",
-    `    <title>${escapeXml(source.channel.title)}</title>`,
-    `    <link>${escapeXml(source.channel.link)}</link>`,
-    `    <description>${escapeXml(source.channel.description)}</description>`,
-    "    <language>zh-cn</language>",
-    "    <generator>Next.js</generator>",
-    `    <lastBuildDate>${escapeXml(lastBuildDate)}</lastBuildDate>`,
-    `    <atom:link href="${escapeXml(feedUrl)}" rel="self" type="application/rss+xml" />`,
-    itemXml,
-    "  </channel>",
-    "</rss>",
-    "",
-  ].join("\n")
+  const feed = await buildFeed(sourcePromise)
+  return feed.rss2()
 }
 
 export async function generateRssXml() {
@@ -230,5 +216,3 @@ export async function generateTagRssXml(tag: { slug: string; name: string; descr
     }
   })())
 }
-
-

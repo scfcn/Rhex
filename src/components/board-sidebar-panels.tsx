@@ -29,6 +29,7 @@ interface BoardSidebarPanelsProps {
   createPostHref?: string
   siteName?: string
   siteDescription?: string
+  siteLogoPath?: string | null
 }
 
 const DEFAULT_BOARD_RULES_MARKDOWN = [
@@ -149,7 +150,7 @@ function BoardLinksPanel({ links }: { links: BoardSidebarLinkItem[] }) {
   )
 }
 
-export function BoardSidebarPanels({ user, hotTopics, board, moderators, postLinkDisplayMode = "SLUG", createPostHref, siteName, siteDescription }: BoardSidebarPanelsProps) {
+export function BoardSidebarPanels({ user, hotTopics, board, moderators, postLinkDisplayMode = "SLUG", createPostHref, siteName, siteDescription, siteLogoPath }: BoardSidebarPanelsProps) {
   const topPanels: HomeSidebarPanelItem[] = []
 
   if (board.sidebarLinks.length > 0) {
@@ -177,6 +178,7 @@ export function BoardSidebarPanels({ user, hotTopics, board, moderators, postLin
       createPostHref={createPostHref}
       siteName={siteName}
       siteDescription={siteDescription}
+      siteLogoPath={siteLogoPath}
       topPanels={topPanels}
     />
   )

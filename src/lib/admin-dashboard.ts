@@ -16,6 +16,7 @@ export interface AdminDashboardData {
     userCount: number
     postCount: number
     commentCount: number
+    pendingCommentCount: number
     boardCount: number
     zoneCount: number
     reportCount: number
@@ -105,6 +106,7 @@ export interface AdminStructureData {
     minPostVipLevel: number
     minReplyVipLevel: number
     requirePostReview: boolean
+    requireCommentReview: boolean
     postListDisplayMode: string | null
     postListLoadMode: string | null
     canEditSettings: boolean
@@ -142,6 +144,7 @@ export interface AdminStructureData {
     minPostVipLevel: number | null
     minReplyVipLevel: number | null
     requirePostReview: boolean | null
+    requireCommentReview: boolean | null
     postListDisplayMode: string | null
     postListLoadMode: string | null
     canEditSettings: boolean
@@ -281,6 +284,7 @@ export function mapAdminStructureData(data: AdminStructureRawData, actor: AdminA
         minPostVipLevel: settings.minPostVipLevel,
         minReplyVipLevel: settings.minReplyVipLevel,
         requirePostReview: settings.requirePostReview,
+        requireCommentReview: settings.requireCommentReview,
         postListDisplayMode: zone.postListDisplayMode ?? null,
         postListLoadMode: zone.postListLoadMode ?? null,
         canEditSettings: canEditZoneSettings(actor, zone.id),
@@ -322,6 +326,7 @@ export function mapAdminStructureData(data: AdminStructureRawData, actor: AdminA
         minPostVipLevel: board.minPostVipLevel ?? null,
         minReplyVipLevel: board.minReplyVipLevel ?? null,
         requirePostReview: board.requirePostReview ?? null,
+        requireCommentReview: board.requireCommentReview ?? null,
         postListDisplayMode: board.postListDisplayMode ?? null,
         postListLoadMode: board.postListLoadMode ?? null,
         canEditSettings: canEditBoardSettings(actor, board.id, board.zoneId),

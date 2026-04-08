@@ -5,8 +5,14 @@ export function getPostRouteSegment(post: { id: string; slug: string }, mode: Po
   return mode === "ID" ? post.id : post.slug
 }
 
-export function getCanonicalPostPath(post: { slug: string }) {
-  return `/posts/${encodeURIComponent(post.slug)}`
+export function getCanonicalPostPath(
+  post: { id?: string; slug: string },
+  options?: PostLinkDisplayMode | { mode?: PostLinkDisplayMode },
+) {
+  const mode = typeof options === "string" ? options : options?.mode ?? "SLUG"
+  const routeSegment = mode === "ID" && post.id ? post.id : post.slug
+
+  return `/posts/${encodeURIComponent(routeSegment)}`
 }
 
 export function getPostPath(post: { id: string; slug: string }, options?: PostLinkDisplayMode | { mode?: PostLinkDisplayMode }) {

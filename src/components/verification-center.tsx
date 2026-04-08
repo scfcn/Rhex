@@ -6,6 +6,7 @@ import { CheckCircle2, Clock3, ShieldCheck, XCircle } from "lucide-react"
 import { LevelIcon } from "@/components/level-icon"
 import { Button } from "@/components/ui/button"
 import { showConfirm } from "@/components/ui/confirm-dialog"
+import { formatDateTime } from "@/lib/formatters"
 import type { VerificationFormField } from "@/lib/verification-form-schema"
 
 
@@ -32,6 +33,7 @@ interface VerificationCenterProps {
       rejectReason?: string | null
       note?: string | null
       content?: string | null
+      customDescription?: string | null
       formResponse?: Record<string, string>
       type: {
         id: string
@@ -48,12 +50,14 @@ interface VerificationCenterProps {
     iconText: string
     color: string
     description?: string | null
+    customDescription?: string | null
   } | null
 }
 
 export function VerificationCenter({ types, approvedVerification }: VerificationCenterProps) {
   const [selectedTypeId, setSelectedTypeId] = useState(types[0]?.id ?? "")
   const [content, setContent] = useState("")
+  const [customDescription, setCustomDescription] = useState("")
   const [formValues, setFormValues] = useState<Record<string, string>>({})
   const [feedback, setFeedback] = useState("")
   const [isUnbinding, setIsUnbinding] = useState(false)
@@ -85,6 +89,7 @@ export function VerificationCenter({ types, approvedVerification }: Verification
         body: JSON.stringify({
           verificationTypeId: selectedType.id,
           content,
+          customDescription,
           formResponse: selectedType.formFields.length > 0 ? formValues : undefined,
         }),
       })
@@ -92,6 +97,7 @@ export function VerificationCenter({ types, approvedVerification }: Verification
       setFeedback(result.message ?? (response.ok ? "提交成功" : "提交失败"))
       if (response.ok) {
         setContent("")
+        setCustomDescription("")
         setFormValues({})
         window.location.reload()
       }
@@ -145,6 +151,7 @@ export function VerificationCenter({ types, approvedVerification }: Verification
           {approvedVerification ? (
             <div className="rounded-[24px] border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
               当前已通过：<span className="font-medium">{approvedVerification.name}</span>
+              {approvedVerification.customDescription ? <span className="ml-1 text-emerald-600/90 dark:text-emerald-200/90">· {approvedVerification.customDescription}</span> : null}
             </div>
           ) : (
             <div className="rounded-[24px] border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">当前尚未通过任何认证</div>
@@ -176,6 +183,7 @@ export function VerificationCenter({ types, approvedVerification }: Verification
                       }
                       setSelectedTypeId(item.id)
                       setContent("")
+                      setCustomDescription("")
                       setFormValues({})
                       setFeedback("")
                     }}
@@ -221,7 +229,7 @@ export function VerificationCenter({ types, approvedVerification }: Verification
                 <div className="mt-5 rounded-[22px] border border-border bg-secondary/20 p-4 text-sm">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="font-medium">当前申请状态：{renderStatusLabel(currentApplication.status)}</div>
-                    <div className="text-xs text-muted-foreground">提交于 {new Date(currentApplication.submittedAt).toLocaleString()}</div>
+                    <div className="text-xs text-muted-foreground">提交于 {formatDateTime(currentApplication.submittedAt)}</div>
                   </div>
                   {currentApplication.formResponse && Object.keys(currentApplication.formResponse).length > 0 ? (
                     <div className="mt-3 grid gap-2 md:grid-cols-2">
@@ -233,6 +241,12 @@ export function VerificationCenter({ types, approvedVerification }: Verification
                       ))}
                     </div>
                   ) : currentApplication.content ? <p className="mt-3 text-muted-foreground whitespace-pre-wrap">{currentApplication.content}</p> : null}
+                  {currentApplication.customDescription ? (
+                    <div className="mt-3 rounded-[18px] bg-background px-3 py-2.5">
+                      <p className="text-xs text-muted-foreground">个性描述</p>
+                      <p className="mt-1 text-foreground">{currentApplication.customDescription}</p>
+                    </div>
+                  ) : null}
                   {currentApplication.note ? <p className="mt-2 text-muted-foreground">审核备注：{currentApplication.note}</p> : null}
                   {currentApplication.rejectReason ? <p className="mt-2 text-rose-600 dark:text-rose-300">驳回原因：{currentApplication.rejectReason}</p> : null}
                 </div>
@@ -290,6 +304,17 @@ export function VerificationCenter({ types, approvedVerification }: Verification
                       />
                     </label>
                   )}
+
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">个性描述（可选）</span>
+                    <input
+                      value={customDescription}
+                      onChange={(event) => setCustomDescription(event.target.value)}
+                      placeholder="用于前台认证徽章提示展示，例如：独立开发者 / 认证摄影师"
+                      className="h-11 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-none transition-colors focus:border-foreground/30"
+                    />
+                    <p className="text-xs leading-6 text-muted-foreground">这条描述会跟随认证图标展示，留空时仅显示认证名称。</p>
+                  </label>
 
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-xs leading-6 text-muted-foreground">建议填写真实身份说明、业务介绍、可核验链接或其它辅助材料，便于后台快速审核。</p>

@@ -56,7 +56,7 @@ export async function createPostFlow(body: unknown) {
     apiError(400, validated.message ?? "参数错误")
   }
 
-  const { title, content, isAnonymous, coverPath, boardSlug, postType, bountyPoints, pollOptions, commentsVisibleToAuthorOnly, replyUnlockContent, replyThreshold, purchaseUnlockContent, purchasePrice, minViewLevel, minViewVipLevel, lotteryConfig } = validated.data
+  const { title, content, isAnonymous, coverPath, boardSlug, postType, bountyPoints, pollOptions, commentsVisibleToAuthorOnly, loginUnlockContent, replyUnlockContent, replyThreshold, purchaseUnlockContent, purchasePrice, minViewLevel, minViewVipLevel, lotteryConfig } = validated.data
 
   const rawBody = body as Record<string, unknown>
   const manualTags = normalizeManualTags(Array.isArray(rawBody?.manualTags)
@@ -91,11 +91,13 @@ export async function createPostFlow(body: unknown) {
 
   const titleSafety = await enforceSensitiveText({ scene: "post.title", text: title })
   const contentSafety = await enforceSensitiveText({ scene: "post.content", text: content })
+  const loginUnlockSafety = loginUnlockContent ? await enforceSensitiveText({ scene: "post.content", text: loginUnlockContent }) : null
   const replyUnlockSafety = replyUnlockContent ? await enforceSensitiveText({ scene: "post.content", text: replyUnlockContent }) : null
   const purchaseUnlockSafety = purchaseUnlockContent ? await enforceSensitiveText({ scene: "post.content", text: purchaseUnlockContent }) : null
 
   const contentDocument = buildPostContentDocument({
     publicContent: contentSafety.sanitizedText,
+    loginUnlockContent: loginUnlockSafety?.sanitizedText ?? "",
     replyUnlockContent: replyUnlockSafety?.sanitizedText ?? "",
     replyThreshold: replyThreshold ?? undefined,
     purchaseUnlockContent: purchaseUnlockSafety?.sanitizedText ?? "",
@@ -201,7 +203,7 @@ export async function createPostFlow(body: unknown) {
     apiError(400, `当前${settings.pointName}不足，无法在该节点发布此帖子`)
   }
 
-  const shouldPending = Boolean(boardContext.settings.requirePostReview || titleSafety.shouldReview || contentSafety.shouldReview || replyUnlockSafety?.shouldReview || purchaseUnlockSafety?.shouldReview || tagsSafety?.shouldReview)
+  const shouldPending = Boolean(boardContext.settings.requirePostReview || titleSafety.shouldReview || contentSafety.shouldReview || loginUnlockSafety?.shouldReview || replyUnlockSafety?.shouldReview || purchaseUnlockSafety?.shouldReview || tagsSafety?.shouldReview)
 
   const post = await runPostCreateTransaction(async (tx) => {
     const lotteryData = normalizedLottery?.data

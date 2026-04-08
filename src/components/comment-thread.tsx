@@ -1,19 +1,14 @@
 "use client"
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { Ellipsis } from "lucide-react"
 
 import { CommentThreadCommentItem, CommentThreadReplyItem } from "@/components/comment-thread-items"
 import { CommentThreadReplyBox } from "@/components/comment-thread-shared"
 
-import {
-  DEFAULT_BROWSING_PREFERENCES,
-  readBrowsingPreferencesSnapshot,
-  subscribeBrowsingPreferences,
-  updateBrowsingPreferences,
-} from "@/lib/browsing-preferences"
+import { updateBrowsingPreferences } from "@/lib/browsing-preferences"
 import type { SiteCommentItem, SiteCommentReplyItem, SiteFlatCommentItem } from "@/lib/comments"
 import { COMMENT_REPLY_TOGGLE_EVENT, emitCommentReplyState, type CommentReplyTarget, type CommentReplyToggleDetail } from "@/lib/comment-reply-box-events"
 import type { MarkdownEmojiItem } from "@/lib/markdown-emoji"
@@ -67,11 +62,6 @@ export function CommentThread({ threadId, comments, flatComments = [], postId, p
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const browsingPreferences = useSyncExternalStore(
-    subscribeBrowsingPreferences,
-    readBrowsingPreferencesSnapshot,
-    () => DEFAULT_BROWSING_PREFERENCES,
-  )
   const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({})
   const [submittingAnswerId, setSubmittingAnswerId] = useState<string | null>(null)
   const [pinningCommentId, setPinningCommentId] = useState<string | null>(null)
@@ -124,19 +114,6 @@ export function CommentThread({ threadId, comments, flatComments = [], postId, p
       setHighlightedCommentId(commentId)
     })
   }, [])
-
-  useEffect(() => {
-    if (searchParams.get("view")) {
-      return
-    }
-
-    const preferredView = browsingPreferences.commentThreadDisplayMode
-    if (preferredView === currentDisplayMode) {
-      return
-    }
-
-    router.replace(buildCommentHref({ page: 1, view: preferredView }), { scroll: false })
-  }, [browsingPreferences.commentThreadDisplayMode, buildCommentHref, currentDisplayMode, router, searchParams])
 
   useEffect(() => {
     function syncHighlightedCommentFromLocation() {

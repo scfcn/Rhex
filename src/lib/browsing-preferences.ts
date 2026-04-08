@@ -6,12 +6,14 @@ export interface BrowsingPreferencesSnapshot {
 }
 
 export const BROWSING_PREFERENCES_STORAGE_KEY = "rhex:browsing-preferences:v1"
+export const BROWSING_PREFERENCES_COOKIE_NAME = "rhex-browsing-preferences"
 export const BROWSING_PREFERENCES_CHANGE_EVENT = "rhex:browsing-preferences-change"
+const BROWSING_PREFERENCES_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 export const DEFAULT_BROWSING_PREFERENCES: BrowsingPreferencesSnapshot = {
   dimReadPostTitles: false,
   openPostLinksInNewTab: false,
   commentThreadDisplayMode: "tree",
-  rewardPoolIntroAnimationMode: "always",
+  rewardPoolIntroAnimationMode: "once-per-tab",
 }
 
 let cachedSnapshot: BrowsingPreferencesSnapshot = DEFAULT_BROWSING_PREFERENCES
@@ -40,17 +42,123 @@ function normalizeBrowsingPreferences(value: unknown): BrowsingPreferencesSnapsh
   }
 }
 
+function areBrowsingPreferencesEqual(left: BrowsingPreferencesSnapshot | null, right: BrowsingPreferencesSnapshot | null) {
+  if (!left || !right) {
+    return left === right
+  }
+
+  return left.dimReadPostTitles === right.dimReadPostTitles
+    && left.openPostLinksInNewTab === right.openPostLinksInNewTab
+    && left.commentThreadDisplayMode === right.commentThreadDisplayMode
+    && left.rewardPoolIntroAnimationMode === right.rewardPoolIntroAnimationMode
+}
+
+function parseStoredBrowsingPreferences(raw: string | null | undefined) {
+  if (!raw) {
+    return null
+  }
+
+  try {
+    return normalizeBrowsingPreferences(JSON.parse(raw))
+  } catch {
+    return null
+  }
+}
+
+export function resolveBrowsingPreferencesSnapshot(raw: string | null | undefined) {
+  if (!raw) {
+    return DEFAULT_BROWSING_PREFERENCES
+  }
+
+  const decodedRaw = (() => {
+    try {
+      return decodeURIComponent(raw)
+    } catch {
+      return raw
+    }
+  })()
+
+  return parseStoredBrowsingPreferences(decodedRaw) ?? DEFAULT_BROWSING_PREFERENCES
+}
+
+function readSnapshotFromCookieValue(cookieValue: string | null | undefined) {
+  if (!cookieValue) {
+    return null
+  }
+
+  return resolveBrowsingPreferencesSnapshot(cookieValue)
+}
+
+function readSnapshotFromCookieString(cookieString: string) {
+  if (!cookieString.trim()) {
+    return null
+  }
+
+  const cookiePrefix = `${BROWSING_PREFERENCES_COOKIE_NAME}=`
+  const entry = cookieString
+    .split(";")
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(cookiePrefix))
+
+  if (!entry) {
+    return null
+  }
+
+  return readSnapshotFromCookieValue(entry.slice(cookiePrefix.length))
+}
+
+function writeSnapshotToStorage(snapshot: BrowsingPreferencesSnapshot) {
+  if (!isBrowser()) {
+    return
+  }
+
+  try {
+    window.localStorage.setItem(BROWSING_PREFERENCES_STORAGE_KEY, JSON.stringify(snapshot))
+  } catch {
+    // Ignore storage failures and still keep the in-memory snapshot available.
+  }
+}
+
+function writeSnapshotToCookie(snapshot: BrowsingPreferencesSnapshot) {
+  if (!isBrowser()) {
+    return
+  }
+
+  try {
+    document.cookie = `${BROWSING_PREFERENCES_COOKIE_NAME}=${encodeURIComponent(JSON.stringify(snapshot))}; path=/; max-age=${BROWSING_PREFERENCES_COOKIE_MAX_AGE}; samesite=lax`
+  } catch {
+    // Ignore cookie failures and still keep the in-memory snapshot available.
+  }
+}
+
 function readSnapshotFromStorage() {
   if (!isBrowser()) {
     return DEFAULT_BROWSING_PREFERENCES
   }
 
-  try {
-    const raw = window.localStorage.getItem(BROWSING_PREFERENCES_STORAGE_KEY)
-    return raw ? normalizeBrowsingPreferences(JSON.parse(raw)) : DEFAULT_BROWSING_PREFERENCES
-  } catch {
-    return DEFAULT_BROWSING_PREFERENCES
+  const storageSnapshot = (() => {
+    try {
+      return parseStoredBrowsingPreferences(window.localStorage.getItem(BROWSING_PREFERENCES_STORAGE_KEY))
+    } catch {
+      return null
+    }
+  })()
+  const cookieSnapshot = readSnapshotFromCookieString(document.cookie)
+
+  if (storageSnapshot) {
+    if (!areBrowsingPreferencesEqual(storageSnapshot, cookieSnapshot)) {
+      writeSnapshotToCookie(storageSnapshot)
+    }
+
+    return storageSnapshot
   }
+
+  if (cookieSnapshot) {
+    writeSnapshotToStorage(cookieSnapshot)
+    return cookieSnapshot
+  }
+
+  return DEFAULT_BROWSING_PREFERENCES
 }
 
 function updateSnapshot(nextSnapshot: BrowsingPreferencesSnapshot, syncStorage = true) {
@@ -62,13 +170,10 @@ function updateSnapshot(nextSnapshot: BrowsingPreferencesSnapshot, syncStorage =
   }
 
   if (syncStorage) {
-    try {
-      window.localStorage.setItem(BROWSING_PREFERENCES_STORAGE_KEY, JSON.stringify(nextSnapshot))
-    } catch {
-      // Ignore storage failures and still update the in-memory snapshot.
-    }
+    writeSnapshotToStorage(nextSnapshot)
   }
 
+  writeSnapshotToCookie(nextSnapshot)
   window.dispatchEvent(new Event(BROWSING_PREFERENCES_CHANGE_EVENT))
 }
 

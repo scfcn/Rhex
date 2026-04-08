@@ -76,6 +76,8 @@ export function PostRewardPoolIntroAnimation({ postId, summary }: PostRewardPool
     readBrowsingPreferencesSnapshot,
     () => DEFAULT_BROWSING_PREFERENCES,
   )
+  const rewardPoolIntroAnimationMode = browsingPreferences.rewardPoolIntroAnimationMode
+  const shouldShowIntro = shouldPlayRewardPoolIntro(summary) && rewardPoolIntroAnimationMode !== "never"
   const [visible, setVisible] = useState(false)
   const [shrinking, setShrinking] = useState(false)
   const [currentRect, setCurrentRect] = useState<RectSnapshot | null>(null)
@@ -97,11 +99,11 @@ export function PostRewardPoolIntroAnimation({ postId, summary }: PostRewardPool
   }, [summary])
 
   useEffect(() => {
-    if (!shouldPlayRewardPoolIntro(summary) || browsingPreferences.rewardPoolIntroAnimationMode === "never") {
+    if (!shouldShowIntro) {
       return
     }
     try{
-    if(window.location.search !=='') {
+    if(window.location.search !=='' && window.location.search !=='?view=flat') {
           return
         }
       }catch{
@@ -114,7 +116,7 @@ export function PostRewardPoolIntroAnimation({ postId, summary }: PostRewardPool
       return
     }
 
-    if (browsingPreferences.rewardPoolIntroAnimationMode === "once-per-tab") {
+    if (rewardPoolIntroAnimationMode === "once-per-tab") {
       const storageKey = `post-reward-pool-intro:${postId}`
       try {
         if (window.sessionStorage.getItem(storageKey) === "done") {
@@ -139,6 +141,7 @@ export function PostRewardPoolIntroAnimation({ postId, summary }: PostRewardPool
         return
       }
 
+      setShrinking(false)
       setCurrentRect(buildCenteredRect())
       setVisible(true)
 
@@ -152,6 +155,8 @@ export function PostRewardPoolIntroAnimation({ postId, summary }: PostRewardPool
 
       closeTimer = window.setTimeout(() => {
         setVisible(false)
+        setShrinking(false)
+        setCurrentRect(null)
       }, INTRO_DISPLAY_MS + INTRO_SHRINK_MS)
     }
 
@@ -167,10 +172,13 @@ export function PostRewardPoolIntroAnimation({ postId, summary }: PostRewardPool
       if (closeTimer !== null) {
         window.clearTimeout(closeTimer)
       }
+      setVisible(false)
+      setShrinking(false)
+      setCurrentRect(null)
     }
-  }, [browsingPreferences.rewardPoolIntroAnimationMode, postId, summary])
+  }, [postId, rewardPoolIntroAnimationMode, shouldShowIntro, summary])
 
-  if (!visible || !currentRect) {
+  if (!shouldShowIntro || !visible || !currentRect) {
     return null
   }
 

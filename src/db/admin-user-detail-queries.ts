@@ -54,6 +54,22 @@ export function findAdminUserDetailById(userId: number) {
           },
         },
       },
+      userBadges: {
+        orderBy: [{ grantedAt: "desc" }],
+        include: {
+          badge: {
+            select: {
+              id: true,
+              name: true,
+              iconText: true,
+              color: true,
+              category: true,
+              status: true,
+              isHidden: true,
+            },
+          },
+        },
+      },
     },
   })
 }

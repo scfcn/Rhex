@@ -1,6 +1,7 @@
 import { countLevelDefinitions, countUserCommentLikes, countUserPostLikes, createManyLevelDefinitions, findAllLevelDefinitions, findAllUserIdsForLevelRefresh, findLevelDefinitionByLevel, findUserLevelGrowthUser, findUserLevelProgressByUserId, saveLevelDefinitionsInTransaction, syncUserReceivedLikesInTransaction, updateUserLevel } from "@/db/level-system-queries"
 import { processInBatches } from "@/lib/async-batch"
 import { enqueueBackgroundJob, registerBackgroundJobHandler } from "@/lib/background-jobs"
+import { createSystemNotification } from "@/lib/notification-writes"
 
 
 type LevelDefinitionRecord = {
@@ -138,6 +139,10 @@ export interface UserLevelGrowthSnapshot {
   lastCheckInDate: string | null
 }
 
+interface EvaluateUserLevelProgressOptions {
+  notifyOnUpgrade?: boolean
+}
+
 export async function ensureLevelDefinitions() {
   const count = await countLevelDefinitions()
 
@@ -203,7 +208,7 @@ function meetsLevelRequirements(snapshot: UserLevelGrowthSnapshot, level: Pick<L
     && snapshot.likeReceivedCount >= level.requireLikeCount
 }
 
-export async function evaluateUserLevelProgress(userId: number) {
+export async function evaluateUserLevelProgress(userId: number, options: EvaluateUserLevelProgressOptions = {}) {
   const [snapshot, levels] = await Promise.all([getLevelGrowthSnapshot(userId), getLevelDefinitions()])
 
   if (!snapshot) {
@@ -225,8 +230,24 @@ export async function evaluateUserLevelProgress(userId: number) {
     await updateUserLevel(userId, nextLevel)
   }
 
+  const previousDefinition = levels.find((item) => item.level === snapshot.level) ?? levels[0] ?? null
   const currentDefinition = levels.find((item) => item.level === nextLevel) ?? levels[0] ?? null
   const maxLevel = levels.at(-1)?.level ?? 1
+
+  if (options.notifyOnUpgrade && nextLevel > snapshot.level && currentDefinition) {
+    const previousLevelName = previousDefinition?.name?.trim()
+    const currentLevelName = currentDefinition.name.trim()
+    const levelLabel = currentLevelName ? `Lv.${nextLevel} ${currentLevelName}` : `Lv.${nextLevel}`
+    const previousLabel = previousLevelName ? `Lv.${snapshot.level} ${previousLevelName}` : `Lv.${snapshot.level}`
+
+    await createSystemNotification({
+      userId,
+      relatedType: "USER",
+      relatedId: String(userId),
+      title: `等级提升到 ${levelLabel}`,
+      content: `你的社区等级已从 ${previousLabel} 升级为 ${levelLabel}。继续签到、发帖、回复和积累获赞，还能解锁更高等级。`,
+    })
+  }
 
   return {
     level: nextLevel,
@@ -239,7 +260,7 @@ export async function evaluateUserLevelProgress(userId: number) {
   }
 }
 
-export async function syncUserReceivedLikes(userId: number) {
+export async function syncUserReceivedLikes(userId: number, options: EvaluateUserLevelProgressOptions = {}) {
   const [postLikes, commentLikes] = await Promise.all([
     countUserPostLikes(userId),
     countUserCommentLikes(userId),
@@ -247,7 +268,7 @@ export async function syncUserReceivedLikes(userId: number) {
 
   await syncUserReceivedLikesInTransaction(userId, postLikes, commentLikes)
 
-  return evaluateUserLevelProgress(userId)
+  return evaluateUserLevelProgress(userId, options)
 }
 
 export async function refreshAllUserLevelProgress() {
@@ -305,7 +326,6 @@ export async function saveLevelDefinitions(input: Array<{
   }
 
   await saveLevelDefinitionsInTransaction(normalized)
-  await enqueueRefreshAllUserLevelProgress()
 
   return getLevelDefinitions()
 }

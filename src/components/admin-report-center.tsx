@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle2, Clock3, ShieldOff, ShieldQuestion } from "
 
 import { AdminActionForm } from "@/components/admin-action-form"
 import { AdminReportDetailModal } from "@/components/admin-report-detail-modal"
+import { serializeDate } from "@/lib/formatters"
 import type { AdminReportListResult } from "@/lib/admin-report-management"
 
 const statusLabelMap: Record<AdminReportListResult["reports"][number]["status"], string> = {
@@ -82,7 +83,7 @@ export function AdminReportCenter({ data }: { data: AdminReportListResult }) {
             <div className="space-y-1 text-muted-foreground">
               <span className={`inline-flex rounded-full px-2 py-0.5 ${statusClassMap[report.status]}`}>{statusLabelMap[report.status]}</span>
               <div>{report.targetType}</div>
-              <div>{new Date(report.createdAt).toLocaleDateString("zh-CN")}</div>
+              <div>{serializeDate(report.createdAt) ?? report.createdAt}</div>
             </div>
 
             <div className="space-y-1 text-muted-foreground">

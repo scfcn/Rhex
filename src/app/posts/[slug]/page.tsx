@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { MessageCircle } from "lucide-react"
+import { cookies } from "next/headers"
 import { notFound } from "next/navigation"
 
 
@@ -37,6 +38,7 @@ import { getPostDetailBySlug, getPostSeoBySlug, incrementPostViewCount } from "@
 import { getPostSidebarData } from "@/lib/post-sidebar"
 import { getPostRedPacketSummary } from "@/lib/post-red-packets"
 import { canUseAnonymousIdentityForPostReply, getAnonymousMaskDisplayIdentity } from "@/lib/post-anonymous"
+import { isImageOnlyMarkdown } from "@/lib/markdown/render"
 import { getPostTipSummary } from "@/lib/post-tips"
 import { getPostOfflineActionMeta } from "@/lib/post-offline"
 
@@ -45,6 +47,8 @@ import { getPurchasedPostBlockBuyerCounts, getPurchasedPostBlockIds } from "@/li
 import { buildArticleJsonLd, buildMetadataKeywords } from "@/lib/seo"
 import { readSearchParam } from "@/lib/search-params"
 import { getSiteSettings } from "@/lib/site-settings"
+import { BROWSING_PREFERENCES_COOKIE_NAME, resolveBrowsingPreferencesSnapshot } from "@/lib/browsing-preferences"
+import { toAbsoluteSiteUrl } from "@/lib/site-origin"
 
 import { getZones } from "@/lib/zones"
 import { getCanonicalPostPath } from "@/lib/post-links"
@@ -60,17 +64,20 @@ export async function generateMetadata(props: PageProps<"/posts/[slug]">): Promi
     }
   }
 
+  const canonicalPath = getCanonicalPostPath(post, { mode: settings.postLinkDisplayMode })
+
   return {
     title: `${post.title} - ${settings.siteName}`,
     description: post.description,
     keywords: buildMetadataKeywords(settings.siteSeoKeywords, [post.title, post.slug, post.description, "帖子", "论坛帖子"]),
     alternates: {
-      canonical: getCanonicalPostPath({ slug: post.slug }) as string,
+      canonical: canonicalPath,
     },
     openGraph: {
       title: post.title,
       description: post.description,
       type: "article",
+      url: canonicalPath,
     },
     twitter: {
       card: "summary_large_image",
@@ -86,7 +93,12 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
   const searchParams = await props.searchParams;
   const params = await props.params;
   const currentSort = readSearchParam(searchParams?.sort) === "newest" ? "newest" : "oldest"
-  const currentCommentView = readSearchParam(searchParams?.view) === "flat" ? "flat" : "tree"
+  const requestedCommentView = readSearchParam(searchParams?.view)
+  const currentCommentView = requestedCommentView === "flat"
+    ? "flat"
+    : requestedCommentView === "tree"
+      ? "tree"
+      : resolveBrowsingPreferencesSnapshot((await cookies()).get(BROWSING_PREFERENCES_COOKIE_NAME)?.value).commentThreadDisplayMode
   const currentPage = Math.max(1, Number(readSearchParam(searchParams?.page) ?? "1") || 1)
 
 
@@ -102,7 +114,8 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
     notFound()
   }
 
-  const canonicalPath = getCanonicalPostPath({ slug: basePost.slug })
+  const canonicalPath = getCanonicalPostPath(basePost, { mode: settings.postLinkDisplayMode })
+  const canonicalUrl = await toAbsoluteSiteUrl(canonicalPath)
   const isFollowingPost = currentUser
     ? await isUserFollowingTarget({
         userId: currentUser.id,
@@ -220,6 +233,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
 
         const visible = block.type === "PUBLIC"
           || (block.type === "AUTHOR_ONLY" && isOwnerOrManager)
+          || (block.type === "LOGIN_UNLOCK" && (Boolean(currentUser?.id) || isOwnerOrManager))
           || (block.type === "REPLY_UNLOCK" && replyUnlocked)
           || (block.type === "PURCHASE_UNLOCK" && (purchasedBlockIds.has(block.id) || isOwnerOrManager))
 
@@ -313,7 +327,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
     description: displayPost.description,
     publishedAt: displayPost.publishedAt,
     author: displayPost.author,
-    url: canonicalPath,
+    url: canonicalUrl,
   })
 
   return (
@@ -349,7 +363,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
               <>
               <div className="space-y-0">
                   <PostBodyCopyMenu
-                    copyPath={`/posts/${displayPost.slug}`}
+                    copyPath={canonicalPath}
                     canReport={Boolean(currentUser && currentUser.id !== displayPost.authorId)}
                     reportTargetId={displayPost.id}
                     reportLabel={displayPost.title}
@@ -394,7 +408,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                         <div className="mt-8 space-y-5 text-[15px] leading-8 text-foreground/90 dark:text-foreground/85">
                           {(displayPost.contentBlocks ?? []).map((block) => (
                             block.type === "PUBLIC"
-                              ? <MarkdownContent key={block.id} content={block.text} markdownEmojiMap={settings.markdownEmojiMap} />
+                              ? <MarkdownContent key={block.id} content={block.text} markdownEmojiMap={settings.markdownEmojiMap} expandImagesWhenImageOnly imageOnly={isImageOnlyMarkdown(block.text, settings.markdownEmojiMap)} />
 
                               : (
                                 <RestrictedPostBlock
@@ -548,7 +562,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
           )}
           rightSidebar={(
             <aside className="mt-6 hidden pb-12 lg:block">
-              <PostSidebarPanels currentUser={sidebarUser} relatedTopics={sidebarData.relatedTopics} tags={sidebarData.tags} postLinkDisplayMode={settings.postLinkDisplayMode} siteName={settings.siteName} siteDescription={settings.siteDescription} />
+              <PostSidebarPanels currentUser={sidebarUser} relatedTopics={sidebarData.relatedTopics} tags={sidebarData.tags} postLinkDisplayMode={settings.postLinkDisplayMode} siteName={settings.siteName} siteDescription={settings.siteDescription} siteLogoPath={settings.siteLogoPath} />
             </aside>
           )}
         />

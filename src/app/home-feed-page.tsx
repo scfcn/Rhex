@@ -176,6 +176,7 @@ export async function HomeFeedPage({ sort, searchParams, mainTopSlot, autoCheckI
                 stats={sidebarStats}
                 siteName={settings.siteName}
                 siteDescription={settings.siteDescription}
+                siteLogoPath={settings.siteLogoPath}
               />
             </div>
           )}

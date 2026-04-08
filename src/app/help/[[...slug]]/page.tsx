@@ -79,6 +79,7 @@ export default async function HelpPage({ params }: HelpPageProps) {
                 announcements={announcements}
                 siteName={settings.siteName}
                 siteDescription={settings.siteDescription}
+                siteLogoPath={settings.siteLogoPath}
               />
             </div>
           )}

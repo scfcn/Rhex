@@ -118,8 +118,8 @@ export function CollapsibleInfoCard({
             </div>
           </div>
           <div className="relative grid gap-3 p-4 pr-[9.5rem] md:grid-cols-[auto_minmax(0,1fr)] md:items-center">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] border border-border bg-accent text-foreground/90">
-              <LevelIcon icon={icon} className="h-5 w-5 text-lg" svgClassName="[&>svg]:block" />
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] text-foreground/90">
+              <LevelIcon icon={icon} className="h-full w-full text-[2rem]" svgClassName="[&>svg]:block" />
             </div>
             <div className="min-w-0 space-y-1">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">

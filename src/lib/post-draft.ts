@@ -11,6 +11,7 @@ export interface LocalPostDraft {
   pollOptions: string[]
   pollExpiresAt: string
   commentsVisibleToAuthorOnly: boolean
+  loginUnlockContent: string
   replyUnlockContent: string
   purchaseUnlockContent: string
   purchasePrice: string
@@ -55,6 +56,7 @@ export function createEmptyLocalPostDraft(boardSlug = ""): LocalPostDraft {
     pollOptions: ["", ""],
     pollExpiresAt: "",
     commentsVisibleToAuthorOnly: false,
+    loginUnlockContent: "",
     replyUnlockContent: "",
     purchaseUnlockContent: "",
     purchasePrice: "20",

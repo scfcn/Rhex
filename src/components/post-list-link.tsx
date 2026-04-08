@@ -26,6 +26,24 @@ interface PostListLinkProps {
   children: ReactNode
 }
 
+function applyCommentViewPreferenceToHref(href: string, preferredView: "tree" | "flat") {
+  if (preferredView !== "flat") {
+    return href
+  }
+
+  try {
+    const url = new URL(href, "https://rhex.local")
+    if (!url.pathname.startsWith("/posts/") || url.searchParams.has("view")) {
+      return href
+    }
+
+    url.searchParams.set("view", preferredView)
+    return `${url.pathname}${url.search}${url.hash}`
+  } catch {
+    return href
+  }
+}
+
 export function PostListLink({ href, visitedPath, dimWhenRead = false, className, title, style, children }: PostListLinkProps) {
   const preferences = useSyncExternalStore(
     subscribeBrowsingPreferences,
@@ -41,10 +59,14 @@ export function PostListLink({ href, visitedPath, dimWhenRead = false, className
     () => Boolean(dimWhenRead && visitedPath && preferences.dimReadPostTitles && hasVisitedPostPath(readingHistory, visitedPath)),
     [dimWhenRead, preferences.dimReadPostTitles, readingHistory, visitedPath],
   )
+  const resolvedHref = useMemo(
+    () => applyCommentViewPreferenceToHref(href, preferences.commentThreadDisplayMode),
+    [href, preferences.commentThreadDisplayMode],
+  )
 
   return (
     <Link
-      href={href}
+      href={resolvedHref}
       title={title}
       target={preferences.openPostLinksInNewTab ? "_blank" : undefined}
       rel={preferences.openPostLinksInNewTab ? "noreferrer noopener" : undefined}

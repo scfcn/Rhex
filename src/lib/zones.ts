@@ -21,6 +21,7 @@ export interface SiteZoneItem {
   boardSlugs: string[]
   count: number
   requirePostReview?: boolean
+  requireCommentReview?: boolean
   minViewPoints?: number
   minViewLevel?: number
   minViewVipLevel?: number
@@ -44,6 +45,7 @@ const getCachedZones = cache(async (): Promise<SiteZoneItem[]> => {
     boardSlugs: zone.boards.map((board) => board.slug),
     count: zone.boards.reduce((total, board) => total + board._count.posts, 0),
     requirePostReview: zone.requirePostReview ?? false,
+    requireCommentReview: zone.requireCommentReview ?? false,
     minViewPoints: (zone as { minViewPoints?: number | null }).minViewPoints ?? 0,
     minViewLevel: (zone as { minViewLevel?: number | null }).minViewLevel ?? 0,
     minViewVipLevel: zone.minViewVipLevel ?? 0,
@@ -75,6 +77,7 @@ const getCachedZoneBySlug = cache(async (slug: string) => {
     boardSlugs: zone.boards.map((board: (typeof zone.boards)[number]) => board.slug),
     count: zone.boards.reduce((total: number, board: (typeof zone.boards)[number]) => total + board._count.posts, 0),
     requirePostReview: zone.requirePostReview ?? false,
+    requireCommentReview: zone.requireCommentReview ?? false,
     minViewPoints: (zone as { minViewPoints?: number | null }).minViewPoints ?? 0,
     minViewLevel: (zone as { minViewLevel?: number | null }).minViewLevel ?? 0,
     minViewVipLevel: zone.minViewVipLevel ?? 0,

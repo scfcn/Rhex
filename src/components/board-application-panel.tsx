@@ -9,7 +9,7 @@ import { AdminFormModal } from "@/components/admin-modal"
 import { Button } from "@/components/ui/button"
 import { showConfirm } from "@/components/ui/confirm-dialog"
 import { toast } from "@/components/ui/toast"
-import { formatNumber } from "@/lib/formatters"
+import { formatDateTime, formatNumber } from "@/lib/formatters"
 
 interface BoardApplicationPanelProps {
   pointName: string
@@ -381,8 +381,4 @@ function renderUserStatus(status: "ACTIVE" | "MUTED" | "BANNED" | "INACTIVE") {
   if (status === "BANNED") return "封禁"
   if (status === "INACTIVE") return "未激活"
   return "正常"
-}
-
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString("zh-CN")
 }

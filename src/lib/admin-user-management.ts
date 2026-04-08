@@ -13,6 +13,7 @@ export interface AdminUserModeratedZoneScope {
   zoneName: string
   zoneSlug: string
   canEditSettings: boolean
+  canWithdrawTreasury: boolean
 }
 
 export interface AdminUserModeratedBoardScope {
@@ -23,6 +24,7 @@ export interface AdminUserModeratedBoardScope {
   zoneName: string | null
   zoneSlug: string | null
   canEditSettings: boolean
+  canWithdrawTreasury: boolean
 }
 
 export interface AdminUserListItem {
@@ -125,6 +127,31 @@ export interface AdminUserDetailLogSection {
   items: AdminUserDetailLogItem[]
 }
 
+export interface AdminUserAssignableBadgeItem {
+  id: string
+  name: string
+  iconText?: string | null
+  color: string
+  category?: string | null
+  status: boolean
+  isHidden: boolean
+  grantedUserCount: number
+}
+
+export interface AdminUserGrantedBadgeItem {
+  badgeId: string
+  name: string
+  iconText?: string | null
+  color: string
+  category?: string | null
+  status: boolean
+  isHidden: boolean
+  isDisplayed: boolean
+  displayOrder: number
+  grantSource: string
+  grantedAt: string
+}
+
 export interface AdminUserDetailResult {
   id: number
   username: string
@@ -152,6 +179,8 @@ export interface AdminUserDetailResult {
   editableProfile: AdminUserEditableProfile
   moderatedZoneScopes: AdminUserModeratedZoneScope[]
   moderatedBoardScopes: AdminUserModeratedBoardScope[]
+  availableBadges: AdminUserAssignableBadgeItem[]
+  grantedBadges: AdminUserGrantedBadgeItem[]
   logSections: AdminUserDetailLogSection[]
 }
 

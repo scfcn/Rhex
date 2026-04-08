@@ -373,6 +373,7 @@ interface PostEnhancementsSectionProps {
     coverUploading: boolean
     coverPath: string
     commentsVisibleToAuthorOnly: boolean
+    loginUnlockContent: string
     replyUnlockContent: string
     purchaseUnlockContent: string
     purchasePrice: string
@@ -394,6 +395,8 @@ interface PostEnhancementsSectionProps {
     onRemoveManualTag: (tag: string) => void
     onCoverClear: () => void
     onCommentsVisibleToAuthorOnlyChange: (checked: boolean) => void
+    onOpenLoginModal: () => void
+    onClearLoginUnlock: () => void
     onOpenReplyModal: () => void
     onClearReplyUnlock: () => void
     onOpenPurchaseModal: () => void
@@ -420,6 +423,7 @@ export function PostEnhancementsSection({ pointName, rewardPoolEnabled, settings
     coverUploading,
     coverPath,
     commentsVisibleToAuthorOnly,
+    loginUnlockContent,
     replyUnlockContent,
     purchaseUnlockContent,
     purchasePrice,
@@ -484,6 +488,15 @@ export function PostEnhancementsSection({ pointName, rewardPoolEnabled, settings
 
         <HiddenConfigChip
           icon={<MessageSquareLock className="h-4 w-4" />}
+          title="登录后可看"
+          active={Boolean(loginUnlockContent.trim())}
+          summary={loginUnlockContent.trim() ? "已配置" : "未配置"}
+          onClick={actions.onOpenLoginModal}
+          onClear={actions.onClearLoginUnlock}
+        />
+
+        <HiddenConfigChip
+          icon={<MessageSquareLock className="h-4 w-4" />}
           title="回复后可看"
           active={Boolean(replyUnlockContent.trim())}
           summary={replyUnlockContent.trim() ? "已配置" : "未配置"}
@@ -502,7 +515,7 @@ export function PostEnhancementsSection({ pointName, rewardPoolEnabled, settings
 
         <HiddenConfigChip
           icon={<Info className="h-4 w-4" />}
-          title="浏览门槛"
+          title="整帖门槛"
           active={Number(minViewLevel) > 0 || Number(minViewVipLevel) > 0}
           summary={Number(minViewVipLevel) > 0 ? `VIP${Number(minViewVipLevel)}${Number(minViewLevel) > 0 ? ` / Lv.${Number(minViewLevel)}` : ""}` : Number(minViewLevel) > 0 ? `Lv.${Number(minViewLevel)}` : "公开可见"}
           onClick={actions.onOpenViewLevelModal}

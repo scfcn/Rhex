@@ -20,7 +20,7 @@ import { UserRecentRepliesList } from "@/components/user-recent-replies-list"
 import { UserBlockToggleButton } from "@/components/user-block-toggle-button"
 import { VerificationCenter } from "@/components/verification-center"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { formatNumber } from "@/lib/formatters"
+import { formatDateTime, formatNumber } from "@/lib/formatters"
 import { getPostPath } from "@/lib/post-links"
 import type { SettingsPageData } from "@/app/settings/settings-page-loader"
 import { followTabs, postManagementTabs, profileTabs } from "@/app/settings/settings-page-loader"
@@ -1080,14 +1080,4 @@ function CursorPaginationBar({ hasPrevPage, hasNextPage, prevHref, nextHref }: {
       </Link>
     </div>
   )
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value))
 }

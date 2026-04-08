@@ -201,7 +201,7 @@ async function executeCheckIn(options: ExecuteCheckInOptions) {
   }
 
   if (!result.alreadyCheckedIn) {
-    await evaluateUserLevelProgress(options.userId)
+    await evaluateUserLevelProgress(options.userId, { notifyOnUpgrade: true })
   }
 
   return result

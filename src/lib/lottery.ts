@@ -13,7 +13,7 @@ import { apiError } from "@/lib/api-route"
 import { canSendEmail } from "@/lib/mailer"
 
 
-import { parseBusinessDateTime } from "@/lib/formatters"
+import { formatDateTime, parseBusinessDateTime } from "@/lib/formatters"
 import { getServerSiteSettings } from "@/lib/site-settings"
 
 
@@ -467,7 +467,7 @@ function buildLotteryAnnouncement(input: {
 }) {
   const lines = [
     `《${input.postTitle}》抽奖结果公示`,
-    `开奖时间：${input.drawnAt.toLocaleString("zh-CN")}`,
+    `开奖时间：${formatDateTime(input.drawnAt)}`,
     `参与总人数：${input.participantCount}`,
   ]
 

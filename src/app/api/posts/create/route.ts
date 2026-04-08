@@ -8,7 +8,7 @@ export const POST = createUserRouteHandler(async ({ request }) => {
   const body = await readJsonBody(request)
   const result = await createPostFlow(body)
 
-  await evaluateUserLevelProgress(result.author.id)
+  await evaluateUserLevelProgress(result.author.id, { notifyOnUpgrade: true })
 
   if (!result.shouldPending) {
     await enqueueNewPostFollowNotifications(result.post.id)

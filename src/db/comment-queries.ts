@@ -170,8 +170,36 @@ export function buildFlatCommentInclude(viewerUserId?: number) {
   }
 }
 
-function buildVisibleCommentStatuses(includeHidden = false) {
-  return includeHidden ? [CommentStatus.NORMAL, CommentStatus.HIDDEN] : [CommentStatus.NORMAL]
+function buildCommentVisibilityWhere(params: {
+  viewerUserId?: number
+  includeHidden?: boolean
+  includePendingOwn?: boolean
+  includePendingAll?: boolean
+}): Prisma.CommentWhereInput {
+  const visibleStatuses: CommentStatus[] = [CommentStatus.NORMAL]
+
+  if (params.includeHidden) {
+    visibleStatuses.push(CommentStatus.HIDDEN)
+  }
+
+  const conditions: Prisma.CommentWhereInput[] = [
+    {
+      status: {
+        in: visibleStatuses,
+      },
+    },
+  ]
+
+  if (params.includePendingAll) {
+    conditions.push({ status: CommentStatus.PENDING })
+  } else if (params.includePendingOwn && params.viewerUserId) {
+    conditions.push({
+      status: CommentStatus.PENDING,
+      userId: params.viewerUserId,
+    })
+  }
+
+  return conditions.length === 1 ? conditions[0] : { OR: conditions }
 }
 
 function buildCommentBlockVisibilityWhere(viewerUserId?: number): Prisma.CommentWhereInput {
@@ -195,27 +223,35 @@ function buildCommentBlockVisibilityWhere(viewerUserId?: number): Prisma.Comment
   }
 }
 
-export function countRootCommentsByPostId(postId: string, viewerUserId?: number, includeHidden = false) {
+export function countRootCommentsByPostId(params: {
+  postId: string
+  viewerUserId?: number
+  includeHidden?: boolean
+  includePendingOwn?: boolean
+  includePendingAll?: boolean
+}) {
   return prisma.comment.count({
     where: {
-      postId,
-      status: {
-        in: buildVisibleCommentStatuses(includeHidden),
-      },
+      postId: params.postId,
+      ...buildCommentVisibilityWhere(params),
       parentId: null,
-      ...buildCommentBlockVisibilityWhere(viewerUserId),
+      ...buildCommentBlockVisibilityWhere(params.viewerUserId),
     },
   })
 }
 
-export function countVisibleCommentsByPostId(postId: string, viewerUserId?: number, includeHidden = false) {
+export function countVisibleCommentsByPostId(params: {
+  postId: string
+  viewerUserId?: number
+  includeHidden?: boolean
+  includePendingOwn?: boolean
+  includePendingAll?: boolean
+}) {
   return prisma.comment.count({
     where: {
-      postId,
-      status: {
-        in: buildVisibleCommentStatuses(includeHidden),
-      },
-      ...buildCommentBlockVisibilityWhere(viewerUserId),
+      postId: params.postId,
+      ...buildCommentVisibilityWhere(params),
+      ...buildCommentBlockVisibilityWhere(params.viewerUserId),
     },
   })
 }
@@ -264,7 +300,7 @@ export async function findRootCommentPageById(params: {
     },
   })
 
-  const totalRootComments = await countRootCommentsByPostId(params.postId)
+  const totalRootComments = await countRootCommentsByPostId({ postId: params.postId })
   const oldestPage = Math.max(1, Math.ceil((precedingCount + 1) / normalizedPageSize))
 
   if (params.sort === "oldest") {
@@ -283,15 +319,15 @@ export function findRootCommentsByPostId(params: {
   pageSize: number
   viewerUserId?: number
   includeHidden?: boolean
+  includePendingOwn?: boolean
+  includePendingAll?: boolean
 }) {
   const normalizedPageSize = Math.min(Math.max(1, params.pageSize), 50)
 
   return prisma.comment.findMany({
     where: {
       postId: params.postId,
-      status: {
-        in: buildVisibleCommentStatuses(params.includeHidden),
-      },
+      ...buildCommentVisibilityWhere(params),
       parentId: null,
       ...buildCommentBlockVisibilityWhere(params.viewerUserId),
     },
@@ -309,13 +345,13 @@ export function findAllRootCommentIdsByPostId(params: {
   postId: string
   viewerUserId?: number
   includeHidden?: boolean
+  includePendingOwn?: boolean
+  includePendingAll?: boolean
 }) {
   return prisma.comment.findMany({
     where: {
       postId: params.postId,
-      status: {
-        in: buildVisibleCommentStatuses(params.includeHidden),
-      },
+      ...buildCommentVisibilityWhere(params),
       parentId: null,
       ...buildCommentBlockVisibilityWhere(params.viewerUserId),
     },
@@ -334,13 +370,13 @@ export function findAllVisibleCommentIdsByPostId(params: {
   postId: string
   viewerUserId?: number
   includeHidden?: boolean
+  includePendingOwn?: boolean
+  includePendingAll?: boolean
 }) {
   return prisma.comment.findMany({
     where: {
       postId: params.postId,
-      status: {
-        in: buildVisibleCommentStatuses(params.includeHidden),
-      },
+      ...buildCommentVisibilityWhere(params),
       ...buildCommentBlockVisibilityWhere(params.viewerUserId),
     },
     select: {
@@ -358,13 +394,13 @@ export function findAllFlatCommentIdsByPostId(params: {
   sort: "oldest" | "newest"
   viewerUserId?: number
   includeHidden?: boolean
+  includePendingOwn?: boolean
+  includePendingAll?: boolean
 }) {
   return prisma.comment.findMany({
     where: {
       postId: params.postId,
-      status: {
-        in: buildVisibleCommentStatuses(params.includeHidden),
-      },
+      ...buildCommentVisibilityWhere(params),
       ...buildCommentBlockVisibilityWhere(params.viewerUserId),
     },
     select: {
@@ -384,6 +420,8 @@ export function findRepliesByParentIds(params: {
   sort: "oldest" | "newest"
   viewerUserId?: number
   includeHidden?: boolean
+  includePendingOwn?: boolean
+  includePendingAll?: boolean
 }) {
   if (params.parentIds.length === 0) {
     return Promise.resolve([])
@@ -392,9 +430,7 @@ export function findRepliesByParentIds(params: {
   return prisma.comment.findMany({
     where: {
       postId: params.postId,
-      status: {
-        in: buildVisibleCommentStatuses(params.includeHidden),
-      },
+      ...buildCommentVisibilityWhere(params),
       parentId: { in: params.parentIds },
       ...buildCommentBlockVisibilityWhere(params.viewerUserId),
     },
@@ -410,15 +446,15 @@ export function findFlatCommentsByPostId(params: {
   pageSize: number
   viewerUserId?: number
   includeHidden?: boolean
+  includePendingOwn?: boolean
+  includePendingAll?: boolean
 }) {
   const normalizedPageSize = Math.min(Math.max(1, params.pageSize), 50)
 
   return prisma.comment.findMany({
     where: {
       postId: params.postId,
-      status: {
-        in: buildVisibleCommentStatuses(params.includeHidden),
-      },
+      ...buildCommentVisibilityWhere(params),
       ...buildCommentBlockVisibilityWhere(params.viewerUserId),
     },
     include: buildFlatCommentInclude(params.viewerUserId),
@@ -436,6 +472,8 @@ export function findCommentsByIds(params: {
   commentIds: string[]
   viewerUserId?: number
   includeHidden?: boolean
+  includePendingOwn?: boolean
+  includePendingAll?: boolean
 }) {
   if (params.commentIds.length === 0) {
     return Promise.resolve([])
@@ -446,9 +484,7 @@ export function findCommentsByIds(params: {
       id: {
         in: params.commentIds,
       },
-      status: {
-        in: buildVisibleCommentStatuses(params.includeHidden),
-      },
+      ...buildCommentVisibilityWhere(params),
       ...buildCommentBlockVisibilityWhere(params.viewerUserId),
     },
     include: buildCommentListInclude(params.viewerUserId),
@@ -495,6 +531,10 @@ export function updateCommentContentById(commentId: string, data: { content: str
     where: { id: commentId },
     data: {
       content: data.content,
+      status: data.reviewNote ? CommentStatus.PENDING : CommentStatus.NORMAL,
+      reviewNote: data.reviewNote,
+      reviewedById: null,
+      reviewedAt: null,
     },
     select: {
       id: true,
@@ -538,6 +578,7 @@ export async function createCommentWithRelations(params: {
   userId: number
   content: string
   status: "PENDING" | "NORMAL"
+  reviewNote?: string | null
   useAnonymousIdentity?: boolean
   parentId?: string
   replyToUserId?: number
@@ -563,6 +604,7 @@ export async function createCommentWithRelations(params: {
         replyToUserId: params.replyToUserId ?? undefined,
         replyToCommentId: params.replyToCommentId ?? undefined,
         status: params.status,
+        reviewNote: params.status === "PENDING" ? (params.reviewNote ?? "评论已进入审核") : null,
       },
     })
 

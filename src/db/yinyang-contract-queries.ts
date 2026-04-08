@@ -202,9 +202,10 @@ export async function updateDailyStat(id: string, data: {
   })
 }
 
-export async function listTopTodayKings(limit = 1) {
+export async function listTopTodayKings(dateKey: string, limit = 1) {
   return prisma.yinYangChallengeDailyStat.findMany({
     where: {
+      dateKey,
       todayProfitPoints: { gt: 0 },
     },
     include: {
@@ -243,7 +244,7 @@ export async function getTopKingByDateKey(dateKey: string) {
 }
 
 
-export async function listTopYinYangWinners(limit = 10) {
+export async function listTopYinYangWinners(dateKey: string, limit = 10) {
   const rows = await prisma.yinYangChallenge.groupBy({
     by: ["winnerId"],
     where: {
@@ -266,92 +267,85 @@ export async function listTopYinYangWinners(limit = 10) {
     return []
   }
 
-  const [users, loseCounts, todayStats] = await Promise.all([
+  const [users, loseCounts, todayStats, totalProfitRows, totalLossRows] = await Promise.all([
     prisma.user.findMany({ where: { id: { in: userIds } }, select: userIdentitySelect }),
     prisma.yinYangChallenge.groupBy({ by: ["loserId"], where: { status: "SETTLED", loserId: { in: userIds } }, _count: { _all: true } }),
-    prisma.yinYangChallengeDailyStat.findMany({ where: { userId: { in: userIds } } }),
+    prisma.yinYangChallengeDailyStat.findMany({ where: { userId: { in: userIds }, dateKey } }),
+    prisma.yinYangChallenge.groupBy({ by: ["winnerId"], where: { status: "SETTLED", winnerId: { in: userIds } }, _sum: { rewardPoints: true } }),
+    prisma.yinYangChallenge.groupBy({ by: ["loserId"], where: { status: "SETTLED", loserId: { in: userIds } }, _sum: { stakePoints: true } }),
   ])
+
+  const todayMap = new Map(todayStats.map((item) => [item.userId, item]))
+  const totalProfitMap = new Map(totalProfitRows.map((item) => [item.winnerId, item]))
+  const totalLossMap = new Map(totalLossRows.map((item) => [item.loserId, item]))
 
   return rows.map((row: { winnerId: number | null; _count: { _all: number } }) => {
     const user = users.find((item) => item.id === row.winnerId)
     const loss = loseCounts.find((item: { loserId: number | null; _count: { _all: number } }) => item.loserId === row.winnerId)
-    const today = todayStats
-      .filter((item) => item.userId === row.winnerId)
-      .reduce((acc, item) => ({
-        todayProfitPoints: acc.todayProfitPoints + item.todayProfitPoints,
-        todayLossPoints: acc.todayLossPoints + item.todayLossPoints,
-        totalProfitPoints: acc.totalProfitPoints + item.todayProfitPoints,
-        totalLossPoints: acc.totalLossPoints + item.todayLossPoints,
-      }), {
-        todayProfitPoints: 0,
-        todayLossPoints: 0,
-        totalProfitPoints: 0,
-        totalLossPoints: 0,
-      })
+    const today = row.winnerId === null ? null : todayMap.get(row.winnerId)
+    const totalProfit = row.winnerId === null ? null : totalProfitMap.get(row.winnerId)
+    const totalLoss = row.winnerId === null ? null : totalLossMap.get(row.winnerId)
     return {
       userId: row.winnerId ?? 0,
       username: user?.username ?? `用户${row.winnerId ?? 0}`,
       nickname: user?.nickname ?? null,
       winCount: row._count._all,
       loseCount: loss?._count._all ?? 0,
-      todayProfitPoints: today.todayProfitPoints,
-      todayLossPoints: today.todayLossPoints,
-      totalProfitPoints: today.totalProfitPoints,
-      totalLossPoints: today.totalLossPoints,
+      todayProfitPoints: today?.todayProfitPoints ?? 0,
+      todayLossPoints: today?.todayLossPoints ?? 0,
+      totalProfitPoints: totalProfit?._sum.rewardPoints ?? 0,
+      totalLossPoints: totalLoss?._sum.stakePoints ?? 0,
     }
   })
 }
 
-export async function listTopYinYangEarners(limit = 10) {
-  const rows = await prisma.yinYangChallengeDailyStat.findMany({
-    include: {
-      user: {
-        select: userIdentitySelect,
+export async function listTopYinYangEarners(dateKey: string, limit = 10) {
+  const normalizedLimit = Math.max(1, Math.min(limit, 20))
+  const [rows, todayRows, users] = await Promise.all([
+    prisma.yinYangChallengeDailyStat.groupBy({
+      by: ["userId"],
+      _sum: {
+        winCount: true,
+        loseCount: true,
+        todayProfitPoints: true,
+        todayLossPoints: true,
       },
-    },
-    orderBy: [{ todayProfitPoints: "desc" }, { todayLossPoints: "asc" }, { winCount: "desc" }],
-    take: Math.max(1, Math.min(limit, 20)),
-  })
+    }),
+    prisma.yinYangChallengeDailyStat.findMany({
+      where: { dateKey },
+      select: {
+        userId: true,
+        todayProfitPoints: true,
+        todayLossPoints: true,
+      },
+    }),
+    prisma.user.findMany({
+      select: userIdentitySelect,
+    }),
+  ])
 
-  const byUser = new Map<number, {
-    userId: number
-    username: string
-    nickname: string | null
-    winCount: number
-    loseCount: number
-    todayProfitPoints: number
-    todayLossPoints: number
-    totalProfitPoints: number
-    totalLossPoints: number
-  }>()
+  const todayMap = new Map(todayRows.map((row) => [row.userId, row]))
+  const userMap = new Map(users.map((user) => [user.id, user]))
 
-  rows.forEach((row) => {
-    const current = byUser.get(row.userId)
-    if (!current) {
-      byUser.set(row.userId, {
+  return rows
+    .map((row) => {
+      const user = userMap.get(row.userId)
+      const today = todayMap.get(row.userId)
+
+      return {
         userId: row.userId,
-        username: row.user.username,
-        nickname: row.user.nickname,
-        winCount: row.winCount,
-        loseCount: row.loseCount,
-        todayProfitPoints: row.todayProfitPoints,
-        todayLossPoints: row.todayLossPoints,
-        totalProfitPoints: row.todayProfitPoints,
-        totalLossPoints: row.todayLossPoints,
-      })
-      return
-    }
-    current.winCount += row.winCount
-    current.loseCount += row.loseCount
-    current.todayProfitPoints = Math.max(current.todayProfitPoints, row.todayProfitPoints)
-    current.todayLossPoints = Math.max(current.todayLossPoints, row.todayLossPoints)
-    current.totalProfitPoints += row.todayProfitPoints
-    current.totalLossPoints += row.todayLossPoints
-  })
-
-  return Array.from(byUser.values())
+        username: user?.username ?? `用户${row.userId}`,
+        nickname: user?.nickname ?? null,
+        winCount: row._sum.winCount ?? 0,
+        loseCount: row._sum.loseCount ?? 0,
+        todayProfitPoints: today?.todayProfitPoints ?? 0,
+        todayLossPoints: today?.todayLossPoints ?? 0,
+        totalProfitPoints: row._sum.todayProfitPoints ?? 0,
+        totalLossPoints: row._sum.todayLossPoints ?? 0,
+      }
+    })
     .sort((left, right) => right.totalProfitPoints - left.totalProfitPoints || left.totalLossPoints - right.totalLossPoints || right.winCount - left.winCount)
-    .slice(0, Math.max(1, Math.min(limit, 20)))
+    .slice(0, normalizedLimit)
 }
 
 export function findYinYangUserPointSnapshot(

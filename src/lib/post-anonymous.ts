@@ -18,6 +18,8 @@ export interface AnonymousDisplayIdentity {
     name: string
     color: string
     iconText?: string | null
+    description?: string | null
+    customDescription?: string | null
   } | null
   authorDisplayedBadges?: Array<{
     id: string
@@ -43,6 +45,8 @@ function mapAnonymousIdentity(user: AnonymousMaskUserRecord): AnonymousDisplayId
           name: user.verificationApplications[0].type.name,
           color: user.verificationApplications[0].type.color,
           iconText: user.verificationApplications[0].type.iconText,
+          description: user.verificationApplications[0].type.description,
+          customDescription: user.verificationApplications[0].customDescription,
         }
       : null,
     authorDisplayedBadges: (user.userBadges ?? [])
@@ -82,6 +86,8 @@ export function applyAnonymousIdentityToPost<T extends {
     name: string
     color: string
     iconText?: string | null
+    description?: string | null
+    customDescription?: string | null
   } | null
   authorDisplayedBadges?: Array<{
     id: string

@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react"
 
 import { Button } from "@/components/ui/button"
 import { TextField } from "@/components/ui/text-field"
+import { formatDateTime, serializeDate } from "@/lib/formatters"
 
 interface AdminRedeemCodeManagerProps {
   initialRedeemCodes: {
@@ -42,7 +43,7 @@ export function AdminRedeemCodeManager({ initialRedeemCodes }: AdminRedeemCodeMa
   }), [redeemCodes])
 
   const pendingRedeemCodes = useMemo(() => redeemCodes.filter((item) => !item.redeemedByUsername), [redeemCodes])
-  const exportText = useMemo(() => pendingRedeemCodes.map((item) => [item.code, `${item.points}积分`, `分类:${item.codeCategory}`, item.categoryUserLimit === null ? "分类限额:不限" : `分类限额:${item.categoryUserLimit}`, item.expiresAt ? `过期:${new Date(item.expiresAt).toLocaleString()}` : "不过期", item.note ?? ""].filter(Boolean).join("\t")).join("\n"), [pendingRedeemCodes])
+  const exportText = useMemo(() => pendingRedeemCodes.map((item) => [item.code, `${item.points}积分`, `分类:${item.codeCategory}`, item.categoryUserLimit === null ? "分类限额:不限" : `分类限额:${item.categoryUserLimit}`, item.expiresAt ? `过期:${formatDateTime(item.expiresAt)}` : "不过期", item.note ?? ""].filter(Boolean).join("\t")).join("\n"), [pendingRedeemCodes])
 
 
   async function handleCopyPendingCodes() {
@@ -67,7 +68,7 @@ export function AdminRedeemCodeManager({ initialRedeemCodes }: AdminRedeemCodeMa
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement("a")
     anchor.href = url
-    anchor.download = `redeem-codes-${new Date().toISOString().slice(0, 10)}.txt`
+    anchor.download = `redeem-codes-${serializeDate(new Date()) ?? "export"}.txt`
     anchor.click()
     URL.revokeObjectURL(url)
     setFeedback(`已导出 ${pendingRedeemCodes.length} 个未兑换兑换码`)
@@ -145,13 +146,13 @@ export function AdminRedeemCodeManager({ initialRedeemCodes }: AdminRedeemCodeMa
           <div key={item.id} className="grid items-center gap-3 border-b border-border px-4 py-3 text-xs last:border-b-0 lg:grid-cols-[minmax(0,1fr)_90px_180px_160px_180px_minmax(0,1fr)]">
             <div className="min-w-0">
               <div className="truncate font-mono text-sm font-medium">{item.code}</div>
-              <div className="mt-1 text-muted-foreground">{new Date(item.createdAt).toLocaleString("zh-CN")}</div>
+              <div className="mt-1 text-muted-foreground">{formatDateTime(item.createdAt)}</div>
             </div>
             <div>{item.points}</div>
             <div className="text-muted-foreground">{item.codeCategory || "default"} / {item.categoryUserLimit == null ? "不限" : `${item.categoryUserLimit}次/人`}</div>
             <div className="text-muted-foreground">{item.redeemedByUsername ? `已被 ${item.redeemedByUsername} 兑换` : "未兑换"}</div>
 
-            <div className="text-muted-foreground">{item.expiresAt ? new Date(item.expiresAt).toLocaleString() : "不过期"}</div>
+            <div className="text-muted-foreground">{item.expiresAt ? formatDateTime(item.expiresAt) : "不过期"}</div>
             <div className="truncate text-muted-foreground">{item.note ?? "-"}</div>
           </div>
 

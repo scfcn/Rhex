@@ -38,12 +38,13 @@ interface HomeSidebarPanelsProps {
   stats?: HomeSidebarStatsData | null
   siteName?: string
   siteDescription?: string
+  siteLogoPath?: string | null
 }
 
-export function HomeSidebarPanels({ user, hotTopics, postLinkDisplayMode = "SLUG", announcements = [], showAnnouncements = true, friendLinks = [], friendLinksEnabled = false, createPostHref, topPanels = [], middlePanels = [], bottomPanels = [], stats = null, siteName, siteDescription }: HomeSidebarPanelsProps) {
+export function HomeSidebarPanels({ user, hotTopics, postLinkDisplayMode = "SLUG", announcements = [], showAnnouncements = true, friendLinks = [], friendLinksEnabled = false, createPostHref, topPanels = [], middlePanels = [], bottomPanels = [], stats = null, siteName, siteDescription, siteLogoPath }: HomeSidebarPanelsProps) {
   return (
     <div className="sticky top-20 min-w-0 w-full max-w-full space-y-4">
-      <SidebarUserCard user={user} createPostHref={createPostHref} siteName={siteName} siteDescription={siteDescription} />
+      <SidebarUserCard user={user} createPostHref={createPostHref} siteName={siteName} siteDescription={siteDescription} siteLogoPath={siteLogoPath} />
 
 
       {topPanels.map((panel) => <div key={panel.id}>{panel.content}</div>)}

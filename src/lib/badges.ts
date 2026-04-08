@@ -3,6 +3,7 @@ import { BadgeRuleOperator, BadgeRuleType, BadgeGrantSource, PointEffectDirectio
 import { createSelfClaimUserBadge, findAllBadgesWithRules, findBadgeEffectRulesByBadgeIds, findBadgeEligibilityUserSnapshot, findBadgeUserPoints, findDisplayedUserBadges, findGrantedBadgeIdsForUser, findGrantedBadgesForUserRecord, findGrantedUserBadgeWithTx, findUserBadgeDisplayStates, findUserBadgeWithBadge, runBadgeTransaction, updateUserBadgeDisplayById } from "@/db/badge-queries"
 import { apiError } from "./api-route"
 import type { BadgeRuleTypeValue } from "@/lib/badge-rule-definitions"
+import { serializeDate } from "@/lib/formatters"
 import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
 import { getSiteSettings } from "@/lib/site-settings"
 
@@ -200,15 +201,15 @@ export function describeBadgeRule(rule: BadgeRuleItem) {
     const end = normalizeDate(rule.extraValue ?? null)
 
     if (rule.operator === BadgeRuleOperator.BETWEEN && start && end) {
-      return `注册时间在 ${start.toLocaleDateString("zh-CN")} - ${end.toLocaleDateString("zh-CN")}`
+      return `注册时间在 ${serializeDate(start) ?? "-"} - ${serializeDate(end) ?? "-"}`
     }
 
     if (rule.operator === BadgeRuleOperator.AFTER && start) {
-      return `注册时间晚于 ${start.toLocaleDateString("zh-CN")}`
+      return `注册时间晚于 ${serializeDate(start) ?? "-"}`
     }
 
     if (rule.operator === BadgeRuleOperator.BEFORE && start) {
-      return `注册时间早于 ${start.toLocaleDateString("zh-CN")}`
+      return `注册时间早于 ${serializeDate(start) ?? "-"}`
     }
 
     return "注册时间符合指定范围"

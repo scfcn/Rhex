@@ -181,6 +181,34 @@ export function AdminCommentStatusNotice({ status }: { status: SiteCommentItem["
   return <div className="rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-[12px] leading-5 text-amber-700 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-200">该评论已下线，仅管理员可见</div>
 }
 
+export function CommentReviewStatusNotice({ status, reviewNote, isAdmin, isOwner }: {
+  status: SiteCommentItem["status"] | SiteCommentReplyItem["status"]
+  reviewNote?: string | null
+  isAdmin: boolean
+  isOwner: boolean
+}) {
+  if (status !== "PENDING") {
+    return null
+  }
+
+  const description = isAdmin
+    ? "该评论待审核，当前仅管理员和评论作者可见。"
+    : isOwner
+      ? "该评论正在审核中，当前仅你和管理员可见。"
+      : null
+
+  if (!description) {
+    return null
+  }
+
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2 text-[12px] leading-5 text-amber-700 dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-200">
+      <div>{description}</div>
+      {reviewNote ? <div className="mt-1 opacity-90">审核说明：{reviewNote}</div> : null}
+    </div>
+  )
+}
+
 export function buildCommentAdminActions({ entry, isAdmin, adminRole, canPinComment = false, pinningCommentId = null }: { entry: ThreadEntry; isAdmin: boolean; adminRole?: "ADMIN" | "MODERATOR" | null; canPinComment?: boolean; pinningCommentId?: string | null }) {
   const actions: CommentAdminAction[] = []
   const canModerateEntryAuthor = adminRole === "ADMIN" || entry.authorRole === "USER"

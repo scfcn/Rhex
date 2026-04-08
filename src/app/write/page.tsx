@@ -113,6 +113,7 @@ export default async function WritePage(props: PageProps<"/write">) {
   const contentDocument = editingPost ? parsePostContentDocument(editingPost.content) : null
   const rewardPoolConfig = editingPost ? parsePostRewardPoolConfigFromContent(editingPost.content) : null
   const publicBlock = contentDocument?.blocks.find((block) => block.type === "PUBLIC")
+  const loginUnlockBlock = contentDocument?.blocks.find((block) => block.type === "LOGIN_UNLOCK")
   const replyUnlockBlock = contentDocument?.blocks.find((block) => block.type === "REPLY_UNLOCK")
   const purchaseUnlockBlock = contentDocument?.blocks.find((block) => block.type === "PURCHASE_UNLOCK")
 
@@ -162,6 +163,7 @@ export default async function WritePage(props: PageProps<"/write">) {
                     isAnonymous: editingPost.isAnonymous,
                     coverPath: editingPost.coverPath,
                     commentsVisibleToAuthorOnly: editingPost.commentsVisibleToAuthorOnly,
+                    loginUnlockContent: loginUnlockBlock?.text ?? "",
                     replyUnlockContent: replyUnlockBlock?.text ?? "",
                     replyThreshold: replyUnlockBlock?.replyThreshold ?? 1,
                     purchaseUnlockContent: purchaseUnlockBlock?.text ?? "",

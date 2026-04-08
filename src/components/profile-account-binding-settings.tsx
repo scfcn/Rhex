@@ -8,6 +8,7 @@ import { Chrome, Github, KeyRound, Link2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/toast"
 import { clearAccountBindingFlashOnClient, readAccountBindingFlashOnClient } from "@/lib/account-binding-flash"
+import { formatDateTime } from "@/lib/formatters"
 
 interface ProviderBindingItem {
   provider: "github" | "google"
@@ -41,18 +42,12 @@ interface ProfileAccountBindingSettingsProps {
 
 const ACCOUNT_BINDINGS_REDIRECT_PATH = "/settings?tab=profile&profileTab=accounts"
 
-function formatDateTime(value: string | null) {
+function formatBindingDateTime(value: string | null) {
   if (!value) {
     return "未记录"
   }
 
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value))
+  return formatDateTime(value)
 }
 
 function buildProviderMeta(binding: ProviderBindingItem) {
@@ -241,7 +236,7 @@ export function ProfileAccountBindingSettings({ providers, passkey }: ProfileAcc
                 <div className="mt-4 space-y-1 text-xs leading-6 text-muted-foreground">
                   {binding.providerUsername ? <p>用户名：{binding.providerUsername}</p> : null}
                   {binding.providerEmail ? <p>邮箱：{binding.providerEmail}</p> : null}
-                  <p>绑定时间：{formatDateTime(binding.connectedAt)}</p>
+                  <p>绑定时间：{formatBindingDateTime(binding.connectedAt)}</p>
                 </div>
               ) : null}
 
@@ -322,8 +317,8 @@ export function ProfileAccountBindingSettings({ providers, passkey }: ProfileAcc
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs leading-6 text-muted-foreground">
                       <span>设备：{item.deviceType || "未知设备"}</span>
                       <span>备份：{item.backedUp ? "已备份" : "未备份"}</span>
-                      <span>创建：{formatDateTime(item.createdAt)}</span>
-                      <span>最近使用：{formatDateTime(item.lastUsedAt)}</span>
+                      <span>创建：{formatBindingDateTime(item.createdAt)}</span>
+                      <span>最近使用：{formatBindingDateTime(item.lastUsedAt)}</span>
                     </div>
                   </div>
                   <Button

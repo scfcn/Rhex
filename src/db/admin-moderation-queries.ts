@@ -16,6 +16,23 @@ export function showCommentById(commentId: string) {
   })
 }
 
+export function updateCommentModerationState(commentId: string, data: {
+  status: CommentStatus
+  reviewNote?: string | null
+  reviewedById?: number | null
+  reviewedAt?: Date | null
+}) {
+  return prisma.comment.update({
+    where: { id: commentId },
+    data: {
+      status: data.status,
+      reviewNote: data.reviewNote ?? null,
+      reviewedById: data.reviewedById ?? null,
+      reviewedAt: data.reviewedAt ?? null,
+    },
+  })
+}
+
 export function findBoardPostingState(boardId: string) {
   return prisma.board.findUnique({
     where: { id: boardId },

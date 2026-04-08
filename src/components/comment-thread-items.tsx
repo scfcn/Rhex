@@ -6,7 +6,7 @@ import { CornerDownRight, Flag } from "lucide-react"
 import { AnonymousUserIndicator } from "@/components/anonymous-user-indicator"
 import { CommentForm } from "@/components/comment-form"
 import { CommentLikeButton } from "@/components/comment-like-button"
-import { AdminCommentStatusNotice, buildCommentAdminActions, CommentAuthorIdentityBadges, CommentJackpotDepositBadge, CommentRewardBadge, CommentRewardEffectBadge, CommentUnavailablePlaceholder, copyCommentPermalink, getCommentUnavailableMessage, type CommentAdminAction } from "@/components/comment-thread-shared"
+import { AdminCommentStatusNotice, buildCommentAdminActions, CommentAuthorIdentityBadges, CommentJackpotDepositBadge, CommentReviewStatusNotice, CommentRewardBadge, CommentRewardEffectBadge, CommentUnavailablePlaceholder, copyCommentPermalink, getCommentUnavailableMessage, type CommentAdminAction } from "@/components/comment-thread-shared"
 import { MarkdownContent } from "@/components/markdown-content"
 import { ReportDialog } from "@/components/report-dialog"
 import { TimeTooltip } from "@/components/time-tooltip"
@@ -156,6 +156,7 @@ export function CommentThreadReplyItem({
               <TimeTooltip value={reply.createdAtRaw}>
                 <span>{reply.createdAt}</span>
               </TimeTooltip>
+              {reply.status === "PENDING" ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] text-amber-700 dark:bg-amber-500/15 dark:text-amber-200">待审核</span> : null}
               {canEditCurrentReply && !isHiddenReplyForViewer ? (
                 <button type="button" className="text-[11px] transition-colors hover:text-foreground" onClick={() => editingCommentId === reply.id ? onStopEdit() : onStartEdit(reply.id)}>
                   {getEditButtonLabel(reply)}
@@ -177,6 +178,7 @@ export function CommentThreadReplyItem({
               ) : (
                 <>
                   {isAdmin ? <AdminCommentStatusNotice status={reply.status} /> : null}
+                  <CommentReviewStatusNotice status={reply.status} reviewNote={reply.reviewNote} isAdmin={isAdmin} isOwner={canEditCurrentReply} />
                   {isFlatLayout && (reply.replyToCommentExcerpt ?? reply.parentCommentExcerpt) ? (
                     <div className="mb-2.5 flex items-start gap-2">
                       <CornerDownRight className="mt-3 h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
@@ -356,6 +358,7 @@ export function CommentThreadCommentItem({
               <TimeTooltip value={comment.createdAtRaw}>
                 <span>{comment.createdAt}</span>
               </TimeTooltip>
+              {comment.status === "PENDING" ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] text-amber-700 dark:bg-amber-500/15 dark:text-amber-200">待审核</span> : null}
               {comment.isPinnedByAuthor ? <span className="rounded-full bg-amber-100 px-3 py-1 text-xs text-amber-700 dark:bg-amber-500/15 dark:text-amber-200">楼主置顶</span> : null}
               {comment.isAcceptedAnswer ? <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">已采纳答案</span> : null}
               {canEditCurrentComment && !isHiddenCommentForViewer ? (
@@ -377,6 +380,7 @@ export function CommentThreadCommentItem({
             ) : (
               <>
                 {isAdmin ? <AdminCommentStatusNotice status={comment.status} /> : null}
+                <CommentReviewStatusNotice status={comment.status} reviewNote={comment.reviewNote} isAdmin={isAdmin} isOwner={canEditCurrentComment} />
                 {commentUnavailableMessage ? (
                   <CommentUnavailablePlaceholder message={commentUnavailableMessage} />
                 ) : (

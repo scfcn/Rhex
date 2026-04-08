@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs"
 
-import { Prisma, UserRole, UserStatus } from "@/db/types"
+import { BadgeGrantSource, Prisma, UserRole, UserStatus } from "@/db/types"
 import {
   demoteUserToUser,
   findUserUsername,
@@ -14,6 +14,8 @@ import {
   updateUserStatus,
   updateUserVip,
 } from "@/db/admin-user-action-queries"
+import { createGrantedUserBadge, findBadgeSummaryById, findGrantedUserBadge, runBadgeTransaction } from "@/db/badge-queries"
+import { createSystemNotification } from "@/lib/notification-writes"
 
 import { apiError } from "@/lib/api-route"
 import {
@@ -22,6 +24,7 @@ import {
   defineAdminAction,
   normalizePositiveUserId,
   readAdminActionNumber,
+  requireAdminActionString,
   readAdminActionString,
   writeAdminActionLog,
   type AdminActionDefinition,
@@ -224,5 +227,73 @@ export const adminUserActionHandlers: Record<string, AdminActionDefinition> = {
 
     await writeAdminActionLog(context, adminUserActionHandlers["user.vip.configure"].metadata)
     return { message: "VIP 设置已更新" }
+  }),
+  "user.badge.grant": defineAdminAction({ targetType: "USER", buildDetail: (context) => {
+    const badgeName = readAdminActionString(context.body, "badgeName")
+    return badgeName ? `管理员手动颁发勋章：${badgeName}` : "管理员手动颁发勋章"
+  } }, async (context) => {
+    if (!isSiteAdmin(context.actor)) apiError(403, "仅管理员可手动颁发勋章")
+    const userId = normalizePositiveUserId(context.targetId)
+    if (!userId) apiError(400, "用户标识不合法")
+    const badgeId = requireAdminActionString(context.body, "badgeId", "请选择要颁发的勋章")
+    const badge = await findBadgeSummaryById(badgeId)
+    if (!badge) apiError(404, "勋章不存在")
+
+    const user = await findUserUsername(userId)
+    if (!user) apiError(404, "用户不存在")
+
+    const existing = await findGrantedUserBadge(userId, badgeId)
+    if (existing) apiError(409, "该用户已经拥有这枚勋章")
+
+    await runBadgeTransaction(async (tx) => {
+      await createGrantedUserBadge({
+        userId,
+        badgeId,
+        grantSource: BadgeGrantSource.ADMIN_GRANT,
+        grantSnapshot: JSON.stringify({
+          grantedByAdminUserId: context.adminUserId,
+          grantedAt: new Date().toISOString(),
+          note: context.message || null,
+        }),
+        client: tx,
+      })
+
+      await createSystemNotification({
+        client: tx,
+        userId,
+        senderId: context.adminUserId,
+        relatedType: "USER",
+        relatedId: String(userId),
+        title: `获得新勋章：${badge.name}`,
+        content: `管理员已为你手动颁发勋章“${badge.name}”。你可以前往勋章中心查看并决定是否佩戴展示。`,
+      })
+    })
+
+    await writeAdminActionLog(context, adminUserActionHandlers["user.badge.grant"].metadata)
+    return { message: `已向 @${user.username} 颁发勋章：${badge.name}` }
+  }),
+  "user.notification.send": defineAdminAction({ targetType: "USER", buildDetail: (context) => {
+    const title = readAdminActionString(context.body, "title")
+    return title ? `管理员向用户发送通知：${title}` : "管理员向用户发送通知"
+  } }, async (context) => {
+    if (!isSiteAdmin(context.actor)) apiError(403, "仅管理员可手动发送通知")
+    const userId = normalizePositiveUserId(context.targetId)
+    if (!userId) apiError(400, "用户标识不合法")
+    const title = requireAdminActionString(context.body, "title", "请填写通知标题")
+    const content = requireAdminActionString(context.body, "content", "请填写通知内容")
+    const user = await findUserUsername(userId)
+    if (!user) apiError(404, "用户不存在")
+
+    await createSystemNotification({
+      userId,
+      senderId: context.adminUserId,
+      relatedType: "USER",
+      relatedId: String(userId),
+      title,
+      content,
+    })
+
+    await writeAdminActionLog(context, adminUserActionHandlers["user.notification.send"].metadata)
+    return { message: `通知已发送给 @${user.username}` }
   }),
 }

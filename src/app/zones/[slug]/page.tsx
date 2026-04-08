@@ -83,6 +83,7 @@ export default async function ZonePage(props: PageProps<"/zones/[slug]">) {
     minPostVipLevel: 0,
     minReplyVipLevel: 0,
     requirePostReview: zone.requirePostReview ?? false,
+    requireCommentReview: zone.requireCommentReview ?? false,
   }, "view")
 
   const rawPage = readSearchParam(searchParams?.page)
@@ -189,7 +190,7 @@ export default async function ZonePage(props: PageProps<"/zones/[slug]">) {
           )}
           rightSidebar={(
             <aside className="mt-6 hidden pb-12 lg:block">
-              <HomeSidebarPanels user={sidebarUser} hotTopics={hotTopics} postLinkDisplayMode={settings.postLinkDisplayMode} createPostHref={zoneBoards[0] ? `/write?board=${zoneBoards[0].slug}` : "/write"} siteName={settings.siteName} siteDescription={settings.siteDescription} />
+              <HomeSidebarPanels user={sidebarUser} hotTopics={hotTopics} postLinkDisplayMode={settings.postLinkDisplayMode} createPostHref={zoneBoards[0] ? `/write?board=${zoneBoards[0].slug}` : "/write"} siteName={settings.siteName} siteDescription={settings.siteDescription} siteLogoPath={settings.siteLogoPath} />
             </aside>
           )}
         />

@@ -4,11 +4,7 @@ import { Search, ShieldCheck, UserRoundCheck, UserRoundX, Users, Zap } from "luc
 import Link from "next/link"
 import { useMemo } from "react"
 
-import { AdminUserActionButton } from "@/components/admin-user-action-button"
 import { AdminUserModal } from "@/components/admin-user-modal"
-import { AdminUserPasswordModal } from "@/components/admin-user-password-modal"
-import { AdminUserStatusModal } from "@/components/admin-user-status-modal"
-import { AdminUserVipModal } from "@/components/admin-user-vip-modal"
 import { Button } from "@/components/ui/button"
 import { formatDateTime } from "@/lib/formatters"
 import type { AdminUserListResult } from "@/lib/admin-user-management"
@@ -121,9 +117,6 @@ export function AdminUserList({ data }: AdminUserListProps) {
         ) : null}
         {data.users.map((user) => {
           const vipActive = isVipActive({ vipLevel: user.vipLevel, vipExpiresAt: user.vipExpiresAt })
-          const canPromoteModerator = user.role === "USER"
-          const canSetAdmin = user.role !== "ADMIN"
-          const canDemote = user.role !== "USER"
           const moderatorScopeSummary = user.role === "MODERATOR"
             ? `${user.moderatedZoneScopes.length} 个分区 / ${user.moderatedBoardScopes.length} 个节点`
             : null
@@ -135,6 +128,7 @@ export function AdminUserList({ data }: AdminUserListProps) {
                   {user.status !== "ACTIVE" ? <span className="rounded-full bg-accent px-2 py-0.5 text-[10px]">{user.status}</span> : null}
                 </div>
                 <div className="mt-1 truncate text-muted-foreground">@{user.username}</div>
+                <div className="mt-1 truncate text-muted-foreground">UID {user.id}</div>
                 <div className="mt-1 truncate text-muted-foreground">{user.email ?? user.phone ?? user.lastLoginIp ?? "-"}</div>
               </div>
 
@@ -167,14 +161,6 @@ export function AdminUserList({ data }: AdminUserListProps) {
 
               <div className="flex flex-wrap justify-end gap-1.5">
                 <AdminUserModal user={user} moderatorScopeOptions={data.moderatorScopeOptions} />
-                <AdminUserStatusModal userId={user.id} username={user.username} action="mute" />
-                <AdminUserStatusModal userId={user.id} username={user.username} action="ban" />
-                <AdminUserActionButton userId={user.id} action="user.activate" label="恢复" className="h-7 rounded-full px-2.5 text-xs" />
-                {canPromoteModerator ? <AdminUserActionButton userId={user.id} action="user.promoteModerator" label="版主" className="h-7 rounded-full px-2.5 text-xs" /> : null}
-                {canSetAdmin ? <AdminUserActionButton userId={user.id} action="user.setAdmin" label="管理员" className="h-7 rounded-full px-2.5 text-xs" /> : null}
-                <AdminUserPasswordModal userId={user.id} username={user.username} displayName={user.displayName} />
-                <AdminUserVipModal userId={user.id} username={user.username} vipLevel={user.vipLevel} vipExpiresAt={user.vipExpiresAt} />
-                {canDemote ? <AdminUserActionButton userId={user.id} action="user.demoteToUser" label="降权" className="h-7 rounded-full px-2.5 text-xs" /> : null}
               </div>
             </div>
           )

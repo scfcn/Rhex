@@ -235,6 +235,10 @@ a {
   max-width: 20em;
   height: auto;
 }
+.markdown-body.markdown-body--image-only img.my-3,
+.markdown-body.markdown-body--image-only img.my-4 {
+  max-width: 100%;
+}
 .markdown-body .md-emoji-image .md-emoji-icon {
   display: block;
   width: auto;
@@ -598,17 +602,31 @@ html.dark .sidebar-user-card-header {
 
 @media (min-width: 1024px) {
   .forum-page-shell {
-    grid-template-columns: 175px minmax(0, 1fr) 274px;
+    grid-template-columns: 200px minmax(0, 1fr) 250px;
+  }
+
+  html[data-sidebar-collapsed="false"] .forum-page-shell {
+    column-gap: 0.5rem;
   }
 
   html[data-sidebar-collapsed="true"] .forum-page-shell {
-    grid-template-columns: 52px minmax(0, 1fr) 274px;
-    column-gap: 0.2rem;
+    grid-template-columns: 60px minmax(0, 1fr) 250px;
+    column-gap: 0.5rem;
   }
 
   .forum-page-right-sidebar {
+    width: 250px;
+    max-width: 250px;
+  }
+
+  html[data-sidebar-collapsed="false"] .forum-page-right-sidebar {
     width: 274px;
     max-width: 274px;
+    padding-left: 1.5rem;
+  }
+
+  html[data-sidebar-collapsed="true"] .forum-page-right-sidebar {
+    padding-left: 0;
   }
 
   .forum-page-right-sidebar > * {
@@ -622,7 +640,7 @@ html.dark .sidebar-user-card-header {
   }
 
   html[data-sidebar-collapsed="false"] .forum-page-sidebar {
-    width: 220px;
+    width: 200px;
   }
 
   html[data-sidebar-collapsed="true"] .forum-page-sidebar-inner {

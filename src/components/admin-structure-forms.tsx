@@ -21,7 +21,7 @@ import { Tooltip } from "@/components/ui/tooltip"
 
 import type { BoardItem, ZoneItem } from "@/lib/admin-structure-management"
 import type { BoardSidebarLinkItem } from "@/lib/board-sidebar-config"
-import { formatNumber } from "@/lib/formatters"
+import { formatDateTime, formatNumber } from "@/lib/formatters"
 import { POST_LIST_LOAD_MODE_INFINITE, POST_LIST_LOAD_MODE_PAGINATION } from "@/lib/post-list-load-mode"
 import { POST_LIST_DISPLAY_MODE_DEFAULT, POST_LIST_DISPLAY_MODE_GALLERY } from "@/lib/post-list-display"
 import { DEFAULT_ALLOWED_POST_TYPES, normalizePostTypes } from "@/lib/post-types"
@@ -134,11 +134,14 @@ interface StructureFormState {
   minPostVipLevel: string
   minReplyVipLevel: string
   requirePostReview: boolean
+  requireCommentReview: boolean
   postListDisplayMode: string
   postListLoadMode: string
   feedback: string
   feedbackTone: "error" | "success"
 }
+
+type StructureFormTab = "basic" | "content" | "policy" | "access"
 
 const postTypeOptions = [
   { value: "NORMAL", label: "普通帖" },
@@ -216,7 +219,7 @@ export function StructureManager({ zones, boards, permissions, canReviewBoardApp
     boardCount: boards.length,
     activeBoardCount: boards.filter((board) => board.status === "ACTIVE").length,
     hiddenBoardCount: boards.filter((board) => board.status === "HIDDEN").length,
-    reviewBoardCount: boards.filter((board) => board.requirePostReview).length,
+    reviewBoardCount: boards.filter((board) => board.requirePostReview || board.requireCommentReview).length,
     lockedPostingBoardCount: boards.filter((board) => !board.allowPost).length,
   }), [boards, zones.length])
 
@@ -327,7 +330,8 @@ export function StructureManager({ zones, boards, permissions, canReviewBoardApp
                   <div className="mt-2 flex flex-wrap gap-1 text-[10px] text-muted-foreground">
                     <span className="rounded-full bg-background px-2 py-0.5">帖 {zone.postCount}</span>
                     <span className="rounded-full bg-background px-2 py-0.5">关注 {zone.followerCount}</span>
-                    <span className="rounded-full bg-background px-2 py-0.5">{zone.requirePostReview ? "发帖审核" : "直发"}</span>
+                    <span className="rounded-full bg-background px-2 py-0.5">{zone.requirePostReview ? "发帖审核" : "帖子直发"}</span>
+                    <span className="rounded-full bg-background px-2 py-0.5">{zone.requireCommentReview ? "回帖审核" : "回帖直发"}</span>
                     <span className="rounded-full bg-background px-2 py-0.5">{zone.hiddenFromSidebar ? "左侧导航隐藏" : "左侧导航显示"}</span>
                   </div>
                 </button>
@@ -509,7 +513,8 @@ function BoardRow({ board, canDelete, onEdit }: { board: BoardItem; canDelete: b
       <div className="space-y-1 text-muted-foreground">
         <div>{board.status}</div>
         <div>{board.allowPost ? "允许发帖" : "暂停发帖"}</div>
-        <div>{board.requirePostReview ? "发帖审核" : "默认直发"}</div>
+        <div>{board.requirePostReview ? "发帖审核" : "帖子直发"}</div>
+        <div>{board.requireCommentReview ? "回帖审核" : "回帖直发"}</div>
       </div>
 
       <div className="space-y-1 text-muted-foreground">
@@ -608,6 +613,7 @@ function StructureModalForm({
 }) {
   const router = useRouter()
   const [form, setForm] = useState<StructureFormState>(() => getInitialStructureFormState(modal, zones))
+  const [activeTab, setActiveTab] = useState<StructureFormTab>("basic")
   const [isPending, startTransition] = useTransition()
   const title = getStructureModalTitle(modal)
 
@@ -642,11 +648,26 @@ function StructureModalForm({
     minPostVipLevel,
     minReplyVipLevel,
     requirePostReview,
+    requireCommentReview,
     postListDisplayMode,
     postListLoadMode,
     feedback,
     feedbackTone,
   } = form
+
+  const formTabs: Array<{ key: StructureFormTab; label: string; hint: string }> = isBoard
+    ? [
+        { key: "basic", label: "基础信息", hint: "名称、slug、图标、所属分区" },
+        { key: "content", label: "内容展示", hint: "描述、侧栏链接、节点规则" },
+        { key: "policy", label: "策略设置", hint: "积分、频率、列表呈现" },
+        { key: "access", label: "权限审核", hint: "访问门槛与审核策略" },
+      ]
+    : [
+        { key: "basic", label: "基础信息", hint: "名称、slug、图标、描述" },
+        { key: "policy", label: "策略设置", hint: "积分、频率、帖子列表" },
+        { key: "access", label: "权限审核", hint: "访问门槛与审核策略" },
+      ]
+  const activeTabMeta = formTabs.find((tab) => tab.key === activeTab) ?? formTabs[0]
 
   function updateField<K extends keyof StructureFormState>(field: K, value: StructureFormState[K]) {
     setForm((current) => ({
@@ -736,6 +757,7 @@ function StructureModalForm({
       minPostVipLevel: minPostVipLevel === "" ? undefined : Number(minPostVipLevel),
       minReplyVipLevel: minReplyVipLevel === "" ? undefined : Number(minReplyVipLevel),
       requirePostReview,
+      requireCommentReview,
       postListDisplayMode,
       postListLoadMode,
 
@@ -775,151 +797,200 @@ function StructureModalForm({
   return (
     <AdminModal open={Boolean(modal)} onClose={onClose} size="xl" title={title} description="统一维护分区默认策略与节点覆盖策略。">
       <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label={isBoard ? "节点名称" : "分区名称"} value={name} onChange={(value) => updateField("name", value)} placeholder={isBoard ? "如 摄影" : "如 生活方式"} />
-          <Field label="标识 slug" value={slug} onChange={(value) => updateField("slug", value)} placeholder={isBoard ? "如 camera" : "如 lifestyle"} />
-          <AdminIconPickerField
-            label="图标"
-            value={icon}
-            onChange={(value) => updateField("icon", value)}
-            popoverTitle={isBoard ? "选择节点图标" : "选择分区图标"}
-            containerClassName="space-y-2 md:col-span-2"
-            triggerClassName="flex h-11 w-full items-center gap-3 rounded-full border border-border bg-background px-4 text-left text-sm transition-colors hover:bg-accent"
-            textareaRows={4}
-          />
-
-
-          <Field label="排序" value={sortOrder} onChange={(value) => updateField("sortOrder", value)} placeholder="数字越小越靠前" />
+        <div className="rounded-[24px] border border-border bg-card/40 p-2">
+          <div className="flex flex-wrap gap-2">
+            {formTabs.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={tab.key === activeTab
+                  ? "inline-flex items-center rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background"
+                  : "inline-flex items-center rounded-full border border-border bg-background px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          <p className="px-2 pt-3 text-xs leading-6 text-muted-foreground">{activeTabMeta.hint}</p>
         </div>
 
-        {!isBoard ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Toggle label="在左侧导航隐藏" checked={hiddenFromSidebar} onChange={(value) => updateField("hiddenFromSidebar", value)} />
-          </div>
-        ) : null}
-
-        {isBoard ? (
-          <div className="space-y-2">
-            <p className="text-sm font-medium">所属分区</p>
-            {isModeratorBoardEdit ? (
-              <div className="flex h-11 items-center rounded-full border border-border bg-background px-4 text-sm text-muted-foreground">
-                {modal.kind === "edit-board" ? (modal.item.zoneName ?? "未分配分区") : "当前节点所属分区"}
-              </div>
-            ) : (
-              <select value={zoneId} onChange={(event) => updateField("zoneId", event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
-                {zones.map((zone) => (
-                  <option key={zone.id} value={zone.id}>{zone.name}</option>
-                ))}
-              </select>
-            )}
-          </div>
-        ) : null}
-
-        <div className="space-y-2">
-          <p className="text-sm font-medium">描述</p>
-          <textarea value={description} onChange={(event) => updateField("description", event.target.value)} placeholder="填写结构描述，帮助用户理解这个分区或节点的定位" className="min-h-[120px] w-full rounded-[24px] border border-border bg-background px-4 py-3 text-sm outline-none" />
-        </div>
-
-        {isBoard ? (
-          <div className="rounded-[24px] ">
-            <h4 className="text-sm font-semibold">节点侧栏</h4>
-            <div className="mt-4 space-y-2">
-              {sidebarLinks.length > 0 ? (
-                <div className="hidden items-center gap-3 px-3 text-[11px] font-medium text-muted-foreground lg:grid lg:grid-cols-[120px_minmax(0,1fr)_110px_120px_80px]">
-                  <span>图标 / 标题</span>
-                  <span>URL</span>
-                  <span>标题颜色</span>
-                  <span className="text-right">操作</span>
+        {activeTab === "basic" ? (
+          <div className="rounded-[24px] border border-border p-5">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label={isBoard ? "节点名称" : "分区名称"} value={name} onChange={(value) => updateField("name", value)} placeholder={isBoard ? "如 摄影" : "如 生活方式"} />
+              <Field label="标识 slug" value={slug} onChange={(value) => updateField("slug", value)} placeholder={isBoard ? "如 camera" : "如 lifestyle"} />
+              <AdminIconPickerField
+                label="图标"
+                value={icon}
+                onChange={(value) => updateField("icon", value)}
+                popoverTitle={isBoard ? "选择节点图标" : "选择分区图标"}
+                containerClassName="space-y-2 md:col-span-2"
+                triggerClassName="flex h-11 w-full items-center gap-3 rounded-full border border-border bg-background px-4 text-left text-sm transition-colors hover:bg-accent"
+                textareaRows={4}
+              />
+              <Field label="排序" value={sortOrder} onChange={(value) => updateField("sortOrder", value)} placeholder="数字越小越靠前" />
+              {isBoard ? (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">所属分区</p>
+                  {isModeratorBoardEdit ? (
+                    <div className="flex h-11 items-center rounded-full border border-border bg-background px-4 text-sm text-muted-foreground">
+                      {modal.kind === "edit-board" ? (modal.item.zoneName ?? "未分配分区") : "当前节点所属分区"}
+                    </div>
+                  ) : (
+                    <select value={zoneId} onChange={(event) => updateField("zoneId", event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
+                      {zones.map((zone) => (
+                        <option key={zone.id} value={zone.id}>{zone.name}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
-              ) : null}
-              {sidebarLinks.map((item, index) => (
-                <BoardSidebarLinkEditor
-                  key={`sidebar-link-${index}`}
-                  item={item}
-                  index={index}
-                  onChange={updateSidebarLink}
-                  onRemove={removeSidebarLink}
-                />
-              ))}
-              <Button type="button" variant="outline" className="h-9 rounded-full px-4 text-xs" onClick={addSidebarLink}>
-                <Plus className="mr-2 h-4 w-4" />新增节点链接
-              </Button>
+              ) : ( <div className="space-y-2">
+                <div className="flex items-center gap-1.5"><p className="text-sm font-medium">隐藏</p></div>
+                <Toggle label="在左侧导航隐藏" checked={hiddenFromSidebar} onChange={(value) => updateField("hiddenFromSidebar", value)} />
+              </div>
+            )}
             </div>
-            <div className="mt-4 space-y-2">
-              <p className="text-sm font-medium">节点规则 Markdown</p>
-              <RefinedRichPostEditor value={rulesMarkdown} onChange={(value) => updateField("rulesMarkdown", value)} placeholder="留空时前台显示系统默认节点规则" minHeight={220} uploadFolder="posts" />
 
-            </div>
-            {!isModeratorBoardEdit ? (
-              <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <Toggle label="版主可提取节点金库" checked={moderatorsCanWithdrawTreasury} onChange={(value) => updateField("moderatorsCanWithdrawTreasury", value)} />
+            {!isBoard ? (
+              <div className="mt-4 space-y-2">
+                <p className="text-sm font-medium">描述</p>
+                <textarea value={description} onChange={(event) => updateField("description", event.target.value)} placeholder="填写结构描述，帮助用户理解这个分区或节点的定位" className="min-h-[120px] w-full rounded-[24px] border border-border bg-background px-4 py-3 text-sm outline-none" />
               </div>
             ) : null}
           </div>
         ) : null}
 
-        <div className="rounded-[24px] border border-border p-5">
-          <h4 className="text-sm font-semibold">积分与频率设置</h4>
-          {isModeratorBoardEdit ? (
-            <p className="mt-2 text-xs leading-6 text-muted-foreground">编辑节点时，这四项只能填写留空、0 或负数；留空表示继续继承分区设置。</p>
-          ) : null}
-          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Field label="发帖积分" help={getStructureNumericFieldHelp({ field: "postPointDelta", isBoard, isModeratorBoardEdit })} value={postPointDelta} onChange={(value) => updateField("postPointDelta", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
-            <Field label="回复积分" help={getStructureNumericFieldHelp({ field: "replyPointDelta", isBoard, isModeratorBoardEdit })} value={replyPointDelta} onChange={(value) => updateField("replyPointDelta", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
-            <Field label="发帖间隔(秒)" help={getStructureNumericFieldHelp({ field: "postIntervalSeconds", isBoard, isModeratorBoardEdit })} value={postIntervalSeconds} onChange={(value) => updateField("postIntervalSeconds", value)} placeholder={isBoard ? "留空继承分区" : "默认 120"} />
-            <Field label="回复间隔(秒)" help={getStructureNumericFieldHelp({ field: "replyIntervalSeconds", isBoard, isModeratorBoardEdit })} value={replyIntervalSeconds} onChange={(value) => updateField("replyIntervalSeconds", value)} placeholder={isBoard ? "留空继承分区" : "默认 3"} />
-          </div>
-        </div>
+        {isBoard && activeTab === "content" ? (
+          <div className="space-y-5">
+            <div className="rounded-[24px] border border-border p-5">
+              <h4 className="text-sm font-semibold">节点描述</h4>
+              <div className="mt-4 space-y-2">
+                <p className="text-sm font-medium">描述</p>
+                <textarea value={description} onChange={(event) => updateField("description", event.target.value)} placeholder="填写结构描述，帮助用户理解这个分区或节点的定位" className="min-h-[120px] w-full rounded-[24px] border border-border bg-background px-4 py-3 text-sm outline-none" />
+              </div>
+            </div>
 
-        <div className="rounded-[24px] border border-border p-5">
-          <h4 className="text-sm font-semibold">支持的帖子类型</h4>
-          <div className="mt-4 flex flex-wrap gap-3">
-            {postTypeOptions.map((item) => (
-              <label key={item.value} className={allowedPostTypes.includes(item.value) ? "inline-flex items-center gap-2 rounded-full border border-foreground bg-accent px-4 py-2 text-sm" : "inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm"}>
-                <input type="checkbox" className="hidden" checked={allowedPostTypes.includes(item.value)} onChange={() => togglePostType(item.value)} />
-                {item.label}
-              </label>
-            ))}
-          </div>
-        </div>
+            <div className="rounded-[24px] border border-border p-5">
+              <h4 className="text-sm font-semibold">节点侧栏</h4>
+              <div className="mt-4 space-y-2">
+                {sidebarLinks.length > 0 ? (
+                  <div className="hidden items-center gap-3 px-3 text-[11px] font-medium text-muted-foreground lg:grid lg:grid-cols-[120px_minmax(0,1fr)_110px_120px_80px]">
+                    <span>图标 / 标题</span>
+                    <span>URL</span>
+                    <span>标题颜色</span>
+                    <span className="text-right">操作</span>
+                  </div>
+                ) : null}
+                {sidebarLinks.map((item, index) => (
+                  <BoardSidebarLinkEditor
+                    key={`sidebar-link-${index}`}
+                    item={item}
+                    index={index}
+                    onChange={updateSidebarLink}
+                    onRemove={removeSidebarLink}
+                  />
+                ))}
+                <Button type="button" variant="outline" className="h-9 rounded-full px-4 text-xs" onClick={addSidebarLink}>
+                  <Plus className="mr-2 h-4 w-4" />新增节点链接
+                </Button>
+              </div>
+            </div>
 
-        <div className="rounded-[24px] border border-border p-5">
-          <h4 className="text-sm font-semibold">浏览 / 发帖 / 回复权限</h4>
-          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <Field label="浏览最低积分" help={getStructureAccessFieldHelp({ field: "minViewPoints", isBoard })} value={minViewPoints} onChange={(value) => updateField("minViewPoints", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
-            <Field label="浏览最低等级" help={getStructureAccessFieldHelp({ field: "minViewLevel", isBoard })} value={minViewLevel} onChange={(value) => updateField("minViewLevel", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
-            <Field label="浏览最低 VIP 等级" help={getStructureAccessFieldHelp({ field: "minViewVipLevel", isBoard })} value={minViewVipLevel} onChange={(value) => updateField("minViewVipLevel", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
-            <Field label="发帖最低积分" help={getStructureAccessFieldHelp({ field: "minPostPoints", isBoard })} value={minPostPoints} onChange={(value) => updateField("minPostPoints", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
-            <Field label="发帖最低等级" help={getStructureAccessFieldHelp({ field: "minPostLevel", isBoard })} value={minPostLevel} onChange={(value) => updateField("minPostLevel", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
-            <Field label="发帖最低 VIP 等级" help={getStructureAccessFieldHelp({ field: "minPostVipLevel", isBoard })} value={minPostVipLevel} onChange={(value) => updateField("minPostVipLevel", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
-            <Field label="回复最低积分" help={getStructureAccessFieldHelp({ field: "minReplyPoints", isBoard })} value={minReplyPoints} onChange={(value) => updateField("minReplyPoints", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
-            <Field label="回复最低等级" help={getStructureAccessFieldHelp({ field: "minReplyLevel", isBoard })} value={minReplyLevel} onChange={(value) => updateField("minReplyLevel", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
-            <Field label="回复最低 VIP 等级" help={getStructureAccessFieldHelp({ field: "minReplyVipLevel", isBoard })} value={minReplyVipLevel} onChange={(value) => updateField("minReplyVipLevel", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+            <div className="rounded-[24px] border border-border p-5">
+              <h4 className="text-sm font-semibold">节点规则</h4>
+              <div className="mt-4 space-y-2">
+                <p className="text-sm font-medium">节点规则 Markdown</p>
+                <RefinedRichPostEditor value={rulesMarkdown} onChange={(value) => updateField("rulesMarkdown", value)} placeholder="留空时前台显示系统默认节点规则" minHeight={220} uploadFolder="posts" />
+              </div>
+              {!isModeratorBoardEdit ? (
+                <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <Toggle label="版主可提取节点金库" checked={moderatorsCanWithdrawTreasury} onChange={(value) => updateField("moderatorsCanWithdrawTreasury", value)} />
+                </div>
+              ) : null}
+            </div>
           </div>
-        </div>
+        ) : null}
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Toggle label="开启发帖审核" checked={requirePostReview} onChange={(value) => updateField("requirePostReview", value)} />
-          <div className="space-y-2 md:col-span-1 xl:col-span-2">
-            <p className="text-sm font-medium">帖子列表形式</p>
-            <select value={postListDisplayMode} onChange={(event) => updateField("postListDisplayMode", event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
-              {isBoard ? <option value="">继承分区</option> : <option value="">默认列表</option>}
-              <option value={POST_LIST_DISPLAY_MODE_DEFAULT}>普通列表</option>
-              <option value={POST_LIST_DISPLAY_MODE_GALLERY}>画廊模式</option>
-            </select>
-            <p className="text-xs leading-6 text-muted-foreground">{isBoard ? "留空时自动继承分区；显式设置后优先使用节点自己的列表形式。" : "留空时使用站点默认普通列表；设置后该分区下未覆盖的节点会继承这里。"}</p>
-          </div>
-          <div className="space-y-2 md:col-span-1 xl:col-span-1">
-            <p className="text-sm font-medium">帖子加载方式</p>
-            <select value={postListLoadMode} onChange={(event) => updateField("postListLoadMode", event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
-              {isBoard ? <option value="">继承分区</option> : <option value={POST_LIST_LOAD_MODE_PAGINATION}>分页加载</option>}
-              {!isBoard ? null : <option value={POST_LIST_LOAD_MODE_PAGINATION}>分页加载</option>}
-              <option value={POST_LIST_LOAD_MODE_INFINITE}>无限下拉</option>
-            </select>
-            <p className="text-xs leading-6 text-muted-foreground">{isBoard ? "留空时自动继承分区；显式设置后优先使用节点自己的加载方式。" : "分区可配置为传统分页或滚动到底自动继续加载。"}</p>
-          </div>
-        </div>
+        {activeTab === "policy" ? (
+          <div className="space-y-5">
+            <div className="rounded-[24px] border border-border p-5">
+              <h4 className="text-sm font-semibold">积分与频率设置</h4>
+              {isModeratorBoardEdit ? (
+                <p className="mt-2 text-xs leading-6 text-muted-foreground">编辑节点时，这四项只能填写留空、0 或负数；留空表示继续继承分区设置。</p>
+              ) : null}
+              <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <Field label="发帖积分" help={getStructureNumericFieldHelp({ field: "postPointDelta", isBoard, isModeratorBoardEdit })} value={postPointDelta} onChange={(value) => updateField("postPointDelta", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+                <Field label="回复积分" help={getStructureNumericFieldHelp({ field: "replyPointDelta", isBoard, isModeratorBoardEdit })} value={replyPointDelta} onChange={(value) => updateField("replyPointDelta", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+                <Field label="发帖间隔(秒)" help={getStructureNumericFieldHelp({ field: "postIntervalSeconds", isBoard, isModeratorBoardEdit })} value={postIntervalSeconds} onChange={(value) => updateField("postIntervalSeconds", value)} placeholder={isBoard ? "留空继承分区" : "默认 120"} />
+                <Field label="回复间隔(秒)" help={getStructureNumericFieldHelp({ field: "replyIntervalSeconds", isBoard, isModeratorBoardEdit })} value={replyIntervalSeconds} onChange={(value) => updateField("replyIntervalSeconds", value)} placeholder={isBoard ? "留空继承分区" : "默认 3"} />
+              </div>
+            </div>
 
+            <div className="rounded-[24px] border border-border p-5">
+              <h4 className="text-sm font-semibold">支持的帖子类型</h4>
+              <div className="mt-4 flex flex-wrap gap-3">
+                {postTypeOptions.map((item) => (
+                  <label key={item.value} className={allowedPostTypes.includes(item.value) ? "inline-flex items-center gap-2 rounded-full border border-foreground bg-accent px-4 py-2 text-sm" : "inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm"}>
+                    <input type="checkbox" className="hidden" checked={allowedPostTypes.includes(item.value)} onChange={() => togglePostType(item.value)} />
+                    {item.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-border p-5">
+              <h4 className="text-sm font-semibold">帖子列表</h4>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">帖子列表形式</p>
+                  <select value={postListDisplayMode} onChange={(event) => updateField("postListDisplayMode", event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
+                    {isBoard ? <option value="">继承分区</option> : <option value="">默认列表</option>}
+                    <option value={POST_LIST_DISPLAY_MODE_DEFAULT}>普通列表</option>
+                    <option value={POST_LIST_DISPLAY_MODE_GALLERY}>画廊模式</option>
+                  </select>
+                  <p className="text-xs leading-6 text-muted-foreground">{isBoard ? "留空时自动继承分区；显式设置后优先使用节点自己的列表形式。" : "留空时使用站点默认普通列表；设置后该分区下未覆盖的节点会继承这里。"}</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">帖子加载方式</p>
+                  <select value={postListLoadMode} onChange={(event) => updateField("postListLoadMode", event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-none">
+                    {isBoard ? <option value="">继承分区</option> : <option value={POST_LIST_LOAD_MODE_PAGINATION}>分页加载</option>}
+                    {!isBoard ? null : <option value={POST_LIST_LOAD_MODE_PAGINATION}>分页加载</option>}
+                    <option value={POST_LIST_LOAD_MODE_INFINITE}>无限下拉</option>
+                  </select>
+                  <p className="text-xs leading-6 text-muted-foreground">{isBoard ? "留空时自动继承分区；显式设置后优先使用节点自己的加载方式。" : "分区可配置为传统分页或滚动到底自动继续加载。"}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {activeTab === "access" ? (
+          <div className="space-y-5">
+            <div className="rounded-[24px] border border-border p-5">
+              <h4 className="text-sm font-semibold">浏览 / 发帖 / 回复权限</h4>
+              <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <Field label="浏览最低积分" help={getStructureAccessFieldHelp({ field: "minViewPoints", isBoard })} value={minViewPoints} onChange={(value) => updateField("minViewPoints", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+                <Field label="浏览最低等级" help={getStructureAccessFieldHelp({ field: "minViewLevel", isBoard })} value={minViewLevel} onChange={(value) => updateField("minViewLevel", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+                <Field label="浏览最低 VIP 等级" help={getStructureAccessFieldHelp({ field: "minViewVipLevel", isBoard })} value={minViewVipLevel} onChange={(value) => updateField("minViewVipLevel", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+                <Field label="发帖最低积分" help={getStructureAccessFieldHelp({ field: "minPostPoints", isBoard })} value={minPostPoints} onChange={(value) => updateField("minPostPoints", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+                <Field label="发帖最低等级" help={getStructureAccessFieldHelp({ field: "minPostLevel", isBoard })} value={minPostLevel} onChange={(value) => updateField("minPostLevel", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+                <Field label="发帖最低 VIP 等级" help={getStructureAccessFieldHelp({ field: "minPostVipLevel", isBoard })} value={minPostVipLevel} onChange={(value) => updateField("minPostVipLevel", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+                <Field label="回复最低积分" help={getStructureAccessFieldHelp({ field: "minReplyPoints", isBoard })} value={minReplyPoints} onChange={(value) => updateField("minReplyPoints", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+                <Field label="回复最低等级" help={getStructureAccessFieldHelp({ field: "minReplyLevel", isBoard })} value={minReplyLevel} onChange={(value) => updateField("minReplyLevel", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+                <Field label="回复最低 VIP 等级" help={getStructureAccessFieldHelp({ field: "minReplyVipLevel", isBoard })} value={minReplyVipLevel} onChange={(value) => updateField("minReplyVipLevel", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-border p-5">
+              <h4 className="text-sm font-semibold">审核策略</h4>
+              <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <Toggle label="开启发帖审核" checked={requirePostReview} onChange={(value) => updateField("requirePostReview", value)} />
+                <Toggle label="开启回帖审核" checked={requireCommentReview} onChange={(value) => updateField("requireCommentReview", value)} />
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         <div className="space-y-3">
           {feedback ? (
@@ -969,6 +1040,7 @@ function getInitialStructureFormState(modal: Exclude<ModalMode, null>, zones: Zo
       minPostVipLevel: "0",
       minReplyVipLevel: "0",
       requirePostReview: false,
+      requireCommentReview: false,
       postListDisplayMode: "",
       postListLoadMode: POST_LIST_LOAD_MODE_PAGINATION,
       feedback: "",
@@ -1003,6 +1075,7 @@ function getInitialStructureFormState(modal: Exclude<ModalMode, null>, zones: Zo
       minPostVipLevel: "",
       minReplyVipLevel: "",
       requirePostReview: false,
+      requireCommentReview: false,
       postListDisplayMode: "",
       postListLoadMode: "",
       feedback: "",
@@ -1037,6 +1110,7 @@ function getInitialStructureFormState(modal: Exclude<ModalMode, null>, zones: Zo
       minPostVipLevel: String(modal.item.minPostVipLevel),
       minReplyVipLevel: String(modal.item.minReplyVipLevel),
       requirePostReview: modal.item.requirePostReview,
+      requireCommentReview: modal.item.requireCommentReview,
       postListDisplayMode: modal.item.postListDisplayMode ?? "",
       postListLoadMode: modal.item.postListLoadMode ?? POST_LIST_LOAD_MODE_PAGINATION,
       feedback: "",
@@ -1070,6 +1144,7 @@ function getInitialStructureFormState(modal: Exclude<ModalMode, null>, zones: Zo
     minPostVipLevel: modal.item.minPostVipLevel == null ? "" : String(modal.item.minPostVipLevel),
     minReplyVipLevel: modal.item.minReplyVipLevel == null ? "" : String(modal.item.minReplyVipLevel),
     requirePostReview: Boolean(modal.item.requirePostReview),
+    requireCommentReview: Boolean(modal.item.requireCommentReview),
     postListDisplayMode: modal.item.postListDisplayMode ?? "",
     postListLoadMode: modal.item.postListLoadMode ?? "",
     feedback: "",
@@ -1232,7 +1307,7 @@ function BoardApplicationReviewModal({
       closeOnEscape={!isPending}
       size="lg"
       title={currentApplication.status === "PENDING" ? "审核节点申请" : "查看节点申请"}
-      description={`申请人 @${currentApplication.applicant.username}，提交于 ${new Date(currentApplication.createdAt).toLocaleString("zh-CN")}`}
+      description={`申请人 @${currentApplication.applicant.username}，提交于 ${formatDateTime(currentApplication.createdAt)}`}
       onSubmit={(event) => {
         event.preventDefault()
         runReviewAction("update")

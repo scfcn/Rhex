@@ -3,6 +3,7 @@ import { prisma } from "@/db/client"
 export interface ModeratorScopeAssignmentInput {
   id: string
   canEditSettings: boolean
+  canWithdrawTreasury: boolean
 }
 
 export async function findModeratorScopeSetup(userId: number, zoneIds: string[], boardIds: string[]) {
@@ -48,6 +49,7 @@ export async function replaceModeratorScopes(
           moderatorId: userId,
           zoneId: scope.id,
           canEditSettings: scope.canEditSettings,
+          canWithdrawTreasury: scope.canWithdrawTreasury,
         })),
       })
     }
@@ -58,6 +60,7 @@ export async function replaceModeratorScopes(
           moderatorId: userId,
           boardId: scope.id,
           canEditSettings: scope.canEditSettings,
+          canWithdrawTreasury: scope.canWithdrawTreasury,
         })),
       })
     }

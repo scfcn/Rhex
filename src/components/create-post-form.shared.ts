@@ -162,6 +162,7 @@ export interface CreatePostFormInitialValues {
   pollOptions?: string[]
   pollExpiresAt?: string | null
   commentsVisibleToAuthorOnly?: boolean
+  loginUnlockContent?: string
   replyUnlockContent?: string
   replyThreshold?: number | null
   purchaseUnlockContent?: string
@@ -220,7 +221,7 @@ export interface CreatePostFormProps {
   initialValues?: CreatePostFormInitialValues
 }
 
-export type HiddenModalType = "reply" | "purchase" | "view-level" | null
+export type HiddenModalType = "login" | "reply" | "purchase" | "view-level" | null
 
 export type LotteryPrizeDraft = LocalPostDraft["lotteryPrizes"][number]
 export type LotteryConditionDraft = LocalPostDraft["lotteryConditions"][number]
@@ -362,6 +363,7 @@ export function buildInitialPostDraft(
     pollOptions: initialValues.pollOptions && initialValues.pollOptions.length > 0 ? initialValues.pollOptions : ["", ""],
     pollExpiresAt: initialValues.pollExpiresAt ?? "",
     commentsVisibleToAuthorOnly: Boolean(initialValues.commentsVisibleToAuthorOnly),
+    loginUnlockContent: initialValues.loginUnlockContent ?? "",
     replyUnlockContent: initialValues.replyUnlockContent ?? "",
     purchaseUnlockContent: initialValues.purchaseUnlockContent ?? "",
     purchasePrice: String(initialValues.purchasePrice ?? 20),
@@ -461,6 +463,7 @@ export function buildSubmitRequest({
     isAnonymous: draft.isAnonymous,
     coverPath: draft.coverPath.trim() || undefined,
     commentsVisibleToAuthorOnly: draft.commentsVisibleToAuthorOnly,
+    loginUnlockContent: draft.loginUnlockContent,
     replyUnlockContent: draft.replyUnlockContent,
     replyThreshold: draft.replyUnlockContent.trim() ? 1 : undefined,
     purchaseUnlockContent: draft.purchaseUnlockContent,

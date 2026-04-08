@@ -370,6 +370,6 @@ export async function createRegisterFlow(options: RegisterFlowOptions): Promise<
     user,
     registerIp,
     invited: Boolean(payload.inviterUsername || payload.inviteCode),
-    successMessage: nicknameSafety?.shouldReview ? "注册成功，昵称已按规则处理" : "success",
+    successMessage: nicknameSafety?.shouldReview ? "注册成功，昵称已按规则处理" : "注册成功",
   }
 }

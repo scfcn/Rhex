@@ -41,7 +41,7 @@ export function BrowsingSettingsPanel() {
           </span>
           <div className="min-w-0">
             <h3 className="text-base font-semibold">浏览设置</h3>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">以下偏好只保存在当前浏览器本地，不会同步到服务器。</p>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">以下偏好保存在当前浏览器，不会跨设备同步。</p>
           </div>
         </div>
 

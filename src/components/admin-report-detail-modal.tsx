@@ -4,6 +4,7 @@ import { useState } from "react"
 
 import { AdminModal } from "@/components/admin-modal"
 import { Button } from "@/components/ui/button"
+import { formatDateTime } from "@/lib/formatters"
 import type { AdminReportItem } from "@/lib/admin-report-management"
 
 interface AdminReportDetailModalProps {
@@ -30,7 +31,7 @@ export function AdminReportDetailModal({ report }: AdminReportDetailModalProps) 
             <Info label="举报状态" value={report.status} />
             <Info label="举报类型" value={report.targetType} />
             <Info label="举报人" value={`@${report.reporter.username}`} />
-            <Info label="提交时间" value={new Date(report.createdAt).toLocaleString("zh-CN")} />
+            <Info label="提交时间" value={formatDateTime(report.createdAt)} />
           </div>
           <div className="rounded-[20px] border border-border p-4">
             <p className="text-xs text-muted-foreground">举报说明</p>
@@ -45,7 +46,7 @@ export function AdminReportDetailModal({ report }: AdminReportDetailModalProps) 
             <div className="rounded-[20px] border border-border p-4">
               <p className="text-xs text-muted-foreground">处理记录</p>
               <p className="mt-2 text-sm text-foreground/90">{report.handledNote}</p>
-              <p className="mt-2 text-xs text-muted-foreground">{report.handler ? `处理人 @${report.handler.username}` : "未记录处理人"} · {report.handledAt ? new Date(report.handledAt).toLocaleString("zh-CN") : "未记录处理时间"}</p>
+              <p className="mt-2 text-xs text-muted-foreground">{report.handler ? `处理人 @${report.handler.username}` : "未记录处理人"} · {report.handledAt ? formatDateTime(report.handledAt) : "未记录处理时间"}</p>
             </div>
           ) : null}
         </div>

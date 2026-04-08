@@ -4,9 +4,11 @@ import { useMemo, useState, useTransition } from "react"
 import { Pencil, Plus, Save, ShieldCheck, ShieldQuestion, Trash2, XCircle } from "lucide-react"
 
 import { AdminIconPickerField } from "@/components/admin-icon-picker-field"
+import { PickerPopover, PickerTriggerField, normalizeHexColor } from "@/components/admin-picker-popover"
 import { LevelIcon } from "@/components/level-icon"
 import { Button } from "@/components/ui/button"
 import { showConfirm } from "@/components/ui/confirm-dialog"
+import { formatDateTime } from "@/lib/formatters"
 import type { VerificationFormField } from "@/lib/verification-form-schema"
 
 
@@ -32,6 +34,7 @@ export type AdminVerificationApplicationItem = {
   id: string
   status: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED"
   content: string
+  customDescription?: string | null
   formResponseJson?: string | null
   note?: string | null
   rejectReason?: string | null
@@ -58,6 +61,7 @@ export type AdminVerificationApplicationItem = {
 interface AdminVerificationManagerProps {
   initialTypes: AdminVerificationTypeItem[]
   initialApplications: AdminVerificationApplicationItem[]
+  mode?: "types" | "reviews"
 }
 
 const COLOR_PRESETS = ["#2563eb", "#0f766e", "#9333ea", "#dc2626", "#ea580c", "#0891b2", "#16a34a", "#64748b"]
@@ -97,14 +101,6 @@ function createVerificationType(nextSortOrder: number): AdminVerificationTypeIte
   }
 }
 
-function normalizeColor(color: string) {
-  if (/^#[0-9a-fA-F]{6}$/.test(color)) {
-    return color
-  }
-
-  return "#2563eb"
-}
-
 function parseApplicationFormResponse(input?: string | null) {
   if (!input?.trim()) {
     return [] as Array<{ key: string; value: string }>
@@ -118,7 +114,7 @@ function parseApplicationFormResponse(input?: string | null) {
   }
 }
 
-export function AdminVerificationManager({ initialTypes, initialApplications }: AdminVerificationManagerProps) {
+export function AdminVerificationManager({ initialTypes, initialApplications, mode = "types" }: AdminVerificationManagerProps) {
   const [types, setTypes] = useState(initialTypes)
   const [applications] = useState(initialApplications)
   const [editingIndex, setEditingIndex] = useState<number | null>(initialTypes[0] ? 0 : null)
@@ -139,12 +135,14 @@ export function AdminVerificationManager({ initialTypes, initialApplications }: 
       if (!keyword) {
         return true
       }
-      return [item.user.displayName, item.user.username, item.type.name, item.content]
+      return [item.user.displayName, item.user.username, item.type.name, item.content, item.customDescription ?? ""]
         .some((value) => value.toLowerCase().includes(keyword))
     })
   }, [applicationKeyword, applicationStatusFilter, applications])
   const pendingApplications = useMemo(() => filteredApplications.filter((item) => item.status === "PENDING"), [filteredApplications])
   const handledApplications = useMemo(() => filteredApplications.filter((item) => item.status !== "PENDING"), [filteredApplications])
+  const showTypeManagement = mode === "types"
+  const showReviewCenter = mode === "reviews"
 
   function updateType(index: number, patch: Partial<AdminVerificationTypeItem>) {
     setTypes((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)))
@@ -290,75 +288,87 @@ export function AdminVerificationManager({ initialTypes, initialApplications }: 
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-[28px] border border-border bg-card p-5">
         <div>
           <h3 className="text-lg font-semibold">认证系统</h3>
-          <p className="mt-1 text-sm text-muted-foreground">后台可自定义认证类型、图标以及申请表单字段，前台用户按模板提交资料后由管理员审核通过。</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {showTypeManagement
+              ? "后台可自定义认证类型、图标以及申请表单字段。"
+              : "集中处理用户认证申请，审核通过后会在前台展示认证标识。"}
+          </p>
         </div>
-        <Button className="gap-2 rounded-full" onClick={appendType} type="button">
-          <Plus className="h-4 w-4" />
-          新建认证
-        </Button>
+        {showTypeManagement ? (
+          <Button className="gap-2 rounded-full" onClick={appendType} type="button">
+            <Plus className="h-4 w-4" />
+            新建认证
+          </Button>
+        ) : (
+          <span className="rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">待审 {pendingApplications.length}</span>
+        )}
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
         <section className="space-y-4">
-          <div className="rounded-[24px] border border-border bg-card p-4">
-            <div className="flex items-center justify-between">
-              <h4 className="text-base font-semibold">认证类型</h4>
-              <span className="text-sm text-muted-foreground">共 {types.length} 项</span>
-            </div>
-            <div className="mt-4 space-y-3">
-              {types.length === 0 ? <p className="text-sm text-muted-foreground">还没有认证类型，先创建一项。</p> : null}
-              {types.map((item, index) => (
-                <button
-                  key={item.id ?? `${item.slug}-${index}`}
-                  type="button"
-                  onClick={() => setEditingIndex(index)}
-                  className={editingIndex === index ? "w-full rounded-[22px] border border-foreground bg-accent/60 p-4 text-left" : "w-full rounded-[22px] border border-border bg-background p-4 text-left hover:bg-accent/40"}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-xl" style={{ backgroundColor: `${item.color}18`, color: item.color }}>
-                        <LevelIcon icon={item.iconText} color={item.color} className="h-5 w-5 text-[20px]" emojiClassName="text-inherit" svgClassName="[&>svg]:block" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate text-sm font-semibold">{item.name}</p>
-                          <span className={item.status ? "rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] text-emerald-700" : "rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600"}>{item.status ? "启用" : "停用"}</span>
+          {showTypeManagement ? (
+            <div className="rounded-[24px] border border-border bg-card p-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-base font-semibold">认证类型</h4>
+                <span className="text-sm text-muted-foreground">共 {types.length} 项</span>
+              </div>
+              <div className="mt-4 space-y-3">
+                {types.length === 0 ? <p className="text-sm text-muted-foreground">还没有认证类型，先创建一项。</p> : null}
+                {types.map((item, index) => (
+                  <button
+                    key={item.id ?? `${item.slug}-${index}`}
+                    type="button"
+                    onClick={() => setEditingIndex(index)}
+                    className={editingIndex === index ? "w-full rounded-[22px] border border-foreground bg-accent/60 p-4 text-left" : "w-full rounded-[22px] border border-border bg-background p-4 text-left hover:bg-accent/40"}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-xl" style={{ backgroundColor: `${item.color}18`, color: item.color }}>
+                          <LevelIcon icon={item.iconText} color={item.color} className="h-5 w-5 text-[20px]" emojiClassName="text-inherit" svgClassName="[&>svg]:block" />
                         </div>
-                        <p className="mt-1 truncate text-xs text-muted-foreground">{item.slug} · 字段 {item.formFields.length} · 申请 {item.applicationCount ?? 0}</p>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate text-sm font-semibold">{item.name}</p>
+                            <span className={item.status ? "rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] text-emerald-700" : "rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600"}>{item.status ? "启用" : "停用"}</span>
+                          </div>
+                          <p className="mt-1 truncate text-xs text-muted-foreground">{item.slug} · 字段 {item.formFields.length} · 申请 {item.applicationCount ?? 0}</p>
+                        </div>
                       </div>
+                      <Pencil className="h-4 w-4 text-muted-foreground" />
                     </div>
-                    <Pencil className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                </button>
-              ))}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : null}
 
-          <div className="rounded-[24px] border border-border bg-card p-4">
-            <h4 className="text-base font-semibold">申请筛选</h4>
-            <p className="mt-1 text-sm text-muted-foreground">支持按状态和关键词快速筛选认证申请。</p>
-            <div className="mt-4 grid gap-3">
-              <label className="space-y-2">
-                <span className="text-xs font-medium text-muted-foreground">关键词</span>
-                <input value={applicationKeyword} onChange={(event) => setApplicationKeyword(event.target.value)} placeholder="用户名 / 昵称 / 认证类型 / 申请内容" className="h-10 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-none transition-colors focus:border-foreground/30" />
-              </label>
-              <label className="space-y-2">
-                <span className="text-xs font-medium text-muted-foreground">状态</span>
-                <select value={applicationStatusFilter} onChange={(event) => setApplicationStatusFilter(event.target.value as "ALL" | "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED")} className="h-10 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-none transition-colors focus:border-foreground/30">
-                  <option value="ALL">全部状态</option>
-                  <option value="PENDING">待审核</option>
-                  <option value="APPROVED">已通过</option>
-                  <option value="REJECTED">已驳回</option>
-                  <option value="CANCELLED">已取消</option>
-                </select>
-              </label>
+          {showReviewCenter ? (
+            <div className="rounded-[24px] border border-border bg-card p-4">
+              <h4 className="text-base font-semibold">申请筛选</h4>
+              <p className="mt-1 text-sm text-muted-foreground">支持按状态和关键词快速筛选认证申请。</p>
+              <div className="mt-4 grid gap-3">
+                <label className="space-y-2">
+                  <span className="text-xs font-medium text-muted-foreground">关键词</span>
+                  <input value={applicationKeyword} onChange={(event) => setApplicationKeyword(event.target.value)} placeholder="用户名 / 昵称 / 认证类型 / 申请内容" className="h-10 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-none transition-colors focus:border-foreground/30" />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-xs font-medium text-muted-foreground">状态</span>
+                  <select value={applicationStatusFilter} onChange={(event) => setApplicationStatusFilter(event.target.value as "ALL" | "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED")} className="h-10 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-none transition-colors focus:border-foreground/30">
+                    <option value="ALL">全部状态</option>
+                    <option value="PENDING">待审核</option>
+                    <option value="APPROVED">已通过</option>
+                    <option value="REJECTED">已驳回</option>
+                    <option value="CANCELLED">已取消</option>
+                  </select>
+                </label>
+              </div>
+              <p className="mt-3 text-sm text-muted-foreground">当前筛选后待审核 {pendingApplications.length} 条。</p>
             </div>
-            <p className="mt-3 text-sm text-muted-foreground">当前筛选后待审核 {pendingApplications.length} 条。</p>
-          </div>
+          ) : null}
         </section>
 
         <section className="space-y-6">
-          {!editingType ? (
+          {showTypeManagement ? (!editingType ? (
             <div className="rounded-[28px] border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">请选择左侧认证类型，或新建一项认证开始配置。</div>
           ) : (
             <div className="rounded-[28px] border border-border bg-card p-5 shadow-soft">
@@ -437,98 +447,108 @@ export function AdminVerificationManager({ initialTypes, initialApplications }: 
 
               {feedback ? <p className="mt-4 text-sm text-muted-foreground">{feedback}</p> : null}
             </div>
-          )}
+          )) : null}
 
-          <div className="rounded-[28px] border border-border bg-card p-5 shadow-soft">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h4 className="text-base font-semibold">认证审核</h4>
-                <p className="mt-1 text-sm text-muted-foreground">审核通过后，用户会在帖子详情和评论作者名前展示认证图标。</p>
+          {showReviewCenter ? (
+            <div className="rounded-[28px] border border-border bg-card p-5 shadow-soft">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-base font-semibold">认证审核</h4>
+                  <p className="mt-1 text-sm text-muted-foreground">审核通过后，用户会在帖子详情和评论作者名前展示认证图标。</p>
+                </div>
+                <span className="rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">待审 {pendingApplications.length}</span>
               </div>
-              <span className="rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">待审 {pendingApplications.length}</span>
-            </div>
 
-            <div className="mt-4 space-y-4">
-              {pendingApplications.length === 0 ? <p className="text-sm text-muted-foreground">当前没有待审核的认证申请。</p> : null}
-              {pendingApplications.map((item) => {
-                const formEntries = parseApplicationFormResponse(item.formResponseJson)
-                return (
-                  <div key={item.id} className="rounded-[22px] border border-border bg-background p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-2 text-sm">
-                          <span className="font-semibold">{item.user.displayName}</span>
-                          <span className="text-muted-foreground">@{item.user.username}</span>
-                          <span className="rounded-full px-2 py-0.5 text-[10px]" style={{ color: item.type.color, backgroundColor: `${item.type.color}12` }}>{item.type.name}</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">提交时间：{new Date(item.submittedAt).toLocaleString()}</p>
-                      </div>
-                      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs text-amber-700">待审核</span>
-                    </div>
-                    {formEntries.length > 0 ? (
-                      <div className="mt-3 grid gap-2 md:grid-cols-2">
-                        {formEntries.map((entry) => (
-                          <div key={entry.key} className="rounded-[18px] bg-secondary/30 p-3 text-sm">
-                            <p className="text-xs text-muted-foreground">{entry.key}</p>
-                            <p className="mt-1 break-all leading-7 text-foreground/90">{entry.value || "-"}</p>
+              <div className="mt-4 space-y-4">
+                {pendingApplications.length === 0 ? <p className="text-sm text-muted-foreground">当前没有待审核的认证申请。</p> : null}
+                {pendingApplications.map((item) => {
+                  const formEntries = parseApplicationFormResponse(item.formResponseJson)
+                  return (
+                    <div key={item.id} className="rounded-[22px] border border-border bg-background p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap items-center gap-2 text-sm">
+                            <span className="font-semibold">{item.user.displayName}</span>
+                            <span className="text-muted-foreground">@{item.user.username}</span>
+                            <span className="rounded-full px-2 py-0.5 text-[10px]" style={{ color: item.type.color, backgroundColor: `${item.type.color}12` }}>{item.type.name}</span>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="mt-3 rounded-[18px] bg-secondary/30 p-3 text-sm leading-7 text-foreground/90">{item.content}</div>
-                    )}
-                    <div className="mt-3 grid gap-3 md:grid-cols-2">
-                      <textarea
-                        value={reviewMessage[item.id] ?? item.note ?? ""}
-                        onChange={(event) => setReviewMessage((current) => ({ ...current, [item.id]: event.target.value }))}
-                        placeholder="审核备注（可选）"
-                        className="min-h-[88px] rounded-[18px] border border-border bg-background px-4 py-3 text-sm outline-none transition-colors focus:border-foreground/30"
-                      />
-                      <textarea
-                        value={reviewRejectReason[item.id] ?? item.rejectReason ?? ""}
-                        onChange={(event) => setReviewRejectReason((current) => ({ ...current, [item.id]: event.target.value }))}
-                        placeholder="驳回原因（驳回时必填）"
-                        className="min-h-[88px] rounded-[18px] border border-border bg-background px-4 py-3 text-sm outline-none transition-colors focus:border-foreground/30"
-                      />
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Button type="button" className="gap-2 rounded-full" disabled={isPending} onClick={() => reviewApplication(item.id, "APPROVED")}>
-                        <ShieldCheck className="h-4 w-4" />
-                        通过
-                      </Button>
-                      <Button type="button" variant="outline" className="gap-2 rounded-full" disabled={isPending} onClick={() => reviewApplication(item.id, "REJECTED")}>
-                        <XCircle className="h-4 w-4" />
-                        驳回
-                      </Button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            {handledApplications.length > 0 ? (
-              <div className="mt-6 border-t border-border pt-4">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <ShieldQuestion className="h-4 w-4" />
-                  最近处理记录
-                </div>
-                <div className="mt-3 space-y-3">
-                  {handledApplications.slice(0, 12).map((item) => (
-                    <div key={item.id} className="rounded-[18px] border border-border bg-secondary/20 p-3 text-sm">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium">{item.user.displayName}</span>
-                          <span className="text-muted-foreground">{item.type.name}</span>
+                          <p className="text-xs text-muted-foreground">提交时间：{formatDateTime(item.submittedAt)}</p>
                         </div>
-                        <span className={item.status === "APPROVED" ? "rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] text-emerald-700" : item.status === "REJECTED" ? "rounded-full bg-rose-100 px-2.5 py-1 text-[11px] text-rose-700" : "rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600"}>{item.status === "APPROVED" ? "已通过" : item.status === "REJECTED" ? "已驳回" : "已取消"}</span>
+                        <span className="rounded-full bg-amber-100 px-3 py-1 text-xs text-amber-700">待审核</span>
                       </div>
-                      <p className="mt-1 text-xs text-muted-foreground">处理时间：{item.reviewedAt ? new Date(item.reviewedAt).toLocaleString() : "-"}{item.reviewer ? ` · 审核人 ${item.reviewer.displayName}` : ""}</p>
+
+                      {formEntries.length > 0 ? (
+                        <div className="mt-3 grid gap-2 md:grid-cols-2">
+                          {formEntries.map((entry) => (
+                            <div key={entry.key} className="rounded-[18px] bg-secondary/30 p-3 text-sm">
+                              <p className="text-xs text-muted-foreground">{entry.key}</p>
+                              <p className="mt-1 break-all leading-7 text-foreground/90">{entry.value || "-"}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="mt-3 rounded-[18px] bg-secondary/30 p-3 text-sm leading-7 text-foreground/90">{item.content}</div>
+                      )}
+                      {item.customDescription ? (
+                        <div className="mt-3 rounded-[18px] bg-secondary/30 p-3 text-sm">
+                          <p className="text-xs text-muted-foreground">个性描述</p>
+                          <p className="mt-1 leading-7 text-foreground/90">{item.customDescription}</p>
+                        </div>
+                      ) : null}
+                      <div className="mt-3 grid gap-3 md:grid-cols-2">
+                        <textarea
+                          value={reviewMessage[item.id] ?? item.note ?? ""}
+                          onChange={(event) => setReviewMessage((current) => ({ ...current, [item.id]: event.target.value }))}
+                          placeholder="审核备注（可选）"
+                          className="min-h-[88px] rounded-[18px] border border-border bg-background px-4 py-3 text-sm outline-none transition-colors focus:border-foreground/30"
+                        />
+                        <textarea
+                          value={reviewRejectReason[item.id] ?? item.rejectReason ?? ""}
+                          onChange={(event) => setReviewRejectReason((current) => ({ ...current, [item.id]: event.target.value }))}
+                          placeholder="驳回原因（驳回时必填）"
+                          className="min-h-[88px] rounded-[18px] border border-border bg-background px-4 py-3 text-sm outline-none transition-colors focus:border-foreground/30"
+                        />
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button type="button" className="gap-2 rounded-full" disabled={isPending} onClick={() => reviewApplication(item.id, "APPROVED")}>
+                          <ShieldCheck className="h-4 w-4" />
+                          通过
+                        </Button>
+                        <Button type="button" variant="outline" className="gap-2 rounded-full" disabled={isPending} onClick={() => reviewApplication(item.id, "REJECTED")}>
+                          <XCircle className="h-4 w-4" />
+                          驳回
+                        </Button>
+                      </div>
                     </div>
-                  ))}
-                </div>
+                  )
+                })}
               </div>
-            ) : null}
-          </div>
+
+              {handledApplications.length > 0 ? (
+                <div className="mt-6 border-t border-border pt-4">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <ShieldQuestion className="h-4 w-4" />
+                    最近处理记录
+                  </div>
+                  <div className="mt-3 space-y-3">
+                    {handledApplications.slice(0, 12).map((item) => (
+                      <div key={item.id} className="rounded-[18px] border border-border bg-secondary/20 p-3 text-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-medium">{item.user.displayName}</span>
+                            <span className="text-muted-foreground">{item.type.name}</span>
+                          </div>
+                          <span className={item.status === "APPROVED" ? "rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] text-emerald-700" : item.status === "REJECTED" ? "rounded-full bg-rose-100 px-2.5 py-1 text-[11px] text-rose-700" : "rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600"}>{item.status === "APPROVED" ? "已通过" : item.status === "REJECTED" ? "已驳回" : "已取消"}</span>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">处理时间：{item.reviewedAt ? formatDateTime(item.reviewedAt) : "-"}{item.reviewer ? ` · 审核人 ${item.reviewer.displayName}` : ""}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {feedback ? <p className="mt-4 text-sm text-muted-foreground">{feedback}</p> : null}
+            </div>
+          ) : null}
         </section>
       </div>
     </div>
@@ -567,18 +587,41 @@ function CheckItem({ checked, onChange, label }: { checked: boolean; onChange: (
 }
 
 function ColorField({ color, onChange }: { color: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const normalizedColor = normalizeHexColor(color, "#2563eb")
+
   return (
-    <div className="space-y-2">
+    <div className="relative space-y-2">
       <span className="text-sm font-medium">主题色</span>
-      <div className="flex items-center gap-2 rounded-[18px] border border-border bg-background px-3 py-2.5">
-        <input type="color" value={normalizeColor(color)} onChange={(event) => onChange(event.target.value)} className="h-8 w-10 cursor-pointer rounded-lg border border-border bg-background p-0.5" aria-label="选择认证主题色" />
-        <input value={color} onChange={(event) => onChange(event.target.value)} className="h-8 w-28 rounded-full border border-border bg-background px-3 text-xs outline-none" />
-        <div className="ml-auto flex flex-wrap items-center gap-1.5">
-          {COLOR_PRESETS.map((preset) => (
-            <button key={preset} type="button" className="h-6 w-6 rounded-full border border-border" style={{ backgroundColor: preset }} onClick={() => onChange(preset)} aria-label={`使用颜色 ${preset}`} />
-          ))}
+      <PickerTriggerField value={color || normalizedColor} previewColor={color || normalizedColor} fallbackColor="#2563eb" onClick={() => setOpen((current) => !current)} />
+      {open ? (
+        <div className="absolute left-0 top-full z-20 mt-2 w-[280px]">
+          <PickerPopover title="选择认证主题色" onClose={() => setOpen(false)}>
+            <div className="flex items-center gap-2">
+              <input type="color" value={normalizedColor} onChange={(event) => onChange(event.target.value)} className="h-8 w-10 cursor-pointer rounded-lg border border-border bg-background p-0.5" aria-label="选择认证主题色" />
+              <input value={color} onChange={(event) => onChange(event.target.value)} className="h-8 w-28 rounded-full border border-border bg-background px-3 text-xs outline-none" />
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              {COLOR_PRESETS.map((preset) => {
+                const active = normalizedColor.toLowerCase() === preset.toLowerCase()
+                return (
+                  <button
+                    key={preset}
+                    type="button"
+                    className={active ? "h-7 w-7 rounded-full ring-2 ring-foreground/20 ring-offset-1 ring-offset-background" : "h-7 w-7 rounded-full border border-border"}
+                    style={{ backgroundColor: preset }}
+                    onClick={() => {
+                      onChange(preset)
+                      setOpen(false)
+                    }}
+                    aria-label={`使用颜色 ${preset}`}
+                  />
+                )
+              })}
+            </div>
+          </PickerPopover>
         </div>
-      </div>
+      ) : null}
     </div>
   )
 }

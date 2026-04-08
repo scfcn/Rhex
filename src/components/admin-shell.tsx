@@ -1,4 +1,4 @@
-import { Settings, ShieldAlert, Flag, LayoutGrid, Settings2, Sparkles, Users, BookText, Logs, Megaphone, AppWindow } from "lucide-react"
+import { Settings, ShieldAlert, Flag, LayoutGrid, Settings2, Sparkles, Users, BookText, Logs, Megaphone, AppWindow, MessageSquare } from "lucide-react"
 import Link from "next/link"
 import type { CSSProperties } from "react"
 
@@ -9,6 +9,7 @@ export const adminNavigation = [
   { href: "/admin", label: "总览", icon: LayoutGrid },
   { href: "/admin?tab=users", label: "用户管理", icon: Users },
   { href: "/admin?tab=posts", label: "帖子管理", icon: BookText },
+  { href: "/admin?tab=comments", label: "评论管理", icon: MessageSquare },
   { href: "/admin?tab=structure", label: "版块管理", icon: Settings2 },
   { href: "/admin?tab=levels", label: "等级系统", icon: Sparkles },
   { href: "/admin?tab=badges", label: "勋章系统", icon: Sparkles },

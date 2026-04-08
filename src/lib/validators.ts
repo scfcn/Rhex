@@ -158,6 +158,7 @@ export function validatePostPayload(body: unknown, options: PostPayloadValidatio
   bountyPoints: number | null
   pollOptions: string[]
   commentsVisibleToAuthorOnly: boolean
+  loginUnlockContent: string
   replyUnlockContent: string
   replyThreshold: number | null
   purchaseUnlockContent: string
@@ -176,6 +177,7 @@ export function validatePostPayload(body: unknown, options: PostPayloadValidatio
 
   const rawBountyPoints = parsePositiveSafeInteger(getField(body, "bountyPoints") ?? 0) ?? 0
   const commentsVisibleToAuthorOnly = Boolean(getField(body, "commentsVisibleToAuthorOnly"))
+  const loginUnlockContent = normalizeString(getField(body, "loginUnlockContent"))
   const replyUnlockContent = normalizeString(getField(body, "replyUnlockContent"))
   const rawReplyThreshold = parsePositiveSafeInteger(getField(body, "replyThreshold") ?? 1) ?? 1
   const purchaseUnlockContent = normalizeString(getField(body, "purchaseUnlockContent"))
@@ -220,7 +222,7 @@ export function validatePostPayload(body: unknown, options: PostPayloadValidatio
     return { success: false, message: "封面地址不能超过 500 个字符" }
   }
 
-  if (replyUnlockContent.length > 20000 || purchaseUnlockContent.length > 20000) {
+  if (loginUnlockContent.length > 20000 || replyUnlockContent.length > 20000 || purchaseUnlockContent.length > 20000) {
     return { success: false, message: "隐藏内容不能超过 20000 个字符" }
   }
 
@@ -281,6 +283,7 @@ export function validatePostPayload(body: unknown, options: PostPayloadValidatio
       bountyPoints: postType === "BOUNTY" ? rawBountyPoints : null,
       pollOptions: postType === "POLL" ? pollOptions : [],
       commentsVisibleToAuthorOnly,
+      loginUnlockContent,
       replyUnlockContent,
       replyThreshold: replyUnlockContent ? rawReplyThreshold : null,
       purchaseUnlockContent,

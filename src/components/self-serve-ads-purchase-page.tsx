@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react"
 import Link from "next/link"
 
+import { PickerPopover, PickerTriggerField, normalizeHexColor } from "@/components/admin-picker-popover"
 import { Button } from "@/components/ui/button"
 import { showConfirm } from "@/components/ui/confirm-dialog"
 import { toast } from "@/components/ui/toast"
@@ -125,12 +126,12 @@ export function SelfServeAdsPurchasePage({ slotType, slotIndex, pointName, price
           </div>
         )}
 
-        <Field label="购买时长" hint={`当前价格：${currentPrice} ${pointName}`}>
+        <Field label="购买时长" hint={`当前价格：${currentPrice} ${pointName}`} useLabel={false}>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
             {SELF_SERVE_AD_DURATION_OPTIONS.map((option) => {
               const active = option.months === form.durationMonths
               return (
-                <button key={option.months} type="button" onClick={() => updateForm("durationMonths", option.months)} className={active ? "rounded-[14px] border border-foreground bg-accent px-2.5 py-2.5 text-xs font-medium text-foreground" : "rounded-[14px] border border-border bg-background px-2.5 py-2.5 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground"}>
+                <button key={option.months} type="button" onClick={() => updateForm("durationMonths", option.months)} className={active ? "rounded-[14px] border border-foreground bg-foreground px-2.5 py-2.5 text-xs font-medium text-background shadow-sm" : "rounded-[14px] border border-border bg-background px-2.5 py-2.5 text-xs text-muted-foreground transition hover:border-foreground/20 hover:bg-accent hover:text-foreground"}>
                   <div>{option.label}</div>
                   <div className="mt-1 text-[11px]">{prices[slotType][option.months]} {pointName}</div>
                 </button>
@@ -154,9 +155,11 @@ export function SelfServeAdsPurchasePage({ slotType, slotIndex, pointName, price
   )
 }
 
-function Field({ label, hint, error, meta, children, className = "" }: { label: string; hint: string; error?: string; meta?: string; children: React.ReactNode; className?: string }) {
+function Field({ label, hint, error, meta, children, className = "", useLabel = true }: { label: string; hint: string; error?: string; meta?: string; children: React.ReactNode; className?: string; useLabel?: boolean }) {
+  const Container = useLabel ? "label" : "div"
+
   return (
-    <label className={`block space-y-1.5 text-sm ${className}`.trim()}>
+    <Container className={`block space-y-1.5 text-sm ${className}`.trim()}>
       <span className="flex items-center justify-between gap-3">
         <span className="font-medium text-foreground">{label}</span>
         {meta ? <span className="text-[11px] text-muted-foreground">{meta}</span> : null}
@@ -164,7 +167,7 @@ function Field({ label, hint, error, meta, children, className = "" }: { label: 
       <p className="text-[11px] leading-5 text-muted-foreground">{hint}</p>
       {children}
       {error ? <p className="text-[11px] leading-5 text-destructive">{error}</p> : null}
-    </label>
+    </Container>
   )
 }
 
@@ -173,14 +176,41 @@ function getInputClassName(hasError: boolean) {
 }
 
 function ColorPicker({ label, value, presets, onChange }: { label: string; value: string; presets: readonly string[]; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const normalizedValue = normalizeHexColor(value, presets[0] ?? "#0f172a")
+
   return (
-    <div className="space-y-1.5">
+    <div className="relative space-y-1.5">
       <p className="text-xs font-medium">{label}</p>
-      <div className="flex flex-wrap items-center gap-2">
-        <input type="color" value={value} onChange={(event) => onChange(event.target.value)} className="h-9 w-10 rounded-lg border border-border bg-background p-1" />
-        <input value={value} onChange={(event) => onChange(event.target.value)} className="h-9 w-24 rounded-full border border-border bg-background px-3 text-xs outline-none" />
-        {presets.map((preset) => <button key={`${label}-${preset}`} type="button" className="h-6 w-6 rounded-full border border-border" style={{ backgroundColor: preset }} onClick={() => onChange(preset)} />)}
-      </div>
+      <PickerTriggerField value={value || normalizedValue} previewColor={value || normalizedValue} fallbackColor={presets[0] ?? "#0f172a"} onClick={() => setOpen((current) => !current)} />
+      {open ? (
+        <div className="absolute left-0 top-full z-20 mt-2 w-[280px]">
+          <PickerPopover title={`选择${label}`} onClose={() => setOpen(false)}>
+            <div className="flex items-center gap-2">
+              <input type="color" value={normalizedValue} onChange={(event) => onChange(event.target.value)} className="h-8 w-10 cursor-pointer rounded-lg border border-border bg-background p-0.5" aria-label={`选择${label}`} />
+              <input value={value} onChange={(event) => onChange(event.target.value)} className="h-8 w-28 rounded-full border border-border bg-background px-3 text-xs outline-none" />
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              {presets.map((preset) => {
+                const active = normalizedValue.toLowerCase() === preset.toLowerCase()
+                return (
+                  <button
+                    key={`${label}-${preset}`}
+                    type="button"
+                    className={active ? "h-7 w-7 rounded-full ring-2 ring-foreground/20 ring-offset-1 ring-offset-background" : "h-7 w-7 rounded-full border border-border"}
+                    style={{ backgroundColor: preset }}
+                    onClick={() => {
+                      onChange(preset)
+                      setOpen(false)
+                    }}
+                    aria-label={`使用颜色 ${preset}`}
+                  />
+                )
+              })}
+            </div>
+          </PickerPopover>
+        </div>
+      ) : null}
     </div>
   )
 }

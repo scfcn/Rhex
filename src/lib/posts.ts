@@ -68,6 +68,8 @@ export interface SitePostItem {
     name: string
     color: string
     iconText?: string | null
+    description?: string | null
+    customDescription?: string | null
   } | null
   authorDisplayedBadges?: Array<{
     id: string
@@ -86,7 +88,7 @@ export interface SitePostItem {
   commentsVisibleToAuthorOnly?: boolean
   contentBlocks?: Array<{
     id: string
-    type: "PUBLIC" | "AUTHOR_ONLY" | "REPLY_UNLOCK" | "PURCHASE_UNLOCK"
+    type: "PUBLIC" | "AUTHOR_ONLY" | "LOGIN_UNLOCK" | "REPLY_UNLOCK" | "PURCHASE_UNLOCK"
     text: string
     visible: boolean
     replyThreshold?: number
@@ -199,6 +201,7 @@ function mapPostDetail(
     const replyUnlocked = isOwner || isAdmin || replyCount >= (block.replyThreshold ?? 1)
     const visible = block.type === "PUBLIC"
       || (block.type === "AUTHOR_ONLY" && (isOwner || isAdmin))
+      || (block.type === "LOGIN_UNLOCK" && (Boolean(currentUserId) || isOwner || isAdmin))
       || (block.type === "REPLY_UNLOCK" && replyUnlocked)
       || (block.type === "PURCHASE_UNLOCK" && (purchasedBlockIds.has(block.id) || isOwner || isAdmin))
 

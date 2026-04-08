@@ -91,6 +91,7 @@ export default async function BoardPage(props: PageProps<"/boards/[slug]">) {
     minPostVipLevel: board.minPostVipLevel ?? 0,
     minReplyVipLevel: board.minReplyVipLevel ?? 0,
     requirePostReview: board.requirePostReview ?? false,
+    requireCommentReview: board.requireCommentReview ?? false,
   }, "view")
 
   const rawPage = readSearchParam(searchParams?.page)
@@ -190,7 +191,7 @@ export default async function BoardPage(props: PageProps<"/boards/[slug]">) {
           )}
           rightSidebar={(
             <aside className="mt-6 hidden pb-12 lg:block">
-              <BoardSidebarPanels user={sidebarUser} hotTopics={hotTopics} board={board} moderators={moderators} postLinkDisplayMode={settings.postLinkDisplayMode} createPostHref={`/write?board=${board.slug}`} siteName={settings.siteName} siteDescription={settings.siteDescription} />
+              <BoardSidebarPanels user={sidebarUser} hotTopics={hotTopics} board={board} moderators={moderators} postLinkDisplayMode={settings.postLinkDisplayMode} createPostHref={`/write?board=${board.slug}`} siteName={settings.siteName} siteDescription={settings.siteDescription} siteLogoPath={settings.siteLogoPath} />
             </aside>
           )}
         />
@@ -198,4 +199,3 @@ export default async function BoardPage(props: PageProps<"/boards/[slug]">) {
     </div>
   )
 }
-

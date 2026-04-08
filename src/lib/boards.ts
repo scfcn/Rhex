@@ -29,6 +29,7 @@ export interface SiteBoardItem {
   count: number
   allowedPostTypes?: string[]
   requirePostReview?: boolean
+  requireCommentReview?: boolean
   minViewPoints?: number
   minViewLevel?: number
   minPostPoints?: number
@@ -64,6 +65,7 @@ const getCachedBoards = cache(async (): Promise<SiteBoardItem[]> => {
       count: board._count.posts,
       allowedPostTypes: settings.allowedPostTypes,
       requirePostReview: settings.requirePostReview,
+      requireCommentReview: settings.requireCommentReview,
       minViewPoints: settings.minViewPoints,
       minViewLevel: settings.minViewLevel,
       minPostPoints: settings.minPostPoints,
@@ -110,6 +112,7 @@ const getCachedBoardBySlug = cache(async (slug: string): Promise<SiteBoardItem |
     rulesMarkdown: sidebarConfig.rulesMarkdown,
     count: board._count.posts,
     allowedPostTypes: settings.allowedPostTypes,
+    requireCommentReview: settings.requireCommentReview,
     minViewPoints: settings.minViewPoints,
     minViewLevel: settings.minViewLevel,
     minPostPoints: settings.minPostPoints,

@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 import { AdminAnnouncementManager } from "@/components/admin-announcement-manager"
 import { AdminAppsSettingsForm } from "@/components/admin-apps-settings-form"
 import { AdminModuleSearch } from "@/components/admin-module-search"
+import { AdminPillTabs } from "@/components/admin-pill-tabs"
 import { AdminFooterLinksSettingsForm } from "@/components/admin-footer-links-settings-form"
 import { AdminFriendLinksSettingsForm } from "@/components/admin-friend-links-settings-form"
 import { AdminBadgeManager } from "@/components/admin-badge-manager"
@@ -17,6 +18,7 @@ import { AdminVerificationManager } from "@/components/admin-verification-manage
 import { AdminLevelSettingsForm } from "@/components/admin-level-settings-form"
 import { AdminLogCenter } from "@/components/admin-log-center"
 import { AdminMarkdownEmojiSettingsForm } from "@/components/admin-markdown-emoji-settings-form"
+import { AdminCommentList } from "@/components/admin-comment-list"
 import { AdminPostList } from "@/components/admin-post-list"
 import { AdminReportCenter } from "@/components/admin-report-center"
 import { AdminSensitiveWordManager } from "@/components/admin-sensitive-word-manager"
@@ -27,7 +29,7 @@ import { AdminShell, adminNavigation } from "@/components/admin-shell"
 import { AdminUserList } from "@/components/admin-user-list"
 import { AdminVipSettingsForm } from "@/components/admin-vip-settings-form"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { getAdminDashboardData, getAdminPosts, getAdminStructureData } from "@/lib/admin"
+import { getAdminComments, getAdminDashboardData, getAdminPosts, getAdminStructureData } from "@/lib/admin"
 import { getAdminAnnouncementList } from "@/lib/admin-announcements"
 import { getVerificationAdminData } from "@/lib/admin-verification-service"
 import { isLocalPostType } from "@/lib/post-types"
@@ -46,10 +48,11 @@ import { readSearchParam } from "@/lib/search-params"
 import { getSensitiveWordPage, getServerSiteSettings } from "@/lib/site-settings"
 import { requireAdminActor } from "@/lib/moderator-permissions"
 
-type AdminTabKey = "overview" | "users" | "posts" | "structure" | "board-applications" | "levels" | "badges" | "verifications" | "announcements" | "reports" | "logs" | "security" | "settings"
+type AdminTabKey = "overview" | "users" | "posts" | "comments" | "structure" | "board-applications" | "levels" | "badges" | "verifications" | "announcements" | "reports" | "logs" | "security" | "settings"
 type AdminSettingsSectionKey = "profile" | "markdown-emoji" | "footer-links" | "apps" | "registration" | "board-applications" | "interaction" | "friend-links" | "invite-codes" | "redeem-codes" | "vip" | "upload"
+type AdminVerificationSubTabKey = "types" | "reviews"
 
-const adminTabs: AdminTabKey[] = ["overview", "users", "posts", "structure", "board-applications", "levels", "badges", "verifications", "announcements", "reports", "logs", "security", "settings"]
+const adminTabs: AdminTabKey[] = ["overview", "users", "posts", "comments", "structure", "board-applications", "levels", "badges", "verifications", "announcements", "reports", "logs", "security", "settings"]
 const adminSettingsSections: AdminSettingsSectionKey[] = ["profile", "markdown-emoji", "footer-links", "apps", "registration", "board-applications", "interaction", "friend-links", "invite-codes", "redeem-codes", "vip", "upload"]
 const sectionsRequiringSiteSettings = new Set<AdminSettingsSectionKey>(["profile", "markdown-emoji", "footer-links", "apps", "registration", "board-applications", "interaction", "vip", "upload"])
 
@@ -57,6 +60,7 @@ const tabLabels: Record<AdminTabKey, string> = {
   overview: "总览",
   users: "用户管理",
   posts: "帖子管理",
+  comments: "评论管理",
   structure: "版块管理",
   "board-applications": "节点申请",
   levels: "等级系统",
@@ -72,7 +76,7 @@ const tabLabels: Record<AdminTabKey, string> = {
 function getAllowedAdminTabs(role: "ADMIN" | "MODERATOR") {
   return role === "ADMIN"
     ? adminTabs
-    : (["posts", "structure"] satisfies AdminTabKey[])
+    : (["posts", "comments", "structure"] satisfies AdminTabKey[])
 }
 
 export async function generateMetadata(props: PageProps<"/admin">): Promise<Metadata> {
@@ -111,6 +115,8 @@ export default async function AdminPage(props: PageProps<"/admin">) {
     ? ((currentSettingsSectionValue as AdminSettingsSectionKey) ?? "profile")
     : "profile"
   const currentSettingsSubTab = readSearchParam(searchParams?.subTab) ?? ""
+  const currentVerificationSubTabValue = readSearchParam(searchParams?.verificationSubTab)
+  const currentVerificationSubTab: AdminVerificationSubTabKey = currentVerificationSubTabValue === "reviews" ? "reviews" : "types"
 
   if (tab === "settings" && admin.role === "ADMIN") {
     if (currentSettingsSection === "invite-codes") {
@@ -132,6 +138,15 @@ export default async function AdminPage(props: PageProps<"/admin">) {
   const currentPostReview = readSearchParam(searchParams?.review) ?? "ALL"
   const currentPostPage = readSearchParam(searchParams?.postPage) ?? "1"
   const currentPostPageSize = readSearchParam(searchParams?.postPageSize) ?? "20"
+  const currentCommentStatusValue = readSearchParam(searchParams?.status)
+  const currentCommentStatus = currentCommentStatusValue === "PENDING" || currentCommentStatusValue === "NORMAL" || currentCommentStatusValue === "HIDDEN" ? currentCommentStatusValue : "ALL"
+  const currentCommentBoardSlug = readSearchParam(searchParams?.board) ?? ""
+  const currentCommentKeyword = readSearchParam(searchParams?.keyword) ?? ""
+  const currentCommentSort = readSearchParam(searchParams?.sort) ?? "newest"
+  const currentCommentReview = readSearchParam(searchParams?.review) ?? "ALL"
+  const currentCommentType = readSearchParam(searchParams?.type) ?? "ALL"
+  const currentCommentPage = readSearchParam(searchParams?.commentPage) ?? "1"
+  const currentCommentPageSize = readSearchParam(searchParams?.commentPageSize) ?? "20"
   const currentReportPage = readSearchParam(searchParams?.reportPage) ?? "1"
   const currentReportPageSize = readSearchParam(searchParams?.reportPageSize) ?? "20"
   const currentSecurityPage = readSearchParam(searchParams?.securityPage) ?? "1"
@@ -160,10 +175,10 @@ export default async function AdminPage(props: PageProps<"/admin">) {
       return true
     }
 
-    return item.href === "/admin?tab=posts" || item.href === "/admin?tab=structure"
+    return item.href === "/admin?tab=posts" || item.href === "/admin?tab=comments" || item.href === "/admin?tab=structure"
   })
 
-  const [dashboardData, structureData, siteSettings, adminUsers, filteredPosts, levelDefinitions, badges, announcements, inviteCodes, redeemCodes, reports, sensitiveWordResult, logCenter, friendLinks, verificationAdminData] = await Promise.all([
+  const [dashboardData, structureData, siteSettings, adminUsers, filteredPosts, filteredComments, levelDefinitions, badges, announcements, inviteCodes, redeemCodes, reports, sensitiveWordResult, logCenter, friendLinks, verificationAdminData] = await Promise.all([
     admin.role === "ADMIN" && tab === "overview"
       ? getAdminDashboardData()
       : Promise.resolve<Awaited<ReturnType<typeof getAdminDashboardData>> | null>(null),
@@ -199,6 +214,18 @@ export default async function AdminPage(props: PageProps<"/admin">) {
         pageSize: Number(currentPostPageSize),
       })
       : Promise.resolve<Awaited<ReturnType<typeof getAdminPosts>> | null>(null),
+    tab === "comments"
+      ? getAdminComments({
+        status: currentCommentStatus,
+        boardSlug: currentCommentBoardSlug || undefined,
+        keyword: currentCommentKeyword || undefined,
+        sort: currentCommentSort,
+        review: currentCommentReview,
+        type: currentCommentType,
+        page: Number(currentCommentPage),
+        pageSize: Number(currentCommentPageSize),
+      })
+      : Promise.resolve<Awaited<ReturnType<typeof getAdminComments>> | null>(null),
     admin.role === "ADMIN" && tab === "levels" ? getLevelDefinitions() : Promise.resolve<Awaited<ReturnType<typeof getLevelDefinitions>>>([]),
     admin.role === "ADMIN" && tab === "badges" ? getAllBadges() : Promise.resolve<Awaited<ReturnType<typeof getAllBadges>>>([]),
     admin.role === "ADMIN" && tab === "announcements" ? getAdminAnnouncementList() : Promise.resolve<Awaited<ReturnType<typeof getAdminAnnouncementList>>>([]),
@@ -325,11 +352,12 @@ export default async function AdminPage(props: PageProps<"/admin">) {
                 </CardHeader>
                 <CardContent className="grid gap-2 pt-0 sm:grid-cols-2">
                   <PendingReviewCard href="/admin?tab=board-applications" title="待审核节点" value={dashboardData!.overview.pendingBoardApplicationCount} description="审核用户提交的节点申请与分区归属" icon={<LayoutGrid className="h-3.5 w-3.5" />} />
-                  <PendingReviewCard href="/admin?tab=verifications" title="待认证审核" value={dashboardData!.overview.pendingVerificationCount} description="处理用户身份与资质认证申请" icon={<CheckCircle2 className="h-3.5 w-3.5" />} />
+                  <PendingReviewCard href="/admin?tab=verifications&verificationSubTab=reviews" title="待认证审核" value={dashboardData!.overview.pendingVerificationCount} description="处理用户身份与资质认证申请" icon={<CheckCircle2 className="h-3.5 w-3.5" />} />
                   <PendingReviewCard href="/admin?tab=settings&section=friend-links" title="友情链接审核" value={dashboardData!.overview.pendingFriendLinkCount} description="审核站点互链申请与展示资料" icon={<Shield className="h-3.5 w-3.5" />} />
                   <PendingReviewCard href="/admin/apps/self-serve-ads" title="广告审核" value={dashboardData!.overview.pendingAdOrderCount} description="审核自助推广广告位申请内容" icon={<Megaphone className="h-3.5 w-3.5" />} />
                   <PendingReviewCard href="/admin?tab=reports" title="举报待处理" value={dashboardData!.overview.pendingReportCount} description="社区风险内容与违规行为处置" icon={<AlertTriangle className="h-3.5 w-3.5" />} />
                   <PendingReviewCard href="/admin?tab=posts&status=PENDING" title="待审核帖子" value={dashboardData!.overview.pendingPostCount} description="人工复核待发布内容" icon={<FileText className="h-3.5 w-3.5" />} />
+                  <PendingReviewCard href="/admin?tab=comments&status=PENDING" title="待审核评论" value={dashboardData!.overview.pendingCommentCount} description="处理命中规则或待人工复核的评论" icon={<MessageSquare className="h-3.5 w-3.5" />} />
                 </CardContent>
               </Card>
             </div>
@@ -392,9 +420,22 @@ export default async function AdminPage(props: PageProps<"/admin">) {
         ) : null}
 
         {admin.role === "ADMIN" && tab === "settings" ? <AdminSettingsTabs currentSection={currentSettingsSection} /> : null}
+        {admin.role === "ADMIN" && tab === "verifications" ? (
+          <div className="rounded-[22px] border border-border bg-card p-3">
+            <AdminPillTabs
+              items={[
+                { key: "types", label: "认证类型", href: "/admin?tab=verifications&verificationSubTab=types" },
+                { key: "reviews", label: "认证审核", href: "/admin?tab=verifications&verificationSubTab=reviews" },
+              ]}
+              activeKey={currentVerificationSubTab}
+              inactiveStyle="outlined"
+            />
+          </div>
+        ) : null}
 
         {tab === "users" ? <AdminUserList data={adminUsers!} /> : null}
         {tab === "posts" ? <AdminPostList data={filteredPosts!} /> : null}
+        {tab === "comments" ? <AdminCommentList data={filteredComments!} /> : null}
         {tab === "structure" ? <StructureManager zones={structureData!.zones} boards={structureData!.boardStatus} permissions={structureData!.permissions} canReviewBoardApplications={structureData!.canReviewBoardApplications} pendingBoardApplicationCount={structureData!.boardApplications.filter((item) => item.status === "PENDING").length} initialFilters={{ keyword: currentStructureKeyword, zoneId: currentStructureZoneId, boardStatus: currentStructureBoardStatus, posting: currentStructurePosting }} /> : null}
         {tab === "board-applications" ? <AdminBoardApplicationManager zones={structureData!.zones} boardApplications={structureData!.boardApplications} canReviewBoardApplications={structureData!.canReviewBoardApplications} /> : null}
         {tab === "levels" ? <AdminLevelSettingsForm initialLevels={levelDefinitions} /> : null}
@@ -436,7 +477,7 @@ export default async function AdminPage(props: PageProps<"/admin">) {
             status: effect.status,
           })),
         }))} /> : null}
-        {tab === "verifications" ? <AdminVerificationManager initialTypes={verificationAdminData!.types} initialApplications={verificationAdminData!.applications.map((item) => ({
+        {tab === "verifications" ? <AdminVerificationManager mode={currentVerificationSubTab} initialTypes={verificationAdminData!.types} initialApplications={verificationAdminData!.applications.map((item) => ({
           ...item,
           type: {
             ...item.type,
@@ -659,7 +700,7 @@ function getTrendPeak(data: Array<{ date: string; userCount: number; postCount: 
 }
 
 function formatChartDate(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", { month: "2-digit", day: "2-digit" }).format(new Date(value))
+  return value.slice(5, 10)
 }
 
 function getOverviewMetricValueClassName(tone: "default" | "rose" | "amber" | "emerald" | "slate" = "default") {

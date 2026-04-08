@@ -44,10 +44,11 @@ export const POST = createRouteHandler(async ({ request }) => {
   return withRequestWriteGuard({
     request,
     scope: "auth-forgot-password-send-code",
-    cooldownMs: 60_000,
-    cooldownMessage: "验证码发送过于频繁，请稍后再试",
+    cooldownMs: 15_000,
+    cooldownMessage: "验证码已发送，如未收到请 15 秒后重试",
     dedupeKey: email,
-    dedupeWindowMs: 60_000,
+    dedupeWindowMs: 3_000,
+    releaseOnError: true,
   }, async () => {
     const result = await sendPasswordResetCode({
       email,

@@ -11,6 +11,7 @@ import {
   findAdminUserPointLogs,
   findAdminUserUploads,
 } from "@/db/admin-user-detail-queries"
+import { findAdminBadgeOptions } from "@/db/badge-queries"
 import { apiError } from "@/lib/api-route"
 import type { AdminUserDetailLogItem, AdminUserDetailLogSection, AdminUserDetailResult } from "@/lib/admin-user-management"
 import { resolvePointLogAuditPresentation } from "@/lib/point-log-audit"
@@ -47,8 +48,9 @@ export async function getAdminUserDetail(userId: number): Promise<AdminUserDetai
     apiError(403, "无权限访问用户详情")
   }
 
-  const [user, loginTotal, loginLogs, checkInTotal, checkInLogs, pointTotal, pointLogs, uploadTotal, uploads, adminActionTotal, adminActionLogs] = await Promise.all([
+  const [user, availableBadges, loginTotal, loginLogs, checkInTotal, checkInLogs, pointTotal, pointLogs, uploadTotal, uploads, adminActionTotal, adminActionLogs] = await Promise.all([
     findAdminUserDetailById(userId),
+    findAdminBadgeOptions(),
     countAdminUserLoginLogs(userId),
     findAdminUserLoginLogs(userId),
     countAdminUserCheckInLogs(userId),
@@ -204,6 +206,7 @@ export async function getAdminUserDetail(userId: number): Promise<AdminUserDetai
       zoneName: scope.zone.name,
       zoneSlug: scope.zone.slug,
       canEditSettings: scope.canEditSettings,
+      canWithdrawTreasury: scope.canWithdrawTreasury,
     })),
     moderatedBoardScopes: user.moderatedBoardScopes.map((scope) => ({
       boardId: scope.boardId,
@@ -213,6 +216,30 @@ export async function getAdminUserDetail(userId: number): Promise<AdminUserDetai
       zoneName: scope.board.zone?.name ?? null,
       zoneSlug: scope.board.zone?.slug ?? null,
       canEditSettings: scope.canEditSettings,
+      canWithdrawTreasury: scope.canWithdrawTreasury,
+    })),
+    availableBadges: availableBadges.map((badge) => ({
+      id: badge.id,
+      name: badge.name,
+      iconText: badge.iconText,
+      color: badge.color,
+      category: badge.category,
+      status: badge.status,
+      isHidden: badge.isHidden,
+      grantedUserCount: badge._count.users,
+    })),
+    grantedBadges: user.userBadges.map((item) => ({
+      badgeId: item.badgeId,
+      name: item.badge.name,
+      iconText: item.badge.iconText,
+      color: item.badge.color,
+      category: item.badge.category,
+      status: item.badge.status,
+      isHidden: item.badge.isHidden,
+      isDisplayed: item.isDisplayed,
+      displayOrder: item.displayOrder,
+      grantSource: item.grantSource,
+      grantedAt: item.grantedAt.toISOString(),
     })),
     logSections,
   }

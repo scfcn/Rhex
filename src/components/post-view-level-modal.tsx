@@ -54,8 +54,8 @@ function PostViewLevelModalBody({ initialValue, levelOptions, vipLevelOptions, o
     <DialogPanel className="max-w-lg">
       <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
         <div>
-          <h4 className="text-lg font-semibold">设置帖子浏览门槛</h4>
-          <p className="mt-1 text-sm text-muted-foreground">等级和 VIP 任一设置为大于 0 时，只有满足全部门槛的用户才可查看帖子正文。</p>
+          <h4 className="text-lg font-semibold">设置整帖浏览门槛</h4>
+          <p className="mt-1 text-sm text-muted-foreground">这里控制整篇帖子的正文访问；</p>
         </div>
         <Button type="button" variant="ghost" onClick={onClose}>关闭</Button>
       </div>

@@ -40,6 +40,8 @@ export async function updateInteractionSiteSettingsSection(existing: SiteSetting
         readOptionalNumberField(body, "commentInitialVisibleReplies") ?? existingCommentAccessSettings.initialVisibleReplies,
       ),
     )
+    const postEditableMinutes = Math.max(0, readOptionalNumberField(body, "postEditableMinutes") ?? existing.postEditableMinutes)
+    const commentEditableMinutes = Math.max(0, readOptionalNumberField(body, "commentEditableMinutes") ?? existing.commentEditableMinutes)
     const existingAnonymousPostSettings = resolveAnonymousPostSettings({
       appStateJson: existing.appStateJson,
       enabledFallback: false,
@@ -269,6 +271,8 @@ export async function updateInteractionSiteSettingsSection(existing: SiteSetting
       tippingDailyLimit,
       tippingPerPostLimit,
       tippingAmounts: tippingAmounts.join(","),
+      postEditableMinutes,
+      commentEditableMinutes,
       postRedPacketEnabled,
       postRedPacketMaxPoints,
       postRedPacketDailyLimit,

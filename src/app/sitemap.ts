@@ -4,12 +4,13 @@ import { getBoards } from "@/lib/boards"
 import { getPostPath } from "@/lib/post-links"
 import { getHomepagePosts } from "@/lib/posts"
 import { toAbsoluteSiteUrl } from "@/lib/site-origin"
+import { getSiteSettings } from "@/lib/site-settings"
 import { getZones } from "@/lib/zones"
 
 
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [boards, posts, zones] = await Promise.all([getBoards(), getHomepagePosts(), getZones()])
+  const [boards, posts, zones, settings] = await Promise.all([getBoards(), getHomepagePosts(), getZones(), getSiteSettings()])
 
   const boardUrls = await Promise.all(boards.map(async (board) => ({
     url: await toAbsoluteSiteUrl(`/boards/${board.slug}`),
@@ -24,7 +25,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   })))
 
   const postUrls = await Promise.all(posts.map(async (post) => ({
-    url: await toAbsoluteSiteUrl(getPostPath(post)),
+    url: await toAbsoluteSiteUrl(getPostPath(post, { mode: settings.postLinkDisplayMode })),
     changeFrequency: "weekly" as const,
     priority: 0.9,
   })))

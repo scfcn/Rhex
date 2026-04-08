@@ -39,7 +39,7 @@ export async function updatePostFlow(input: {
     apiError(400, validated.message ?? "参数错误")
   }
 
-  const { title, content, coverPath, replyUnlockContent, replyThreshold, purchaseUnlockContent, purchasePrice, commentsVisibleToAuthorOnly, minViewLevel, minViewVipLevel } = validated.data
+  const { title, content, coverPath, loginUnlockContent, replyUnlockContent, replyThreshold, purchaseUnlockContent, purchasePrice, commentsVisibleToAuthorOnly, minViewLevel, minViewVipLevel } = validated.data
   const rawAppendedContent = (input.body as Record<string, unknown> | null)?.appendedContent
   const appendedContent = typeof rawAppendedContent === "string"
     ? rawAppendedContent.trim()
@@ -69,6 +69,7 @@ export async function updatePostFlow(input: {
   if (canEditNormally && !appendedContent) {
     const titleSafety = await enforceSensitiveText({ scene: "post.title", text: title })
     const contentSafety = await enforceSensitiveText({ scene: "post.content", text: content })
+    const loginUnlockSafety = loginUnlockContent ? await enforceSensitiveText({ scene: "post.content", text: loginUnlockContent }) : null
     const replyUnlockSafety = replyUnlockContent ? await enforceSensitiveText({ scene: "post.content", text: replyUnlockContent }) : null
     const purchaseUnlockSafety = purchaseUnlockContent ? await enforceSensitiveText({ scene: "post.content", text: purchaseUnlockContent }) : null
     const tagsSafety = sanitizedManualTags.length > 0 ? await enforceSensitiveText({ scene: "post.tags", text: sanitizedManualTags.join("\n") }) : null
@@ -77,6 +78,7 @@ export async function updatePostFlow(input: {
     const normalizedPurchasePrice = purchaseUnlockContent ? (purchasePrice ?? 1) : undefined
     const serializedContent = serializePostContentDocument(buildPostContentDocument({
       publicContent: contentSafety.sanitizedText,
+      loginUnlockContent: loginUnlockSafety?.sanitizedText ?? "",
       replyUnlockContent: replyUnlockSafety?.sanitizedText ?? "",
       replyThreshold: normalizedReplyThreshold,
       purchaseUnlockContent: purchaseUnlockSafety?.sanitizedText ?? "",
@@ -87,6 +89,7 @@ export async function updatePostFlow(input: {
     const shouldReview = Boolean(
       titleSafety.shouldReview
       || contentSafety.shouldReview
+      || loginUnlockSafety?.shouldReview
       || replyUnlockSafety?.shouldReview
       || purchaseUnlockSafety?.shouldReview
       || tagsSafety?.shouldReview,

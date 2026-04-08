@@ -6,6 +6,7 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   const body = await readJsonBody(request)
   const verificationTypeId = requireStringField(body, "verificationTypeId", "请选择认证类型")
   const content = readOptionalStringField(body, "content")
+  const customDescription = readOptionalStringField(body, "customDescription")
   const formResponse = body.formResponse && typeof body.formResponse === "object"
     ? Object.fromEntries(Object.entries(body.formResponse as Record<string, unknown>).map(([key, value]) => [key, String(value ?? "")]))
     : undefined
@@ -14,6 +15,7 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     userId: currentUser.id,
     verificationTypeId,
     content,
+    customDescription,
     formResponse,
   })
 

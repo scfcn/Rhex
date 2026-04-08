@@ -480,6 +480,8 @@ export function buildAdminBasicSettingsPayload(draft: AdminBasicSettingsDraft, m
     tippingEnabled: draft.tippingEnabled,
     guestCanViewComments: draft.guestCanViewComments,
     commentInitialVisibleReplies: Number(draft.commentInitialVisibleReplies),
+    postEditableMinutes: Number(draft.postEditableMinutes),
+    commentEditableMinutes: Number(draft.commentEditableMinutes),
     anonymousPostEnabled: draft.anonymousPostEnabled,
     anonymousPostPrice: Number(draft.anonymousPostPrice),
     anonymousPostDailyLimit: Number(draft.anonymousPostDailyLimit),

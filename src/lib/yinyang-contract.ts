@@ -305,9 +305,9 @@ async function buildLeaderboards() {
   const yesterdayRange = getBusinessDayRange(new Date(todayRange.start.getTime() - 24 * 60 * 60 * 1000))
 
   const [winnerRows, earnerRows, todayKings, previousKing] = await Promise.all([
-    listTopYinYangWinners(10),
-    listTopYinYangEarners(10),
-    listTopTodayKings(1),
+    listTopYinYangWinners(todayRange.dayKey, 10),
+    listTopYinYangEarners(todayRange.dayKey, 10),
+    listTopTodayKings(todayRange.dayKey, 1),
     getTopKingByDateKey(yesterdayRange.dayKey),
   ])
 

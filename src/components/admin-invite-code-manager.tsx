@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react"
 
 import { Button } from "@/components/ui/button"
 import { TextField } from "@/components/ui/text-field"
+import { formatDateTime } from "@/lib/formatters"
 
 interface AdminInviteCodeManagerProps {
   initialInviteCodes: {
@@ -63,7 +64,6 @@ export function AdminInviteCodeManager({ initialInviteCodes }: AdminInviteCodeMa
       <div className="rounded-[22px] border border-border bg-card p-4 space-y-4">
         <div>
           <h3 className="text-sm font-semibold">邀请码批量生成</h3>
-          <p className="mt-1 text-xs text-muted-foreground">运营活动、人审发放、邀新链路都统一收口到这里。</p>
         </div>
         <div className="grid gap-3 xl:grid-cols-[160px_minmax(0,1fr)_auto]">
           <TextField label="生成数量" value={count} onChange={setCount} placeholder="1-100" inputClassName="h-10" />
@@ -87,7 +87,7 @@ export function AdminInviteCodeManager({ initialInviteCodes }: AdminInviteCodeMa
           <div key={item.id} className="grid items-center gap-3 border-b border-border px-4 py-3 text-xs last:border-b-0 lg:grid-cols-[minmax(0,1.2fr)_140px_180px_minmax(0,1fr)]">
             <div className="min-w-0">
               <div className="truncate font-mono text-sm font-medium">{item.code}</div>
-              <div className="mt-1 text-muted-foreground">{new Date(item.createdAt).toLocaleString("zh-CN")}</div>
+              <div className="mt-1 text-muted-foreground">{formatDateTime(item.createdAt)}</div>
             </div>
             <div className="truncate text-muted-foreground">{item.createdByUsername ?? "系统"}</div>
             <div className="text-muted-foreground">{item.usedByUsername ? `已被 ${item.usedByUsername} 使用` : "未使用"}</div>

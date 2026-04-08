@@ -15,6 +15,7 @@ import { MAX_MANUAL_TAGS, normalizeManualTags } from "@/lib/post-tags"
 import { DEFAULT_POST_TYPE, type LocalPostType } from "@/lib/post-types"
 import { ensureJiebaReady, extractAutoTags } from "@/lib/post-taxonomy"
 import { multiplyPositiveSafeIntegers, parsePositiveSafeInteger } from "@/lib/shared/safe-integer"
+import { formatDateTime } from "@/lib/formatters"
 
 import { BoardSelectField } from "@/components/board-select-field"
 import {
@@ -822,6 +823,7 @@ export function CreatePostForm({
             coverUploading,
             coverPath: draft.coverPath,
             commentsVisibleToAuthorOnly: draft.commentsVisibleToAuthorOnly,
+            loginUnlockContent: draft.loginUnlockContent,
             replyUnlockContent: draft.replyUnlockContent,
             purchaseUnlockContent: draft.purchaseUnlockContent,
             purchasePrice: draft.purchasePrice,
@@ -843,6 +845,8 @@ export function CreatePostForm({
             onRemoveManualTag: removeManualTag,
             onCoverClear: () => updateDraftField("coverPath", ""),
             onCommentsVisibleToAuthorOnlyChange: (checked) => updateDraftField("commentsVisibleToAuthorOnly", checked),
+            onOpenLoginModal: () => setActiveModal("login"),
+            onClearLoginUnlock: () => updateDraftField("loginUnlockContent", ""),
             onOpenReplyModal: () => setActiveModal("reply"),
             onClearReplyUnlock: () => updateDraftField("replyUnlockContent", ""),
             onOpenPurchaseModal: () => setActiveModal("purchase"),
@@ -890,7 +894,7 @@ export function CreatePostForm({
             <PostDraftNotice
               title={pendingDraftToRestore ? "检测到本地草稿" : lastSavedDraftAt ? (draftRestored ? "已恢复草稿" : "本地草稿") : "草稿状态"}
               description={pendingDraftToRestore ? `你在${isEditMode ? "编辑帖子" : "发帖"}页有一份未提交内容，可直接恢复继续编辑。支持 Ctrl/Cmd+S 快速保存草稿。` : "当前内容会自动暂存到本地。支持 Ctrl/Cmd+S 快速保存草稿。"}
-              meta={draftMetaTimestamp ? `保存于 ${new Date(draftMetaTimestamp).toLocaleString()}` : undefined}
+              meta={draftMetaTimestamp ? `保存于 ${formatDateTime(draftMetaTimestamp)}` : undefined}
               tone={pendingDraftToRestore ? "warning" : "info"}
               size="dense"
               actions={draftNoticeActions}
@@ -975,6 +979,15 @@ export function CreatePostForm({
           onTotalPointsChange: (value) => updateDraftField("redPacketTotalPoints", value),
           onPacketCountChange: (value) => updateDraftField("redPacketPacketCount", value),
         }}
+      />
+
+      <HiddenContentModal
+        open={activeModal === "login"}
+        title="配置登录后可看"
+        description="这部分内容仅登录用户可见。适合给游客隐藏附件说明、站内资源入口或成员补充内容。"
+        value={draft.loginUnlockContent}
+        onChange={(value) => updateDraftField("loginUnlockContent", value)}
+        onClose={() => setActiveModal(null)}
       />
 
       <HiddenContentModal

@@ -94,6 +94,7 @@ export async function getVerificationAdminData() {
       id: item.id,
       status: item.status,
       content: item.content,
+      customDescription: item.customDescription,
       formResponseJson: item.formResponseJson,
       note: item.note,
       rejectReason: item.rejectReason,

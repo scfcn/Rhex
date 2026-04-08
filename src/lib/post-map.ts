@@ -33,11 +33,13 @@ interface ListPostAuthor extends VipStateSource {
     }
   }>
   verificationApplications?: Array<{
+    customDescription?: string | null
     type: {
       id: string
       name: string
       color: string
       iconText?: string | null
+      description?: string | null
     }
   }>
 
@@ -121,6 +123,8 @@ export function mapListPost(post: ListPostSource, anonymousMaskIdentity: Anonymo
           name: post.author.verificationApplications[0].type.name,
           color: post.author.verificationApplications[0].type.color,
           iconText: post.author.verificationApplications[0].type.iconText,
+          description: post.author.verificationApplications[0].type.description,
+          customDescription: post.author.verificationApplications[0].customDescription,
         }
       : null,
     authorDisplayedBadges: (post.author.userBadges ?? [])

@@ -2,7 +2,7 @@ import { createHash } from "crypto"
 
 import { Prisma } from "@/db/types"
 
-import { createRequestControl, purgeExpiredRequestControls } from "@/db/write-guard-queries"
+import { createRequestControl, deleteExpiredRequestControlsForKey, deleteRequestControlById, purgeExpiredRequestControls } from "@/db/write-guard-queries"
 import { apiError } from "@/lib/api-route"
 
 
@@ -23,6 +23,7 @@ export interface WriteGuardOptions {
   cooldownMessage?: string
   dedupeKey?: string | null
   dedupeWindowMs?: number
+  releaseOnError?: boolean
 }
 
 
@@ -67,17 +68,29 @@ async function createRequestControlRecord(params: {
   message: string
 }) {
   try {
+    const now = new Date()
+
+    await deleteExpiredRequestControlsForKey({
+      scope: params.scope,
+      identity: params.identity,
+      kind: params.kind,
+      fingerprint: params.fingerprint ?? null,
+      now,
+    })
+
     if (shouldPurgeExpiredRequestControls()) {
-      await purgeExpiredRequestControls(new Date())
+      await purgeExpiredRequestControls(now)
     }
 
-    await createRequestControl({
+    const created = await createRequestControl({
       scope: params.scope,
       identity: params.identity,
       kind: params.kind,
       fingerprint: params.fingerprint ?? null,
       expiresAt: params.expiresAt,
     })
+
+    return created.id
 
 
   } catch (error) {
@@ -93,6 +106,7 @@ export async function withWriteGuard<T>(options: WriteGuardOptions, task: () => 
   const now = Date.now()
   const cooldownMs = Math.max(0, options.cooldownMs ?? DEFAULT_COOLDOWN_MS)
   const dedupeWindowMs = Math.max(0, options.dedupeWindowMs ?? DEFAULT_DEDUPE_WINDOW_MS)
+  const createdControlIds: string[] = []
 
   logRequestStarted({
     scope: options.scope,
@@ -103,17 +117,18 @@ export async function withWriteGuard<T>(options: WriteGuardOptions, task: () => 
 
   try {
     if (cooldownMs > 0) {
-      await createRequestControlRecord({
+      const controlId = await createRequestControlRecord({
         scope: options.scope,
         identity,
         kind: RATE_LIMIT_KIND,
         expiresAt: new Date(now + cooldownMs),
         message: options.cooldownMessage ?? "操作过于频繁，请稍后再试",
       })
+      createdControlIds.push(controlId)
     }
 
     if (options.dedupeKey) {
-      await createRequestControlRecord({
+      const controlId = await createRequestControlRecord({
         scope: options.scope,
         identity,
         kind: DEDUPE_KIND,
@@ -121,6 +136,7 @@ export async function withWriteGuard<T>(options: WriteGuardOptions, task: () => 
         expiresAt: new Date(now + dedupeWindowMs),
         message: "请求重复，请勿重复提交",
       })
+      createdControlIds.push(controlId)
     }
 
     const result = await task()
@@ -132,6 +148,10 @@ export async function withWriteGuard<T>(options: WriteGuardOptions, task: () => 
     })
     return result
   } catch (error) {
+    if (options.releaseOnError && createdControlIds.length > 0) {
+      await Promise.all(createdControlIds.map((id) => deleteRequestControlById(id)))
+    }
+
     logRequestFailed({
       scope: options.scope,
       userId: options.identity?.userId ?? null,

@@ -6,6 +6,7 @@ import { useMemo, useState } from "react"
 
 
 import { Button } from "@/components/ui/button"
+import { formatDateTime } from "@/lib/formatters"
 
 interface SensitiveWordItem {
   id: string
@@ -159,7 +160,7 @@ export function AdminSensitiveWordManager({ data }: AdminSensitiveWordManagerPro
           <div key={item.id} className="grid items-center gap-3 border-b border-border px-4 py-3 text-xs last:border-b-0 lg:grid-cols-[minmax(0,1.3fr)_140px_140px_120px_180px]">
             <div className="min-w-0">
               <div className="truncate text-sm font-medium">{item.word}</div>
-              <div className="mt-1 text-muted-foreground">{new Date(item.createdAt).toLocaleString("zh-CN")}</div>
+              <div className="mt-1 text-muted-foreground">{formatDateTime(item.createdAt)}</div>
             </div>
             <div className="text-muted-foreground">{item.matchType}</div>
             <div className="text-muted-foreground">{item.actionType}</div>

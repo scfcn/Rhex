@@ -112,6 +112,38 @@ export function findAllBadgesWithRules() {
   })
 }
 
+export function findAdminBadgeOptions() {
+  return prisma.badge.findMany({
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+    select: {
+      id: true,
+      name: true,
+      iconText: true,
+      color: true,
+      category: true,
+      status: true,
+      isHidden: true,
+      _count: {
+        select: {
+          users: true,
+        },
+      },
+    },
+  })
+}
+
+export function findBadgeSummaryById(badgeId: string) {
+  return prisma.badge.findUnique({
+    where: { id: badgeId },
+    select: {
+      id: true,
+      name: true,
+      status: true,
+      isHidden: true,
+    },
+  })
+}
+
 export function findGrantedBadgeIdsForUser(userId: number) {
   return prisma.userBadge.findMany({
     where: { userId },
@@ -198,7 +230,16 @@ export function createSelfClaimUserBadge(input: {
   grantSnapshot: string | null
   client?: Prisma.TransactionClient
 }) {
+  return createGrantedUserBadge(input)
+}
 
+export function createGrantedUserBadge(input: {
+  userId: number
+  badgeId: string
+  grantSource: BadgeGrantSource
+  grantSnapshot: string | null
+  client?: Prisma.TransactionClient
+}) {
   const client = input.client ?? prisma
 
   return client.userBadge.create({

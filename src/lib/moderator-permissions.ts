@@ -24,6 +24,7 @@ export interface AdminActor {
     zoneName: string
     zoneSlug: string
     canEditSettings: boolean
+    canWithdrawTreasury: boolean
   }>
   moderatedBoardScopes: Array<{
     boardId: string
@@ -33,6 +34,7 @@ export interface AdminActor {
     zoneName: string | null
     zoneSlug: string | null
     canEditSettings: boolean
+    canWithdrawTreasury: boolean
   }>
 }
 
@@ -49,6 +51,7 @@ function mapAdminActor(record: SessionActor | ModeratorScopeRecord): AdminActor 
           zoneName: scope.zone.name,
           zoneSlug: scope.zone.slug,
           canEditSettings: scope.canEditSettings,
+          canWithdrawTreasury: scope.canWithdrawTreasury,
         }))
       : [],
     moderatedBoardScopes: "moderatedBoardScopes" in record
@@ -60,6 +63,7 @@ function mapAdminActor(record: SessionActor | ModeratorScopeRecord): AdminActor 
           zoneName: scope.board.zone?.name ?? null,
           zoneSlug: scope.board.zone?.slug ?? null,
           canEditSettings: scope.canEditSettings,
+          canWithdrawTreasury: scope.canWithdrawTreasury,
         }))
       : [],
   }
@@ -125,6 +129,26 @@ export function buildManagedPostWhereInput(actor: AdminActor): Prisma.PostWhereI
 
   if (boardIds.length > 0) {
     or.push({ boardId: { in: boardIds } })
+  }
+
+  return or.length > 0 ? { OR: or } : { id: { in: [] } }
+}
+
+export function buildManagedCommentWhereInput(actor: AdminActor): Prisma.CommentWhereInput | undefined {
+  if (isSiteAdmin(actor)) {
+    return undefined
+  }
+
+  const zoneIds = getManagedZoneIds(actor)
+  const boardIds = getManagedBoardIds(actor)
+  const or: Prisma.CommentWhereInput[] = []
+
+  if (zoneIds.length > 0) {
+    or.push({ post: { board: { zoneId: { in: zoneIds } } } })
+  }
+
+  if (boardIds.length > 0) {
+    or.push({ post: { boardId: { in: boardIds } } })
   }
 
   return or.length > 0 ? { OR: or } : { id: { in: [] } }
@@ -220,7 +244,15 @@ export function canWithdrawBoardTreasury(actor: AdminActor, boardId: string, opt
     return false
   }
 
-  return canManageBoard(actor, boardId, options.zoneId)
+  if (actor.moderatedBoardScopes.some((scope) => scope.boardId === boardId && scope.canWithdrawTreasury)) {
+    return true
+  }
+
+  if (!options.zoneId) {
+    return false
+  }
+
+  return actor.moderatedZoneScopes.some((scope) => scope.zoneId === options.zoneId && scope.canWithdrawTreasury)
 }
 
 export function getAvailablePinScopes(actor: AdminActor, options: { zoneId?: string | null; currentPinScope?: PinScope | null }) {

@@ -1,4 +1,5 @@
 import { PostListLink } from "@/components/post-list-link"
+import { formatDateTime } from "@/lib/formatters"
 import { getPostCommentPath } from "@/lib/post-links"
 import type { PostLinkDisplayMode } from "@/lib/site-settings"
 
@@ -62,14 +63,4 @@ export function UserRecentRepliesList({
       })}
     </div>
   )
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value))
 }

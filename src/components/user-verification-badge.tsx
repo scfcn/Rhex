@@ -7,6 +7,8 @@ export interface UserVerificationBadgeItem {
   name: string
   color: string
   iconText?: string | null
+  description?: string | null
+  customDescription?: string | null
 }
 
 interface UserVerificationBadgeProps {
@@ -21,8 +23,12 @@ export function UserVerificationBadge({ verification, compact = false, className
     return null
   }
 
+  const tooltipContent = verification.customDescription?.trim()
+    ? `${verification.customDescription.trim()}`
+    : verification.description?.trim() || verification.name
+
   return (
-    <Tooltip content={verification.name}>
+    <Tooltip content={tooltipContent}>
       <span
         className={cn(
           "inline-flex items-center justify-center align-middle",
@@ -30,7 +36,7 @@ export function UserVerificationBadge({ verification, compact = false, className
           compact ? "h-5 w-5" : "h-6 w-6",
           className,
         )}
-        aria-label={verification.name}
+        aria-label={tooltipContent}
         style={appearance === "outlined"
           ? {
               color: verification.color,

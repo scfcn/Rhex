@@ -17,6 +17,7 @@ export type VerificationBadgeView = {
   iconText: string
   color: string
   description?: string | null
+  customDescription?: string | null
 }
 
 export type UserVerificationView = {
@@ -27,6 +28,7 @@ export type UserVerificationView = {
   rejectReason?: string | null
   note?: string | null
   content?: string | null
+  customDescription?: string | null
   formResponse?: Record<string, string>
   type: VerificationBadgeView
 }
@@ -101,6 +103,7 @@ function mapApplication(application: {
   rejectReason: string | null
   note: string | null
   content: string | null
+  customDescription: string | null
   formResponseJson?: string | null
   type: {
     id: string
@@ -118,6 +121,7 @@ function mapApplication(application: {
     rejectReason: application.rejectReason,
     note: application.note,
     content: application.content,
+    customDescription: application.customDescription,
     formResponse: parseFormResponseJson(application.formResponseJson),
     type: {
       id: application.type.id,
@@ -163,6 +167,7 @@ export async function getCurrentUserVerificationData(): Promise<CurrentUserVerif
           iconText: approvedVerification.type.iconText?.trim() || "✔️",
           color: approvedVerification.type.color,
           description: approvedVerification.type.description,
+          customDescription: approvedVerification.customDescription,
         }
       : null,
   }
@@ -183,6 +188,7 @@ export async function submitVerificationApplication(input: {
   userId: number
   verificationTypeId: string
   content?: string
+  customDescription?: string
   formResponse?: Record<string, string>
 }) {
   const verificationType = await findVerificationTypeById(input.verificationTypeId)
@@ -214,6 +220,7 @@ export async function submitVerificationApplication(input: {
   const formFields = parseVerificationFormSchema(verificationType.formSchemaJson)
   const rawFormResponse = input.formResponse ?? {}
   const normalizedFormResponse = Object.fromEntries(Object.entries(rawFormResponse).map(([key, value]) => [key, String(value ?? "").trim()]))
+  const customDescription = String(input.customDescription ?? "").trim()
 
   for (const field of formFields) {
     if (field.required && !normalizedFormResponse[field.id]) {
@@ -233,6 +240,7 @@ export async function submitVerificationApplication(input: {
     userId: input.userId,
     verificationTypeId: input.verificationTypeId,
     content,
+    customDescription: customDescription || null,
     formResponseJson: formFields.length > 0 ? JSON.stringify(normalizedFormResponse) : null,
   })
 }
@@ -268,6 +276,7 @@ export async function getUserApprovedVerificationBadge(userId: number | null | u
     iconText: application.type.iconText?.trim() || "✔️",
     color: application.type.color,
     description: application.type.description,
+    customDescription: application.customDescription,
   }
 }
 

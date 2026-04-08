@@ -16,7 +16,7 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     },
   })
 
-  await evaluateUserLevelProgress(currentUser.id)
+  await evaluateUserLevelProgress(currentUser.id, { notifyOnUpgrade: true })
 
   const { redPacketClaim } = await handleCommentCreateSideEffects({
     postId: result.postId,
@@ -24,7 +24,7 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     commentId: result.created.id,
   })
 
-  if (!result.contentSafety.shouldReview) {
+  if (!result.reviewRequired) {
     await enqueuePostFollowCommentNotifications({
       commentId: result.created.id,
       excludeUserIds: [
@@ -47,7 +47,7 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   }, {
     postId: result.postId,
     page: result.targetPage,
-    reviewRequired: result.contentSafety.shouldReview,
+    reviewRequired: result.reviewRequired,
   })
 
   return apiSuccess({
@@ -58,7 +58,7 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
       view: result.commentView,
       anchor: `comment-${result.created.id}`,
     },
-  }, result.contentSafety.shouldReview ? "回复命中敏感词规则，已进入审核" : result.normalizedReplyToUserName ? `已回复 @${result.normalizedReplyToUserName}${redPacketMessage}` : `回复成功${redPacketMessage}`)
+  }, result.reviewRequired ? (result.contentSafety.shouldReview ? "回复命中敏感词规则，已进入审核" : "当前节点开启回帖审核，回复已进入审核") : result.normalizedReplyToUserName ? `已回复 @${result.normalizedReplyToUserName}${redPacketMessage}` : `回复成功${redPacketMessage}`)
 }, {
   errorMessage: "评论失败",
   logPrefix: "[api/comments/create] unexpected error",

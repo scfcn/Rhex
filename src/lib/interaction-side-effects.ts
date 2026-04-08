@@ -29,7 +29,7 @@ registerInteractionEffectHooks({
 
     await Promise.all([
       targetUserId
-        ? swallowSideEffect(`post-like:sync-likes:${input.postId}:${input.userId}`, () => syncUserReceivedLikes(targetUserId))
+        ? swallowSideEffect(`post-like:sync-likes:${input.postId}:${input.userId}`, () => syncUserReceivedLikes(targetUserId, { notifyOnUpgrade: true }))
         : Promise.resolve(null),
       input.liked
         ? swallowSideEffect(`post-like:lottery:${input.postId}:${input.userId}`, () => enrollUserInLotteryPool({ postId: input.postId, userId: input.userId }))

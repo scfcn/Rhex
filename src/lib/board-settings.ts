@@ -10,6 +10,7 @@ export interface EffectiveBoardSettings {
   replyIntervalSeconds: number
   allowedPostTypes: LocalPostType[]
   requirePostReview: boolean
+  requireCommentReview: boolean
   minViewPoints: number
   minViewLevel: number
   minPostPoints: number
@@ -54,6 +55,7 @@ export function resolveBoardSettings(zone?: Partial<Zone> | null, board?: Partia
     allowedPostTypes: normalizePostTypes(board?.allowedPostTypes ?? zoneAdvanced?.allowedPostTypes),
 
     requirePostReview: board?.requirePostReview ?? zone?.requirePostReview ?? false,
+    requireCommentReview: board?.requireCommentReview ?? zone?.requireCommentReview ?? false,
     minViewPoints: board?.minViewPoints ?? (zone as { minViewPoints?: number | null } | null | undefined)?.minViewPoints ?? 0,
     minViewLevel: board?.minViewLevel ?? (zone as { minViewLevel?: number | null } | null | undefined)?.minViewLevel ?? 0,
     minPostPoints: board?.minPostPoints ?? (zone as { minPostPoints?: number | null } | null | undefined)?.minPostPoints ?? 0,

@@ -9,6 +9,7 @@ import { AdminPillTabs } from "@/components/admin-pill-tabs"
 import { AdminModal } from "@/components/admin-modal"
 import { Button } from "@/components/ui/button"
 import { TextField } from "@/components/ui/text-field"
+import { Tooltip } from "@/components/ui/tooltip"
 import { toast } from "@/components/ui/toast"
 import {
   buildAdminBasicSettingsPayload,
@@ -92,6 +93,14 @@ function normalizeHeatThresholdsInput(raw: string) {
   return Array.from(new Set(values)).sort((left, right) => left - right)
 }
 
+function extractEmailAddress(value: string) {
+  const matched = value.match(/<([^<>@\s]+@[^<>@\s]+)>/)
+  if (matched?.[1]) {
+    return matched[1]
+  }
+  return /\S+@\S+\.\S+/.test(value) ? value.trim() : ""
+}
+
 export function AdminBasicSettingsForm({ initialSettings, mode = "profile", initialSubTab, initialInviteCodes = [] }: AdminBasicSettingsFormProps) {
   const [draft, setDraft] = useState(() => createAdminBasicSettingsDraft(initialSettings))
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
@@ -99,6 +108,8 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile", init
   const [authDocOpen, setAuthDocOpen] = useState(false)
   const [siteOrigin, setSiteOrigin] = useState("https://your-domain.com")
   const [activeSubTab, setActiveSubTab] = useState(() => resolveInternalSettingTab(mode, initialSubTab))
+  const [smtpTestRecipient, setSmtpTestRecipient] = useState(() => extractEmailAddress(initialSettings.smtpFrom ?? "") || (initialSettings.smtpUser ?? ""))
+  const [isSendingSmtpTest, setIsSendingSmtpTest] = useState(false)
   const { isPending, runMutation } = useAdminMutation()
 
   useEffect(() => {
@@ -268,6 +279,31 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile", init
     }
   }
 
+  async function handleSendSmtpTest() {
+    setIsSendingSmtpTest(true)
+
+    try {
+      const result = await adminPost("/api/admin/site-settings/smtp-test", {
+        recipient: smtpTestRecipient,
+        siteName,
+        smtpHost,
+        smtpPort: Number(smtpPort),
+        smtpUser,
+        smtpPass,
+        smtpFrom,
+        smtpSecure,
+      }, {
+        defaultSuccessMessage: "测试邮件发送成功",
+        defaultErrorMessage: "测试邮件发送失败",
+      })
+      toast.success(result.message, "发送成功")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "测试邮件发送失败，请稍后再试", "发送失败")
+    } finally {
+      setIsSendingSmtpTest(false)
+    }
+  }
+
   const submitText = mode === "profile"
     ? "保存基础信息"
     : mode === "registration"
@@ -310,15 +346,11 @@ export function AdminBasicSettingsForm({ initialSettings, mode = "profile", init
         <div className="rounded-[24px] border border-border p-5 space-y-4">
           <div>
             <h3 className="text-sm font-semibold">品牌与基础信息</h3>
-            <p className="mt-1 text-xs leading-6 text-muted-foreground">站点名称、Logo 文案、Slogan 与编辑时效配置。</p>
+            <p className="mt-1 text-xs leading-6 text-muted-foreground">站点名称、Logo 文案、Slogan 等品牌基础信息配置。</p>
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <TextField label="站点名称" value={siteName} onChange={(value) => updateDraftField("siteName", value)} placeholder="如 兴趣论坛" />
             <TextField label="Logo 文案" value={siteLogoText} onChange={(value) => updateDraftField("siteLogoText", value)} placeholder="如 兴趣论坛" />
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <TextField label="帖子可编辑分钟数" value={postEditableMinutes} onChange={(value) => updateDraftField("postEditableMinutes", value)} placeholder="如 10" />
-            <TextField label="评论可编辑分钟数" value={commentEditableMinutes} onChange={(value) => updateDraftField("commentEditableMinutes", value)} placeholder="如 5" />
           </div>
           <TextField label="站点 Slogan" value={siteSlogan} onChange={(value) => updateDraftField("siteSlogan", value)} placeholder="如 Waste your time on things you love" />
           <SiteLogoUploadCard
@@ -587,6 +619,15 @@ Passkey Origin = ${resolvedPasskeyOrigin}`}</code></pre>
               <TextField label="SMTP 密码 / 授权码" type="password" value={smtpPass} onChange={(value) => updateDraftField("smtpPass", value)} placeholder="请输入密码或授权码" />
               <TextField label="发件人地址" value={smtpFrom} onChange={(value) => updateDraftField("smtpFrom", value)} placeholder="如 Forum <no-reply@example.com>" />
             </div>
+            <div className="rounded-[20px] border border-border bg-secondary/20 p-4">
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                <TextField label="测试收件邮箱" value={smtpTestRecipient} onChange={setSmtpTestRecipient} placeholder="输入你要接收测试邮件的邮箱" />
+                <Button type="button" variant="outline" disabled={isSendingSmtpTest} onClick={handleSendSmtpTest}>
+                  {isSendingSmtpTest ? "发送中..." : "发送测试邮件"}
+                </Button>
+              </div>
+              <p className="mt-3 text-xs leading-6 text-muted-foreground">直接使用当前表单里的 SMTP 配置发送测试邮件，不需要先保存设置。</p>
+            </div>
           </div>
         </>
       ) : null}
@@ -612,8 +653,8 @@ Passkey Origin = ${resolvedPasskeyOrigin}`}</code></pre>
         <>
           <div className="rounded-[24px] border border-border p-5 space-y-4">
             <div>
-              <h3 className="text-sm font-semibold">发帖与回复字数限制</h3>
-              <p className="mt-1 text-xs leading-6 text-muted-foreground">分别控制标题、正文、回复的最小字数和最大字数，服务端会按这里的值做校验。</p>
+              <h3 className="text-sm font-semibold">发帖、回复与编辑限制</h3>
+              <p className="mt-1 text-xs leading-6 text-muted-foreground">分别控制标题、正文、回复的字数范围，以及帖子和评论的可编辑时长，服务端会按这里的值做校验。</p>
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <TextField label="发帖标题最小字数" value={postTitleMinLength} onChange={(value) => updateDraftField("postTitleMinLength", value)} placeholder="默认 5，最小 1" />
@@ -622,8 +663,10 @@ Passkey Origin = ${resolvedPasskeyOrigin}`}</code></pre>
               <TextField label="发帖正文最大字数" value={postContentMaxLength} onChange={(value) => updateDraftField("postContentMaxLength", value)} placeholder="默认 50000，最大 100000" />
               <TextField label="回复正文最小字数" value={commentContentMinLength} onChange={(value) => updateDraftField("commentContentMinLength", value)} placeholder="默认 2，最小 1" />
               <TextField label="回复正文最大字数" value={commentContentMaxLength} onChange={(value) => updateDraftField("commentContentMaxLength", value)} placeholder="默认 2000，最大 20000" />
+              <TextField label="帖子可编辑分钟数" value={postEditableMinutes} onChange={(value) => updateDraftField("postEditableMinutes", value)} placeholder="如 10" />
+              <TextField label="评论可编辑分钟数" value={commentEditableMinutes} onChange={(value) => updateDraftField("commentEditableMinutes", value)} placeholder="如 5" />
             </div>
-            <p className="text-xs leading-6 text-muted-foreground">保存时若最大值小于最小值，会自动按最小值兜底；发帖、编辑帖子、回复、编辑回复都会使用这组限制。</p>
+            <p className="text-xs leading-6 text-muted-foreground">保存时若最大值小于最小值，会自动按最小值兜底；发帖、编辑帖子、回复、编辑回复都会使用这组限制。可编辑分钟数填 `0` 表示发出后不可再编辑。</p>
           </div>
         </>
       ) : null}
@@ -869,7 +912,7 @@ function InfoTextField(props: {
     <div className="space-y-2">
       <div className="flex items-center gap-2">
         <p className="text-sm font-medium">{label}</p>
-        <div className="group relative inline-flex">
+        <Tooltip content={helpText} align="start" contentClassName="max-w-64 leading-6" enableMobileTap>
           <button
             type="button"
             className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -877,10 +920,7 @@ function InfoTextField(props: {
           >
             <CircleHelp className="h-3.5 w-3.5" />
           </button>
-          <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden w-64 -translate-x-1/2 rounded-2xl border border-border bg-popover px-3 py-2 text-xs leading-6 text-popover-foreground shadow-lg group-hover:block">
-            {helpText}
-          </div>
-        </div>
+        </Tooltip>
       </div>
       <input
         type="text"

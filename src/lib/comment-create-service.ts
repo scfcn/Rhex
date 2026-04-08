@@ -146,12 +146,19 @@ export async function createCommentFlow(input: {
   }
 
   const resolvedComment = resolveMentionsInText(contentSafety.sanitizedText, mentionUsers)
+  const reviewRequired = Boolean(postContext.settings.requireCommentReview || contentSafety.shouldReview)
+  const reviewNote = contentSafety.shouldReview
+    ? "评论命中敏感词规则，已进入审核"
+    : postContext.settings.requireCommentReview
+      ? "当前节点开启回帖审核，评论已进入审核"
+      : null
 
   const created = await createCommentWithRelations({
     postId,
     userId: input.currentUser.id,
     content: resolvedComment.content,
-    status: contentSafety.shouldReview ? "PENDING" : "NORMAL",
+    status: reviewRequired ? "PENDING" : "NORMAL",
+    reviewNote,
     useAnonymousIdentity,
     parentId: normalizedParentId || undefined,
     replyToUserId: normalizedReplyToUserId ?? undefined,
@@ -170,9 +177,19 @@ export async function createCommentFlow(input: {
   })
 
   const pageSize = 15
-  const totalRootComments = normalizedParentId ? null : await countRootCommentsByPostId(postId)
+  const totalRootComments = normalizedParentId
+    ? null
+    : await countRootCommentsByPostId({
+        postId,
+        viewerUserId: input.currentUser.id,
+        includePendingOwn: reviewRequired,
+      })
   const targetPage = commentView === "flat"
-    ? Math.max(1, Math.ceil((await countVisibleCommentsByPostId(postId)) / pageSize))
+    ? Math.max(1, Math.ceil((await countVisibleCommentsByPostId({
+        postId,
+        viewerUserId: input.currentUser.id,
+        includePendingOwn: reviewRequired,
+      })) / pageSize))
     : normalizedParentId
       ? await findRootCommentPageById({
           postId,
@@ -194,5 +211,6 @@ export async function createCommentFlow(input: {
     normalizedReplyToUserName,
     mentionUserIds: resolvedComment.mentions.map((mention) => mention.id),
     contentSafety,
+    reviewRequired,
   }
 }

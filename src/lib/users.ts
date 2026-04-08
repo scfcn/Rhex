@@ -38,6 +38,8 @@ export interface SiteUserProfile {
     name: string
     color: string
     iconText?: string | null
+    description?: string | null
+    customDescription?: string | null
   } | null
   activityVisibility: UserProfileVisibility
   introductionVisibility: UserProfileVisibility
@@ -89,6 +91,8 @@ export async function getUserProfile(username: string): Promise<SiteUserProfile 
             name: approvedVerification.type.name,
             color: approvedVerification.type.color,
             iconText: approvedVerification.type.iconText,
+            description: approvedVerification.type.description,
+            customDescription: approvedVerification.customDescription,
           }
         : null,
       activityVisibility: profileSettings.activityVisibility,

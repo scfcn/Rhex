@@ -1,6 +1,6 @@
 import { writeAdminLog } from "@/lib/admin"
 import { apiSuccess, createAdminRouteHandler, readJsonBody } from "@/lib/api-route"
-import { getLevelDefinitions, saveLevelDefinitions } from "@/lib/level-system"
+import { enqueueRefreshAllUserLevelProgress, getLevelDefinitions, saveLevelDefinitions } from "@/lib/level-system"
 
 export const GET = createAdminRouteHandler(async () => {
   const levels = await getLevelDefinitions()
@@ -13,6 +13,14 @@ export const GET = createAdminRouteHandler(async () => {
 
 export const POST = createAdminRouteHandler(async ({ request, adminUser }) => {
   const body = await readJsonBody(request)
+  const action = typeof body.action === "string" ? body.action.trim() : ""
+
+  if (action === "refresh-all-users") {
+    await enqueueRefreshAllUserLevelProgress()
+    await writeAdminLog(adminUser.id, "site.levels.refresh-all-users", "SITE", "level-system", "管理员手动触发了全站用户等级重算")
+    return apiSuccess(undefined, "已开始重算全站用户等级，请稍后查看结果")
+  }
+
   const levels = Array.isArray(body.levels) ? body.levels : []
 
   const saved = await saveLevelDefinitions(levels)

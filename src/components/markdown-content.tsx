@@ -7,7 +7,7 @@ import { Counter, Zoom,Fullscreen  } from "yet-another-react-lightbox/plugins"
 
 import { useMarkdownEmojiMap } from "@/components/site-settings-provider"
 import { bindBase64Inspector, bindBrokenImagePlaceholders, bindImageLightbox, enhanceMarkdown, type LightboxImage } from "@/lib/markdown/enhance"
-import { renderMarkdown } from "@/lib/markdown/render"
+import { isImageOnlyMarkdownHtml, renderMarkdown } from "@/lib/markdown/render"
 import type { MarkdownEmojiItem } from "@/lib/markdown-emoji"
 import { cn } from "@/lib/utils"
 
@@ -16,12 +16,15 @@ interface MarkdownContentProps {
   className?: string
   emptyText?: string
   markdownEmojiMap?: MarkdownEmojiItem[]
+  expandImagesWhenImageOnly?: boolean
+  imageOnly?: boolean
 }
 
 interface MarkdownBodyProps {
   html: string
   className?: string
   onOpenLightbox: (images: LightboxImage[], index: number) => void
+  isImageOnly?: boolean
 }
 
 interface LightboxState {
@@ -94,7 +97,7 @@ function LightboxPortal({ lightbox, onClose, onChange }: LightboxPortalProps) {
   )
 }
 
-const MarkdownBody = memo(function MarkdownBody({ html, className, onOpenLightbox }: MarkdownBodyProps) {
+const MarkdownBody = memo(function MarkdownBody({ html, className, onOpenLightbox, isImageOnly = false }: MarkdownBodyProps) {
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -127,17 +130,29 @@ const MarkdownBody = memo(function MarkdownBody({ html, className, onOpenLightbo
   return (
     <div
       ref={containerRef}
-      className={cn("markdown-body prose prose-sm max-w-none prose-p:my-3 prose-ul:my-3 prose-ol:my-3 prose-li:my-1", className)}
+      suppressHydrationWarning
+      className={cn("markdown-body prose prose-sm max-w-none prose-p:my-3 prose-ul:my-3 prose-ol:my-3 prose-li:my-1", isImageOnly && "markdown-body--image-only", className)}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   )
 })
 
-export function MarkdownContent({ content, className, emptyText, markdownEmojiMap }: MarkdownContentProps) {
+export function MarkdownContent({ content, className, emptyText, markdownEmojiMap, expandImagesWhenImageOnly = false, imageOnly }: MarkdownContentProps) {
   const [lightbox, setLightbox] = useState<LightboxState | null>(null)
   const normalized = content.replace(/\r\n/g, "\n").trim()
   const resolvedMarkdownEmojiMap = useMarkdownEmojiMap(markdownEmojiMap)
   const html = useMemo(() => (normalized ? renderMarkdown(normalized, resolvedMarkdownEmojiMap) : ""), [normalized, resolvedMarkdownEmojiMap])
+  const isImageOnly = useMemo(() => {
+    if (!expandImagesWhenImageOnly) {
+      return false
+    }
+
+    if (typeof imageOnly === "boolean") {
+      return imageOnly
+    }
+
+    return isImageOnlyMarkdownHtml(html)
+  }, [expandImagesWhenImageOnly, html, imageOnly])
   const handleOpenLightbox = useCallback((images: LightboxImage[], index: number) => {
     setLightbox({ images, index })
   }, [])
@@ -148,7 +163,7 @@ export function MarkdownContent({ content, className, emptyText, markdownEmojiMa
 
   return (
     <>
-      <MarkdownBody html={html} className={className} onOpenLightbox={handleOpenLightbox} />
+      <MarkdownBody html={html} className={className} onOpenLightbox={handleOpenLightbox} isImageOnly={isImageOnly} />
       {lightbox ? (
         <LightboxPortal
           lightbox={lightbox}

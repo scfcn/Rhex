@@ -26,6 +26,7 @@ function parseRewardEffectFeedback(rawValue: string) {
 export interface SiteCommentReplyItem {
   id: string
   status: "NORMAL" | "HIDDEN" | "DELETED" | "PENDING"
+  reviewNote?: string | null
   author: string
   authorIsAnonymous?: boolean
   authorId: number
@@ -40,6 +41,8 @@ export interface SiteCommentReplyItem {
     name: string
     color: string
     iconText?: string | null
+    description?: string | null
+    customDescription?: string | null
   } | null
   authorDisplayedBadges?: Array<{
     id: string
@@ -73,6 +76,7 @@ export interface SiteCommentReplyItem {
 export interface SiteCommentItem {
   id: string
   status: "NORMAL" | "HIDDEN" | "DELETED" | "PENDING"
+  reviewNote?: string | null
   author: string
   authorIsAnonymous?: boolean
   authorId: number
@@ -87,6 +91,8 @@ export interface SiteCommentItem {
     name: string
     color: string
     iconText?: string | null
+    description?: string | null
+    customDescription?: string | null
   } | null
   authorDisplayedBadges?: Array<{
     id: string
@@ -156,11 +162,13 @@ interface CommentQueryUser {
     }
   }>
   verificationApplications?: Array<{
+    customDescription?: string | null
     type: {
       id: string
       name: string
       color: string
       iconText?: string | null
+      description?: string | null
     }
   }>
 }
@@ -200,6 +208,8 @@ function mapVerification(user: CommentQueryUser) {
     name: item.type.name,
     color: item.type.color,
     iconText: item.type.iconText,
+    description: item.type.description,
+    customDescription: item.customDescription,
   }
 }
 
@@ -259,6 +269,7 @@ export async function getCommentsByPostId(
     type RawCommentRecord = {
       id: string
       status: "NORMAL" | "HIDDEN" | "DELETED" | "PENDING"
+      reviewNote: string | null
       userId: number
       useAnonymousIdentity: boolean
       parentId: string | null
@@ -315,6 +326,7 @@ export async function getCommentsByPostId(
       return {
         id: comment.id,
         status: comment.status,
+        reviewNote: comment.reviewNote,
         postId,
         author: displayAsAnonymous ? anonymousCommentIdentity.author : (comment.user.nickname ?? comment.user.username),
         authorIsAnonymous: displayAsAnonymous,
@@ -356,6 +368,7 @@ export async function getCommentsByPostId(
       return {
         id: comment.id,
         status: comment.status,
+        reviewNote: comment.reviewNote,
         postId,
         author: displayAsAnonymous ? anonymousCommentIdentity.author : getUserDisplayName(comment.user),
         authorIsAnonymous: displayAsAnonymous,
@@ -396,13 +409,21 @@ export async function getCommentsByPostId(
       postId,
       viewerUserId: viewer?.userId,
       includeHidden: true,
+      includePendingOwn: Boolean(viewer?.userId),
+      includePendingAll: Boolean(viewer?.isAdmin),
     })
     const rootFloorMap = new Map(allRootComments.map((comment, index) => [comment.id, index + 1]))
     const rootPageMap = new Map(allRootComments.map((comment, index) => [comment.id, Math.floor(index / pageSize) + 1]))
 
     if (viewMode === "flat") {
       const [total, rawComments, allVisibleComments, allFlatComments] = await Promise.all([
-        countVisibleCommentsByPostId(postId, viewer?.userId, true),
+        countVisibleCommentsByPostId({
+          postId,
+          viewerUserId: viewer?.userId,
+          includeHidden: true,
+          includePendingOwn: Boolean(viewer?.userId),
+          includePendingAll: Boolean(viewer?.isAdmin),
+        }),
         findFlatCommentsByPostId({
           postId,
           sort,
@@ -410,17 +431,23 @@ export async function getCommentsByPostId(
           pageSize,
           viewerUserId: viewer?.userId,
           includeHidden: true,
+          includePendingOwn: Boolean(viewer?.userId),
+          includePendingAll: Boolean(viewer?.isAdmin),
         }),
         findAllVisibleCommentIdsByPostId({
           postId,
           viewerUserId: viewer?.userId,
           includeHidden: true,
+          includePendingOwn: Boolean(viewer?.userId),
+          includePendingAll: Boolean(viewer?.isAdmin),
         }),
         findAllFlatCommentIdsByPostId({
           postId,
           sort,
           viewerUserId: viewer?.userId,
           includeHidden: true,
+          includePendingOwn: Boolean(viewer?.userId),
+          includePendingAll: Boolean(viewer?.isAdmin),
         }),
       ])
 
@@ -438,6 +465,8 @@ export async function getCommentsByPostId(
         commentIds: missingParentIds,
         viewerUserId: viewer?.userId,
         includeHidden: true,
+        includePendingOwn: Boolean(viewer?.userId),
+        includePendingAll: Boolean(viewer?.isAdmin),
       }) as unknown as RawCommentRecord[]
       const parentCommentEntries: Array<[string, RawCommentRecord]> = [
         ...flatComments
@@ -538,7 +567,13 @@ export async function getCommentsByPostId(
     }
 
     const [total, rawRootComments] = await Promise.all([
-      countRootCommentsByPostId(postId, viewer?.userId, true),
+      countRootCommentsByPostId({
+        postId,
+        viewerUserId: viewer?.userId,
+        includeHidden: true,
+        includePendingOwn: Boolean(viewer?.userId),
+        includePendingAll: Boolean(viewer?.isAdmin),
+      }),
       findRootCommentsByPostId({
         postId,
         sort,
@@ -546,6 +581,8 @@ export async function getCommentsByPostId(
         pageSize,
         viewerUserId: viewer?.userId,
         includeHidden: true,
+        includePendingOwn: Boolean(viewer?.userId),
+        includePendingAll: Boolean(viewer?.isAdmin),
       }),
     ])
 
@@ -557,6 +594,8 @@ export async function getCommentsByPostId(
       sort,
       viewerUserId: viewer?.userId,
       includeHidden: true,
+      includePendingOwn: Boolean(viewer?.userId),
+      includePendingAll: Boolean(viewer?.isAdmin),
     }) as unknown as RawCommentRecord[]
     const commentIds = [
       ...rootIds,

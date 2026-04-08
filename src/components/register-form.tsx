@@ -145,11 +145,11 @@ export function RegisterForm({ settings }: RegisterFormProps) {
       return
     }
 
-    const successMessage = "注册成功，正在跳转到首页…"
+    const autoLogin = Boolean(result.data?.autoLogin)
+    const successMessage = result.message ?? (autoLogin ? "注册成功，正在跳转到首页…" : "注册成功，请前往登录页登录")
     toast.success(successMessage, "注册成功")
 
-
-    router.replace("/")
+    router.replace(autoLogin ? "/" : "/login")
     router.refresh()
     setLoading(false)
   }

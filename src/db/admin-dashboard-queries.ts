@@ -108,11 +108,13 @@ async function getAdminDashboardRawDataUncached() {
     `),
     prisma.$queryRaw<Array<{
       commentCount: NumericLike
+      pendingCommentCount: NumericLike
       newCommentCount7d: NumericLike
       todayCommentCount: NumericLike
     }>>(Prisma.sql`
       SELECT
         COUNT(*) AS "commentCount",
+        COUNT(*) FILTER (WHERE status = 'PENDING') AS "pendingCommentCount",
         COUNT(*) FILTER (WHERE "createdAt" >= ${sevenDaysAgo}) AS "newCommentCount7d",
         COUNT(*) FILTER (WHERE "createdAt" >= ${todayStart}) AS "todayCommentCount"
       FROM "Comment"
@@ -197,6 +199,7 @@ async function getAdminDashboardRawDataUncached() {
       userCount: toNumber(resolvedUserStats?.userCount),
       postCount: toNumber(resolvedPostStats?.postCount),
       commentCount: toNumber(resolvedCommentStats?.commentCount),
+      pendingCommentCount: toNumber(resolvedCommentStats?.pendingCommentCount),
       boardCount: toNumber(resolvedSiteStats?.boardCount),
       zoneCount: toNumber(resolvedSiteStats?.zoneCount),
       reportCount: toNumber(resolvedReportStats?.reportCount),
@@ -267,6 +270,7 @@ export async function getAdminStructureRawData(options?: {
         sortOrder: true,
         hiddenFromSidebar: true,
         requirePostReview: true,
+        requireCommentReview: true,
         postPointDelta: true,
         replyPointDelta: true,
         postIntervalSeconds: true,
@@ -303,6 +307,7 @@ export async function getAdminStructureRawData(options?: {
         followerCount: true,
         treasuryPoints: true,
         requirePostReview: true,
+        requireCommentReview: true,
         postPointDelta: true,
         replyPointDelta: true,
         postIntervalSeconds: true,

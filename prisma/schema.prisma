@@ -348,6 +348,7 @@ model User {
   verificationCodes          VerificationCode[]
   verificationApplications   UserVerification[]          @relation("userVerificationApplicant")
   reviewedVerifications      UserVerification[]          @relation("userVerificationReviewer")
+  reviewedComments           Comment[]                   @relation("commentReviewer")
   yinYangChallengesCreated   YinYangChallenge[]          @relation("YinYangChallengeCreator")
   yinYangChallengesJoined    YinYangChallenge[]          @relation("YinYangChallengeChallenger")
   yinYangChallengeAttempts   YinYangChallengeAttempt[]
@@ -555,6 +556,7 @@ model Zone {
   sortOrder            Int                  @default(0)
   hiddenFromSidebar    Boolean              @default(false)
   requirePostReview    Boolean              @default(false)
+  requireCommentReview Boolean              @default(false)
   postPointDelta       Int                  @default(0)
   replyPointDelta      Int                  @default(0)
   postIntervalSeconds  Int                  @default(120)
@@ -593,6 +595,7 @@ model Board {
   status               BoardStatus           @default(ACTIVE)
   allowPost            Boolean               @default(true)
   requirePostReview    Boolean?
+  requireCommentReview Boolean?
   postPointDelta       Int?
   replyPointDelta      Int?
   postIntervalSeconds  Int?
@@ -630,6 +633,7 @@ model ModeratorZoneScope {
   moderatorId     Int
   zoneId          String
   canEditSettings Boolean  @default(false)
+  canWithdrawTreasury Boolean @default(true)
   createdAt       DateTime @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime @updatedAt @db.Timestamptz(3)
   moderator       User     @relation(fields: [moderatorId], references: [id], onDelete: Cascade)
@@ -645,6 +649,7 @@ model ModeratorBoardScope {
   moderatorId     Int
   boardId         String
   canEditSettings Boolean  @default(false)
+  canWithdrawTreasury Boolean @default(true)
   createdAt       DateTime @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime @updatedAt @db.Timestamptz(3)
   moderator       User     @relation(fields: [moderatorId], references: [id], onDelete: Cascade)
@@ -860,6 +865,9 @@ model Comment {
   useAnonymousIdentity   Boolean                @default(false)
   content               String
   status                CommentStatus          @default(NORMAL)
+  reviewNote            String?
+  reviewedById          Int?
+  reviewedAt            DateTime?              @db.Timestamptz(3)
   likeCount             Int                    @default(0)
   isAcceptedAnswer      Boolean                @default(false)
   isPinnedByAuthor      Boolean                @default(false)
@@ -874,6 +882,7 @@ model Comment {
   replyToUser           User?                  @relation("replyToUser", fields: [replyToUserId], references: [id])
   replyToComment        Comment?               @relation("CommentReplyTargets", fields: [replyToCommentId], references: [id], onDelete: SetNull)
   quotedReplies         Comment[]              @relation("CommentReplyTargets")
+  reviewer              User?                  @relation("commentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   likes                 Like[]
   pollVotes             PollVote[]
   lotteryParticipants   LotteryParticipant[]
@@ -886,6 +895,7 @@ model Comment {
   @@index([replyToCommentId])
   @@index([postId, status, createdAt])
   @@index([postId, status, parentId, createdAt])
+  @@index([reviewedById, reviewedAt])
 }
 
 model Like {
@@ -1212,6 +1222,7 @@ model UserVerification {
   typeId           String
   status           UserVerificationStatus @default(PENDING)
   content          String
+  customDescription String?
   formResponseJson String?
   note             String?
   rejectReason     String?

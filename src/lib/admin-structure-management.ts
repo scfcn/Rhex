@@ -10,6 +10,7 @@ export interface ZoneItem {
   postCount: number
   followerCount: number
   requirePostReview: boolean
+  requireCommentReview: boolean
   postPointDelta: number
   replyPointDelta: number
   postIntervalSeconds: number
@@ -54,6 +55,7 @@ export interface BoardItem {
   todayPostCount: number
   treasuryPoints: number
   requirePostReview: boolean | null
+  requireCommentReview: boolean | null
   postPointDelta: number | null
   replyPointDelta: number | null
   postIntervalSeconds: number | null

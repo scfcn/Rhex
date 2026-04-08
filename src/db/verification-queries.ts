@@ -143,6 +143,7 @@ export function createUserVerificationApplication(input: {
   userId: number
   verificationTypeId: string
   content: string
+  customDescription: string | null
   formResponseJson: string | null
 }) {
   return prisma.userVerification.create({
@@ -150,6 +151,7 @@ export function createUserVerificationApplication(input: {
       userId: input.userId,
       typeId: input.verificationTypeId,
       content: input.content,
+      customDescription: input.customDescription,
       formResponseJson: input.formResponseJson,
       status: "PENDING",
     },

@@ -13,7 +13,7 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   })
 
   if (result.targetUserId) {
-    await syncUserReceivedLikes(result.targetUserId)
+    await syncUserReceivedLikes(result.targetUserId, { notifyOnUpgrade: true })
   }
 
   return apiSuccess({ liked: result.liked }, result.liked ? "点赞成功" : "已取消点赞")

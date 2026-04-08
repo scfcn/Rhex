@@ -1,6 +1,6 @@
 import type { StoredPostRewardPoolConfig } from "@/lib/post-reward-pool-config"
 
-export type PostBlockAccessType = "PUBLIC" | "AUTHOR_ONLY" | "REPLY_UNLOCK" | "PURCHASE_UNLOCK"
+export type PostBlockAccessType = "PUBLIC" | "AUTHOR_ONLY" | "LOGIN_UNLOCK" | "REPLY_UNLOCK" | "PURCHASE_UNLOCK"
 
 export interface PostContentBlock {
   id: string
@@ -48,7 +48,7 @@ function normalizeReplyThreshold(value: unknown) {
 }
 
 function normalizeBlockType(value: unknown): PostBlockAccessType {
-  if (value === "AUTHOR_ONLY" || value === "REPLY_UNLOCK" || value === "PURCHASE_UNLOCK") {
+  if (value === "AUTHOR_ONLY" || value === "LOGIN_UNLOCK" || value === "REPLY_UNLOCK" || value === "PURCHASE_UNLOCK") {
     return value
   }
 
@@ -58,6 +58,7 @@ function normalizeBlockType(value: unknown): PostBlockAccessType {
 export function buildPostContentDocument(input: {
   publicContent?: string
   authorOnlyContent?: string
+  loginUnlockContent?: string
   replyUnlockContent?: string
   replyThreshold?: number
   purchaseUnlockContent?: string
@@ -67,6 +68,7 @@ export function buildPostContentDocument(input: {
   const blocks: PostContentBlock[] = []
   const publicContent = normalizeText(input.publicContent)
   const authorOnlyContent = normalizeText(input.authorOnlyContent)
+  const loginUnlockContent = normalizeText(input.loginUnlockContent)
   const replyUnlockContent = normalizeText(input.replyUnlockContent)
   const purchaseUnlockContent = normalizeText(input.purchaseUnlockContent)
 
@@ -83,6 +85,14 @@ export function buildPostContentDocument(input: {
       id: createId("author", blocks.length),
       type: "AUTHOR_ONLY",
       text: authorOnlyContent,
+    })
+  }
+
+  if (loginUnlockContent) {
+    blocks.push({
+      id: createId("login", blocks.length),
+      type: "LOGIN_UNLOCK",
+      text: loginUnlockContent,
     })
   }
 

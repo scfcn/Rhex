@@ -45,6 +45,10 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     request,
     userId: currentUser.id,
     scope: "upload-file",
+    cooldownMs: 0,
+    dedupeKey: `${currentUser.id}:${folder}:${preparedFile.fileHash}`,
+    dedupeWindowMs: 10_000,
+    releaseOnError: true,
   }, async () => {
     // 同用户、同 bucket、相同内容 → 直接复用已有记录，跳过写盘和入库
     const existing = await findExistingUpload(currentUser.id, folder, preparedFile.fileHash)

@@ -21,3 +21,29 @@ export function createRequestControl(data: {
     data,
   })
 }
+
+export function deleteExpiredRequestControlsForKey(input: {
+  scope: string
+  identity: string
+  kind: string
+  fingerprint: string | null
+  now: Date
+}) {
+  return prisma.requestControl.deleteMany({
+    where: {
+      scope: input.scope,
+      identity: input.identity,
+      kind: input.kind,
+      fingerprint: input.fingerprint,
+      expiresAt: {
+        lte: input.now,
+      },
+    },
+  })
+}
+
+export function deleteRequestControlById(id: string) {
+  return prisma.requestControl.deleteMany({
+    where: { id },
+  })
+}

@@ -8,7 +8,7 @@ import type { MarkdownEmojiItem } from "@/lib/markdown-emoji"
 
 interface RestrictedPostBlockProps {
 
-  type: "AUTHOR_ONLY" | "REPLY_UNLOCK" | "PURCHASE_UNLOCK"
+  type: "AUTHOR_ONLY" | "LOGIN_UNLOCK" | "REPLY_UNLOCK" | "PURCHASE_UNLOCK"
   postId: string
   blockId: string
   text?: string
@@ -49,7 +49,14 @@ export function RestrictedPostBlock({ type, postId, blockId, text, visible, curr
 
 
   if (visible && text) {
-    return <UnlockedContentFrame title={type === "REPLY_UNLOCK" ? "回复后已解锁内容" : "购买后已解锁内容"} content={text} summary={type === "PURCHASE_UNLOCK" ? `已有 ${purchaseCount} 人购买` : undefined} markdownEmojiMap={markdownEmojiMap} />
+    return (
+      <UnlockedContentFrame
+        title={type === "LOGIN_UNLOCK" ? "登录后可见内容" : type === "REPLY_UNLOCK" ? "回复后已解锁内容" : "购买后已解锁内容"}
+        content={text}
+        summary={type === "PURCHASE_UNLOCK" ? `已有 ${purchaseCount} 人购买` : undefined}
+        markdownEmojiMap={markdownEmojiMap}
+      />
+    )
 
   }
 
@@ -74,6 +81,18 @@ export function RestrictedPostBlock({ type, postId, blockId, text, visible, curr
             {scrolling ? "正在跳转回复框..." : "立即回复并解锁"}
           </button>
         ) : null}
+      </div>
+    )
+  }
+
+  if (type === "LOGIN_UNLOCK") {
+    return (
+      <div className="space-y-4 rounded-[20px] border border-dashed border-violet-300 bg-violet-50 px-5 py-4 text-sm text-violet-900">
+        <div className="space-y-1">
+          <p className="font-medium">登录后可见内容</p>
+          <p>{isOwnerOrAdmin ? "你是楼主或管理员，可直接查看该内容。" : "这部分内容仅登录用户可查看。"}</p>
+        </div>
+        {!currentUserId ? <p>请先登录后再查看。</p> : null}
       </div>
     )
   }

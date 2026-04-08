@@ -253,9 +253,11 @@ export async function approveBoardApplicationWithBoardCreation(params: {
         moderatorId: params.applicantId,
         boardId: board.id,
         canEditSettings: true,
+        canWithdrawTreasury: true,
       },
       update: {
         canEditSettings: true,
+        canWithdrawTreasury: true,
       },
     })
 

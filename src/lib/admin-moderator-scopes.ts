@@ -8,6 +8,7 @@ import { isSiteAdmin } from "@/lib/moderator-permissions"
 interface ScopeInput {
   id: string
   canEditSettings: boolean
+  canWithdrawTreasury: boolean
 }
 
 function readScopeArray(value: unknown, key: "zoneId" | "boardId") {
@@ -30,6 +31,7 @@ function readScopeArray(value: unknown, key: "zoneId" | "boardId") {
       return {
         id,
         canEditSettings: record.canEditSettings === true,
+        canWithdrawTreasury: record.canWithdrawTreasury !== false,
       }
     })
     .filter((item): item is ScopeInput => Boolean(item))

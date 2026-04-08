@@ -6,7 +6,17 @@ export { getRequestIp } from "@/lib/request-ip"
 
 import { getAdminDashboardRawData, getAdminStructureRawData } from "@/db/admin-dashboard-queries"
 import { createAdminLogEntry } from "@/db/admin-log-queries"
+import { countAdminCommentSummary, findAdminCommentBoardOptions, findAdminCommentsPage } from "@/db/admin-comment-management-queries"
 import { countAdminPostSummary, findAdminPostBoardOptions, findAdminPostsPage } from "@/db/admin-post-management-queries"
+import {
+  buildAdminCommentFilters,
+  buildAdminCommentOrderBy,
+  buildAdminCommentWhere,
+  mapAdminCommentBoardOption,
+  mapAdminCommentListItem,
+  normalizeAdminCommentQuery,
+  type AdminCommentQuery,
+} from "@/lib/admin-comment-list"
 import {
   buildAdminPostFilters,
   buildAdminPostOrderBy,
@@ -136,6 +146,44 @@ export async function writeAdminLog(adminId: number, action: string, targetType:
     detail,
     ip,
   })
+}
+
+export async function getAdminComments(query: AdminCommentQuery = {}) {
+  const currentUser = await requireAdminActor()
+
+  if (!currentUser) {
+    apiError(403, "无权限访问评论管理")
+  }
+
+  const normalizedQuery = normalizeAdminCommentQuery(query)
+  const where = buildAdminCommentWhere(currentUser, normalizedQuery)
+  const orderBy = buildAdminCommentOrderBy(normalizedQuery.sort)
+
+  const [summary, boardOptions] = await Promise.all([
+    countAdminCommentSummary(where),
+    findAdminCommentBoardOptions(buildManagedBoardWhereInput(currentUser)),
+  ])
+
+  const totalPages = Math.max(1, Math.ceil(summary.total / normalizedQuery.pageSize))
+  const page = Math.min(normalizedQuery.page, totalPages)
+  const skip = (page - 1) * normalizedQuery.pageSize
+  const comments = await findAdminCommentsPage(where, orderBy, skip, normalizedQuery.pageSize)
+
+  return {
+    comments: comments.map(mapAdminCommentListItem),
+    actorRole: currentUser.role,
+    boardOptions: boardOptions.map(mapAdminCommentBoardOption),
+    filters: buildAdminCommentFilters(normalizedQuery),
+    summary,
+    pagination: {
+      page,
+      pageSize: normalizedQuery.pageSize,
+      total: summary.total,
+      totalPages,
+      hasPrevPage: page > 1,
+      hasNextPage: page < totalPages,
+    },
+  }
 }
 
 
