@@ -88,7 +88,7 @@ export async function HomeFeedPage({
     : Promise.all([currentUserPromise, settingsPromise]).then(([currentUser, settings]) => (
         getLatestFeed(currentPage, settings.homeFeedPostPageSize, postSort, currentUser?.id, settings.homeHotRecentWindowHours)
       ))
-  const universeFeedPromise = sort !== "universe"
+  const universeFeedPromise = sort !== "universe" || enableUniverseSourceFilter
     ? Promise.resolve(null)
     : rssHomeSettingsPromise.then((rssHomeSettings) => {
         if (!rssHomeSettings.homeDisplayEnabled) {
@@ -132,6 +132,10 @@ export async function HomeFeedPage({
   )
   const showUniverse = rssHomeSettings.homeDisplayEnabled
 
+  if (sort === "universe" && !showUniverse) {
+    redirect(buildHomeFeedHref("latest"))
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {currentUser?.id && shouldAutoCheckIn ? (
@@ -146,11 +150,11 @@ export async function HomeFeedPage({
           main={(
             <div className="pb-12 py-1">
               {mainTopSlot ? <div className="mt-6 mb-4">{mainTopSlot}</div> : null}
-              {sort === "universe" && universeFeedPage ? (
+              {sort === "universe" ? (
                 <>
                   {enableUniverseSourceFilter ? (
-                    <RssUniversePageClient initialData={universeFeedPage} showUniverse={showUniverse} />
-                  ) : (
+                    <RssUniversePageClient initialPage={currentPage} showUniverse={showUniverse} />
+                  ) : universeFeedPage ? (
                     <>
                       <RssUniverseFeedView items={universeFeedPage.items} showUniverse={showUniverse} />
                       {universeFeedPage.items.length === 0 ? <div className="mt-4 rounded-md border bg-background p-8 text-sm text-muted-foreground">宇宙栏目还没有可展示的采集内容。</div> : null}
@@ -164,7 +168,7 @@ export async function HomeFeedPage({
                         />
                       ) : null}
                     </>
-                  )}
+                  ) : null}
                 </>
               ) : null}
               {sort !== "universe" && postFeedPage ? (() => {

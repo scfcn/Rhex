@@ -5,6 +5,7 @@ const workspaceRoot = resolve(__dirname, "../")
 const versionDirectory = join(resolve(__dirname, "../../"), "version/Rhex")
 
 const includeEntries = [
+  "LICENSE",
   "src",
   "docs",
   "public",

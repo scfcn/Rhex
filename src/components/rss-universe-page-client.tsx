@@ -35,55 +35,63 @@ function buildPageTokens(page: number, totalPages: number) {
   return result
 }
 
-function normalizeStoredSourceIds(rawValue: string | null, availableSourceIds: string[]) {
+function parseStoredSourceIds(rawValue: string | null) {
   if (!rawValue) {
-    return availableSourceIds
+    return null
   }
 
   try {
     const parsed = JSON.parse(rawValue)
     if (!Array.isArray(parsed)) {
-      return availableSourceIds
+      return null
     }
 
-    const availableSet = new Set(availableSourceIds)
     const normalized = Array.from(new Set(
       parsed
         .filter((value): value is string => typeof value === "string")
         .map((value) => value.trim())
-        .filter((value) => value && availableSet.has(value)),
+        .filter(Boolean),
     ))
 
-    return normalized.length > 0 ? normalized : availableSourceIds
+    return normalized.length > 0 ? normalized : null
   } catch {
-    return availableSourceIds
+    return null
   }
 }
 
-function areSameSourceIds(left: string[], right: string[]) {
-  if (left.length !== right.length) {
-    return false
+function normalizeSelectedSourceIds(sourceIds: string[] | null | undefined, availableSourceIds: string[]) {
+  if (availableSourceIds.length === 0) {
+    return []
   }
 
-  const leftSorted = [...left].sort()
-  const rightSorted = [...right].sort()
-  return leftSorted.every((value, index) => value === rightSorted[index])
+  if (!sourceIds?.length) {
+    return [...availableSourceIds]
+  }
+
+  const availableSet = new Set(availableSourceIds)
+  const normalized = Array.from(new Set(
+    sourceIds
+      .map((value) => value.trim())
+      .filter((value) => value && availableSet.has(value)),
+  ))
+
+  return normalized.length > 0 ? normalized : [...availableSourceIds]
 }
 
-function buildUniverseApiUrl(page: number, selectedSourceIds: string[], availableSourceIds: string[]) {
+function buildUniverseApiUrl(page: number, selectedSourceIds: string[]) {
   const searchParams = new URLSearchParams({
     page: String(Math.max(1, Math.trunc(page))),
   })
 
-  if (selectedSourceIds.length > 0 && selectedSourceIds.length < availableSourceIds.length) {
+  if (selectedSourceIds.length > 0) {
     searchParams.set("sourceIds", selectedSourceIds.join(","))
   }
 
   return `/api/rss-universe?${searchParams.toString()}`
 }
 
-async function readUniverseFeedPage(page: number, selectedSourceIds: string[], availableSourceIds: string[]) {
-  const response = await fetch(buildUniverseApiUrl(page, selectedSourceIds, availableSourceIds), {
+async function readUniverseFeedPage(page: number, selectedSourceIds: string[]) {
+  const response = await fetch(buildUniverseApiUrl(page, selectedSourceIds), {
     method: "GET",
     cache: "no-store",
   })
@@ -104,36 +112,67 @@ function syncUniversePageUrl(page: number) {
   window.history.replaceState(window.history.state, "", buildHomeFeedHref("universe", page))
 }
 
+function RssUniverseFeedLoading({ showUniverse }: { showUniverse: boolean }) {
+  return (
+    <div className="overflow-hidden rounded-md bg-background">
+      <RssUniverseFeedView items={[]} showUniverse={showUniverse} />
+      <div className="space-y-3 px-1 py-4 lg:px-4" aria-live="polite" aria-busy="true">
+        <div className="flex items-center gap-2 px-3 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>正在读取宇宙源筛选...</span>
+        </div>
+        {Array.from({ length: 6 }, (_, index) => (
+          <div key={index} className="flex items-start gap-3 rounded-2xl border border-border/60 bg-card/40 px-3 py-3">
+            <div className="h-10 w-10 shrink-0 rounded-xl bg-muted/70" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="h-4 w-4/5 rounded-full bg-muted/80" />
+              <div className="h-3 w-3/5 rounded-full bg-muted/60" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+interface LoadPageOptions {
+  scrollToTop?: boolean
+}
+
 export function RssUniversePageClient({
-  initialData,
+  initialPage,
   showUniverse,
 }: {
-  initialData: RssUniverseFeedPageData
+  initialPage: number
   showUniverse: boolean
 }) {
-  const [data, setData] = useState(initialData)
+  const [data, setData] = useState<RssUniverseFeedPageData | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState("")
-  const availableSourceIds = useMemo(() => data.availableSources.map((source) => source.id), [data.availableSources])
-  const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>(() => initialData.availableSources.map((source) => source.id))
-  const [draftSourceIds, setDraftSourceIds] = useState<string[]>(() => initialData.availableSources.map((source) => source.id))
-  const initializedFromStorageRef = useRef(false)
+  const availableSourceIds = useMemo(() => data?.availableSources.map((source) => source.id) ?? [], [data])
+  const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([])
+  const [draftSourceIds, setDraftSourceIds] = useState<string[]>([])
+  const initializedRef = useRef(false)
   const selectedCount = selectedSourceIds.length
-  const allSelected = selectedCount === availableSourceIds.length
+  const allSelected = availableSourceIds.length === 0 || selectedCount === availableSourceIds.length
 
-  const loadPage = useCallback(async (page: number, nextSelectedSourceIds: string[]) => {
-    if (availableSourceIds.length === 0) {
-      return
-    }
-
+  const loadPage = useCallback(async (
+    page: number,
+    requestedSourceIds: string[],
+    options?: LoadPageOptions,
+  ) => {
     setLoading(true)
     setErrorMessage("")
     try {
-      const nextData = await readUniverseFeedPage(page, nextSelectedSourceIds, availableSourceIds)
+      const nextData = await readUniverseFeedPage(page, requestedSourceIds)
+      const nextAvailableSourceIds = nextData.availableSources.map((source) => source.id)
+      const normalizedSelection = normalizeSelectedSourceIds(requestedSourceIds, nextAvailableSourceIds)
       setData(nextData)
+      setSelectedSourceIds(normalizedSelection)
+      setDraftSourceIds(normalizedSelection)
       syncUniversePageUrl(nextData.pagination.page)
-      if (typeof window !== "undefined") {
+      if (options?.scrollToTop !== false && typeof window !== "undefined") {
         window.scrollTo({ top: 0, behavior: "smooth" })
       }
     } catch (error) {
@@ -141,37 +180,23 @@ export function RssUniversePageClient({
     } finally {
       setLoading(false)
     }
-  }, [availableSourceIds])
+  }, [])
+
+  const initializePage = useCallback(async () => {
+    const storedSourceIds = parseStoredSourceIds(
+      typeof window === "undefined" ? null : window.localStorage.getItem(RSS_UNIVERSE_SOURCE_FILTER_STORAGE_KEY),
+    )
+    await loadPage(initialPage, storedSourceIds ?? [], { scrollToTop: false })
+  }, [initialPage, loadPage])
 
   useEffect(() => {
-    if (initializedFromStorageRef.current) {
+    if (initializedRef.current) {
       return
     }
 
-    initializedFromStorageRef.current = true
-    const normalized = normalizeStoredSourceIds(
-      typeof window === "undefined" ? null : window.localStorage.getItem(RSS_UNIVERSE_SOURCE_FILTER_STORAGE_KEY),
-      availableSourceIds,
-    )
-
-    setSelectedSourceIds(normalized)
-    setDraftSourceIds(normalized)
-
-    if (!areSameSourceIds(normalized, availableSourceIds)) {
-      void loadPage(initialData.pagination.page, normalized)
-    }
-  }, [availableSourceIds, initialData.pagination.page, loadPage])
-
-  useEffect(() => {
-    setSelectedSourceIds((current) => {
-      const normalized = current.filter((value) => availableSourceIds.includes(value))
-      return normalized.length > 0 ? normalized : availableSourceIds
-    })
-    setDraftSourceIds((current) => {
-      const normalized = current.filter((value) => availableSourceIds.includes(value))
-      return normalized.length > 0 ? normalized : availableSourceIds
-    })
-  }, [availableSourceIds])
+    initializedRef.current = true
+    void initializePage()
+  }, [initializePage])
 
   function persistSelectedSourceIds(nextSelectedSourceIds: string[]) {
     if (typeof window === "undefined") {
@@ -199,7 +224,6 @@ export function RssUniversePageClient({
 
     const normalized = availableSourceIds.filter((sourceId) => draftSourceIds.includes(sourceId))
     persistSelectedSourceIds(normalized)
-    setSelectedSourceIds(normalized)
     setPanelOpen(false)
     await loadPage(1, normalized)
   }
@@ -207,10 +231,28 @@ export function RssUniversePageClient({
   function resetFilters() {
     const normalized = [...availableSourceIds]
     persistSelectedSourceIds(normalized)
-    setSelectedSourceIds(normalized)
-    setDraftSourceIds(normalized)
     setPanelOpen(false)
     void loadPage(1, normalized)
+  }
+
+  if (!data) {
+    return (
+      <>
+        <RssUniverseFeedLoading showUniverse={showUniverse} />
+        {errorMessage ? (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <span>{errorMessage}</span>
+            <button
+              type="button"
+              onClick={() => void initializePage()}
+              className="rounded-full border border-red-200 bg-background px-3 py-1.5 text-xs text-red-700 transition-colors hover:bg-red-100"
+            >
+              重新加载
+            </button>
+          </div>
+        ) : null}
+      </>
+    )
   }
 
   const pageTokens = buildPageTokens(data.pagination.page, data.pagination.totalPages)
@@ -338,29 +380,29 @@ export function RssUniversePageClient({
 
               <div className="max-h-[min(48vh,20rem)] overflow-y-auto px-3 pb-3 sm:max-h-[min(54vh,22rem)]">
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {data.availableSources.map((source) => {
-                  const checked = draftSourceIds.includes(source.id)
-                  const logoUrl = getAvatarUrl(source.logoPath, source.siteName)
+                  {data.availableSources.map((source) => {
+                    const checked = draftSourceIds.includes(source.id)
+                    const logoUrl = getAvatarUrl(source.logoPath, source.siteName)
 
-                  return (
-                    <button
-                      key={source.id}
-                      type="button"
-                      onClick={() => toggleDraftSource(source.id)}
-                      className={cn(
-                        "flex min-w-0 items-center gap-2 rounded-[14px] border px-2 py-1.5 text-left transition-colors",
-                        checked
-                          ? "border-foreground/20 bg-accent/60"
-                          : "border-border bg-card hover:bg-accent/30",
-                      )}
-                    >
-                      <div className="relative h-6 w-6 shrink-0 overflow-hidden rounded-md border border-border bg-card">
-                        <Image src={logoUrl} alt={`${source.siteName} logo`} fill sizes="24px" className="object-cover" unoptimized />
-                      </div>
-                      <div className="min-w-0 flex-1 truncate text-[11px] leading-4 text-foreground">{source.siteName}</div>
-                    </button>
-                  )
-                })}
+                    return (
+                      <button
+                        key={source.id}
+                        type="button"
+                        onClick={() => toggleDraftSource(source.id)}
+                        className={cn(
+                          "flex min-w-0 items-center gap-2 rounded-[14px] border px-2 py-1.5 text-left transition-colors",
+                          checked
+                            ? "border-foreground/20 bg-accent/60"
+                            : "border-border bg-card hover:bg-accent/30",
+                        )}
+                      >
+                        <div className="relative h-6 w-6 shrink-0 overflow-hidden rounded-md border border-border bg-card">
+                          <Image src={logoUrl} alt={`${source.siteName} logo`} fill sizes="24px" className="object-cover" unoptimized />
+                        </div>
+                        <div className="min-w-0 flex-1 truncate text-[11px] leading-4 text-foreground">{source.siteName}</div>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
 
