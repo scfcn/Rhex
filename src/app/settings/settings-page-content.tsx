@@ -9,6 +9,7 @@ import { BrowsingSettingsPanel } from "@/components/browsing-settings-panel"
 import { InviteCodePurchaseCard } from "@/components/invite-code-purchase-card"
 import { InviteLinkCopyButton } from "@/components/invite-link-copy-button"
 import { LevelBadge } from "@/components/level-badge"
+import { FavoriteCollectionManager } from "@/components/favorite-collection-manager"
 import { PostListLink } from "@/components/post-list-link"
 import { ProfileAccountBindingSettings } from "@/components/profile-account-binding-settings"
 import { ProfileEditForm } from "@/components/profile-edit-form"
@@ -71,6 +72,7 @@ export function SettingsPageContent({ data }: { data: SettingsPageData }) {
           userPosts={data.userPosts}
           replies={data.replies}
           favoritePosts={data.favoritePosts}
+          favoriteCollections={data.favoriteCollections}
           likedPosts={data.likedPosts}
           postLinkDisplayMode={settings.postLinkDisplayMode}
         />
@@ -309,6 +311,7 @@ function PostManagementPanel({
   userPosts,
   replies,
   favoritePosts,
+  favoriteCollections,
   likedPosts,
   postLinkDisplayMode,
 }: {
@@ -316,6 +319,7 @@ function PostManagementPanel({
   userPosts: SettingsPageData["userPosts"]
   replies: SettingsPageData["replies"]
   favoritePosts: SettingsPageData["favoritePosts"]
+  favoriteCollections: SettingsPageData["favoriteCollections"]
   likedPosts: SettingsPageData["likedPosts"]
   postLinkDisplayMode: "SLUG" | "ID"
 }) {
@@ -334,6 +338,7 @@ function PostManagementPanel({
       {currentTab === "posts" ? <MyPostsPanel userPosts={userPosts} postLinkDisplayMode={postLinkDisplayMode} /> : null}
       {currentTab === "replies" ? <MyRepliesPanel replies={replies} postLinkDisplayMode={postLinkDisplayMode} /> : null}
       {currentTab === "favorites" ? <FavoritesPanel favoritePosts={favoritePosts} postLinkDisplayMode={postLinkDisplayMode} /> : null}
+      {currentTab === "collections" ? <CollectionsPanel favoriteCollections={favoriteCollections} /> : null}
       {currentTab === "likes" ? <MyLikesPanel likedPosts={likedPosts} postLinkDisplayMode={postLinkDisplayMode} /> : null}
     </div>
   )
@@ -836,6 +841,10 @@ function FavoritesPanel({ favoritePosts, postLinkDisplayMode }: { favoritePosts:
   }
 
   return <PostListPanel title="我的收藏" emptyText="当前还没有收藏的帖子。" posts={favoritePosts} postLinkDisplayMode={postLinkDisplayMode} paginationBase="/settings?tab=post-management&postTab=favorites" />
+}
+
+function CollectionsPanel({ favoriteCollections }: { favoriteCollections: SettingsPageData["favoriteCollections"] }) {
+  return <FavoriteCollectionManager initialData={favoriteCollections} />
 }
 
 function MyLikesPanel({ likedPosts, postLinkDisplayMode }: { likedPosts: SettingsPageData["likedPosts"]; postLinkDisplayMode: "SLUG" | "ID" }) {

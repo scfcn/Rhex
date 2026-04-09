@@ -1,6 +1,8 @@
+import { NotificationType } from "@/db/types"
 import { toggleCommentLike } from "@/db/interaction-queries"
 import {  apiSuccess, createUserRouteHandler, readJsonBody, requireStringField } from "@/lib/api-route"
-import { syncUserReceivedLikes } from "@/lib/level-system"
+import { enqueueSyncUserReceivedLikes } from "@/lib/level-system"
+import { enqueueNotification } from "@/lib/notification-writes"
 
 export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   const body = await readJsonBody(request)
@@ -13,7 +15,19 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   })
 
   if (result.targetUserId) {
-    await syncUserReceivedLikes(result.targetUserId, { notifyOnUpgrade: true })
+    void enqueueSyncUserReceivedLikes(result.targetUserId, { notifyOnUpgrade: true })
+  }
+
+  if (result.liked && result.notificationTargetUserId) {
+    void enqueueNotification({
+      userId: result.notificationTargetUserId,
+      type: NotificationType.LIKE,
+      senderId: currentUser.id,
+      relatedType: "COMMENT",
+      relatedId: commentId,
+      title: "你的评论收到了赞",
+      content: `${currentUser.nickname ?? currentUser.username} 赞了你的评论：${result.commentPreview}`,
+    })
   }
 
   return apiSuccess({ liked: result.liked }, result.liked ? "点赞成功" : "已取消点赞")

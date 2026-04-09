@@ -176,6 +176,7 @@ export async function updatePostFlow(input: {
       where: { id: input.postId },
       data: {
         activityAt,
+        lastCommentedAt: activityAt,
         appendedContent: nextAppendedContent,
         lastAppendedAt: activityAt,
         reviewNote: appendSafety.shouldReview ? "追加内容命中敏感词审核规则，请复核" : undefined,

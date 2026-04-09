@@ -6,9 +6,10 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { ChevronLeft, ChevronUp, MessageSquareMore, Send, SmilePlus } from "lucide-react"
 
 import { EmojiPicker } from "@/components/emoji-picker"
+import { MarkdownContent } from "@/components/markdown-content"
+import { useMarkdownEmojiMap } from "@/components/site-settings-provider"
 import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/user-avatar"
-import { EMOJI_OPTIONS } from "@/lib/emoji"
 import { cn } from "@/lib/utils"
 import type { MessageBubbleItem, MessageConversationDetail, MessageSendResult } from "@/lib/message-types"
 
@@ -84,10 +85,20 @@ function MessageThreadPanelContent({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const threadRef = useRef<HTMLDivElement | null>(null)
   const shouldStickToBottomRef = useRef(true)
+  const markdownEmojiMap = useMarkdownEmojiMap()
   const [draft, setDraft] = useState("")
   const [error, setError] = useState("")
   const [showEmojiPanel, setShowEmojiPanel] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const emojiPickerItems = useMemo(
+    () => markdownEmojiMap.map((emoji) => ({
+      key: emoji.shortcode,
+      value: `:${emoji.shortcode}:`,
+      icon: emoji.icon,
+      label: `${emoji.label}（:${emoji.shortcode}:）`,
+    })),
+    [markdownEmojiMap],
+  )
 
   useEffect(() => {
     textareaRef.current?.focus()
@@ -277,7 +288,14 @@ function MessageThreadPanelContent({
                     : "rounded-bl-md border border-border bg-card text-foreground dark:bg-secondary/70 dark:text-foreground",
                 )}
               >
-                {message.body}
+                <MarkdownContent
+                  content={message.body}
+                  markdownEmojiMap={markdownEmojiMap}
+                  className={cn(
+                    "prose-p:my-0 prose-headings:my-0 prose-blockquote:my-2 prose-pre:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0 prose-p:text-inherit prose-headings:text-inherit prose-strong:text-inherit prose-code:text-inherit prose-blockquote:text-inherit prose-li:text-inherit prose-a:text-inherit",
+                    message.isMine && "text-inherit [&_*]:text-inherit [&_.md-list]:text-inherit [&_.md-task-list_.task-list-item_label]:text-inherit [&_.md-task-list_.task-list-item:has(input[type='checkbox']:checked)]:text-inherit [&_.md-callout-title]:text-inherit",
+                  )}
+                />
               </div>
               <p className={cn("mt-2 text-xs text-muted-foreground", message.isMine ? "text-right" : "text-left")}>{message.createdAt}</p>
             </div>
@@ -310,14 +328,9 @@ function MessageThreadPanelContent({
                 <span>表情</span>
               </button>
               {showEmojiPanel ? (
-                <div className="absolute bottom-[calc(100%+12px)] left-0 z-20 w-[260px] rounded-2xl border border-border bg-background p-3 shadow-2xl">
+                <div className="absolute bottom-[calc(100%+12px)] left-0 z-20 w-[260px] max-h-[320px] overflow-y-auto rounded-2xl border border-border bg-background p-3 shadow-2xl">
                   <EmojiPicker
-                    items={EMOJI_OPTIONS.map((emoji) => ({
-                      key: emoji.value,
-                      value: emoji.value,
-                      icon: emoji.value,
-                      label: emoji.label,
-                    }))}
+                    items={emojiPickerItems}
                     columns={5}
                     panelClassName="space-y-2"
                     onSelect={(value) => insertEmoji(value)}

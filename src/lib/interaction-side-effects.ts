@@ -1,7 +1,7 @@
 import {
-  dispatchCommentCreateEffects,
-  dispatchPostFavoriteEffects,
-  dispatchPostLikeEffects,
+  enqueueCommentCreateEffects,
+  enqueuePostFavoriteEffects,
+  enqueuePostLikeEffects,
   registerInteractionEffectHooks,
 } from "@/lib/background-task"
 import { syncUserReceivedLikes } from "@/lib/level-system"
@@ -70,7 +70,7 @@ export async function handlePostLikeSideEffects(input: {
       }))
     : null
 
-  await dispatchPostLikeEffects({
+  void enqueuePostLikeEffects({
     postId: input.postId,
     userId: input.userId,
     targetUserId: input.targetUserId,
@@ -99,7 +99,7 @@ export async function handlePostFavoriteSideEffects(input: {
     triggerType: "FAVORITE",
   }))
 
-  await dispatchPostFavoriteEffects({
+  void enqueuePostFavoriteEffects({
     postId: input.postId,
     userId: input.userId,
     favored: input.favored,
@@ -122,7 +122,7 @@ export async function handleCommentCreateSideEffects(input: {
     triggerCommentId: input.commentId,
   }))
 
-  await dispatchCommentCreateEffects({
+  void enqueueCommentCreateEffects({
     postId: input.postId,
     userId: input.userId,
     commentId: input.commentId,

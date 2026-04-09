@@ -33,10 +33,10 @@ interface BoardSidebarPanelsProps {
 }
 
 const DEFAULT_BOARD_RULES_MARKDOWN = [
-  "1. 请围绕当前节点主题发帖与回复。",
-  "2. 禁止广告、灌水、引战、人身攻击与违法内容。",
-  "3. 尊重原作者与讨论对象，引用外部内容请注明来源。",
-  "4. 节点版主会根据站点规范与节点规则处理违规内容。",
+  "1. 请围绕当前节点主题发帖与回复",
+  "2. 禁止广告、灌水、引战、人身攻击与违法内容",
+  "3. 尊重作者与社友，引用外部内容请注明来源",
+  "4. 节点版主会根据站点规范与节点规则处理违规内容",
 ].join("\n")
 
 function isExternalUrl(url: string) {
@@ -124,7 +124,7 @@ function BoardRulesPanel({ board, moderators }: Pick<BoardSidebarPanelsProps, "b
       </div>
       <MarkdownContent
         content={board.rulesMarkdown || DEFAULT_BOARD_RULES_MARKDOWN}
-        className="text-[13px] leading-6 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1"
+        className="text-[11px] leading-6 prose-headings:mb-2 prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1"
       />
     </section>
   )

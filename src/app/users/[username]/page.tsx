@@ -10,6 +10,7 @@ import { MarkdownContent } from "@/components/markdown-content"
 import { UserProfileBadgeShowcase } from "@/components/user-profile-badge-showcase"
 import { ReportDialog } from "@/components/report-dialog"
 import { SiteHeader } from "@/components/site-header"
+import { UserPublicCollectionsPanel } from "@/components/user-public-collections-panel"
 import { UserRecentActivityPanel } from "@/components/user-recent-activity-panel"
 import { UserRecentRepliesList } from "@/components/user-recent-replies-list"
 import { UserAvatar } from "@/components/user-avatar"
@@ -23,6 +24,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { getCurrentUser } from "@/lib/auth"
 import { getGrantedBadgesForUser } from "@/lib/badges"
+import { getPublicFavoriteCollectionsByUsername } from "@/lib/favorite-collections"
 import { isUserFollowingTarget } from "@/lib/follows"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getUserProfileAccessState } from "@/lib/user-blocks"
@@ -93,9 +95,10 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
   const canViewIntroduction = canViewUserProfileVisibility(user.introductionVisibility, visibilityContext)
   const introduction = user.introduction.trim()
 
-  const [posts, recentReplies, badgeItems, isFollowingUser] = await Promise.all([
+  const [posts, recentReplies, publicCollections, badgeItems, isFollowingUser] = await Promise.all([
     canViewRecentActivity ? getUserPosts(params.username) : Promise.resolve([]),
     canViewRecentActivity ? getUserRecentReplies(params.username) : Promise.resolve([]),
+    getPublicFavoriteCollectionsByUsername(params.username, { page: 1 }),
     getGrantedBadgesForUser(user.id),
     currentUser && currentUser.id !== user.id && !profileAccess.relation.isBlocked
       ? isUserFollowingTarget({
@@ -156,7 +159,7 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
                     />
                     <div className="min-w-0 flex-1 pt-0.5">
                       <div className="flex flex-wrap items-center gap-2">
-                        <UserVerificationBadge verification={user.verification ?? null} />
+                        <UserVerificationBadge verification={user.verification ?? null} appearance="plain" />
                         <div className="flex min-w-0 items-center gap-1.5">
                           <h1 className="min-w-0 truncate text-[22px] font-semibold leading-6 tracking-tight">
                             <VipDisplayName
@@ -295,6 +298,12 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
                   ) : (
                     <ForumPostStream posts={posts} />
                   ),
+                },
+                {
+                  key: "collections",
+                  label: "合集",
+                  count: publicCollections.pagination.total,
+                  content: <UserPublicCollectionsPanel username={user.username} initialData={publicCollections} />,
                 },
                 {
                   key: "replies",

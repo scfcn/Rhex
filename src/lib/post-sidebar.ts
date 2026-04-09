@@ -1,7 +1,17 @@
 import { findPostSidebarData } from "@/db/post-sidebar-queries"
 
-export async function getPostSidebarData(postId: string, authorUsername: string, relatedPostsLimit = 5) {
-  const { author, postTags, relatedPosts } = await findPostSidebarData(postId, authorUsername, relatedPostsLimit)
+export async function getPostSidebarData(
+  postId: string,
+  authorUsername: string,
+  relatedPostsLimit = 5,
+  currentUserId?: number | null,
+) {
+  const { author, postTags, relatedPosts, favoriteCollections } = await findPostSidebarData(
+    postId,
+    authorUsername,
+    relatedPostsLimit,
+    currentUserId,
+  )
 
   return {
     author: author
@@ -16,6 +26,11 @@ export async function getPostSidebarData(postId: string, authorUsername: string,
       id: item.tag.id,
       name: item.tag.name,
       slug: item.tag.slug,
+    })),
+    collections: favoriteCollections.map((item) => ({
+      id: item.collection.id,
+      title: item.collection.title,
+      visibility: item.collection.visibility,
     })),
   }
 }

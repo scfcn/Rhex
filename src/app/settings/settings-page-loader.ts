@@ -8,6 +8,7 @@ import { getUserPointLogs } from "@/lib/points"
 import { readSearchParam } from "@/lib/search-params"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getCurrentUserLevelProgressView } from "@/lib/user-level-view"
+import { getUserFavoriteCollectionManageData } from "@/lib/favorite-collections"
 import { getUserBlocks, getUserBoardFollows, getUserFavoritePosts, getUserFollowers, getUserLikedPosts, getUserPostFollows, getUserPosts, getUserReplies, getUserTagFollows, getUserUserFollows } from "@/lib/user-panel"
 import { getUserAccountSettings, getUserProfile } from "@/lib/users"
 import { getCurrentUserVerificationData } from "@/lib/verifications"
@@ -18,7 +19,7 @@ import type { SessionActor } from "@/lib/auth"
 
 export type SettingsTabKey = "profile" | "invite" | "post-management" | "board-applications" | "level" | "badges" | "verifications" | "points" | "follows"
 export type ProfileTabKey = "basic" | "privacy" | "notifications" | "accounts" | "browsing"
-export type PostManagementTabKey = "posts" | "replies" | "favorites" | "likes"
+export type PostManagementTabKey = "posts" | "replies" | "favorites" | "collections" | "likes"
 export type FollowTabKey = "boards" | "users" | "followers" | "tags" | "posts" | "history" | "blocks"
 
 export const settingsTabs: SettingsTabKey[] = ["profile", "invite", "post-management", "board-applications", "level", "badges", "verifications", "points", "follows"]
@@ -33,6 +34,7 @@ export const postManagementTabs: Array<{ key: PostManagementTabKey; label: strin
   { key: "posts", label: "我的帖子" },
   { key: "replies", label: "我的回复" },
   { key: "favorites", label: "我的收藏" },
+  { key: "collections", label: "我的合集" },
   { key: "likes", label: "我的点赞" },
 ]
 export const followTabs: Array<{ key: FollowTabKey; label: string }> = [
@@ -62,6 +64,7 @@ interface RawSettingsSearchParams {
   profileTab?: string | string[]
   postTab?: string | string[]
   followTab?: string | string[]
+  collectionPage?: string | string[]
   listAfter?: string | string[]
   listBefore?: string | string[]
   pointsAfter?: string | string[]
@@ -73,6 +76,7 @@ export interface ResolvedSettingsRoute {
   currentProfileTab: ProfileTabKey
   currentPostTab: PostManagementTabKey
   currentFollowTab: FollowTabKey
+  collectionPage: number
   listAfter: string | null
   listBefore: string | null
   pointsAfter: string | null
@@ -97,6 +101,7 @@ export interface SettingsPageData {
   userPosts: Awaited<ReturnType<typeof getUserPosts>> | null
   replies: Awaited<ReturnType<typeof getUserReplies>> | null
   favoritePosts: Awaited<ReturnType<typeof getUserFavoritePosts>> | null
+  favoriteCollections: Awaited<ReturnType<typeof getUserFavoriteCollectionManageData>> | null
   likedPosts: Awaited<ReturnType<typeof getUserLikedPosts>> | null
   followedBoards: Awaited<ReturnType<typeof getUserBoardFollows>> | null
   followedUsers: Awaited<ReturnType<typeof getUserUserFollows>> | null
@@ -145,6 +150,7 @@ export function resolveSettingsRoute(searchParams?: RawSettingsSearchParams): Re
   const currentProfileTab = resolveTabKey(readSearchParam(searchParams?.profileTab), profileTabs.map((tab) => tab.key), "basic")
   const currentPostTab = resolveTabKey(readSearchParam(searchParams?.postTab), postManagementTabs.map((tab) => tab.key), "posts")
   const currentFollowTab = resolveTabKey(readSearchParam(searchParams?.followTab), followTabs.map((tab) => tab.key), "boards")
+  const collectionPageValue = Number(readSearchParam(searchParams?.collectionPage) ?? "1")
   const listAfter = readSearchParam(searchParams?.listAfter) ?? null
   const listBefore = readSearchParam(searchParams?.listBefore) ?? null
   const pointsAfter = readSearchParam(searchParams?.pointsAfter) ?? null
@@ -155,6 +161,7 @@ export function resolveSettingsRoute(searchParams?: RawSettingsSearchParams): Re
     currentProfileTab,
     currentPostTab,
     currentFollowTab,
+    collectionPage: Number.isFinite(collectionPageValue) && collectionPageValue > 0 ? Math.floor(collectionPageValue) : 1,
     listAfter,
     listBefore,
     pointsAfter,
@@ -174,6 +181,7 @@ async function loadSettingsTabData(
     userPosts,
     replies,
     favoritePosts,
+    favoriteCollections,
     likedPosts,
     followedBoards,
     followedUsers,
@@ -198,6 +206,9 @@ async function loadSettingsTabData(
     currentTab === "post-management" && currentPostTab === "favorites"
       ? getUserFavoritePosts(userId, { pageSize: 10, after: listAfter, before: listBefore })
       : Promise.resolve<Awaited<ReturnType<typeof getUserFavoritePosts>> | null>(null),
+    currentTab === "post-management" && currentPostTab === "collections"
+      ? getUserFavoriteCollectionManageData(userId, { page: route.collectionPage })
+      : Promise.resolve<Awaited<ReturnType<typeof getUserFavoriteCollectionManageData>> | null>(null),
     currentTab === "post-management" && currentPostTab === "likes"
       ? getUserLikedPosts(userId, { pageSize: 10, after: listAfter, before: listBefore })
       : Promise.resolve<Awaited<ReturnType<typeof getUserLikedPosts>> | null>(null),
@@ -238,6 +249,7 @@ async function loadSettingsTabData(
     userPosts,
     replies,
     favoritePosts,
+    favoriteCollections,
     likedPosts,
     followedBoards,
     followedUsers,

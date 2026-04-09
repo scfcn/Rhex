@@ -1,3 +1,5 @@
+import { enqueueBackgroundJob, registerBackgroundJobHandler } from "@/lib/background-jobs"
+
 export interface InteractionEffectHooks {
   onPostLike?: (input: {
     postId: string
@@ -23,7 +25,7 @@ export function registerInteractionEffectHooks(hooks: InteractionEffectHooks) {
   interactionEffectHooks.push(hooks)
 }
 
-export async function dispatchPostLikeEffects(input: {
+async function runPostLikeEffects(input: {
   postId: string
   userId: number
   targetUserId: number | null
@@ -34,7 +36,7 @@ export async function dispatchPostLikeEffects(input: {
   }
 }
 
-export async function dispatchPostFavoriteEffects(input: {
+async function runPostFavoriteEffects(input: {
   postId: string
   userId: number
   favored: boolean
@@ -44,7 +46,7 @@ export async function dispatchPostFavoriteEffects(input: {
   }
 }
 
-export async function dispatchCommentCreateEffects(input: {
+async function runCommentCreateEffects(input: {
   postId: string
   userId: number
   commentId: string
@@ -52,4 +54,66 @@ export async function dispatchCommentCreateEffects(input: {
   for (const hooks of interactionEffectHooks) {
     await hooks.onCommentCreate?.(input)
   }
+}
+
+registerBackgroundJobHandler("interaction.dispatch-post-like-effects", async (payload) => {
+  await runPostLikeEffects(payload)
+})
+
+registerBackgroundJobHandler("interaction.dispatch-post-favorite-effects", async (payload) => {
+  await runPostFavoriteEffects(payload)
+})
+
+registerBackgroundJobHandler("interaction.dispatch-comment-create-effects", async (payload) => {
+  await runCommentCreateEffects(payload)
+})
+
+export function dispatchPostLikeEffects(input: {
+  postId: string
+  userId: number
+  targetUserId: number | null
+  liked: boolean
+}) {
+  return runPostLikeEffects(input)
+}
+
+export function dispatchPostFavoriteEffects(input: {
+  postId: string
+  userId: number
+  favored: boolean
+}) {
+  return runPostFavoriteEffects(input)
+}
+
+export function dispatchCommentCreateEffects(input: {
+  postId: string
+  userId: number
+  commentId: string
+}) {
+  return runCommentCreateEffects(input)
+}
+
+export function enqueuePostLikeEffects(input: {
+  postId: string
+  userId: number
+  targetUserId: number | null
+  liked: boolean
+}) {
+  return enqueueBackgroundJob("interaction.dispatch-post-like-effects", input)
+}
+
+export function enqueuePostFavoriteEffects(input: {
+  postId: string
+  userId: number
+  favored: boolean
+}) {
+  return enqueueBackgroundJob("interaction.dispatch-post-favorite-effects", input)
+}
+
+export function enqueueCommentCreateEffects(input: {
+  postId: string
+  userId: number
+  commentId: string
+}) {
+  return enqueueBackgroundJob("interaction.dispatch-comment-create-effects", input)
 }

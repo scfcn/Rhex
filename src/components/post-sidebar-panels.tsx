@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Tag } from "lucide-react"
+import { FolderOpen, Tag } from "lucide-react"
 
 import { SidebarUserCard, type SidebarUserCardData } from "@/components/sidebar-user-card"
 import { getPostPath } from "@/lib/post-links"
@@ -16,17 +16,33 @@ interface TopicTag {
   slug: string
 }
 
+interface FavoriteCollectionTag {
+  id: string
+  title: string
+  visibility: "PUBLIC" | "PRIVATE"
+}
+
 interface PostSidebarPanelsProps {
   currentUser: SidebarUserCardData | null
   relatedTopics: RelatedTopic[]
   tags: TopicTag[]
+  collections: FavoriteCollectionTag[]
   postLinkDisplayMode?: "SLUG" | "ID"
   siteName?: string
   siteDescription?: string
   siteLogoPath?: string | null
 }
 
-export function PostSidebarPanels({ currentUser, relatedTopics, tags, postLinkDisplayMode = "SLUG", siteName, siteDescription, siteLogoPath }: PostSidebarPanelsProps) {
+export function PostSidebarPanels({
+  currentUser,
+  relatedTopics,
+  tags,
+  collections,
+  postLinkDisplayMode = "SLUG",
+  siteName,
+  siteDescription,
+  siteLogoPath,
+}: PostSidebarPanelsProps) {
   return (
     <div className="min-w-0 w-full max-w-full space-y-4">
       <SidebarUserCard user={currentUser} siteName={siteName} siteDescription={siteDescription} siteLogoPath={siteLogoPath} />
@@ -67,6 +83,27 @@ export function PostSidebarPanels({ currentUser, relatedTopics, tags, postLinkDi
               </Link>
             ))}
           </div>
+
+          {collections.length > 0 ? (
+            <div className="mt-4 border-t border-border/70 pt-4">
+              <div className="mb-3 flex items-center gap-2">
+                <FolderOpen className="h-4 w-4" />
+                <h4 className="font-semibold">收录合集</h4>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {collections.map((collection) => (
+                  <Link
+                    key={collection.id}
+                    href={`/collections/${collection.id}`}
+                    className="inline-flex max-w-full items-center rounded-full border border-border bg-background px-3 py-1 text-xs transition-colors hover:border-primary hover:bg-accent"
+                    title={collection.title}
+                  >
+                    <span className="truncate">{collection.title}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

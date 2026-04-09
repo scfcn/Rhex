@@ -1,6 +1,8 @@
+import { NotificationType } from "@/db/types"
 import { togglePostLike } from "@/db/interaction-queries"
 import { apiError, apiSuccess, createUserRouteHandler, readJsonBody } from "@/lib/api-route"
 import { handlePostLikeSideEffects } from "@/lib/interaction-side-effects"
+import { enqueueNotification } from "@/lib/notification-writes"
 import { logRequestSucceeded } from "@/lib/request-log"
 
 export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
@@ -23,6 +25,18 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     userId: currentUser.id,
     targetUserId: result.targetUserId,
   })
+
+  if (result.liked && result.notificationTargetUserId) {
+    void enqueueNotification({
+      userId: result.notificationTargetUserId,
+      type: NotificationType.LIKE,
+      senderId: currentUser.id,
+      relatedType: "POST",
+      relatedId: postId,
+      title: "你的帖子收到了赞",
+      content: `${currentUser.nickname ?? currentUser.username} 赞了你的帖子：${result.postTitle}`,
+    })
+  }
 
   logRequestSucceeded({
     scope: "posts-like",

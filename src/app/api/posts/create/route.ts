@@ -1,18 +1,12 @@
 import { apiSuccess, createUserRouteHandler, readJsonBody } from "@/lib/api-route"
 import { enqueueNewPostFollowNotifications } from "@/lib/follow-notifications"
-import { evaluateUserLevelProgress } from "@/lib/level-system"
+import { enqueueEvaluateUserLevelProgress } from "@/lib/level-system"
 import { createPostFlow } from "@/lib/post-create-service"
 import { logRouteWriteSuccess } from "@/lib/route-metadata"
 
 export const POST = createUserRouteHandler(async ({ request }) => {
   const body = await readJsonBody(request)
   const result = await createPostFlow(body)
-
-  await evaluateUserLevelProgress(result.author.id, { notifyOnUpgrade: true })
-
-  if (!result.shouldPending) {
-    await enqueueNewPostFollowNotifications(result.post.id)
-  }
 
   logRouteWriteSuccess({
     scope: "posts-create",
@@ -26,6 +20,12 @@ export const POST = createUserRouteHandler(async ({ request }) => {
       reviewRequired: result.shouldPending,
     },
   })
+
+  void enqueueEvaluateUserLevelProgress(result.author.id, { notifyOnUpgrade: true })
+
+  if (!result.shouldPending) {
+    void enqueueNewPostFollowNotifications(result.post.id)
+  }
 
   return apiSuccess({
     id: result.post.id,

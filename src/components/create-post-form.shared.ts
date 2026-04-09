@@ -3,6 +3,7 @@ import type { AccessThresholdOption } from "@/lib/access-threshold-options"
 import { createEmptyLocalPostDraft, type LocalPostDraft } from "@/lib/post-draft"
 import { normalizeManualTags } from "@/lib/post-tags"
 import { DEFAULT_ALLOWED_POST_TYPES, DEFAULT_POST_TYPE, normalizePostType, type LocalPostType } from "@/lib/post-types"
+import type { PostLinkDisplayMode } from "@/lib/site-settings"
 import { multiplyPositiveSafeIntegers, parsePositiveSafeInteger } from "@/lib/shared/safe-integer"
 
 export type LotteryConditionCategory = "INTERACTION" | "THRESHOLD"
@@ -218,6 +219,7 @@ export interface CreatePostFormProps {
   mode?: "create" | "edit"
   postId?: string
   successSlug?: string
+  postLinkDisplayMode?: PostLinkDisplayMode
   initialValues?: CreatePostFormInitialValues
 }
 

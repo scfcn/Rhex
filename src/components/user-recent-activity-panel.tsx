@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react"
 import { useState } from "react"
-import { FileText, MessageSquareText, Sparkles, type LucideIcon } from "lucide-react"
+import { FileText, FolderOpen, MessageSquareText, Sparkles, type LucideIcon } from "lucide-react"
 
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
@@ -26,6 +26,7 @@ const defaultActivityTabMeta: Record<string, { icon: LucideIcon }> = {
   introduction: { icon: Sparkles },
   posts: { icon: FileText },
   replies: { icon: MessageSquareText },
+  collections: { icon: FolderOpen },
 }
 
 export function UserRecentActivityPanel({

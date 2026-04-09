@@ -4,20 +4,30 @@ import { useMemo, useState, type ReactNode } from "react"
 import { Copy, Ellipsis, Flag } from "lucide-react"
 
 import { ReportDialog } from "@/components/report-dialog"
+import { getPostPath } from "@/lib/post-links"
+import type { PostLinkDisplayMode } from "@/lib/site-settings"
 import { toast } from "@/components/ui/toast"
 import { cn } from "@/lib/utils"
 
 interface PostBodyCopyMenuProps {
-  copyPath: string
+  post: {
+    id: string
+    slug: string
+  }
+  postLinkDisplayMode?: PostLinkDisplayMode
   canReport?: boolean
   reportTargetId?: string
   reportLabel?: string
   children: ReactNode
 }
 
-export function PostBodyCopyMenu({ copyPath, canReport = false, reportTargetId, reportLabel = "当前帖子", children }: PostBodyCopyMenuProps) {
+export function PostBodyCopyMenu({ post, postLinkDisplayMode = "SLUG", canReport = false, reportTargetId, reportLabel = "当前帖子", children }: PostBodyCopyMenuProps) {
   const [isHovered, setIsHovered] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const copyPath = useMemo(
+    () => getPostPath(post, { mode: postLinkDisplayMode }),
+    [post, postLinkDisplayMode],
+  )
   const copyLink = useMemo(() => {
     if (typeof window === "undefined") {
       return copyPath

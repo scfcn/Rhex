@@ -6,6 +6,7 @@ import {
   type NotificationDraft,
   type NotificationWriteClient,
 } from "@/db/notification-write-queries"
+import { enqueueBackgroundJob, registerBackgroundJobHandler } from "@/lib/background-jobs"
 import { resolveUserProfileSettings } from "@/lib/user-profile-settings"
 
 interface SystemNotificationWebhookPayload {
@@ -129,6 +130,26 @@ export function createNotifications(params: {
   client?: NotificationWriteClient
 }) {
   return createNotificationsEntry(params)
+}
+
+registerBackgroundJobHandler("notification.create", async (payload) => {
+  await createNotification(payload)
+})
+
+registerBackgroundJobHandler("notification.create-many", async (payload) => {
+  await createNotifications({
+    notifications: payload.notifications,
+  })
+})
+
+export function enqueueNotification(params: NotificationDraft) {
+  return enqueueBackgroundJob("notification.create", params)
+}
+
+export function enqueueNotifications(notifications: NotificationDraft[]) {
+  return enqueueBackgroundJob("notification.create-many", {
+    notifications,
+  })
 }
 
 export async function createSystemNotification(params: {

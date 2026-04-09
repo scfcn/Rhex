@@ -662,62 +662,6 @@ export async function createCommentWithRelations(params: {
         activityAt: commentedAt,
       },
     })
-
-
-    const notifications = [] as Array<{
-      userId: number
-      type: NotificationType
-      senderId: number
-      relatedType: "POST" | "COMMENT"
-      relatedId: string
-      title: string
-      content: string
-    }>
-
-    if (!params.normalizedParentId && params.postAuthorId !== params.userId) {
-      notifications.push({
-        userId: params.postAuthorId,
-        type: NotificationType.REPLY_POST,
-        senderId: params.userId,
-        relatedType: "POST",
-        relatedId: params.postId,
-        title: "你的帖子有了新回复",
-        content: `${params.senderName} 回复了你的帖子：${params.content.slice(0, 80)}`,
-      })
-    }
-
-    if (params.normalizedReplyToUserId && params.normalizedReplyToUserId !== params.userId) {
-      notifications.push({
-        userId: params.normalizedReplyToUserId,
-        type: NotificationType.REPLY_COMMENT,
-        senderId: params.userId,
-        relatedType: "COMMENT",
-        relatedId: comment.id,
-        title: "你的评论有了新回复",
-        content: `${params.senderName} 回复了你的评论：${params.content.slice(0, 80)}`,
-      })
-    }
-
-    const notificationTargets = params.mentionUsers.filter((mentionUser) => mentionUser.id !== params.userId && mentionUser.id !== params.normalizedReplyToUserId)
-    notifications.push(
-      ...notificationTargets.map((mentionUser) => ({
-        userId: mentionUser.id,
-        type: NotificationType.MENTION,
-        senderId: params.userId,
-        relatedType: "COMMENT" as const,
-        relatedId: comment.id,
-        title: "你被提及了",
-        content: `${params.senderName} 在评论中提到了你：${params.content.slice(0, 80)}`,
-      })),
-    )
-
-    if (notifications.length > 0) {
-      await createNotifications({
-        client: tx,
-        notifications,
-      })
-    }
-
     return comment
   })
 }

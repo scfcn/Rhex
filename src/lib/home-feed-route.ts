@@ -1,9 +1,9 @@
 import type { FeedSort } from "@/lib/forum-feed"
 
-export type HomeFeedSort = Exclude<FeedSort, "weekly">
+export type HomeFeedSort = Exclude<FeedSort, "weekly"> | "universe"
 
 export function normalizeHomeFeedSort(sort?: string): HomeFeedSort {
-  if (sort === "new" || sort === "hot" || sort === "following") {
+  if (sort === "new" || sort === "hot" || sort === "following" || sort === "universe") {
     return sort
   }
 

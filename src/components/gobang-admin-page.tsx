@@ -12,6 +12,7 @@ interface GobangAdminPageProps {
 }
 
 export function GobangAdminPage({ AppId, config }: GobangAdminPageProps) {
+  void AppId
   const [dailyFreeGames, setDailyFreeGames] = useState(String(config.dailyFreeGames ?? 1))
   const [dailyVipFreeGames, setDailyVipFreeGames] = useState(String(config.dailyVipFreeGames ?? 2))
   const [dailyNormalGameLimit, setDailyNormalGameLimit] = useState(String(config.dailyNormalGameLimit ?? 3))
@@ -50,14 +51,7 @@ export function GobangAdminPage({ AppId, config }: GobangAdminPageProps) {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>应用后台 · 五子棋</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm text-muted-foreground">
-          <p>应用标识：{AppId}</p>
-        </CardContent>
-      </Card>
+
 
       <Card>
         <CardHeader>

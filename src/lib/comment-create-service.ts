@@ -94,6 +94,9 @@ export async function createCommentFlow(input: {
   const anonymousMaskUser = postContext.post.isAnonymous && settings.anonymousPostMaskUserId
     ? await findAnonymousMaskUserById(settings.anonymousPostMaskUserId)
     : null
+  const senderName = useAnonymousIdentity
+    ? (anonymousMaskUser?.nickname ?? anonymousMaskUser?.username ?? "匿名用户")
+    : (input.currentUser.nickname ?? input.currentUser.username)
 
   if (useAnonymousIdentity && !anonymousMaskUser) {
     apiError(400, "匿名账号不存在或未配置，暂时不能匿名回复")
@@ -166,9 +169,7 @@ export async function createCommentFlow(input: {
     replyPointDelta: postContext.settings.replyPointDelta ?? 0,
     replyPointDeltaPrepared,
     pointName: settings.pointName,
-    senderName: useAnonymousIdentity
-      ? (anonymousMaskUser?.nickname ?? anonymousMaskUser?.username ?? "匿名用户")
-      : (input.currentUser.nickname ?? input.currentUser.username),
+    senderName,
     postAuthorId: postContext.post.authorId,
     mentionUsers: resolvedComment.mentions,
     normalizedParentId: normalizedParentId || undefined,
@@ -210,6 +211,7 @@ export async function createCommentFlow(input: {
     normalizedReplyToUserId,
     normalizedReplyToUserName,
     mentionUserIds: resolvedComment.mentions.map((mention) => mention.id),
+    senderName,
     contentSafety,
     reviewRequired,
   }

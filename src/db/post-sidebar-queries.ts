@@ -1,7 +1,12 @@
 import { prisma } from "@/db/client"
 
-export async function findPostSidebarData(postId: string, authorUsername: string, relatedPostsLimit = 5) {
-  const [author, postTags, relatedPosts] = await Promise.all([
+export async function findPostSidebarData(
+  postId: string,
+  authorUsername: string,
+  relatedPostsLimit = 5,
+  currentUserId?: number | null,
+) {
+  const [author, postTags, relatedPosts, favoriteCollections] = await Promise.all([
     prisma.user.findUnique({
       where: { username: authorUsername },
       select: {
@@ -35,7 +40,36 @@ export async function findPostSidebarData(postId: string, authorUsername: string
       take: relatedPostsLimit,
       orderBy: [{ createdAt: "desc" }],
     }),
+    prisma.favoriteCollectionItem.findMany({
+      where: {
+        postId,
+        collection: currentUserId
+          ? {
+              OR: [
+                { visibility: "PUBLIC" },
+                { ownerId: currentUserId },
+              ],
+            }
+          : {
+              visibility: "PUBLIC",
+            },
+      },
+      select: {
+        collection: {
+          select: {
+            id: true,
+            title: true,
+            visibility: true,
+          },
+        },
+      },
+      orderBy: [
+        { collection: { updatedAt: "desc" } },
+        { collection: { title: "asc" } },
+      ],
+      take: 10,
+    }),
   ])
 
-  return { author, postTags, relatedPosts }
+  return { author, postTags, relatedPosts, favoriteCollections }
 }

@@ -157,6 +157,7 @@ export default async function WritePage(props: PageProps<"/write">) {
                   mode="edit"
                   postId={editingPost.id}
                   successSlug={editingPost.slug}
+                  postLinkDisplayMode={settings.postLinkDisplayMode}
                   initialValues={{
                     title: editingPost.title,
                     content: publicBlock?.text ?? editingPost.content,
@@ -226,6 +227,7 @@ export default async function WritePage(props: PageProps<"/write">) {
                 }}
                 viewLevelOptions={viewLevelOptions}
                 viewVipLevelOptions={viewVipLevelOptions}
+                postLinkDisplayMode={settings.postLinkDisplayMode}
                 initialValues={preferredBoardSlug ? { title: "", content: "", isAnonymous: false, boardSlug: preferredBoardSlug, postType: "NORMAL" } : undefined}
               />
             )}

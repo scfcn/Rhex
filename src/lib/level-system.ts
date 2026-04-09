@@ -260,6 +260,32 @@ export async function evaluateUserLevelProgress(userId: number, options: Evaluat
   }
 }
 
+registerBackgroundJobHandler("level.evaluate-user-progress", async (payload) => {
+  await evaluateUserLevelProgress(payload.userId, {
+    notifyOnUpgrade: payload.notifyOnUpgrade,
+  })
+})
+
+registerBackgroundJobHandler("level.sync-user-received-likes", async (payload) => {
+  await syncUserReceivedLikes(payload.userId, {
+    notifyOnUpgrade: payload.notifyOnUpgrade,
+  })
+})
+
+export function enqueueEvaluateUserLevelProgress(userId: number, options: EvaluateUserLevelProgressOptions = {}) {
+  return enqueueBackgroundJob("level.evaluate-user-progress", {
+    userId,
+    notifyOnUpgrade: Boolean(options.notifyOnUpgrade),
+  })
+}
+
+export function enqueueSyncUserReceivedLikes(userId: number, options: EvaluateUserLevelProgressOptions = {}) {
+  return enqueueBackgroundJob("level.sync-user-received-likes", {
+    userId,
+    notifyOnUpgrade: Boolean(options.notifyOnUpgrade),
+  })
+}
+
 export async function syncUserReceivedLikes(userId: number, options: EvaluateUserLevelProgressOptions = {}) {
   const [postLikes, commentLikes] = await Promise.all([
     countUserPostLikes(userId),

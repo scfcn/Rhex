@@ -24,13 +24,19 @@ export {
   Prisma,
   RelatedType,
   ReportStatus,
+  RssLogLevel,
+  RssEntryReviewStatus,
+  RssQueueStatus,
+  RssRunStatus,
+  RssSourceStatus,
+  RssTriggerType,
   SiteDocumentSourceType,
   SiteDocumentType,
   TargetType,
   UserRole,
   UserStatus,
   VerificationChannel,
-} from "@prisma/client/index"
+} from "@prisma/client"
 
 export type {
   Board,
@@ -46,6 +52,12 @@ export type {
   PollVote,
   Post,
   PostAppendix,
+  RssEntry,
+  RssLog,
+  RssQueue,
+  RssRun,
+  RssSetting,
+  RssSource,
   User,
   Zone,
-} from "@prisma/client/index"
+} from "@prisma/client"

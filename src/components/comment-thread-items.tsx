@@ -28,6 +28,7 @@ export type CommentThreadReplyLayout = "tree" | "flat"
 interface CommentThreadCommentItemProps {
   comment: SiteCommentItem
   index: number
+  postPath: string
   pointName?: string
   canReply: boolean
   currentUserId?: number
@@ -59,6 +60,7 @@ interface CommentThreadCommentItemProps {
 
 interface CommentThreadReplyItemProps {
   reply: SiteCommentReplyItem
+  postPath: string
   parentCommentId: string
   parentCommentFloor?: number
   referenceCommentId?: string
@@ -85,6 +87,7 @@ interface CommentThreadReplyItemProps {
 
 export function CommentThreadReplyItem({
   reply,
+  postPath,
   parentCommentId,
   referenceCommentId,
   parentCommentHref,
@@ -244,7 +247,7 @@ export function CommentThreadReplyItem({
               <button
                 type="button"
                 onClick={() => {
-                  void copyCommentPermalink(reply.id, reply.flatFloor!)
+                  void copyCommentPermalink(reply.id, reply.flatFloor!, postPath)
                 }}
                 className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-semibold text-foreground/80 transition-colors hover:bg-accent hover:text-foreground"
                 title={`复制 #${reply.flatFloor} 楼链接`}
@@ -282,6 +285,7 @@ export function CommentThreadReplyItem({
 export function CommentThreadCommentItem({
   comment,
   index,
+  postPath,
   pointName,
   canReply,
   currentUserId,
@@ -430,7 +434,7 @@ export function CommentThreadCommentItem({
           <button
             type="button"
             onClick={() => {
-              void copyCommentPermalink(comment.id, comment.floor)
+              void copyCommentPermalink(comment.id, comment.floor, postPath)
             }}
             className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-semibold text-foreground/80 transition-colors hover:bg-accent hover:text-foreground"
             title={`复制 #${comment.floor} 楼链接`}
@@ -447,6 +451,7 @@ export function CommentThreadCommentItem({
             <CommentThreadReplyItem
               key={reply.id}
               reply={reply}
+              postPath={postPath}
               parentCommentId={comment.id}
               parentCommentFloor={comment.floor}
               parentCommentHref={`?sort=oldest&page=1&view=tree#comment-${comment.id}`}

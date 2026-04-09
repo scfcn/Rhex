@@ -1,8 +1,10 @@
+import { NotificationType } from "@/db/types"
 import { apiSuccess, createUserRouteHandler, readJsonBody } from "@/lib/api-route"
 import { createCommentFlow } from "@/lib/comment-create-service"
 import { enqueuePostFollowCommentNotifications } from "@/lib/follow-notifications"
 import { handleCommentCreateSideEffects } from "@/lib/interaction-side-effects"
-import { evaluateUserLevelProgress } from "@/lib/level-system"
+import { enqueueEvaluateUserLevelProgress } from "@/lib/level-system"
+import { enqueueNotifications } from "@/lib/notification-writes"
 import { logRequestSucceeded } from "@/lib/request-log"
 
 export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
@@ -16,24 +18,13 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     },
   })
 
-  await evaluateUserLevelProgress(currentUser.id, { notifyOnUpgrade: true })
+  void enqueueEvaluateUserLevelProgress(currentUser.id, { notifyOnUpgrade: true })
 
   const { redPacketClaim } = await handleCommentCreateSideEffects({
     postId: result.postId,
     userId: currentUser.id,
     commentId: result.created.id,
   })
-
-  if (!result.reviewRequired) {
-    await enqueuePostFollowCommentNotifications({
-      commentId: result.created.id,
-      excludeUserIds: [
-        ...(result.isRootComment ? [result.postAuthorId] : []),
-        ...(typeof result.normalizedReplyToUserId === "number" ? [result.normalizedReplyToUserId] : []),
-        ...result.mentionUserIds,
-      ],
-    })
-  }
 
   const redPacketMessage = redPacketClaim?.claimed
     ? `，并获得了 ${redPacketClaim.amount} ${redPacketClaim.pointName} ${redPacketClaim.rewardMode === "JACKPOT" ? "聚宝盆奖励" : "红包"}`
@@ -49,6 +40,68 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     page: result.targetPage,
     reviewRequired: result.reviewRequired,
   })
+
+  if (!result.reviewRequired) {
+    const notifications = [] as Array<{
+      userId: number
+      type: NotificationType
+      senderId: number
+      relatedType: "POST" | "COMMENT"
+      relatedId: string
+      title: string
+      content: string
+    }>
+
+    if (result.isRootComment && result.postAuthorId !== currentUser.id) {
+      notifications.push({
+        userId: result.postAuthorId,
+        type: NotificationType.REPLY_POST,
+        senderId: currentUser.id,
+        relatedType: "POST",
+        relatedId: result.postId,
+        title: "你的帖子有了新回复",
+        content: `${result.senderName} 回复了你的帖子：${result.created.content.slice(0, 80)}`,
+      })
+    }
+
+    if (result.normalizedReplyToUserId && result.normalizedReplyToUserId !== currentUser.id) {
+      notifications.push({
+        userId: result.normalizedReplyToUserId,
+        type: NotificationType.REPLY_COMMENT,
+        senderId: currentUser.id,
+        relatedType: "COMMENT",
+        relatedId: result.created.id,
+        title: "你的评论有了新回复",
+        content: `${result.senderName} 回复了你的评论：${result.created.content.slice(0, 80)}`,
+      })
+    }
+
+    const mentionTargets = [...new Set(result.mentionUserIds)].filter((userId) => userId !== currentUser.id && userId !== result.normalizedReplyToUserId)
+    notifications.push(
+      ...mentionTargets.map((userId) => ({
+        userId,
+        type: NotificationType.MENTION,
+        senderId: currentUser.id,
+        relatedType: "COMMENT" as const,
+        relatedId: result.created.id,
+        title: "你被提及了",
+        content: `${result.senderName} 在评论中提到了你：${result.created.content.slice(0, 80)}`,
+      })),
+    )
+
+    if (notifications.length > 0) {
+      void enqueueNotifications(notifications)
+    }
+
+    void enqueuePostFollowCommentNotifications({
+      commentId: result.created.id,
+      excludeUserIds: [
+        ...(result.isRootComment ? [result.postAuthorId] : []),
+        ...(typeof result.normalizedReplyToUserId === "number" ? [result.normalizedReplyToUserId] : []),
+        ...result.mentionUserIds,
+      ],
+    })
+  }
 
   return apiSuccess({
     id: result.created.id,

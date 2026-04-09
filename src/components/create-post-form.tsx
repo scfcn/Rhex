@@ -1,7 +1,6 @@
 "use client"
 
-import { ChevronDown, Info } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { ChevronDown, Info, Loader2 } from "lucide-react"
 import type { ChangeEvent, FormEvent } from "react"
 import { useDeferredValue, useEffect, useEffectEvent, useMemo, useRef, useState } from "react"
 
@@ -43,6 +42,7 @@ import { PostDraftNotice, type PostDraftNoticeAction } from "@/components/post-d
 import { PostViewLevelModal } from "@/components/post-view-level-modal"
 import { RefinedRichPostEditor } from "@/components/refined-rich-post-editor"
 import { Button } from "@/components/ui/button"
+import { getPostPath } from "@/lib/post-links"
 import { toast } from "@/components/ui/toast"
 
 function HoverTip({ text }: { text: string }) {
@@ -111,11 +111,13 @@ export function CreatePostForm({
   viewVipLevelOptions,
   mode = "create",
   postId,
+  successSlug,
+  postLinkDisplayMode = "SLUG",
   initialValues,
 }: CreatePostFormProps) {
-  const router = useRouter()
   const isEditMode = mode === "edit"
   const storageMode = isEditMode ? "edit" : "create"
+  const slowSubmitThresholdMs = 8000
 
   const initialDraftData = useMemo(
     () => {
@@ -153,6 +155,8 @@ export function CreatePostForm({
   const [lastSavedDraftAt, setLastSavedDraftAt] = useState<string | null>(null)
   const [coverUploading, setCoverUploading] = useState(false)
   const [jiebaReady, setJiebaReady] = useState(false)
+  const [submitStartedAt, setSubmitStartedAt] = useState<number | null>(null)
+  const [showSlowSubmitHint, setShowSlowSubmitHint] = useState(false)
   const hasPromptedDraftRef = useRef(false)
 
   const deferredTitle = useDeferredValue(draft.title)
@@ -297,6 +301,19 @@ export function CreatePostForm({
 
     return () => window.clearTimeout(timer)
   }, [draft, initialDraftData, postId, storageMode])
+
+  useEffect(() => {
+    if (!loading) {
+      setShowSlowSubmitHint(false)
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      setShowSlowSubmitHint(true)
+    }, slowSubmitThresholdMs)
+
+    return () => window.clearTimeout(timer)
+  }, [loading, slowSubmitThresholdMs])
 
   const handleManualDraftSaveEffect = useEffectEvent(() => {
     handleManualDraftSave()
@@ -632,31 +649,59 @@ export function CreatePostForm({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setLoading(true)
-
-    const { endpoint, payload } = buildSubmitRequest({ mode, postId, draft })
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    })
-    const result = await response.json()
-
-    if (!response.ok) {
-      const errorMessage = result.message ?? (isEditMode ? "保存失败" : "发帖失败")
-      toast.error(errorMessage, isEditMode ? "保存失败" : "发帖失败")
-      setLoading(false)
+    if (loading) {
       return
     }
 
-    const successMessage = result.message ?? (isEditMode ? "保存成功，正在返回详情页…" : "发布成功，正在跳转详情页…")
-    toast.success(successMessage, isEditMode ? "保存成功" : "发布成功")
+    setLoading(true)
+    setSubmitStartedAt(Date.now())
+    setShowSlowSubmitHint(false)
 
-    router.push(`/posts/${result.data?.id ?? postId}`)
-    router.refresh()
-    setLoading(false)
+    try {
+      const { endpoint, payload } = buildSubmitRequest({ mode, postId, draft })
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      })
+      const result = await response.json().catch(() => null) as {
+        message?: string
+        data?: {
+          id?: string
+          slug?: string
+        }
+      } | null
+
+      if (!response.ok) {
+        const errorMessage = result?.message ?? (isEditMode ? "保存失败" : "发帖失败")
+        toast.error(errorMessage, isEditMode ? "保存失败" : "发帖失败")
+        return
+      }
+
+      const successMessage = result?.message ?? (isEditMode ? "保存成功，正在返回详情页…" : "发布成功，正在跳转详情页…")
+      toast.success(successMessage, isEditMode ? "保存成功" : "发布成功")
+
+      const nextPostId = result?.data?.id ?? postId
+      const nextPostSlug = result?.data?.slug ?? successSlug ?? nextPostId
+      const targetPath = nextPostId && nextPostSlug
+        ? getPostPath({ id: nextPostId, slug: nextPostSlug }, { mode: postLinkDisplayMode })
+        : null
+      if (typeof window !== "undefined") {
+        if (targetPath) {
+          window.location.assign(targetPath)
+          return
+        }
+        window.location.reload()
+        return
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : (isEditMode ? "保存失败" : "发帖失败"), isEditMode ? "保存失败" : "发帖失败")
+    } finally {
+      setLoading(false)
+      setSubmitStartedAt(null)
+    }
   }
 
   function handleCloseTagModal() {
@@ -900,9 +945,25 @@ export function CreatePostForm({
               actions={draftNoticeActions}
               className="w-full"
             />
+            {loading && showSlowSubmitHint ? (
+              <PostDraftNotice
+                title={isEditMode ? "保存仍在处理中" : "发帖仍在处理中"}
+                description={submitStartedAt
+                  ? `已等待 ${Math.max(8, Math.floor((Date.now() - submitStartedAt) / 1000))} 秒。服务器当前响应较慢，请勿重复提交；创建完成后会自动跳转到帖子详情页。`
+                  : "服务器当前响应较慢，请勿重复提交；创建完成后会自动跳转到帖子详情页。"}
+                tone="warning"
+                size="dense"
+                className="mt-2 w-full"
+              />
+            ) : null}
           </div>
           <Button className="h-8 rounded-full px-4 text-xs sm:h-9 sm:px-4 sm:text-sm" disabled={loading || !canPostInBoard}>
-            {loading ? (isEditMode ? "保存中..." : "发布中...") : (isEditMode ? "保存帖子" : "发布帖子")}
+            {loading ? (
+              <>
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin sm:h-4 sm:w-4" />
+                {isEditMode ? "保存中..." : "发布中..."}
+              </>
+            ) : (isEditMode ? "保存帖子" : "发布帖子")}
           </Button>
         </div>
       </form>

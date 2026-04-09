@@ -7,12 +7,13 @@ import { ForumFeedView } from "@/components/forum-feed-view"
 
 interface ForumFeedListProps {
   items: ForumFeedItem[]
-  currentSort: FeedSort
+  currentSort: Exclude<FeedSort, "weekly">
+  showUniverse?: boolean
   listDisplayMode?: PostListDisplayMode
   postLinkDisplayMode?: "SLUG" | "ID"
 }
 
-export async function ForumFeedList({ items, currentSort, listDisplayMode, postLinkDisplayMode = "SLUG" }: ForumFeedListProps) {
+export async function ForumFeedList({ items, currentSort, showUniverse = false, listDisplayMode, postLinkDisplayMode = "SLUG" }: ForumFeedListProps) {
   const settings = await getSiteSettings()
   const displayItems = mapForumFeedItemsToDisplayItems(items, currentSort, settings)
 
@@ -20,6 +21,7 @@ export async function ForumFeedList({ items, currentSort, listDisplayMode, postL
     <ForumFeedView
       items={displayItems}
       currentSort={currentSort}
+      showUniverse={showUniverse}
       listDisplayMode={listDisplayMode}
       postLinkDisplayMode={postLinkDisplayMode}
     />

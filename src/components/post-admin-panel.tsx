@@ -5,6 +5,8 @@ import { useMemo, useState, useTransition } from "react"
 import { AdminModal } from "@/components/admin-modal"
 import { BoardSelectField, type BoardSelectGroup } from "@/components/board-select-field"
 import { Button } from "@/components/ui/button"
+import { getPostPath } from "@/lib/post-links"
+import type { PostLinkDisplayMode } from "@/lib/site-settings"
 
 interface PostAdminPanelProps {
   postId: string
@@ -20,6 +22,7 @@ interface PostAdminPanelProps {
   pinScope?: string | null
   isFeatured: boolean
   boardOptions: BoardSelectGroup[]
+  postLinkDisplayMode?: PostLinkDisplayMode
 }
 
 interface AdminQuickAction {
@@ -44,6 +47,7 @@ export function PostAdminPanel({
   
   isFeatured,
   boardOptions,
+  postLinkDisplayMode = "SLUG",
 }: PostAdminPanelProps) {
   const [feedback, setFeedback] = useState("")
   const [moveBoardSlug, setMoveBoardSlug] = useState(currentBoardSlug)
@@ -81,12 +85,19 @@ export function PostAdminPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, targetId, postId, ...extra }),
       })
-      const result = await response.json()
+      const result = await response.json() as {
+        message?: string
+        data?: {
+          id?: string
+          slug?: string
+        }
+      }
       setFeedback(result.message ?? (response.ok ? "操作成功" : "操作失败"))
       if (response.ok) {
         if (action === "post.moveBoard") {
           const nextPostId = typeof result.data?.id === "string" && result.data.id ? result.data.id : postId
-          window.location.href = `/posts/${nextPostId}`
+          const nextPostSlug = typeof result.data?.slug === "string" && result.data.slug ? result.data.slug : postSlug
+          window.location.href = getPostPath({ id: nextPostId, slug: nextPostSlug }, { mode: postLinkDisplayMode })
           return
         }
         window.location.reload()

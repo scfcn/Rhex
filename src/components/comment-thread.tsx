@@ -18,6 +18,7 @@ interface CommentThreadProps {
   comments: SiteCommentItem[]
   flatComments?: SiteFlatCommentItem[]
   postId: string
+  postPath: string
   pointName?: string
   canReply: boolean
   currentPage: number
@@ -58,7 +59,7 @@ function shouldIgnoreReplyShortcut(target: EventTarget | null) {
   return ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)
 }
 
-export function CommentThread({ threadId, comments, flatComments = [], postId, pointName, canReply, currentPage, pageSize, total, currentSort, currentDisplayMode, currentUserId, canAcceptAnswer = false, commentsVisibleToAuthorOnly = false, anonymousReplyEnabled = false, anonymousReplyDefaultChecked = false, anonymousReplySwitchVisible = false, isAdmin = false, adminRole = null, canPinComment = false, markdownEmojiMap, commentEditWindowMinutes = 5, initialVisibleReplies = 10 }: CommentThreadProps) {
+export function CommentThread({ threadId, comments, flatComments = [], postId, postPath, pointName, canReply, currentPage, pageSize, total, currentSort, currentDisplayMode, currentUserId, canAcceptAnswer = false, commentsVisibleToAuthorOnly = false, anonymousReplyEnabled = false, anonymousReplyDefaultChecked = false, anonymousReplySwitchVisible = false, isAdmin = false, adminRole = null, canPinComment = false, markdownEmojiMap, commentEditWindowMinutes = 5, initialVisibleReplies = 10 }: CommentThreadProps) {
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -563,13 +564,14 @@ export function CommentThread({ threadId, comments, flatComments = [], postId, p
 
       {currentDisplayMode === "tree" ? (
         filteredComments.map((comment, index) => (
-          <CommentThreadCommentItem
-            key={comment.id}
-            comment={comment}
-            index={index}
-            pointName={pointName}
-            canReply={canReply}
-            currentUserId={currentUserId}
+              <CommentThreadCommentItem
+                key={comment.id}
+                comment={comment}
+                index={index}
+                postPath={postPath}
+                pointName={pointName}
+                canReply={canReply}
+                currentUserId={currentUserId}
             canAcceptAnswer={canAcceptAnswer}
             isAdmin={isAdmin}
             adminRole={adminRole}
@@ -603,6 +605,7 @@ export function CommentThread({ threadId, comments, flatComments = [], postId, p
                 key={entry.comment.id}
                 comment={entry.comment}
                 index={index}
+                postPath={postPath}
                 pointName={pointName}
                 canReply={canReply}
                 currentUserId={currentUserId}
@@ -638,6 +641,7 @@ export function CommentThread({ threadId, comments, flatComments = [], postId, p
             <CommentThreadReplyItem
               key={entry.reply.id}
               reply={entry.reply}
+              postPath={postPath}
               parentCommentId={entry.reply.parentCommentId ?? ""}
               parentCommentFloor={entry.reply.parentCommentFloor}
               referenceCommentId={entry.reply.replyToCommentId ?? entry.reply.parentCommentId}

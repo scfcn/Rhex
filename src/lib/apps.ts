@@ -26,6 +26,15 @@ export const HOST_APPS = [
     adminHref: "/admin/apps/self-serve-ads",
     category: "运营",
   },
+  {
+    id: "rss-harvest",
+    slug: "rss-harvest",
+    name: "RSS 抓取中心",
+    description: "外部 RSS/Atom 抓取后台，支持定时任务、持久化队列、失败重试、日志追踪与手动启停。",
+    href: "/admin/apps/rss-harvest",
+    adminHref: "/admin/apps/rss-harvest",
+    category: "采集",
+  },
 ] as const
 
 

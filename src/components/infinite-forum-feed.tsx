@@ -11,7 +11,8 @@ interface InfiniteForumFeedProps {
   initialItems: FeedDisplayItem[]
   initialPage: number
   initialHasNextPage: boolean
-  currentSort: FeedSort
+  currentSort: Exclude<FeedSort, "weekly">
+  showUniverse?: boolean
   listDisplayMode?: PostListDisplayMode
   postLinkDisplayMode?: "SLUG" | "ID"
 }
@@ -27,6 +28,7 @@ export function InfiniteForumFeed({
   initialPage,
   initialHasNextPage,
   currentSort,
+  showUniverse = false,
   listDisplayMode,
   postLinkDisplayMode = "SLUG",
 }: InfiniteForumFeedProps) {
@@ -87,6 +89,7 @@ export function InfiniteForumFeed({
       <ForumFeedView
         items={items}
         currentSort={currentSort}
+        showUniverse={showUniverse}
         listDisplayMode={listDisplayMode}
         postLinkDisplayMode={postLinkDisplayMode}
       />

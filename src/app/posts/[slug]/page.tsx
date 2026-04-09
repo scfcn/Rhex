@@ -200,7 +200,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
     redPacketSummaryPromise,
     postOfflineMetaPromise,
     commentResultPromise,
-    getPostSidebarData(basePost.id, basePost.authorUsername ?? basePost.author, settings.postSidebarRelatedTopicsCount),
+    getPostSidebarData(basePost.id, basePost.authorUsername ?? basePost.author, settings.postSidebarRelatedTopicsCount, currentUser?.id),
     getBoards(),
     getZones(),
   ])
@@ -363,7 +363,8 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
               <>
               <div className="space-y-0">
                   <PostBodyCopyMenu
-                    copyPath={canonicalPath}
+                    post={{ id: displayPost.id, slug: displayPost.slug }}
+                    postLinkDisplayMode={settings.postLinkDisplayMode}
                     canReport={Boolean(currentUser && currentUser.id !== displayPost.authorId)}
                     reportTargetId={displayPost.id}
                     reportLabel={displayPost.title}
@@ -483,6 +484,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                     postId={displayPost.id}
                     postSlug={displayPost.slug}
                     currentBoardSlug={displayPost.boardSlug ?? ""}
+                    postLinkDisplayMode={settings.postLinkDisplayMode}
                     actorRole={adminActor?.role ?? "MODERATOR"}
                     allowedPinScopes={allowedPinScopes}
                     postAuthorId={displayPost.authorId ?? 0}
@@ -531,6 +533,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                         threadId={displayPost.id}
                         comments={commentResult.items}
                         postId={displayPost.id}
+                        postPath={canonicalPath}
                         pointName={settings.pointName}
                         canReply={Boolean(currentUser && displayPost.status === "NORMAL")}
                         currentPage={commentResult.page}
@@ -562,7 +565,16 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
           )}
           rightSidebar={(
             <aside className="mt-6 hidden pb-12 lg:block">
-              <PostSidebarPanels currentUser={sidebarUser} relatedTopics={sidebarData.relatedTopics} tags={sidebarData.tags} postLinkDisplayMode={settings.postLinkDisplayMode} siteName={settings.siteName} siteDescription={settings.siteDescription} siteLogoPath={settings.siteLogoPath} />
+              <PostSidebarPanels
+                currentUser={sidebarUser}
+                relatedTopics={sidebarData.relatedTopics}
+                tags={sidebarData.tags}
+                collections={sidebarData.collections}
+                postLinkDisplayMode={settings.postLinkDisplayMode}
+                siteName={settings.siteName}
+                siteDescription={settings.siteDescription}
+                siteLogoPath={settings.siteLogoPath}
+              />
             </aside>
           )}
         />

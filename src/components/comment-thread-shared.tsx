@@ -237,9 +237,12 @@ export function buildCommentAdminActions({ entry, isAdmin, adminRole, canPinComm
   return actions
 }
 
-export async function copyCommentPermalink(commentId: string, floor: number) {
+export async function copyCommentPermalink(commentId: string, floor: number, postPath?: string) {
   if (typeof window === "undefined") return
   const url = new URL(window.location.href)
+  if (postPath?.startsWith("/")) {
+    url.pathname = postPath
+  }
   url.hash = `comment-${commentId}`
 
   try {

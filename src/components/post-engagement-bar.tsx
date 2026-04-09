@@ -4,6 +4,7 @@ import { Bookmark, Flag, ThumbsUp } from "lucide-react"
 import { useState, useTransition } from "react"
 
 import { PostAuthorInlineCard } from "@/components/post-author-inline-card"
+import { FavoriteCollectionDialog } from "@/components/favorite-collection-dialog"
 import { PostRewardPoolIntroAnimation } from "@/components/post-reward-pool-intro-animation"
 import { PostRedPacketPanel } from "@/components/post-red-packet-panel"
 import { PostTipPanel } from "@/components/post-tip-panel"
@@ -60,6 +61,8 @@ export function PostEngagementBar({ postId, author, likeCount, favoriteCount = 0
   const [liked, setLiked] = useState(initialLiked)
   const [favored, setFavored] = useState(initialFavored)
   const [message, setMessage] = useState("")
+  const [favoriteDialogOpen, setFavoriteDialogOpen] = useState(false)
+  const [favoriteDialogMode, setFavoriteDialogMode] = useState<"newly-favored" | "manage">("manage")
   const [isPending, startTransition] = useTransition()
 
   function runAction(type: "like" | "favorite") {
@@ -81,11 +84,40 @@ export function PostEngagementBar({ postId, author, likeCount, favoriteCount = 0
         const nextLiked = Boolean(result.data?.liked)
         setLiked(nextLiked)
         setLikes((current) => current + (nextLiked ? 1 : -1))
+        setMessage(result.message ?? "")
       } else {
         const nextFavored = Boolean(result.data?.favored)
         setFavored(nextFavored)
         setFavorites((current) => current + (nextFavored ? 1 : -1))
+        if (nextFavored) {
+          setFavoriteDialogMode("newly-favored")
+          setFavoriteDialogOpen(true)
+          setMessage("")
+        } else {
+          setMessage(result.message ?? "")
+        }
       }
+    })
+  }
+
+  function handleFavoriteButtonClick() {
+    if (favored) {
+      setFavoriteDialogMode("manage")
+      setFavoriteDialogOpen(true)
+      return
+    }
+
+    runAction("favorite")
+  }
+
+  function handleFavoriteStateChanged(nextFavored: boolean) {
+    setFavored(nextFavored)
+    setFavorites((current) => {
+      if (nextFavored === favored) {
+        return current
+      }
+
+      return current + (nextFavored ? 1 : -1)
     })
   }
 
@@ -113,10 +145,10 @@ export function PostEngagementBar({ postId, author, likeCount, favoriteCount = 0
             </button>
             <button
               type="button"
-              title={favored ? "取消收藏" : "收藏"}
-              aria-label={favored ? "取消收藏" : "收藏"}
+              title={favored ? "管理收藏合集" : "收藏"}
+              aria-label={favored ? "管理收藏合集" : "收藏"}
               className={favored ? "flex items-center gap-1 text-foreground" : "flex items-center gap-1 hover:text-foreground"}
-              onClick={() => runAction("favorite")}
+              onClick={handleFavoriteButtonClick}
               disabled={isPending}
             >
               <Bookmark className="h-4 w-4" />{favorites > 0 ? favorites : null}
@@ -156,6 +188,17 @@ export function PostEngagementBar({ postId, author, likeCount, favoriteCount = 0
       </div>
 
       {message ? <span className="text-xs lg:self-end">{message}</span> : null}
+      <FavoriteCollectionDialog
+        open={favoriteDialogOpen}
+        postId={postId}
+        favored={favored}
+        openMode={favoriteDialogMode}
+        onClose={() => {
+          setFavoriteDialogOpen(false)
+          setFavoriteDialogMode("manage")
+        }}
+        onFavoriteChanged={handleFavoriteStateChanged}
+      />
     </div>
   )
 }
