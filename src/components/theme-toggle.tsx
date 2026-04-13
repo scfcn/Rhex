@@ -1,24 +1,22 @@
 "use client"
 
 import { Monitor, Moon, Palette, Sun, Type } from "lucide-react"
+import { useTheme } from "next-themes"
 import { useEffect, useRef, useState, useSyncExternalStore } from "react"
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/rbutton"
 import {
   FONT_SIZE_PRESET_STORAGE_KEY,
   FONT_SIZE_PRESETS,
   THEME_PRESET_STORAGE_KEY,
   THEME_PRESETS,
   THEME_SETTINGS_CHANGE_EVENT,
-  THEME_STORAGE_KEY,
   type FontSizePreset,
   type ThemePreference,
   type ThemePreset,
-  applyTheme,
   getThemePresetDisplayMeta,
   readStoredCustomThemeConfig,
   resolveStoredFontSizePreset,
-  resolveStoredThemePreference,
   resolveStoredThemePreset,
   setStoredFontSizePreset,
   setStoredThemePreference,
@@ -45,13 +43,7 @@ const themePresetOptions = Object.entries(THEME_PRESETS) as Array<[keyof typeof 
 const fontSizePresetOptions = Object.entries(FONT_SIZE_PRESETS) as Array<[FontSizePreset, (typeof FONT_SIZE_PRESETS)[FontSizePreset]]>
 
 export function ThemeToggle() {
-  const [themePreference, setThemePreference] = useState<ThemePreference>(() => {
-    if (typeof window === "undefined") {
-      return "light"
-    }
-
-    return resolveStoredThemePreference(window.localStorage.getItem(THEME_STORAGE_KEY))
-  })
+  const { theme, setTheme } = useTheme()
   const [themePreset, setThemePreset] = useState<ThemePreset>(() => {
     if (typeof window === "undefined") {
       return "default"
@@ -73,25 +65,6 @@ export function ThemeToggle() {
     () => true,
     () => false,
   )
-
-  useEffect(() => {
-    applyTheme(themePreference, themePreset, fontSizePreset)
-  }, [themePreference, themePreset, fontSizePreset])
-
-  useEffect(() => {
-    if (!mounted || themePreference !== "system") {
-      return
-    }
-
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
-    const handleChange = () => applyTheme("system", themePreset, fontSizePreset)
-
-    mediaQuery.addEventListener("change", handleChange)
-
-    return () => {
-      mediaQuery.removeEventListener("change", handleChange)
-    }
-  }, [mounted, themePreference, themePreset, fontSizePreset])
 
   useEffect(() => {
     if (!menuOpen) {
@@ -127,13 +100,12 @@ export function ThemeToggle() {
     }
 
     const syncThemeState = () => {
-      setThemePreference(resolveStoredThemePreference(window.localStorage.getItem(THEME_STORAGE_KEY)))
       setThemePreset(resolveStoredThemePreset(window.localStorage.getItem(THEME_PRESET_STORAGE_KEY)))
       setFontSizePreset(resolveStoredFontSizePreset(window.localStorage.getItem(FONT_SIZE_PRESET_STORAGE_KEY)))
     }
 
     const handleStorage = (event: StorageEvent) => {
-      if (event.key === THEME_STORAGE_KEY || event.key === THEME_PRESET_STORAGE_KEY || event.key === FONT_SIZE_PRESET_STORAGE_KEY || event.key === "rhex-custom-theme") {
+      if (event.key === THEME_PRESET_STORAGE_KEY || event.key === FONT_SIZE_PRESET_STORAGE_KEY || event.key === "rhex-custom-theme") {
         syncThemeState()
       }
     }
@@ -148,24 +120,23 @@ export function ThemeToggle() {
   }, [])
 
   function handleThemeSelect(preference: ThemePreference) {
-    applyTheme(preference, themePreset, fontSizePreset)
+    setTheme(preference)
     setStoredThemePreference(preference)
-    setThemePreference(preference)
   }
 
   function handlePresetSelect(preset: ThemePreset) {
-    applyTheme(themePreference, preset, fontSizePreset)
     setStoredThemePreset(preset)
     setThemePreset(preset)
   }
 
   function handleFontSizePresetSelect(preset: FontSizePreset) {
-    applyTheme(themePreference, themePreset, preset)
     setStoredFontSizePreset(preset)
     setFontSizePreset(preset)
   }
 
-  const currentTheme = mounted ? themePreference : "light"
+  const currentTheme: ThemePreference = mounted && (theme === "light" || theme === "dark" || theme === "system")
+    ? theme
+    : "light"
   const currentPreset = mounted ? themePreset : "default"
   const currentMeta = themeMeta[currentTheme]
   const CurrentIcon = currentMeta.icon
@@ -207,7 +178,7 @@ export function ThemeToggle() {
                 <button
                   key={option}
                   type="button"
-                  className={active ? "flex h-7.5 w-full items-center justify-center rounded-full bg-foreground text-background shadow-sm" : "flex h-7.5 w-full items-center justify-center rounded-full border border-border bg-background text-foreground transition-colors hover:bg-accent"}
+                  className={active ? "flex h-7.5 w-full items-center justify-center rounded-full bg-foreground text-background shadow-xs" : "flex h-7.5 w-full items-center justify-center rounded-full border border-border bg-background text-foreground transition-colors hover:bg-accent"}
                   onClick={() => handleThemeSelect(option)}
                   role="menuitemradio"
                   aria-checked={active}
@@ -234,7 +205,7 @@ export function ThemeToggle() {
                   key={presetKey}
                   type="button"
                   onClick={() => handlePresetSelect(presetKey)}
-                  className={active ? "flex h-7.5 w-full items-center justify-center rounded-full border border-foreground/10 bg-accent px-1 shadow-sm" : "flex h-7.5 w-full items-center justify-center rounded-full border border-border bg-background px-1 transition-colors hover:bg-accent"}
+                  className={active ? "flex h-7.5 w-full items-center justify-center rounded-full border border-foreground/10 bg-accent px-1 shadow-xs" : "flex h-7.5 w-full items-center justify-center rounded-full border border-border bg-background px-1 transition-colors hover:bg-accent"}
                   aria-label={presetMeta.label}
                   title={presetMeta.label}
                 >
@@ -242,7 +213,7 @@ export function ThemeToggle() {
                     {presetMeta.preview.map((color: string) => (
                       <span
                         key={`${presetKey}-${color}`}
-                        className={active ? "h-2.5 w-2.5 rounded-full border border-white/70 shadow-sm" : "h-2.5 w-2.5 rounded-full border border-white/60 shadow-sm"}
+                        className={active ? "h-2.5 w-2.5 rounded-full border border-white/70 shadow-xs" : "h-2.5 w-2.5 rounded-full border border-white/60 shadow-xs"}
                         style={{ backgroundColor: `hsl(${color})` }}
                         aria-hidden="true"
                       />
@@ -267,7 +238,7 @@ export function ThemeToggle() {
                   key={presetKey}
                   type="button"
                   onClick={() => handleFontSizePresetSelect(presetKey)}
-                  className={active ? "flex h-7.5 w-full items-center justify-center rounded-full bg-foreground text-background shadow-sm" : "flex h-7.5 w-full items-center justify-center rounded-full border border-border bg-background text-foreground transition-colors hover:bg-accent"}
+                  className={active ? "flex h-7.5 w-full items-center justify-center rounded-full bg-foreground text-background shadow-xs" : "flex h-7.5 w-full items-center justify-center rounded-full border border-border bg-background text-foreground transition-colors hover:bg-accent"}
                   aria-label={presetMeta.label}
                   title={presetMeta.label}
                 >

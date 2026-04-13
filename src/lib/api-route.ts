@@ -2,10 +2,34 @@ import { NextResponse } from "next/server"
 
 import { UserRole } from "@/db/types"
 
-import { getCurrentSessionActor } from "@/lib/auth"
 import { ContentSafetyError } from "@/lib/content-safety"
-import { requireAdminActor, requireSiteAdminActor } from "@/lib/moderator-permissions"
+import type { SessionActor } from "@/db/session-actor-queries"
 import { PublicRouteError, isPublicRouteError } from "@/lib/public-route-error"
+
+type AdminRouteActor = {
+  id: number
+  username: string
+  nickname: string | null
+  role: "ADMIN" | "MODERATOR"
+  status: SessionActor["status"]
+  moderatedZoneScopes: Array<{
+    zoneId: string
+    zoneName: string
+    zoneSlug: string
+    canEditSettings: boolean
+    canWithdrawTreasury: boolean
+  }>
+  moderatedBoardScopes: Array<{
+    boardId: string
+    boardName: string
+    boardSlug: string
+    zoneId: string | null
+    zoneName: string | null
+    zoneSlug: string | null
+    canEditSettings: boolean
+    canWithdrawTreasury: boolean
+  }>
+}
 
 export interface ApiSuccessPayload<T = unknown> {
   code: 0
@@ -28,7 +52,7 @@ export interface ApiRouteContext {
 }
 
 export interface AuthenticatedApiRouteContext extends ApiRouteContext {
-  currentUser: NonNullable<Awaited<ReturnType<typeof getCurrentSessionActor>>>
+  currentUser: SessionActor
 }
 
 export interface CustomApiRouteContext<TContext> extends ApiRouteContext {
@@ -36,7 +60,7 @@ export interface CustomApiRouteContext<TContext> extends ApiRouteContext {
 }
 
 export interface AdminApiRouteContext extends ApiRouteContext {
-  adminUser: NonNullable<Awaited<ReturnType<typeof requireAdminActor>>>
+  adminUser: AdminRouteActor
 }
 
 export type ApiRouteHandler<T = unknown, C extends ApiRouteContext = ApiRouteContext> = (context: C) => Promise<ApiRouteResult<T>>
@@ -196,6 +220,7 @@ export function createUserRouteHandler<T = unknown>(
     errorMessage: options?.errorMessage,
     logPrefix: options?.logPrefix,
     buildContext: async (request) => {
+      const { getCurrentSessionActor } = await import("@/lib/auth")
       const currentUser = await getCurrentSessionActor()
 
 
@@ -242,6 +267,7 @@ export function createAdminRouteHandler<T = unknown>(
     errorMessage: options?.errorMessage,
     logPrefix: options?.logPrefix,
     buildContext: async (request, routeContext) => {
+      const { requireAdminActor, requireSiteAdminActor } = await import("@/lib/moderator-permissions")
       const adminUser = options?.allowModerator
         ? await requireAdminActor()
         : await requireSiteAdminActor()

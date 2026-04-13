@@ -1,8 +1,8 @@
 import { updateSiteSettingsRecord } from "@/db/site-settings-write-queries"
 import { apiError, readOptionalStringField, type JsonObject } from "@/lib/api-route"
 import { finalizeSiteSettingsUpdate, type SiteSettingsRecord } from "@/lib/admin-site-settings-shared"
-import { mergeMarkdownImageUploadSettings, mergeUploadObjectStorageSettings, resolveMarkdownImageUploadSettings, resolveUploadObjectStorageSettings } from "@/lib/site-settings-app-state"
-import { normalizePositiveInteger } from "@/lib/shared/normalizers"
+import { mergeAttachmentFeatureSettings, mergeImageWatermarkSettings, mergeMarkdownImageUploadSettings, mergeUploadObjectStorageSettings, resolveAttachmentFeatureSettings, resolveImageWatermarkSettings, resolveMarkdownImageUploadSettings, resolveUploadObjectStorageSettings, type ImageWatermarkPosition } from "@/lib/site-settings-app-state"
+import { normalizeNonNegativeInteger, normalizePositiveInteger } from "@/lib/shared/normalizers"
 import { mergeUploadStorageSensitiveConfig, resolveUploadStorageSensitiveConfig } from "@/lib/site-settings-sensitive-state"
 import { normalizeUploadLocalPath } from "@/lib/upload-path"
 import { normalizeUploadProvider } from "@/lib/upload-provider"
@@ -33,6 +33,27 @@ export async function updateUploadSiteSettingsSection(existing: SiteSettingsReco
     appStateJson: existing.appStateJson,
     enabledFallback: true,
   })
+  const existingImageWatermarkSettings = resolveImageWatermarkSettings({
+    appStateJson: existing.appStateJson,
+    enabledFallback: false,
+    textFallback: "",
+    positionFallback: "BOTTOM_RIGHT",
+    opacityFallback: 22,
+    fontSizeFallback: 24,
+    marginFallback: 24,
+    colorFallback: "#FFFFFF",
+    logoPathFallback: "",
+    logoScalePercentFallback: 16,
+  })
+  const existingAttachmentFeatureSettings = resolveAttachmentFeatureSettings({
+    appStateJson: existing.appStateJson,
+    uploadEnabledFallback: false,
+    downloadEnabledFallback: false,
+    minUploadLevelFallback: 0,
+    minUploadVipLevelFallback: 0,
+    allowedExtensionsFallback: ["zip", "rar", "7z", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt"],
+    maxFileSizeMbFallback: 20,
+  })
   const existingUploadObjectStorageSettings = resolveUploadObjectStorageSettings({
     appStateJson: existing.appStateJson,
     forcePathStyleFallback: true,
@@ -40,6 +61,27 @@ export async function updateUploadSiteSettingsSection(existing: SiteSettingsReco
   const markdownImageUploadEnabled = body.markdownImageUploadEnabled === undefined
     ? existingMarkdownImageUploadSettings.enabled
     : Boolean(body.markdownImageUploadEnabled)
+  const imageWatermarkEnabled = body.imageWatermarkEnabled === undefined
+    ? existingImageWatermarkSettings.enabled
+    : Boolean(body.imageWatermarkEnabled)
+  const imageWatermarkText = readOptionalStringField(body, "imageWatermarkText") || existingImageWatermarkSettings.text
+  const imageWatermarkPosition = (readOptionalStringField(body, "imageWatermarkPosition") || existingImageWatermarkSettings.position) as ImageWatermarkPosition
+  const imageWatermarkOpacity = normalizeNonNegativeInteger(body.imageWatermarkOpacity, existingImageWatermarkSettings.opacity)
+  const imageWatermarkFontSize = normalizePositiveInteger(body.imageWatermarkFontSize, existingImageWatermarkSettings.fontSize)
+  const imageWatermarkMargin = normalizeNonNegativeInteger(body.imageWatermarkMargin, existingImageWatermarkSettings.margin)
+  const imageWatermarkColor = readOptionalStringField(body, "imageWatermarkColor") || existingImageWatermarkSettings.color
+  const imageWatermarkLogoPath = readOptionalStringField(body, "imageWatermarkLogoPath") || existingImageWatermarkSettings.logoPath
+  const imageWatermarkLogoScalePercent = normalizePositiveInteger(body.imageWatermarkLogoScalePercent, existingImageWatermarkSettings.logoScalePercent)
+  const attachmentUploadEnabled = body.attachmentUploadEnabled === undefined
+    ? existingAttachmentFeatureSettings.uploadEnabled
+    : Boolean(body.attachmentUploadEnabled)
+  const attachmentDownloadEnabled = body.attachmentDownloadEnabled === undefined
+    ? existingAttachmentFeatureSettings.downloadEnabled
+    : Boolean(body.attachmentDownloadEnabled)
+  const attachmentMinUploadLevel = normalizeNonNegativeInteger(body.attachmentMinUploadLevel, existingAttachmentFeatureSettings.minUploadLevel)
+  const attachmentMinUploadVipLevel = normalizeNonNegativeInteger(body.attachmentMinUploadVipLevel, existingAttachmentFeatureSettings.minUploadVipLevel)
+  const attachmentAllowedExtensions = Array.from(new Set(readOptionalStringField(body, "attachmentAllowedExtensions").split(/[，,\s]+/).map((item) => item.trim().toLowerCase().replace(/^\./, "")).filter(Boolean)))
+  const attachmentMaxFileSizeMb = normalizePositiveInteger(body.attachmentMaxFileSizeMb, existingAttachmentFeatureSettings.maxFileSizeMb)
   const uploadS3ForcePathStyle = body.uploadS3ForcePathStyle === undefined
     ? existingUploadObjectStorageSettings.forcePathStyle
     : Boolean(body.uploadS3ForcePathStyle)
@@ -52,10 +94,37 @@ export async function updateUploadSiteSettingsSection(existing: SiteSettingsReco
     apiError(400, "头像上传大小限制不能大于通用上传大小限制")
   }
 
+  if (attachmentAllowedExtensions.length === 0) {
+    apiError(400, "请至少配置一种允许上传的附件格式")
+  }
+
+  if (imageWatermarkEnabled && !imageWatermarkText.trim()) {
+    apiError(400, "启用图片水印时请填写水印文字")
+  }
+
   const appStateWithMarkdownImageUpload = mergeMarkdownImageUploadSettings(existing.appStateJson, {
     enabled: markdownImageUploadEnabled,
   })
-  const appStateJson = mergeUploadObjectStorageSettings(appStateWithMarkdownImageUpload, {
+  const appStateWithImageWatermark = mergeImageWatermarkSettings(appStateWithMarkdownImageUpload, {
+    enabled: imageWatermarkEnabled,
+    text: imageWatermarkText,
+    position: imageWatermarkPosition,
+    opacity: imageWatermarkOpacity,
+    fontSize: imageWatermarkFontSize,
+    margin: imageWatermarkMargin,
+    color: imageWatermarkColor,
+    logoPath: imageWatermarkLogoPath,
+    logoScalePercent: imageWatermarkLogoScalePercent,
+  })
+  const appStateWithAttachmentFeature = mergeAttachmentFeatureSettings(appStateWithImageWatermark, {
+    uploadEnabled: attachmentUploadEnabled,
+    downloadEnabled: attachmentDownloadEnabled,
+    minUploadLevel: attachmentMinUploadLevel,
+    minUploadVipLevel: attachmentMinUploadVipLevel,
+    allowedExtensions: attachmentAllowedExtensions,
+    maxFileSizeMb: attachmentMaxFileSizeMb,
+  })
+  const appStateJson = mergeUploadObjectStorageSettings(appStateWithAttachmentFeature, {
     forcePathStyle: uploadS3ForcePathStyle,
   })
   const currentSensitiveStateJson = ("sensitiveStateJson" in existing ? existing.sensitiveStateJson : null) ?? null

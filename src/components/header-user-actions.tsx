@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Bell, MessageSquareMore, User } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
-import { UserAvatar } from "@/components/user-avatar"
+import { Button } from "@/components/ui/rbutton"
+import { UserAvatar } from "@/components/user/user-avatar"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
 
 

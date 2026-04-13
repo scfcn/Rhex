@@ -12,7 +12,7 @@ interface HelpDocumentPageContentProps {
 export function HelpDocumentPageContent({ items, activeItem }: HelpDocumentPageContentProps) {
   return (
     <div>
-      <section className="overflow-hidden rounded-[24px] border border-border bg-card shadow-sm shadow-black/5 dark:shadow-black/30">
+      <section className="overflow-hidden rounded-[24px] border border-border bg-card shadow-xs shadow-black/5 dark:shadow-black/30">
         <div className="grid xl:grid-cols-[220px_minmax(0,1fr)]">
           <aside className="border-b border-border xl:border-b-0 xl:border-r">
             <div className="p-2">

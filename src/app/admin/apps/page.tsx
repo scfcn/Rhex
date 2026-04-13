@@ -1,8 +1,8 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 
-import { AdminModuleSearch } from "@/components/admin-module-search"
-import { AdminShell } from "@/components/admin-shell"
+import { AdminModuleSearch } from "@/components/admin/admin-module-search"
+import { AdminShell } from "@/components/admin/admin-shell"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 import { HOST_APPS } from "@/lib/apps"
@@ -24,23 +24,20 @@ export default async function AdminAppsPage() {
   }
 
   return (
-    <AdminShell currentTab="/admin/apps" adminName={admin.nickname ?? admin.username}>
+    <AdminShell
+      currentKey="apps"
+      adminName={admin.nickname ?? admin.username}
+      headerDescription="统一管理站点内置应用和每个应用的独立后台入口。"
+      headerSearch={<AdminModuleSearch className="w-full" />}
+    >
       <div className="space-y-6">
-        <div className="flex flex-col gap-4 rounded-[24px] border border-border bg-card px-5 py-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">当前模块</p>
-            <h2 className="text-lg font-semibold">应用中心</h2>
-          </div>
-          <AdminModuleSearch className="md:ml-auto" />
-        </div>
-
         <Card>
-          <CardHeader>
+          <CardHeader className="border-b">
             <CardTitle>应用</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-4 lg:grid-cols-2">
+          <CardContent className="grid gap-4 py-4 lg:grid-cols-2">
             {HOST_APPS.map((app) => (
-              <div key={app.id} className="rounded-[24px] border border-border p-5">
+              <div key={app.id} className="rounded-xl border border-border p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{app.category}</p>

@@ -100,6 +100,22 @@ export async function findEditablePostBySlug(slug: string) {
           },
         },
       },
+      attachments: {
+        orderBy: {
+          sortOrder: "asc",
+        },
+        include: {
+          upload: {
+            select: {
+              id: true,
+              originalName: true,
+              fileExt: true,
+              mimeType: true,
+              fileSize: true,
+            },
+          },
+        },
+      },
     },
   })
 }

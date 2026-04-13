@@ -31,7 +31,27 @@ function parseNullableNumber(value: unknown) {
 }
 
 function parseBoolean(value: unknown) {
-  return value === true
+  return value === true || value === "true"
+}
+
+function parseNullableBoolean(value: unknown): boolean | null | undefined {
+  if (value === undefined) {
+    return undefined
+  }
+
+  if (value === null || value === "") {
+    return null
+  }
+
+  if (value === true || value === "true") {
+    return true
+  }
+
+  if (value === false || value === "false") {
+    return false
+  }
+
+  return undefined
 }
 
 interface MutableRecord {
@@ -135,6 +155,7 @@ function buildBoardAdvancedPayload(body: Record<string, unknown>, currentConfig?
     minReplyVipLevel: parseNullableNumber(body.minReplyVipLevel),
     requirePostReview: body.requirePostReview === undefined ? undefined : parseBoolean(body.requirePostReview),
     requireCommentReview: body.requireCommentReview === undefined ? undefined : parseBoolean(body.requireCommentReview),
+    showInHomeFeed: parseNullableBoolean(body.showInHomeFeed),
     postListDisplayMode: normalizeNullablePostListDisplayMode(body.postListDisplayMode) ?? undefined,
     postListLoadMode: normalizeNullablePostListLoadMode(body.postListLoadMode) ?? undefined,
     configJson: buildBoardConfigJson(body, currentConfig),
@@ -155,7 +176,17 @@ function ensureModeratorBoardAdvancedLimits(payload: ReturnType<typeof buildBoar
   }
 }
 
-function buildZonePayload(body: Record<string, unknown>, sortOrder: number, name: string, slug: string, description: string, icon: string) {
+function buildZonePayload(
+  body: Record<string, unknown>,
+  sortOrder: number,
+  name: string,
+  slug: string,
+  description: string,
+  icon: string,
+  currentShowInHomeFeed?: boolean,
+) {
+  const showInHomeFeed = parseNullableBoolean(body.showInHomeFeed)
+
   return {
     name,
     slug,
@@ -163,6 +194,7 @@ function buildZonePayload(body: Record<string, unknown>, sortOrder: number, name
     icon,
     sortOrder,
     hiddenFromSidebar: parseBoolean(body.hiddenFromSidebar),
+    showInHomeFeed: typeof showInHomeFeed === "boolean" ? showInHomeFeed : currentShowInHomeFeed ?? true,
     postPointDelta: parseNullableNumber(body.postPointDelta) ?? 0,
     replyPointDelta: parseNullableNumber(body.replyPointDelta) ?? 0,
     postIntervalSeconds: parseNullableNumber(body.postIntervalSeconds) ?? 120,
@@ -292,9 +324,9 @@ export async function updateStructureItem(params: {
 
   if (type === "zone") {
     try {
-      await ensureCanEditZone(params.actor, id)
+      const currentZone = await ensureCanEditZone(params.actor, id)
       const icon = readOptionalStringField(rawBody, "icon") || "📚"
-      await updateZone(id, buildZonePayload(rawBody, sortOrder, name, slug, description, icon))
+      await updateZone(id, buildZonePayload(rawBody, sortOrder, name, slug, description, icon, currentZone.showInHomeFeed))
 
       return { message: "分区已更新", action: "zone.update", targetType: "ZONE", targetId: id, detail: `更新分区 ${name}` }
     } catch (error) {

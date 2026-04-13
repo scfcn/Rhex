@@ -143,10 +143,10 @@ export function GlobalNavigationProgress() {
   return (
     <div
       aria-hidden="true"
-      className={`pointer-events-none fixed inset-x-0 top-0 z-[120] h-1 transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
+      className={`pointer-events-none fixed inset-x-0 top-0 z-120 h-1 transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
     >
       <div
-        className="h-full bg-gradient-to-r from-orange-400 via-amber-400 to-yellow-300 shadow-[0_0_18px_rgba(251,191,36,0.55)] transition-[width] duration-200 ease-out"
+        className="h-full bg-linear-to-r from-orange-400 via-amber-400 to-yellow-300 shadow-[0_0_18px_rgba(251,191,36,0.55)] transition-[width] duration-200 ease-out"
         style={{ width: `${progress}%` }}
       />
     </div>

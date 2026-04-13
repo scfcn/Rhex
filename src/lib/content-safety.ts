@@ -3,8 +3,28 @@ import { cache } from "react"
 import { findActiveSensitiveWords } from "@/db/content-safety-queries"
 
 export type SensitiveMatchType = "EXACT" | "CONTAINS" | "REGEX"
-export type SensitiveActionType = "REJECT" | "REVIEW" | "REPLACE"
-export type SensitiveScene = "post.title" | "post.content" | "post.tags" | "comment.content" | "profile.nickname" | "profile.bio" | "profile.introduction" | "yinyang.question" | "yinyang.answer"
+export type SensitiveActionType = "REJECT" | "REPLACE"
+export type SensitiveScene =
+  | "post.title"
+  | "post.content"
+  | "post.tags"
+  | "comment.content"
+  | "profile.nickname"
+  | "profile.bio"
+  | "profile.introduction"
+  | "favoriteCollection.title"
+  | "favoriteCollection.description"
+  | "boardApplication.name"
+  | "boardApplication.description"
+  | "boardApplication.reason"
+  | "verification.content"
+  | "verification.customDescription"
+  | "report.reasonDetail"
+  | "message.body"
+  | "friendLink.name"
+  | "selfServeAd.title"
+  | "yinyang.question"
+  | "yinyang.answer"
 
 export interface SensitiveWordRule {
   id: string
@@ -36,7 +56,7 @@ export interface SensitiveScanResult {
   sanitizedText: string
   hits: SensitiveHit[]
   shouldReject: boolean
-  shouldReview: boolean
+  wasReplaced: boolean
 }
 
 export class ContentSafetyError extends Error {
@@ -58,18 +78,15 @@ let cachedSensitiveWordRules: CompiledSensitiveWordRule[] | null = null
 let sensitiveWordRulesCacheExpiry = 0
 let sensitiveWordRulesCachePromise: Promise<CompiledSensitiveWordRule[]> | null = null
 
-function normalizeMatchType(value: string): SensitiveMatchType {
+export function normalizeSensitiveMatchType(value: string): SensitiveMatchType {
   if (value === "EXACT" || value === "REGEX") {
     return value
   }
   return "CONTAINS"
 }
 
-function normalizeActionType(value: string): SensitiveActionType {
-  if (value === "REVIEW" || value === "REPLACE") {
-    return value
-  }
-  return "REJECT"
+export function normalizeSensitiveActionType(value: string): SensitiveActionType {
+  return value === "REPLACE" ? "REPLACE" : "REJECT"
 }
 
 function escapeRegExp(value: string) {
@@ -97,8 +114,8 @@ function compileSensitiveWordRules(rules: Awaited<ReturnType<typeof findActiveSe
     const normalizedRule: SensitiveWordRule = {
       id: rule.id,
       word: rule.word,
-      matchType: normalizeMatchType(rule.matchType),
-      actionType: normalizeActionType(rule.actionType),
+      matchType: normalizeSensitiveMatchType(rule.matchType),
+      actionType: normalizeSensitiveActionType(rule.actionType),
       status: rule.status,
     }
 
@@ -188,7 +205,7 @@ export async function scanSensitiveText(
     sanitizedText,
     hits,
     shouldReject: hits.some((item) => item.actionType === "REJECT"),
-    shouldReview: hits.some((item) => item.actionType === "REVIEW"),
+    wasReplaced: sanitizedText !== text,
   }
 }
 

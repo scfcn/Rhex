@@ -10,11 +10,14 @@ import {
   mergeIntroductionChangePointCostSettings,
   mergeInviteCodePurchasePriceSettings,
   mergeNicknameChangePointCostSettings,
+  mergeVipNameColorSettings,
   resolveCheckInStreakSettings,
   mergeVipLevelIconSettings,
   resolveAvatarChangePointCostSettings,
   resolveIntroductionChangePointCostSettings,
+  resolveVipNameColorSettings,
 } from "@/lib/site-settings-app-state"
+import { normalizeVipNameColors } from "@/lib/vip-name-colors"
 import { normalizeVipLevelIcons } from "@/lib/vip-level-icons"
 
 export async function updateVipSiteSettingsSection(existing: SiteSettingsRecord, body: JsonObject, section: string) {
@@ -77,6 +80,15 @@ export async function updateVipSiteSettingsSection(existing: SiteSettingsRecord,
     vip2: readOptionalStringField(body, "vipLevelIconVip2"),
     vip3: readOptionalStringField(body, "vipLevelIconVip3"),
   })
+  const existingVipNameColors = resolveVipNameColorSettings({
+    appStateJson: existing.appStateJson,
+  })
+  const vipNameColors = normalizeVipNameColors({
+    normal: body.vipNameColorNormal === undefined ? existingVipNameColors.normal : readOptionalStringField(body, "vipNameColorNormal"),
+    vip1: body.vipNameColorVip1 === undefined ? existingVipNameColors.vip1 : readOptionalStringField(body, "vipNameColorVip1"),
+    vip2: body.vipNameColorVip2 === undefined ? existingVipNameColors.vip2 : readOptionalStringField(body, "vipNameColorVip2"),
+    vip3: body.vipNameColorVip3 === undefined ? existingVipNameColors.vip3 : readOptionalStringField(body, "vipNameColorVip3"),
+  }, existingVipNameColors)
   const appStateWithCheckInRewards = mergeCheckInRewardSettings(existing.appStateJson, {
     vip1: checkInVip1Reward,
     vip2: checkInVip2Reward,
@@ -113,6 +125,7 @@ export async function updateVipSiteSettingsSection(existing: SiteSettingsRecord,
     makeUpCountsTowardStreak: checkInMakeUpCountsTowardStreak,
   })
   const appStateWithVipLevelIcons = mergeVipLevelIconSettings(appStateWithCheckInStreak, vipLevelIcons)
+  const appStateWithVipNameColors = mergeVipNameColorSettings(appStateWithVipLevelIcons, vipNameColors)
 
   if (existing.inviteCodePurchaseEnabled && inviteCodePrice < 1) {
     apiError(400, "开启积分购买邀请码时，普通用户价格必须大于 0")
@@ -126,7 +139,7 @@ export async function updateVipSiteSettingsSection(existing: SiteSettingsRecord,
     checkInVipMakeUpCardPrice,
     nicknameChangePointCost,
     inviteCodePrice,
-    appStateJson: appStateWithVipLevelIcons,
+    appStateJson: appStateWithVipNameColors,
     vipMonthlyPrice,
     vipQuarterlyPrice,
     vipYearlyPrice,

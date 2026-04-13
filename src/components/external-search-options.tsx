@@ -17,16 +17,18 @@ export function ExternalSearchOptions({
   onSelect,
   variant = "menu",
 }: ExternalSearchOptionsProps) {
+  const siteHost = typeof window === "undefined" ? "site:" : `site:${window.location.host}`
+  const searchKeyword = siteHost === "site:" ? keyword : `${siteHost} ${keyword}`
+
   if (!keyword.trim()) {
     return null
   }
-  const siteHost ='site:'+ window.location.origin.replace('https://','').replace('http://','')
 
 
   return (
     <div className={variant === "menu" ? "grid gap-1" : "grid gap-3 sm:grid-cols-2"}>
       {engines.map((engine) => {
-        const href = buildExternalSearchUrl(engine.urlTemplate, siteHost+' '+keyword)
+        const href = buildExternalSearchUrl(engine.urlTemplate, searchKeyword)
 
         return (
           <a

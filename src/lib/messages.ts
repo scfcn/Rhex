@@ -21,6 +21,7 @@ import { Prisma, ConversationKind, UserStatus } from "@/db/types"
 
 
 import { apiError } from "@/lib/api-route"
+import { enforceSensitiveText } from "@/lib/content-safety"
 import { formatMonthDayTime } from "@/lib/formatters"
 import { messageEventBus } from "@/lib/message-event-bus"
 import { getUserDisplayName } from "@/lib/user-display"
@@ -89,6 +90,7 @@ function mapMessageBubble(
     id: message.id,
     body: message.body,
     createdAt: formatMonthDayTime(message.createdAt),
+    occurredAt: message.createdAt.toISOString(),
     senderId: message.senderId,
     senderName: message.senderId === currentUserId ? "我" : getUserDisplayName(message.sender),
     senderAvatarPath: message.sender.avatarPath,
@@ -366,16 +368,26 @@ export async function sendDirectMessage(senderId: number, recipientId: number, b
     blockedByMessage: "对方已将你拉黑，无法发送私信",
   })
 
+  const contentSafety = await enforceSensitiveText({ scene: "message.body", text: content })
   const conversation = await getOrCreateConversation(senderId, recipientId)
 
-  const message = await createDirectMessageInTransaction(conversation.id, senderId, recipientId, content)
+  const message = await createDirectMessageInTransaction(conversation.id, senderId, recipientId, contentSafety.sanitizedText)
+  const sender = await findMessageRecipientById(senderId)
   const occurredAt = message.createdAt.toISOString()
+  const senderDisplayName = sender ? getUserDisplayName(sender) : "用户"
+  const senderUsername = sender?.username ?? ""
+  const senderAvatarPath = sender?.avatarPath ?? null
 
-  messageEventBus.publish({
+  await messageEventBus.publish({
     type: "message.created",
     conversationId: conversation.id,
     messageId: message.id,
+    content: message.body,
+    createdAtLabel: formatMonthDayTime(message.createdAt),
     senderId,
+    senderUsername,
+    senderDisplayName,
+    senderAvatarPath,
     recipientId,
     occurredAt,
   })
@@ -387,6 +399,7 @@ export async function sendDirectMessage(senderId: number, recipientId: number, b
     content: message.body,
     createdAt: formatMonthDayTime(message.createdAt),
     occurredAt,
+    contentAdjusted: contentSafety.wasReplaced,
   }
 }
 

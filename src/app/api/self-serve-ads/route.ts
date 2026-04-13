@@ -14,7 +14,7 @@ function normalizeDurationMonths(value: unknown): SelfServeAdPurchaseDraft["dura
 
 export const POST = createRouteHandler(async ({ request }) => {
   const body = await readJsonBody(request)
-  await submitSelfServeAdOrder({
+  const result = await submitSelfServeAdOrder({
     slotType: normalizeSlotType(body.slotType),
     slotIndex: Number(body.slotIndex ?? 0),
     title: typeof body.title === "string" ? body.title : "",
@@ -29,7 +29,7 @@ export const POST = createRouteHandler(async ({ request }) => {
 
   revalidatePath("/")
   revalidatePath("/funs/self-serve-ads")
-  return apiSuccess(undefined, "广告申请已提交，待管理员审核")
+  return apiSuccess(undefined, result.contentAdjusted ? "广告申请已提交，部分内容已自动替换，待管理员审核" : "广告申请已提交，待管理员审核")
 }, {
   errorMessage: "广告申请提交失败",
   logPrefix: "[api/self-serve-ads] unexpected error",

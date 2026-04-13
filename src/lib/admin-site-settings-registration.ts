@@ -2,12 +2,23 @@ import { updateSiteSettingsRecord } from "@/db/site-settings-write-queries"
 import { apiError, readOptionalNumberField, readOptionalStringField, type JsonObject } from "@/lib/api-route"
 import { finalizeSiteSettingsUpdate, type SiteSettingsRecord } from "@/lib/admin-site-settings-shared"
 import {
+  mergeAuthPageShowcaseSettings,
   mergeAuthProviderSettings,
+  mergeRegisterInviteCodeHelpSettings,
+  mergeRegisterNicknameLengthSettings,
+  mergeRegistrationEmailTemplateSettings,
   mergeRegistrationRewardSettings,
+  resolveRegisterInviteCodeHelpSettings,
+  resolveRegistrationEmailTemplateSettings,
+  resolveRegisterNicknameLengthSettings,
   resolveRegistrationRewardSettings,
 } from "@/lib/site-settings-app-state"
 import { mergeAuthProviderSensitiveConfig, mergeCaptchaSensitiveConfig } from "@/lib/site-settings-sensitive-state"
 import { normalizeCaptchaMode } from "@/lib/shared/config-parsers"
+
+function isSupportedInviteCodeHelpUrl(value: string) {
+  return value.startsWith("/") || /^https?:\/\//i.test(value)
+}
 
 export async function updateRegistrationSiteSettingsSection(existing: SiteSettingsRecord, body: JsonObject, section: string) {
   if (section !== "site-registration") {
@@ -20,10 +31,26 @@ export async function updateRegistrationSiteSettingsSection(existing: SiteSettin
     appStateJson: existing.appStateJson,
     initialPointsFallback: 0,
   })
+  const existingRegistrationEmailTemplateSettings = resolveRegistrationEmailTemplateSettings({
+    appStateJson: existing.appStateJson,
+    siteNameFallback: existing.siteName,
+  })
+  const existingRegisterInviteCodeHelpSettings = resolveRegisterInviteCodeHelpSettings({
+    appStateJson: existing.appStateJson,
+  })
   const registerInitialPoints = Math.max(0, readOptionalNumberField(body, "registerInitialPoints") ?? existingRegistrationRewardSettings.initialPoints)
+  const existingRegisterNicknameLengthSettings = resolveRegisterNicknameLengthSettings({
+    appStateJson: existing.appStateJson,
+    minLengthFallback: 1,
+    maxLengthFallback: 20,
+  })
   const registrationEnabled = Boolean(body.registrationEnabled)
+  const authPageShowcaseEnabled = "authPageShowcaseEnabled" in body ? Boolean(body.authPageShowcaseEnabled) : true
   const registrationRequireInviteCode = Boolean(body.registrationRequireInviteCode)
   const registerInviteCodeEnabled = Boolean(body.registerInviteCodeEnabled)
+  const registerInviteCodeHelpEnabled = registerInviteCodeEnabled && Boolean(body.registerInviteCodeHelpEnabled)
+  const registerInviteCodeHelpTitle = readOptionalStringField(body, "registerInviteCodeHelpTitle") || existingRegisterInviteCodeHelpSettings.title
+  const registerInviteCodeHelpUrl = readOptionalStringField(body, "registerInviteCodeHelpUrl") || existingRegisterInviteCodeHelpSettings.url
   const inviteCodePurchaseEnabled = Boolean(body.inviteCodePurchaseEnabled)
   const registerCaptchaMode = normalizeCaptchaMode(body.registerCaptchaMode)
   const loginCaptchaMode = normalizeCaptchaMode(body.loginCaptchaMode)
@@ -37,6 +64,8 @@ export async function updateRegistrationSiteSettingsSection(existing: SiteSettin
   const registerPhoneVerification = registerPhoneEnabled && Boolean(body.registerPhoneVerification)
   const registerNicknameEnabled = Boolean(body.registerNicknameEnabled)
   const registerNicknameRequired = registerNicknameEnabled && Boolean(body.registerNicknameRequired)
+  const registerNicknameMinLength = Math.max(1, readOptionalNumberField(body, "registerNicknameMinLength") ?? existingRegisterNicknameLengthSettings.minLength)
+  const registerNicknameMaxLength = Math.max(1, readOptionalNumberField(body, "registerNicknameMaxLength") ?? existingRegisterNicknameLengthSettings.maxLength)
   const registerGenderEnabled = Boolean(body.registerGenderEnabled)
   const registerGenderRequired = registerGenderEnabled && Boolean(body.registerGenderRequired)
   const registerInviterEnabled = Boolean(body.registerInviterEnabled)
@@ -58,9 +87,23 @@ export async function updateRegistrationSiteSettingsSection(existing: SiteSettin
   const smtpPass = readOptionalStringField(body, "smtpPass") || null
   const smtpFrom = readOptionalStringField(body, "smtpFrom") || null
   const smtpSecure = Boolean(body.smtpSecure)
+  const registerVerificationEmailSubject = readOptionalStringField(body, "registerVerificationEmailSubject") || existingRegistrationEmailTemplateSettings.registerVerification.subject
+  const registerVerificationEmailText = readOptionalStringField(body, "registerVerificationEmailText") || existingRegistrationEmailTemplateSettings.registerVerification.text
+  const registerVerificationEmailHtml = readOptionalStringField(body, "registerVerificationEmailHtml") || existingRegistrationEmailTemplateSettings.registerVerification.html
+  const resetPasswordEmailSubject = readOptionalStringField(body, "resetPasswordEmailSubject") || existingRegistrationEmailTemplateSettings.resetPasswordVerification.subject
+  const resetPasswordEmailText = readOptionalStringField(body, "resetPasswordEmailText") || existingRegistrationEmailTemplateSettings.resetPasswordVerification.text
+  const resetPasswordEmailHtml = readOptionalStringField(body, "resetPasswordEmailHtml") || existingRegistrationEmailTemplateSettings.resetPasswordVerification.html
 
   if (registrationRequireInviteCode && !registerInviteCodeEnabled) {
     apiError(400, "注册要求必须填写邀请码时，不能关闭邀请码输入框显示")
+  }
+
+  if (registerInviteCodeHelpEnabled && !registerInviteCodeHelpUrl) {
+    apiError(400, "开启邀请码输入框链接时，必须填写链接地址")
+  }
+
+  if (registerInviteCodeHelpUrl && !isSupportedInviteCodeHelpUrl(registerInviteCodeHelpUrl)) {
+    apiError(400, "邀请码输入框链接仅支持以 /、http:// 或 https:// 开头")
   }
 
   if ((registerCaptchaMode === "TURNSTILE" || loginCaptchaMode === "TURNSTILE") && (!turnstileSiteKey || !turnstileSecretKey)) {
@@ -71,13 +114,41 @@ export async function updateRegistrationSiteSettingsSection(existing: SiteSettin
     apiError(400, "开启 SMTP 时请完整填写主机、端口、账号、密码和发件人地址")
   }
 
+  if (registerNicknameMaxLength < registerNicknameMinLength) {
+    apiError(400, "昵称最大字符数不能小于最小字符数")
+  }
+
   const appStateWithRegistrationRewards = mergeRegistrationRewardSettings(existing.appStateJson, {
     initialPoints: registerInitialPoints,
   })
-  const appStateJson = mergeAuthProviderSettings(appStateWithRegistrationRewards, {
+  const appStateWithRegistrationEmailTemplates = mergeRegistrationEmailTemplateSettings(appStateWithRegistrationRewards, {
+    registerVerification: {
+      subject: registerVerificationEmailSubject,
+      text: registerVerificationEmailText,
+      html: registerVerificationEmailHtml,
+    },
+    resetPasswordVerification: {
+      subject: resetPasswordEmailSubject,
+      text: resetPasswordEmailText,
+      html: resetPasswordEmailHtml,
+    },
+  })
+  const appStateWithAuthProviders = mergeAuthProviderSettings(appStateWithRegistrationEmailTemplates, {
     githubEnabled: authGithubEnabled,
     googleEnabled: authGoogleEnabled,
     passkeyEnabled: authPasskeyEnabled,
+  })
+  const appStateWithAuthPageShowcase = mergeAuthPageShowcaseSettings(appStateWithAuthProviders, {
+    enabled: authPageShowcaseEnabled,
+  })
+  const appStateWithRegisterNicknameLengths = mergeRegisterNicknameLengthSettings(appStateWithAuthPageShowcase, {
+    minLength: registerNicknameMinLength,
+    maxLength: registerNicknameMaxLength,
+  })
+  const appStateJson = mergeRegisterInviteCodeHelpSettings(appStateWithRegisterNicknameLengths, {
+    enabled: registerInviteCodeHelpEnabled,
+    title: registerInviteCodeHelpTitle,
+    url: registerInviteCodeHelpUrl,
   })
   const currentSensitiveStateJson = ("sensitiveStateJson" in existing ? existing.sensitiveStateJson : null) ?? null
   const sensitiveStateWithAuthProvider = mergeAuthProviderSensitiveConfig(currentSensitiveStateJson, {

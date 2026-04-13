@@ -5,6 +5,7 @@ import { sendRegisterVerificationEmail } from "@/lib/mailer"
 import { getRequestIp } from "@/lib/request-ip"
 import { logRouteWriteSuccess } from "@/lib/route-metadata"
 import { sendVerificationCode } from "@/lib/verification"
+import { createRequestWriteGuardOptions } from "@/lib/write-guard-policies"
 import { withRequestWriteGuard } from "@/lib/write-guard"
 
 
@@ -39,15 +40,13 @@ export const POST = createRouteHandler(async ({ request }) => {
     apiError(400, "当前暂未接入短信通道，请先关闭手机验证码或后续接入短信服务")
   }
 
-  return withRequestWriteGuard({
+  return withRequestWriteGuard(createRequestWriteGuardOptions("auth-send-verification-code", {
     request,
-    scope: "auth-send-verification-code",
-    cooldownMs: 15_000,
-    cooldownMessage: "验证码已发送，如未收到请 15 秒后重试",
-    dedupeKey: `${channel}:${target}`,
-    dedupeWindowMs: 3_000,
-    releaseOnError: true,
-  }, async () => {
+    input: {
+      channel,
+      target,
+    },
+  }), async () => {
     const result = await sendVerificationCode({
       channel,
       target,

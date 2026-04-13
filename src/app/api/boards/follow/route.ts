@@ -1,5 +1,7 @@
 import { toggleFollowTarget } from "@/db/follow-queries"
 import { apiError, apiSuccess, createUserRouteHandler, readJsonBody, requireStringField } from "@/lib/api-route"
+import { revalidateUserSurfaceCache } from "@/lib/user-surface"
+import { createRequestWriteGuardOptions } from "@/lib/write-guard-policies"
 import { withRequestWriteGuard } from "@/lib/write-guard"
 
 
@@ -7,13 +9,13 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   const body = await readJsonBody(request)
   const boardId = requireStringField(body, "boardId", "缺少节点参数")
 
-  return withRequestWriteGuard({
+  return withRequestWriteGuard(createRequestWriteGuardOptions("boards-follow-toggle", {
     request,
     userId: currentUser.id,
-    scope: "boards-follow-toggle",
-    cooldownMs: 1_500,
-    dedupeKey: `${currentUser.id}:${boardId}`,
-  }, async () => {
+    input: {
+      boardId,
+    },
+  }), async () => {
     const result = await toggleFollowTarget({
       userId: currentUser.id,
       targetType: "board",
@@ -27,6 +29,8 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     if (result.status !== "ok") {
       apiError(400, "关注节点失败")
     }
+
+    revalidateUserSurfaceCache(currentUser.id)
 
     return apiSuccess({ followed: result.followed }, result.followed ? "关注节点成功" : "已取消关注节点")
   })

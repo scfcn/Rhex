@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 
-import { PasskeyAuthPanel } from "@/components/passkey-auth-panel"
+import { PasskeyAuthPanel } from "@/components/auth/passkey-auth-panel"
 import { SiteHeader } from "@/components/site-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getCurrentUser } from "@/lib/auth"

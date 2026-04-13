@@ -87,7 +87,7 @@ export async function GET(request: Request, props: OAuthProviderRouteProps) {
       const response = NextResponse.redirect(await buildRedirectUrl("/auth/complete"))
       clearOAuthFlowState(response, params.provider)
       clearPendingExternalAuthState(response)
-      setPendingExternalAuthState(response, result.state)
+      await setPendingExternalAuthState(response, result.state)
       return response
     }
 

@@ -1,11 +1,11 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 
-import { ForumPostStream } from "@/components/forum-post-stream"
+import { ForumPostStream } from "@/components/forum/forum-post-stream"
 import { FollowToggleButton } from "@/components/follow-toggle-button"
-import { ForumPageShell } from "@/components/forum-page-shell"
-import { HomeSidebarPanels } from "@/components/home-sidebar-panels"
-import { RssSubscribeButton } from "@/components/rss-subscribe-button"
+import { ForumPageShell } from "@/components/forum/forum-page-shell"
+import { HomeSidebarPanels } from "@/components/home/home-sidebar-panels"
+import { RssSubscribeButton } from "@/components/rss/rss-subscribe-button"
 import { SiteHeader } from "@/components/site-header"
 import { Card, CardContent } from "@/components/ui/card"
 import { getCurrentUser } from "@/lib/auth"
@@ -78,7 +78,7 @@ export default async function TagPage(props: PageProps<"/tags/[slug]">) {
           main={(
             <main className="pb-12 py-1 mt-5">
             <div className="space-y-6">
-              <Card className="overflow-hidden border-none bg-gradient-to-r from-[#1f1b16] via-[#2e261f] to-[#382c22] text-white shadow-soft">
+              <Card className="overflow-hidden border-none bg-linear-to-r from-[#1f1b16] via-[#2e261f] to-[#382c22] text-white shadow-soft">
                 <CardContent className="p-8">
                   <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                     <div>
@@ -112,7 +112,7 @@ export default async function TagPage(props: PageProps<"/tags/[slug]">) {
           )}
           rightSidebar={(
             <aside className="mt-6 hidden pb-12 lg:block">
-              <HomeSidebarPanels user={sidebarUser} hotTopics={hotTopics} siteName={settings.siteName} siteDescription={settings.siteDescription} siteLogoPath={settings.siteLogoPath} />
+              <HomeSidebarPanels user={sidebarUser} hotTopics={hotTopics} siteName={settings.siteName} siteDescription={settings.siteDescription} siteLogoPath={settings.siteLogoPath} siteIconPath={settings.siteIconPath} />
             </aside>
           )}
         />

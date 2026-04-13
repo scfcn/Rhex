@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react"
 
 import { LevelIcon } from "@/components/level-icon"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/rbutton"
 
 
 interface BadgeCenterItem {

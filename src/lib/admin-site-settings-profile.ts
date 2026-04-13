@@ -8,7 +8,7 @@ import { finalizeSiteSettingsUpdate, type SiteSettingsRecord } from "@/lib/admin
 import { normalizeMarkdownEmojiItems, serializeMarkdownEmojiItems } from "@/lib/markdown-emoji"
 import { normalizePostListLoadMode } from "@/lib/post-list-load-mode"
 import { normalizePostListDisplayMode } from "@/lib/post-list-display"
-import { mergeFooterCopyrightSettings, mergeHomeFeedPostListLoadSettings, mergeHomeSidebarAnnouncementSettings, mergePostPageSizeSettings, resolveFooterCopyrightSettings, resolveHomeFeedPostListLoadSettings, resolveHomeSidebarAnnouncementSettings, resolvePostPageSizeSettings } from "@/lib/site-settings-app-state"
+import { mergeFooterCopyrightSettings, mergeHomeFeedPostListLoadSettings, mergeHomeSidebarAnnouncementSettings, mergeLeftSidebarDisplaySettings, mergePostPageSizeSettings, mergePostSlugGenerationSettings, mergeSiteBrandingSettings, normalizeLeftSidebarDisplayMode, normalizePostSlugGenerationMode, resolveFooterCopyrightSettings, resolveHomeFeedPostListLoadSettings, resolveHomeSidebarAnnouncementSettings, resolveLeftSidebarDisplaySettings, resolvePostPageSizeSettings, resolvePostSlugGenerationSettings, resolveSiteBrandingSettings } from "@/lib/site-settings-app-state"
 import { normalizeHeaderAppIconName, normalizeSiteHeaderAppLinks } from "@/lib/site-header-app-links"
 import { mergeSiteSearchSettings, resolveSiteSearchSettings } from "@/lib/site-search-settings"
 import { normalizeFooterLinks } from "@/lib/shared/config-parsers"
@@ -20,10 +20,16 @@ export async function updateProfileSiteSettingsSection(existing: SiteSettingsRec
     const siteDescription = readOptionalStringField(body, "siteDescription")
     const siteLogoText = readOptionalStringField(body, "siteLogoText")
     const siteLogoPath = readOptionalStringField(body, "siteLogoPath")
+    const siteIconPath = readOptionalStringField(body, "siteIconPath")
     const siteSeoKeywords = readOptionalStringField(body, "siteSeoKeywords").split(/[，,\n]+/).map((item) => item.trim()).filter(Boolean).join(",")
     const analyticsCode = readOptionalStringField(body, "analyticsCode")
     const footerCopyrightText = readOptionalStringField(body, "footerCopyrightText")
     const postLinkDisplayMode = readOptionalStringField(body, "postLinkDisplayMode") === "ID" ? "ID" : "SLUG"
+    const existingPostSlugGenerationSettings = resolvePostSlugGenerationSettings({
+      appStateJson: existing.appStateJson,
+      modeFallback: "TITLE_TIMESTAMP",
+    })
+    const postSlugGenerationMode = normalizePostSlugGenerationMode(body.postSlugGenerationMode, existingPostSlugGenerationSettings.mode)
     const homeFeedPostListDisplayMode = normalizePostListDisplayMode(body.homeFeedPostListDisplayMode)
     const homeSidebarStatsCardEnabled = body.homeSidebarStatsCardEnabled === undefined ? existing.homeSidebarStatsCardEnabled : Boolean(body.homeSidebarStatsCardEnabled)
     const existingHomeSidebarAnnouncementSettings = resolveHomeSidebarAnnouncementSettings({
@@ -33,6 +39,11 @@ export async function updateProfileSiteSettingsSection(existing: SiteSettingsRec
     const homeSidebarAnnouncementsEnabled = body.homeSidebarAnnouncementsEnabled === undefined
       ? existingHomeSidebarAnnouncementSettings.enabled
       : Boolean(body.homeSidebarAnnouncementsEnabled)
+    const existingLeftSidebarDisplaySettings = resolveLeftSidebarDisplaySettings({
+      appStateJson: existing.appStateJson,
+      modeFallback: "DEFAULT",
+    })
+    const leftSidebarDisplayMode = normalizeLeftSidebarDisplayMode(body.leftSidebarDisplayMode, existingLeftSidebarDisplaySettings.mode)
     const existingHomeFeedPostListLoadSettings = resolveHomeFeedPostListLoadSettings({
       appStateJson: existing.appStateJson,
       loadModeFallback: normalizePostListLoadMode(undefined),
@@ -46,6 +57,10 @@ export async function updateProfileSiteSettingsSection(existing: SiteSettingsRec
       appStateJson: existing.appStateJson,
       textFallback: `${siteName} @ ${new Date().getFullYear()}`,
       brandingVisibleFallback: true,
+    })
+    const existingSiteBrandingSettings = resolveSiteBrandingSettings({
+      appStateJson: existing.appStateJson,
+      iconPathFallback: "",
     })
     const footerBrandingVisible = body.footerBrandingVisible === undefined
       ? existingFooterCopyrightSettings.brandingVisible
@@ -91,7 +106,21 @@ export async function updateProfileSiteSettingsSection(existing: SiteSettingsRec
       externalEngines: existingSearchSettings.externalEngines,
     })
 
-    const appStateJson = mergeFooterCopyrightSettings(appStateWithSearch, {
+    const appStateWithLeftSidebarDisplay = mergeLeftSidebarDisplaySettings(appStateWithSearch, {
+      mode: leftSidebarDisplayMode,
+    })
+
+    const appStateWithPostSlugGeneration = mergePostSlugGenerationSettings(appStateWithLeftSidebarDisplay, {
+      mode: postSlugGenerationMode,
+    })
+
+    const appStateWithSiteBranding = mergeSiteBrandingSettings(appStateWithPostSlugGeneration, {
+      iconPath: body.siteIconPath === undefined
+        ? existingSiteBrandingSettings.iconPath || ""
+        : siteIconPath,
+    })
+
+    const appStateJson = mergeFooterCopyrightSettings(appStateWithSiteBranding, {
       text: footerCopyrightText || existingFooterCopyrightSettings.text || `${siteName} @ ${new Date().getFullYear()}`,
       brandingVisible: footerBrandingVisible,
     })

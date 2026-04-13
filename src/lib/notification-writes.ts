@@ -7,6 +7,8 @@ import {
   type NotificationWriteClient,
 } from "@/db/notification-write-queries"
 import { enqueueBackgroundJob, registerBackgroundJobHandler } from "@/lib/background-jobs"
+import { logError, logInfo } from "@/lib/logger"
+import { revalidateUserSurfaceCache } from "@/lib/user-surface"
 import { resolveUserProfileSettings } from "@/lib/user-profile-settings"
 
 interface SystemNotificationWebhookPayload {
@@ -24,6 +26,63 @@ interface SystemNotificationWebhookPayload {
   recipient: {
     userId: number
   }
+}
+
+const DEFAULT_SYSTEM_NOTIFICATION_WEBHOOK_TIMEOUT_MS = 5_000
+const DEFAULT_SYSTEM_NOTIFICATION_WEBHOOK_MAX_ATTEMPTS = 4
+const DEFAULT_SYSTEM_NOTIFICATION_WEBHOOK_RETRY_BASE_MS = 15_000
+const DEFAULT_SYSTEM_NOTIFICATION_WEBHOOK_RETRY_MAX_MS = 5 * 60 * 1_000
+
+function parseIntegerConfig(rawValue: string | undefined, fallback: number, min: number, max: number) {
+  const parsed = Number.parseInt(String(rawValue ?? ""), 10)
+
+  if (!Number.isFinite(parsed)) {
+    return fallback
+  }
+
+  return Math.min(max, Math.max(min, parsed))
+}
+
+function getSystemNotificationWebhookTimeoutMs() {
+  return parseIntegerConfig(
+    process.env.SYSTEM_NOTIFICATION_WEBHOOK_TIMEOUT_MS,
+    DEFAULT_SYSTEM_NOTIFICATION_WEBHOOK_TIMEOUT_MS,
+    1_000,
+    60_000,
+  )
+}
+
+function getSystemNotificationWebhookMaxAttempts() {
+  return parseIntegerConfig(
+    process.env.SYSTEM_NOTIFICATION_WEBHOOK_MAX_ATTEMPTS,
+    DEFAULT_SYSTEM_NOTIFICATION_WEBHOOK_MAX_ATTEMPTS,
+    1,
+    10,
+  )
+}
+
+function getSystemNotificationWebhookRetryBaseMs() {
+  return parseIntegerConfig(
+    process.env.SYSTEM_NOTIFICATION_WEBHOOK_RETRY_BASE_MS,
+    DEFAULT_SYSTEM_NOTIFICATION_WEBHOOK_RETRY_BASE_MS,
+    1_000,
+    60 * 60 * 1_000,
+  )
+}
+
+function getSystemNotificationWebhookRetryMaxMs() {
+  return parseIntegerConfig(
+    process.env.SYSTEM_NOTIFICATION_WEBHOOK_RETRY_MAX_MS,
+    DEFAULT_SYSTEM_NOTIFICATION_WEBHOOK_RETRY_MAX_MS,
+    5_000,
+    24 * 60 * 60 * 1_000,
+  )
+}
+
+function resolveSystemNotificationWebhookRetryDelayMs(attempt: number) {
+  const baseDelayMs = getSystemNotificationWebhookRetryBaseMs()
+  const retryDelayMs = baseDelayMs * Math.max(1, 2 ** Math.max(0, attempt - 1))
+  return Math.min(getSystemNotificationWebhookRetryMaxMs(), retryDelayMs)
 }
 
 function buildSystemNotificationWebhookPayload(input: {
@@ -55,7 +114,7 @@ function buildSystemNotificationWebhookPayload(input: {
 
 async function postSystemNotificationWebhook(webhookUrl: string, payload: SystemNotificationWebhookPayload) {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 5000)
+  const timeout = setTimeout(() => controller.abort(), getSystemNotificationWebhookTimeoutMs())
 
   try {
     const response = await fetch(webhookUrl, {
@@ -75,7 +134,7 @@ async function postSystemNotificationWebhook(webhookUrl: string, payload: System
   }
 }
 
-async function dispatchSystemNotificationWebhook(input: {
+async function deliverSystemNotificationWebhook(input: {
   id: string
   userId: number
   title: string
@@ -84,24 +143,47 @@ async function dispatchSystemNotificationWebhook(input: {
   relatedId: string
   createdAt: Date
 }) {
-  try {
-    const recipient = await findNotificationWebhookRecipientSignature(input.userId)
+  const recipient = await findNotificationWebhookRecipientSignature(input.userId)
 
-    if (!recipient) {
-      return
-    }
-
-    const profileSettings = resolveUserProfileSettings(recipient.signature)
-    const webhookUrl = profileSettings.notificationWebhookUrl.trim()
-
-    if (!profileSettings.externalNotificationEnabled || !webhookUrl) {
-      return
-    }
-
-    await postSystemNotificationWebhook(webhookUrl, buildSystemNotificationWebhookPayload(input))
-  } catch (error) {
-    console.warn("[notification-writes] failed to dispatch system notification webhook", error)
+  if (!recipient) {
+    return false
   }
+
+  const profileSettings = resolveUserProfileSettings(recipient.signature)
+  const webhookUrl = profileSettings.notificationWebhookUrl.trim()
+
+  if (!profileSettings.externalNotificationEnabled || !webhookUrl) {
+    return false
+  }
+
+  await postSystemNotificationWebhook(webhookUrl, buildSystemNotificationWebhookPayload(input))
+
+  return true
+}
+
+function enqueueSystemNotificationWebhookDelivery(params: {
+  id: string
+  userId: number
+  title: string
+  content: string
+  relatedType: RelatedType
+  relatedId: string
+  createdAt: Date
+  attempt?: number
+  delayMs?: number
+}) {
+  return enqueueBackgroundJob("notification.dispatch-system-webhook", {
+    id: params.id,
+    userId: params.userId,
+    title: params.title,
+    content: params.content,
+    relatedType: params.relatedType,
+    relatedId: params.relatedId,
+    createdAt: params.createdAt.toISOString(),
+    attempt: Math.max(1, params.attempt ?? 1),
+  }, {
+    delayMs: Math.max(0, params.delayMs ?? 0),
+  })
 }
 
 export async function sendSystemNotificationWebhookTest(params: {
@@ -121,15 +203,24 @@ export async function sendSystemNotificationWebhookTest(params: {
 
 export type { NotificationDraft, NotificationWriteClient }
 
-export function createNotification(params: NotificationDraft & { client?: NotificationWriteClient }) {
-  return createNotificationEntry(params)
+export async function createNotification(params: NotificationDraft & { client?: NotificationWriteClient }) {
+  const notification = await createNotificationEntry(params)
+  revalidateUserSurfaceCache(notification.userId)
+  return notification
 }
 
-export function createNotifications(params: {
+export async function createNotifications(params: {
   notifications: NotificationDraft[]
   client?: NotificationWriteClient
 }) {
-  return createNotificationsEntry(params)
+  const result = await createNotificationsEntry(params)
+
+  const userIds = [...new Set(params.notifications.map((item) => item.userId))]
+  for (const userId of userIds) {
+    revalidateUserSurfaceCache(userId)
+  }
+
+  return result
 }
 
 registerBackgroundJobHandler("notification.create", async (payload) => {
@@ -140,6 +231,62 @@ registerBackgroundJobHandler("notification.create-many", async (payload) => {
   await createNotifications({
     notifications: payload.notifications,
   })
+})
+
+registerBackgroundJobHandler("notification.dispatch-system-webhook", async (payload) => {
+  try {
+    const delivered = await deliverSystemNotificationWebhook({
+      id: payload.id,
+      userId: payload.userId,
+      title: payload.title,
+      content: payload.content,
+      relatedType: payload.relatedType,
+      relatedId: payload.relatedId,
+      createdAt: new Date(payload.createdAt),
+    })
+
+    if (delivered) {
+      logInfo({
+        scope: "notification-webhook",
+        action: "deliver",
+        userId: payload.userId,
+        targetId: payload.id,
+        metadata: {
+          attempt: payload.attempt,
+        },
+      })
+    }
+  } catch (error) {
+    const maxAttempts = getSystemNotificationWebhookMaxAttempts()
+    const nextAttempt = payload.attempt + 1
+
+    logError({
+      scope: "notification-webhook",
+      action: "deliver",
+      userId: payload.userId,
+      targetId: payload.id,
+      metadata: {
+        attempt: payload.attempt,
+        maxAttempts,
+      },
+    }, error)
+
+    if (nextAttempt > maxAttempts) {
+      return
+    }
+
+    await enqueueSystemNotificationWebhookDelivery({
+      id: payload.id,
+      userId: payload.userId,
+      title: payload.title,
+      content: payload.content,
+      relatedType: payload.relatedType,
+      relatedId: payload.relatedId,
+      createdAt: new Date(payload.createdAt),
+      attempt: nextAttempt,
+      delayMs: resolveSystemNotificationWebhookRetryDelayMs(payload.attempt),
+    })
+  }
 })
 
 export function enqueueNotification(params: NotificationDraft) {
@@ -172,7 +319,7 @@ export async function createSystemNotification(params: {
     content: params.content,
   })
 
-  void dispatchSystemNotificationWebhook({
+  void enqueueSystemNotificationWebhookDelivery({
     id: notification.id,
     userId: notification.userId,
     title: notification.title,
@@ -180,6 +327,13 @@ export async function createSystemNotification(params: {
     relatedType: notification.relatedType,
     relatedId: notification.relatedId,
     createdAt: notification.createdAt,
+  }).catch((error) => {
+    logError({
+      scope: "notification-webhook",
+      action: "enqueue",
+      userId: notification.userId,
+      targetId: notification.id,
+    }, error)
   })
 
   return notification

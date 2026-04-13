@@ -228,7 +228,7 @@ export function formatMonthDayTime(input: string | Date, locale = "zh-CN") {
   }, locale)
 }
 
-export function formatRelativeTime(input: SupportedDateInput, locale = "zh-CN") {
+export function formatRelativeTime(input: SupportedDateInput, locale = "zh-CN", referenceTime = Date.now()) {
 
   const date = normalizeDate(input)
 
@@ -236,8 +236,7 @@ export function formatRelativeTime(input: SupportedDateInput, locale = "zh-CN") 
     return typeof input === "string" ? input : "-"
   }
 
-  const now = Date.now()
-  const diffSeconds = Math.round((date.getTime() - now) / 1000)
+  const diffSeconds = Math.round((date.getTime() - referenceTime) / 1000)
   const absSeconds = Math.abs(diffSeconds)
   const formatter = new Intl.RelativeTimeFormat(locale, { numeric: "auto" })
 

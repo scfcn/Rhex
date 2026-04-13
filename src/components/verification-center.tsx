@@ -4,8 +4,8 @@ import { useMemo, useState, useTransition } from "react"
 import { CheckCircle2, Clock3, ShieldCheck, XCircle } from "lucide-react"
 
 import { LevelIcon } from "@/components/level-icon"
-import { Button } from "@/components/ui/button"
-import { showConfirm } from "@/components/ui/confirm-dialog"
+import { Button } from "@/components/ui/rbutton"
+import { showConfirm } from "@/components/ui/alert-dialog"
 import { formatDateTime } from "@/lib/formatters"
 import type { VerificationFormField } from "@/lib/verification-form-schema"
 
@@ -277,7 +277,7 @@ export function VerificationCenter({ types, approvedVerification }: Verification
                               onChange={(event) => updateFieldValue(field.id, event.target.value)}
                               rows={5}
                               placeholder={field.placeholder}
-                              className="min-h-[120px] w-full rounded-[22px] border border-border bg-background px-4 py-3 text-sm leading-7 outline-none transition-colors focus:border-foreground/30"
+                              className="min-h-[120px] w-full rounded-[22px] border border-border bg-background px-4 py-3 text-sm leading-7 outline-hidden transition-colors focus:border-foreground/30"
                             />
                           ) : (
                             <input
@@ -285,7 +285,7 @@ export function VerificationCenter({ types, approvedVerification }: Verification
                               value={formValues[field.id] ?? ""}
                               onChange={(event) => updateFieldValue(field.id, event.target.value)}
                               placeholder={field.placeholder}
-                              className="h-11 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-none transition-colors focus:border-foreground/30"
+                              className="h-11 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-hidden transition-colors focus:border-foreground/30"
                             />
                           )}
                           {field.helpText ? <p className="text-xs leading-6 text-muted-foreground">{field.helpText}</p> : null}
@@ -300,7 +300,7 @@ export function VerificationCenter({ types, approvedVerification }: Verification
                         onChange={(event) => setContent(event.target.value)}
                         rows={8}
                         placeholder={`请填写 ${selectedType.name} 的身份说明、资质链接、联系方式等审核材料`}
-                        className="min-h-[180px] w-full rounded-[22px] border border-border bg-background px-4 py-3 text-sm leading-7 outline-none transition-colors focus:border-foreground/30"
+                        className="min-h-[180px] w-full rounded-[22px] border border-border bg-background px-4 py-3 text-sm leading-7 outline-hidden transition-colors focus:border-foreground/30"
                       />
                     </label>
                   )}
@@ -311,7 +311,7 @@ export function VerificationCenter({ types, approvedVerification }: Verification
                       value={customDescription}
                       onChange={(event) => setCustomDescription(event.target.value)}
                       placeholder="用于前台认证徽章提示展示，例如：独立开发者 / 认证摄影师"
-                      className="h-11 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-none transition-colors focus:border-foreground/30"
+                      className="h-11 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-hidden transition-colors focus:border-foreground/30"
                     />
                     <p className="text-xs leading-6 text-muted-foreground">这条描述会跟随认证图标展示，留空时仅显示认证名称。</p>
                   </label>
@@ -369,3 +369,4 @@ function renderStatusPill(status?: VerificationApplicationStatus | null) {
 
   return <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600"><ShieldCheck className="h-3 w-3" />已取消</span>
 }
+

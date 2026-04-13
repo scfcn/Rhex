@@ -2,14 +2,12 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react"
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/rbutton"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "@/components/ui/toast"
 import { useContentSafety } from "@/hooks/use-content-safety"
-import type { YinYangChallengeCard, YinYangLobbyData, YinYangLeaderboardUser } from "@/lib/yinyang-contract"
-
 import { formatNumber } from "@/lib/formatters"
-import { formatYinYangChallengeTime } from "@/lib/yinyang-contract"
+import { formatYinYangChallengeTime, type YinYangChallengeCard, type YinYangLobbyData, type YinYangLeaderboardUser } from "@/lib/yinyang-contract-shared"
 
 type ApiResponse<T> = { code: number; message?: string; data?: T }
 type ResultFxState = null | { type: "win" | "lose"; title: string; detail: string }
@@ -325,26 +323,26 @@ function CreateChallengeModal({ open, canPlay, isPending, question, optionA, opt
     <ModalShell title="发起阴阳挑战" description="设置问题、双答案与正确答案，提交后挑战会进入大厅。" onClose={onClose}>
       <div className="space-y-4 text-sm">
         <Field label="问题" action={<Button type="button" variant="outline" className="h-8 rounded-full px-3 text-xs" onClick={onRollRandom}>🎲 骰子</Button>} hint={<span className={`inline-flex text-xs ${questionSafety.overLimit ? "text-rose-500" : "text-muted-foreground"}`}>{questionSafety.length}/120</span>}>
-          <textarea value={question} onChange={(event) => onQuestionChange(event.target.value)} className={`min-h-[110px] w-full rounded-[16px] border bg-background px-4 py-3 text-sm outline-none ${questionSafety.overLimit ? "border-rose-400 focus-visible:border-rose-500" : "border-border"}`} placeholder="输入挑战问题" />
+          <textarea value={question} onChange={(event) => onQuestionChange(event.target.value)} className={`min-h-[110px] w-full rounded-[16px] border bg-background px-4 py-3 text-sm outline-hidden ${questionSafety.overLimit ? "border-rose-400 focus-visible:border-rose-500" : "border-border"}`} placeholder="输入挑战问题" />
         </Field>
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="答案 A" hint={<span className={`inline-flex text-xs ${optionASafety.overLimit ? "text-rose-500" : "text-muted-foreground"}`}>{optionASafety.length}/40</span>}>
-            <input value={optionA} onChange={(event) => onOptionAChange(event.target.value)} className={`h-11 w-full rounded-[16px] border bg-background px-4 text-sm outline-none ${optionASafety.overLimit ? "border-rose-400 focus-visible:border-rose-500" : "border-border"}`} placeholder="输入答案 A" />
+            <input value={optionA} onChange={(event) => onOptionAChange(event.target.value)} className={`h-11 w-full rounded-[16px] border bg-background px-4 text-sm outline-hidden ${optionASafety.overLimit ? "border-rose-400 focus-visible:border-rose-500" : "border-border"}`} placeholder="输入答案 A" />
           </Field>
           <Field label="答案 B" hint={<span className={`inline-flex text-xs ${optionBSafety.overLimit ? "text-rose-500" : "text-muted-foreground"}`}>{optionBSafety.length}/40</span>}>
-            <input value={optionB} onChange={(event) => onOptionBChange(event.target.value)} className={`h-11 w-full rounded-[16px] border bg-background px-4 text-sm outline-none ${optionBSafety.overLimit ? "border-rose-400 focus-visible:border-rose-500" : "border-border"}`} placeholder="输入答案 B" />
+            <input value={optionB} onChange={(event) => onOptionBChange(event.target.value)} className={`h-11 w-full rounded-[16px] border bg-background px-4 text-sm outline-hidden ${optionBSafety.overLimit ? "border-rose-400 focus-visible:border-rose-500" : "border-border"}`} placeholder="输入答案 B" />
           </Field>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="正确答案">
-            <select value={correctOption} onChange={(event) => onCorrectOptionChange(event.target.value === "B" ? "B" : "A")} className="h-11 w-full rounded-[16px] border border-border bg-background px-4 text-sm outline-none">
+            <select value={correctOption} onChange={(event) => onCorrectOptionChange(event.target.value === "B" ? "B" : "A")} className="h-11 w-full rounded-[16px] border border-border bg-background px-4 text-sm outline-hidden">
               <option value="A">答案 A</option>
               <option value="B">答案 B</option>
             </select>
           </Field>
           <Field label={`积分彩头（${minStakePoints}-${maxStakePoints}）`}>
-            <input value={stakePoints} onChange={(event) => onStakePointsChange(event.target.value)} className="h-11 w-full rounded-[16px] border border-border bg-background px-4 text-sm outline-none" inputMode="numeric" />
+            <input value={stakePoints} onChange={(event) => onStakePointsChange(event.target.value)} className="h-11 w-full rounded-[16px] border border-border bg-background px-4 text-sm outline-hidden" inputMode="numeric" />
           </Field>
         </div>
         <div className="rounded-[16px] bg-muted p-4 text-xs leading-6 text-muted-foreground">
@@ -492,7 +490,7 @@ function LeaderboardList({ items, getMetric }: { items: YinYangLeaderboardUser[]
         return (
           <div
             key={`leaderboard-${item.userId}-${index}`}
-            className={`flex items-center justify-between gap-3 rounded-[18px] px-4 py-3 ${isTopThree ? "border border-amber-200/70 bg-gradient-to-r from-amber-50 via-background to-amber-50 shadow-[0_10px_30px_rgba(245,158,11,0.08)]" : "bg-muted"}`}
+            className={`flex items-center justify-between gap-3 rounded-[18px] px-4 py-3 ${isTopThree ? "border border-amber-200/70 bg-linear-to-r from-amber-50 via-background to-amber-50 shadow-[0_10px_30px_rgba(245,158,11,0.08)]" : "bg-muted"}`}
           >
             <div className="flex items-center gap-3">
               <div className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold ${isTopThree ? "bg-amber-100 text-amber-700" : "bg-background text-muted-foreground"}`}>
@@ -516,7 +514,7 @@ function LeaderboardList({ items, getMetric }: { items: YinYangLeaderboardUser[]
 
 function ModalShell({ title, description, children, onClose, size = "md" }: { title: string; description: string; children: React.ReactNode; onClose: () => void; size?: "md" | "lg" }) {
   return (
-    <div className="fixed inset-0 z-[65] flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-[8px]">
+    <div className="fixed inset-0 z-65 flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
       <div className={`w-full rounded-[28px] border border-border bg-background shadow-[0_30px_80px_rgba(15,23,42,0.24)] ${size === "lg" ? "max-w-3xl" : "max-w-xl"}`}>
         <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
           <div>
@@ -566,13 +564,13 @@ function EmptyState({ text }: { text: string }) {
 
 function AnimatedCardTitle({ previousKing, currentKing }: { previousKing: string | null; currentKing: string | null }) {
   return (
-    <div className="relative overflow-hidden rounded-[18px] border border-amber-200/60 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 px-4 py-3 shadow-[0_16px_40px_rgba(15,23,42,0.18)]">
+    <div className="relative overflow-hidden rounded-[18px] border border-amber-200/60 bg-linear-to-r from-slate-950 via-slate-900 to-slate-950 px-4 py-3 shadow-[0_16px_40px_rgba(15,23,42,0.18)]">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.28),transparent_45%),radial-gradient(circle_at_bottom,rgba(96,165,250,0.22),transparent_40%)]" />
-      <div className="absolute inset-y-0 left-[-20%] w-1/3 skew-x-[-20deg] animate-[pulse_2.4s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+      <div className="absolute inset-y-0 left-[-20%] w-1/3 skew-x-[-20deg] animate-[pulse_2.4s_ease-in-out_infinite] bg-linear-to-r from-transparent via-white/10 to-transparent" />
       <div className="relative space-y-2 text-center">
         <div className="flex items-center justify-center gap-2 text-sm font-semibold tracking-[0.24em] text-amber-100">
           <span className="text-amber-300 animate-[pulse_1.8s_ease-in-out_infinite]">✦</span>
-          <span className="bg-gradient-to-r from-amber-200 via-white to-sky-200 bg-clip-text text-transparent">阴阳契·命定双生</span>
+          <span className="bg-linear-to-r from-amber-200 via-white to-sky-200 bg-clip-text text-transparent">阴阳契 - 命定双生</span>
           <span className="text-sky-300 animate-[pulse_1.8s_ease-in-out_infinite]">✦</span>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] text-slate-200/90">
@@ -592,7 +590,7 @@ function ResultFxOverlay({ state, onClose }: { state: ResultFxState; onClose: ()
   const isWin = state.type === "win"
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-[70] flex items-center justify-center overflow-hidden">
+    <div className="pointer-events-none fixed inset-0 z-70 flex items-center justify-center overflow-hidden">
       <div className={`absolute inset-0 ${isWin ? "bg-emerald-500/18" : "bg-slate-950/30"} backdrop-blur-[2px]`} />
       <div className="absolute inset-0 overflow-hidden">
         {isWin ? Array.from({ length: 18 }).map((_, index) => (
@@ -609,12 +607,12 @@ function ResultFxOverlay({ state, onClose }: { state: ResultFxState; onClose: ()
           />
         ))}
       </div>
-      <div className={`relative mx-4 w-full max-w-md rounded-[28px] border px-6 py-7 text-center shadow-[0_28px_80px_rgba(15,23,42,0.28)] ${isWin ? "border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-amber-50" : "border-slate-300/70 bg-gradient-to-br from-slate-50 via-white to-sky-50"}`}>
+      <div className={`relative mx-4 w-full max-w-md rounded-[28px] border px-6 py-7 text-center shadow-[0_28px_80px_rgba(15,23,42,0.28)] ${isWin ? "border-emerald-200/70 bg-linear-to-br from-emerald-50 via-white to-amber-50" : "border-slate-300/70 bg-linear-to-br from-slate-50 via-white to-sky-50"}`}>
         <button type="button" className="pointer-events-auto absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background/80 text-sm text-muted-foreground" onClick={onClose}>×</button>
         <div className={`mx-auto flex h-24 w-24 items-center justify-center rounded-full text-5xl shadow-inner ${isWin ? "bg-emerald-100 text-emerald-600 animate-[pulse_1.1s_ease-in-out_infinite]" : "bg-sky-100 text-sky-500 animate-[bounce_1.6s_ease-in-out_infinite]"}`}>{isWin ? "✦" : "☾"}</div>
         <h3 className={`mt-5 text-2xl font-black tracking-tight ${isWin ? "text-emerald-700" : "text-slate-700"}`}>{state.title}</h3>
         <p className={`mt-2 text-sm ${isWin ? "text-emerald-700/80" : "text-slate-600"}`}>{state.detail}</p>
-        <div className={`mx-auto mt-4 h-1.5 w-28 rounded-full ${isWin ? "bg-gradient-to-r from-emerald-400 via-amber-300 to-emerald-500" : "bg-gradient-to-r from-slate-300 via-sky-200 to-slate-400"}`} />
+        <div className={`mx-auto mt-4 h-1.5 w-28 rounded-full ${isWin ? "bg-linear-to-r from-emerald-400 via-amber-300 to-emerald-500" : "bg-linear-to-r from-slate-300 via-sky-200 to-slate-400"}`} />
       </div>
     </div>
   )

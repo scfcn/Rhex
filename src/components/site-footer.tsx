@@ -4,6 +4,7 @@ import { Github } from "lucide-react"
 import packageJson from "../../package.json"
 
 import { getSiteSettings } from "@/lib/site-settings"
+import ShinyText from '@/components/ShinyText';
 
 function isExternalHref(href: string) {
   return /^https?:\/\//i.test(href)
@@ -25,14 +26,28 @@ export async function SiteFooter() {
             <div className="max-w-lg">
               <div className="flex items-center gap-3">
                 <div className="min-w-0">
-                  <div className="text-base font-semibold tracking-tight text-foreground sm:text-lg">{settings.siteName}</div>
-                  <p className="mt-1 text-sm text-muted-foreground">{settings.siteSlogan}</p>
+                   <div className="text-base font-semibold tracking-tight text-foreground sm:text-lg"> <ShinyText
+  text={"✨ "+settings.siteName}
+  speed={2}
+  delay={0}
+  color="#b5b5b5"
+  shineColor="#ffffff"
+  spread={120}
+  direction="left"
+  yoyo={false}
+  pauseOnHover={false}
+  disabled={false}
+/></div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                  
+{settings.siteSlogan}
+                    </p>
                 </div>
               </div>
             </div>
 
-            <div className="w-full md:max-w-[28rem]">
-              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+            <div className="w-full md:max-w-md">
+              <div className="grid grid-cols-3 gap-3 sm:flex sm:flex-wrap sm:justify-end">
                 {settings.footerLinks.map((item) => {
                   const isExternal = isExternalHref(item.href)
 

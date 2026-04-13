@@ -1,14 +1,12 @@
 import crypto from "node:crypto"
 
-import { createRequestControl, purgeExpiredRequestControls } from "@/db/write-guard-queries"
-import { Prisma } from "@/db/types"
 import { PublicRouteError } from "@/lib/public-route-error"
+import { createRedisKey } from "@/lib/redis"
+import { acquireRedisLease } from "@/lib/redis-lease"
 
 const DEFAULT_POW_DIFFICULTY = 5
 const DEFAULT_POW_EXPIRE_SECONDS = 40
 const POW_CONSUME_SCOPE = "pow-captcha-consume"
-const POW_CONSUME_KIND = "pow"
-const POW_PURGE_SAMPLING_RATE = 0.01
 
 export type PowCaptchaScope = "login" | "register"
 
@@ -90,16 +88,8 @@ function normalizeScope(raw: unknown): PowCaptchaScope {
   throw new PublicRouteError("工作量证明场景参数错误，请刷新后重试")
 }
 
-function isUniqueConstraintError(error: unknown) {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002"
-}
-
 function getRequestIpHash(requestIp?: string | null) {
   return createContextHash(requestIp?.trim().toLowerCase() || "anonymous")
-}
-
-function shouldPurgeExpiredPowControls() {
-  return Math.random() < POW_PURGE_SAMPLING_RATE
 }
 
 function parseChallenge(challenge: string) {
@@ -133,24 +123,13 @@ function parseChallenge(challenge: string) {
 }
 
 async function consumePowChallenge(challengeId: string, scope: PowCaptchaScope, expiresAt: number) {
-  try {
-    if (shouldPurgeExpiredPowControls()) {
-      await purgeExpiredRequestControls(new Date())
-    }
+  const lease = await acquireRedisLease({
+    key: createRedisKey(POW_CONSUME_SCOPE, scope, challengeId),
+    ttlMs: Math.max(1, expiresAt - Date.now()),
+  })
 
-    await createRequestControl({
-      scope: POW_CONSUME_SCOPE,
-      identity: `scope:${scope}`,
-      kind: POW_CONSUME_KIND,
-      fingerprint: challengeId,
-      expiresAt: new Date(expiresAt),
-    })
-  } catch (error) {
-    if (isUniqueConstraintError(error)) {
-      throw new PublicRouteError("工作量证明已被使用，请重新验证")
-    }
-
-    throw error
+  if (!lease) {
+    throw new PublicRouteError("工作量证明已被使用，请重新验证")
   }
 }
 

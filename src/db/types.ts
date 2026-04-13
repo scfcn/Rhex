@@ -1,4 +1,6 @@
 export {
+  AiReplyTaskSourceType,
+  AiReplyTaskStatus,
   AnnouncementStatus,
   BadgeGrantSource,
   BadgeRuleOperator,
@@ -16,6 +18,7 @@ export {
   PointEffectDirection,
   PointEffectRuleKind,
   PointEffectTargetType,
+  PostAttachmentSourceType,
   PostRedPacketGrantMode,
   PostRedPacketClaimOrderMode,
   PostRedPacketStatus,
@@ -39,6 +42,7 @@ export {
 } from "@prisma/client"
 
 export type {
+  AiReplyTask,
   Board,
   BoardApplication,
   Comment,
@@ -51,6 +55,7 @@ export type {
   PollOption,
   PollVote,
   Post,
+  PostAttachment,
   PostAppendix,
   RssEntry,
   RssLog,

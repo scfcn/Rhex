@@ -1,21 +1,22 @@
 "use client"
 
 import React from "react"
+import { Table2 } from "lucide-react"
 
-import { AdminModal } from "@/components/admin-modal"
+import { Modal } from "@/components/ui/modal"
 import { EmojiPicker } from "@/components/emoji-picker"
 import { FloatingEditorPanel } from "@/components/refined-rich-post-editor/floating-panels"
 import type { FloatingPanelPosition, UploadSummary } from "@/components/refined-rich-post-editor/types"
 import type { MarkdownEmojiItem } from "@/lib/markdown-emoji"
-import { cn } from "@/lib/utils"
 import type { UploadFileResult } from "@/hooks/use-image-upload"
 
-const FLOATING_EDITOR_PANEL_CLASSNAME = "fixed z-[160] overflow-y-auto rounded-2xl border border-border bg-background shadow-2xl"
+const FLOATING_EDITOR_PANEL_CLASSNAME = "overflow-y-auto rounded-2xl border border-border bg-background shadow-2xl"
 
 type FloatingPanelBaseProps = {
   open: boolean
   isClient: boolean
   disabled?: boolean
+  anchorRef: React.RefObject<HTMLDivElement | null>
   position: FloatingPanelPosition | null
   ready: boolean
   panelRef: React.MutableRefObject<HTMLDivElement | null>
@@ -39,7 +40,7 @@ export function Base64Dialog({
   onConfirm,
 }: Base64DialogProps) {
   return (
-    <AdminModal
+    <Modal
       open={open}
       onClose={onClose}
       size="lg"
@@ -75,7 +76,7 @@ export function Base64Dialog({
             value={value}
             onChange={(event) => onChange(event.target.value)}
             placeholder="输入需要编码的文本"
-            className="min-h-32 w-full resize-y rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:border-foreground"
+            className="min-h-32 w-full resize-y rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-hidden transition focus:border-foreground"
           />
         </div>
         <div className="space-y-2">
@@ -85,7 +86,7 @@ export function Base64Dialog({
           </div>
         </div>
       </div>
-    </AdminModal>
+    </Modal>
   )
 }
 
@@ -101,6 +102,7 @@ export function MediaInsertPanel({
   open,
   isClient,
   disabled,
+  anchorRef,
   position,
   ready,
   panelRef,
@@ -115,10 +117,16 @@ export function MediaInsertPanel({
       open={open}
       isClient={isClient}
       disabled={disabled}
+      anchorRef={anchorRef}
       position={position}
       ready={ready}
       panelRef={panelRef}
       className={`${FLOATING_EDITOR_PANEL_CLASSNAME} p-4`}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          onClose()
+        }
+      }}
     >
       <div className="mb-3 space-y-1">
         <div className="text-sm font-medium text-foreground">插入媒体</div>
@@ -129,7 +137,7 @@ export function MediaInsertPanel({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder="https://example.com/video.mp4"
-        className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none ring-0 transition focus:border-foreground"
+        className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-hidden ring-0 transition focus:border-foreground"
       />
       <p className="mt-2 text-xs text-muted-foreground">{hint}</p>
       <div className="mt-3 flex items-center justify-end gap-2">
@@ -167,6 +175,7 @@ export function LinkInsertPanel({
   open,
   isClient,
   disabled,
+  anchorRef,
   position,
   ready,
   panelRef,
@@ -183,10 +192,16 @@ export function LinkInsertPanel({
       open={open}
       isClient={isClient}
       disabled={disabled}
+      anchorRef={anchorRef}
       position={position}
       ready={ready}
       panelRef={panelRef}
       className={`${FLOATING_EDITOR_PANEL_CLASSNAME} p-4`}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          onClose()
+        }
+      }}
     >
       <div className="mb-3 space-y-1">
         <div className="text-sm font-medium text-foreground">插入链接</div>
@@ -198,14 +213,14 @@ export function LinkInsertPanel({
           value={text}
           onChange={(event) => onTextChange(event.target.value)}
           placeholder="链接文本"
-          className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none ring-0 transition focus:border-foreground"
+          className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-hidden ring-0 transition focus:border-foreground"
         />
         <input
           type="url"
           value={url}
           onChange={(event) => onUrlChange(event.target.value)}
           placeholder="https://example.com"
-          className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none ring-0 transition focus:border-foreground"
+          className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-hidden ring-0 transition focus:border-foreground"
         />
       </div>
       <p className="mt-2 text-xs text-muted-foreground">{hint}</p>
@@ -231,9 +246,6 @@ export function LinkInsertPanel({
 }
 
 type TableInsertPanelProps = FloatingPanelBaseProps & {
-  hoverSize: { rows: number; columns: number }
-  hint: string
-  onHoverChange: (size: { rows: number; columns: number }) => void
   onClose: () => void
   onSelect: (rows: number, columns: number) => void
 }
@@ -242,58 +254,84 @@ export function TableInsertPanel({
   open,
   isClient,
   disabled,
+  anchorRef,
   position,
   ready,
   panelRef,
-  hoverSize,
-  hint,
-  onHoverChange,
   onClose,
   onSelect,
 }: TableInsertPanelProps) {
+  const [previewSize, setPreviewSize] = React.useState<{ rows: number; columns: number } | null>(null)
+
   return (
     <FloatingEditorPanel
       open={open}
       isClient={isClient}
       disabled={disabled}
+      anchorRef={anchorRef}
       position={position}
       ready={ready}
       panelRef={panelRef}
       className={`${FLOATING_EDITOR_PANEL_CLASSNAME} p-4`}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          setPreviewSize(null)
+          onClose()
+        }
+      }}
     >
       <div className="mb-3 space-y-1">
         <div className="text-sm font-medium text-foreground">插入表格</div>
-        <p className="text-xs leading-5 text-muted-foreground">选择表格尺寸，点击即可插入对应行列的表格。</p>
+        <p className="text-xs leading-5 text-muted-foreground">
+          {previewSize
+            ? `将插入 ${previewSize.rows} 行 ${previewSize.columns} 列表格。`
+            : "选择表格尺寸，点击即可插入对应行列的表格。"}
+        </p>
       </div>
-      <div className="grid grid-cols-8 gap-1 rounded-xl border border-border/80 bg-muted/20 p-3">
+      <div
+        className="grid grid-cols-8 gap-1 rounded-xl border border-border/80 bg-muted/20 p-3"
+        onMouseLeave={() => setPreviewSize(null)}
+      >
         {Array.from({ length: 6 }, (_, rowIndex) => (
           Array.from({ length: 8 }, (_, columnIndex) => {
-            const active = rowIndex < hoverSize.rows && columnIndex < hoverSize.columns
+            const active = previewSize
+              ? rowIndex < previewSize.rows && columnIndex < previewSize.columns
+              : false
+
             return (
               <button
                 key={`${rowIndex + 1}-${columnIndex + 1}`}
                 type="button"
-                className={cn(
-                  "h-6 w-6 rounded-[6px] border transition-colors",
-                  active ? "border-foreground bg-foreground/80" : "border-border bg-background hover:border-foreground/40 hover:bg-accent",
-                )}
-                onMouseEnter={() => onHoverChange({ rows: rowIndex + 1, columns: columnIndex + 1 })}
-                onMouseLeave={() => onHoverChange({ rows: 0, columns: 0 })}
-                onFocus={() => onHoverChange({ rows: rowIndex + 1, columns: columnIndex + 1 })}
-                onBlur={() => onHoverChange({ rows: 0, columns: 0 })}
-                onClick={() => onSelect(rowIndex + 1, columnIndex + 1)}
+                className={active
+                  ? "h-6 w-6 rounded-[6px] border border-primary/50 bg-accent text-accent-foreground shadow-xs transition-colors"
+                  : "h-6 w-6 rounded-[6px] border border-border bg-background transition-colors hover:border-foreground/45 hover:bg-accent focus-visible:border-foreground focus-visible:bg-accent"}
+                onMouseEnter={() => setPreviewSize({ rows: rowIndex + 1, columns: columnIndex + 1 })}
+                onFocus={() => setPreviewSize({ rows: rowIndex + 1, columns: columnIndex + 1 })}
+                onClick={() => {
+                  setPreviewSize(null)
+                  onSelect(rowIndex + 1, columnIndex + 1)
+                }}
                 aria-label={`插入 ${rowIndex + 1} 行 ${columnIndex + 1} 列表格`}
-              />
+                title={`${rowIndex + 1} × ${columnIndex + 1}`}
+              >
+                <span className="sr-only">{`${rowIndex + 1} × ${columnIndex + 1}`}</span>
+              </button>
             )
           })
         ))}
       </div>
       <div className="mt-3 flex items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">{hint}</p>
+        <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+          <Table2 className="h-3.5 w-3.5" />
+          <span>{previewSize ? `${previewSize.rows} × ${previewSize.columns}` : "直接点击目标尺寸即可插入表格。"}</span>
+        </div>
         <button
           type="button"
           className="rounded-full px-3 py-1.5 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground"
-          onClick={onClose}
+          onClick={() => {
+            setPreviewSize(null)
+            onClose()
+          }}
         >
           取消
         </button>
@@ -305,27 +343,36 @@ export function TableInsertPanel({
 type EmojiInsertPanelProps = FloatingPanelBaseProps & {
   markdownEmojiMap: MarkdownEmojiItem[]
   onSelect: (shortcode: string) => void
+  onClose: () => void
 }
 
 export function EmojiInsertPanel({
   open,
   isClient,
   disabled,
+  anchorRef,
   position,
   ready,
   panelRef,
   markdownEmojiMap,
   onSelect,
+  onClose,
 }: EmojiInsertPanelProps) {
   return (
     <FloatingEditorPanel
       open={open}
       isClient={isClient}
       disabled={disabled}
+      anchorRef={anchorRef}
       position={position}
       ready={ready}
       panelRef={panelRef}
       className={`${FLOATING_EDITOR_PANEL_CLASSNAME} p-3`}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          onClose()
+        }
+      }}
     >
       <EmojiPicker
         items={markdownEmojiMap.map((emoji) => ({
@@ -360,6 +407,7 @@ export function ImageInsertPanel({
   open,
   isClient,
   disabled,
+  anchorRef,
   position,
   ready,
   panelRef,
@@ -382,10 +430,16 @@ export function ImageInsertPanel({
       open={open}
       isClient={isClient}
       disabled={disabled}
+      anchorRef={anchorRef}
       position={position}
       ready={ready}
       panelRef={panelRef}
       className={`${FLOATING_EDITOR_PANEL_CLASSNAME} p-4`}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          onClose()
+        }
+      }}
     >
       {markdownImageUploadEnabled ? (
         <>
@@ -466,14 +520,14 @@ export function ImageInsertPanel({
               value={remoteImageUrl}
               onChange={(event) => onRemoteImageUrlChange(event.target.value)}
               placeholder="https://example.com/image.webp"
-              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none ring-0 transition focus:border-foreground"
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-hidden ring-0 transition focus:border-foreground"
             />
             <input
               type="text"
               value={remoteImageAlt}
               onChange={(event) => onRemoteImageAltChange(event.target.value)}
               placeholder="图片说明（可选）"
-              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none ring-0 transition focus:border-foreground"
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-hidden ring-0 transition focus:border-foreground"
             />
           </div>
           <p className="mt-2 text-xs text-muted-foreground">{remoteImageHint}</p>
@@ -499,3 +553,4 @@ export function ImageInsertPanel({
     </FloatingEditorPanel>
   )
 }
+

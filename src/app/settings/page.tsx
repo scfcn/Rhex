@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 
 import { SettingsPageContent } from "@/app/settings/settings-page-content"
 import { loadSettingsPageData, resolveSettingsRoute, settingsTabTitles } from "@/app/settings/settings-page-loader"
-import { SettingsShell } from "@/components/settings-shell"
+import { SettingsShell } from "@/components/settings/settings-shell"
 import { SiteHeader } from "@/components/site-header"
 import { getSiteSettings } from "@/lib/site-settings"
 

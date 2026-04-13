@@ -17,6 +17,7 @@ import {
 import { decrementBoardTreasuryPointsIfEnough } from "@/db/board-treasury-queries"
 import { apiError } from "@/lib/api-route"
 import type { SessionActor } from "@/lib/auth"
+import { enforceSensitiveText } from "@/lib/content-safety"
 import { canWithdrawBoardTreasury, ensureCanManageBoard, resolveAdminActorFromSessionUser } from "@/lib/moderator-permissions"
 import { createSystemNotification } from "@/lib/notification-writes"
 import { applyPointDelta } from "@/lib/point-center"
@@ -48,7 +49,7 @@ function normalizeBoardApplicationSlug(value: unknown) {
   return normalized
 }
 
-function ensureBoardApplicationPayload(input: {
+async function ensureBoardApplicationPayload(input: {
   zoneId: string
   name: string
   slug: string
@@ -58,7 +59,6 @@ function ensureBoardApplicationPayload(input: {
 }) {
   const zoneId = normalizeTrimmedText(input.zoneId, 100)
   const name = normalizeTrimmedText(input.name, 40)
-  const slug = normalizeBoardApplicationSlug(input.slug || input.name)
   const description = normalizeTrimmedText(input.description, 3000) || null
   const icon = normalizeTrimmedText(input.icon, 100) || null
   const reason = normalizeTrimmedText(input.reason, 2000) || null
@@ -71,17 +71,25 @@ function ensureBoardApplicationPayload(input: {
     apiError(400, "请输入节点名称")
   }
 
+  const [nameSafety, descriptionSafety, reasonSafety] = await Promise.all([
+    enforceSensitiveText({ scene: "boardApplication.name", text: name }),
+    description ? enforceSensitiveText({ scene: "boardApplication.description", text: description }) : Promise.resolve(null),
+    reason ? enforceSensitiveText({ scene: "boardApplication.reason", text: reason }) : Promise.resolve(null),
+  ])
+  const slug = normalizeBoardApplicationSlug(input.slug || nameSafety.sanitizedText)
+
   if (!slug) {
     apiError(400, "请输入合法的节点 slug")
   }
 
   return {
     zoneId,
-    name,
+    name: nameSafety.sanitizedText,
     slug,
-    description,
+    description: descriptionSafety?.sanitizedText || null,
     icon,
-    reason,
+    reason: reasonSafety?.sanitizedText || null,
+    contentAdjusted: nameSafety.wasReplaced || Boolean(descriptionSafety?.wasReplaced) || Boolean(reasonSafety?.wasReplaced),
   }
 }
 
@@ -208,7 +216,7 @@ export async function submitBoardApplication(input: BoardApplicationSubmitInput)
     apiError(403, "当前站点未开启节点申请")
   }
 
-  const payload = ensureBoardApplicationPayload(input)
+  const payload = await ensureBoardApplicationPayload(input)
   const zone = await findZoneByIdForBoardApplication(payload.zoneId)
 
   if (!zone) {
@@ -225,7 +233,7 @@ export async function submitBoardApplication(input: BoardApplicationSubmitInput)
     apiError(409, "你已经提交过同 slug 的待审核申请，请勿重复提交")
   }
 
-  return createBoardApplication({
+  const application = await createBoardApplication({
     applicantId: input.applicantId,
     zoneId: payload.zoneId,
     name: payload.name,
@@ -235,6 +243,11 @@ export async function submitBoardApplication(input: BoardApplicationSubmitInput)
     reason: payload.reason,
     status: BoardApplicationStatus.PENDING,
   })
+
+  return {
+    ...application,
+    contentAdjusted: payload.contentAdjusted,
+  }
 }
 
 export async function reviewBoardApplication(input: {
@@ -254,7 +267,7 @@ export async function reviewBoardApplication(input: {
     apiError(404, "节点申请不存在")
   }
 
-  const payload = ensureBoardApplicationPayload({
+  const payload = await ensureBoardApplicationPayload({
     zoneId: input.zoneId ?? application.zoneId,
     name: input.name ?? application.name,
     slug: input.slug ?? application.slug,

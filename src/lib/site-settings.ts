@@ -2,6 +2,7 @@ import { unstable_cache } from "next/cache"
 
 import { listActiveGiftDefinitions } from "@/db/post-gift-queries"
 import { createSiteSettingsRecord, findSensitiveWordsPage, findSiteSettingsRecord, getSensitiveWordStats } from "@/db/site-settings-queries"
+import { normalizeSensitiveActionType } from "@/lib/content-safety"
 import {
   normalizeCaptchaMode,
   parseFooterLinks,
@@ -14,9 +15,11 @@ import { defaultSiteSettingsCreateInput } from "@/lib/site-settings-defaults"
 import { parseMarkdownEmojiMapJson } from "@/lib/markdown-emoji"
 import { normalizePostListLoadMode, type PostListLoadMode } from "@/lib/post-list-load-mode"
 import { normalizePostListDisplayMode, type PostListDisplayMode } from "@/lib/post-list-display"
-import { resolveAnonymousPostSettings, resolveAuthProviderSettings, resolveAvatarChangePointCostSettings, resolveBoardApplicationSettings, resolveBoardTreasurySettings, resolveCheckInMakeUpPriceSettings, resolveCheckInRewardSettings, resolveCheckInStreakSettings, resolveCommentAccessSettings, resolveFooterCopyrightSettings, resolveHomeFeedPostListLoadSettings, resolveHomeHotFeedSettings, resolveHomeSidebarAnnouncementSettings, resolveInteractionGateSettings, resolveIntroductionChangePointCostSettings, resolveInviteCodePurchasePriceSettings, resolveMarkdownImageUploadSettings, resolveNicknameChangePointCostSettings, resolvePostContentLengthSettings, resolvePostJackpotSettings, resolvePostPageSizeSettings, resolvePostRedPacketSettings, resolveRegistrationRewardSettings, resolveUploadObjectStorageSettings, resolveVipLevelIconSettings, type InteractionGateSettings } from "@/lib/site-settings-app-state"
+import { resolveAnonymousPostSettings, resolveAttachmentFeatureSettings, resolveAuthProviderSettings, resolveAvatarChangePointCostSettings, resolveBoardApplicationSettings, resolveBoardTreasurySettings, resolveCheckInMakeUpPriceSettings, resolveCheckInRewardSettings, resolveCheckInStreakSettings, resolveCommentAccessSettings, resolveFooterCopyrightSettings, resolveHomeFeedPostListLoadSettings, resolveHomeHotFeedSettings, resolveHomeSidebarAnnouncementSettings, resolveImageWatermarkSettings, resolveInteractionGateSettings, resolveIntroductionChangePointCostSettings, resolveInviteCodePurchasePriceSettings, resolveLeftSidebarDisplaySettings, resolveMarkdownImageUploadSettings, resolveNicknameChangePointCostSettings, resolvePostContentLengthSettings, resolvePostJackpotSettings, resolvePostPageSizeSettings, resolvePostRedPacketSettings, resolvePostSlugGenerationSettings, resolveRegisterInviteCodeHelpSettings, resolveRegisterNicknameLengthSettings, resolveRegistrationEmailTemplateSettings, resolveRegistrationRewardSettings, resolveSiteBrandingSettings, resolveUploadObjectStorageSettings, resolveVipLevelIconSettings, resolveVipNameColorSettings, type ImageWatermarkPosition, type InteractionGateSettings, type LeftSidebarDisplayMode, type PostSlugGenerationMode, type RegistrationEmailTemplateSettings } from "@/lib/site-settings-app-state"
+import { resolveAuthPageShowcaseSettings } from "@/lib/site-settings-app-state"
 import { resolveAuthProviderSensitiveConfig, resolveCaptchaSensitiveConfig, resolveUploadStorageSensitiveConfig } from "@/lib/site-settings-sensitive-state"
 import { resolveSiteSearchSettings, type SiteSearchSettings } from "@/lib/site-search-settings"
+import { type VipNameColors } from "@/lib/vip-name-colors"
 import { normalizePositiveInteger } from "@/lib/shared/normalizers"
 import { type SiteTippingGiftItem } from "@/lib/tipping-gifts"
 import { normalizeUploadProvider, type UploadProvider } from "@/lib/upload-provider"
@@ -28,7 +31,11 @@ export type { FooterLinkItem } from "@/lib/shared/config-parsers"
 export type PostLinkDisplayMode = "SLUG" | "ID"
 export type { SiteSearchSettings } from "@/lib/site-search-settings"
 export type { SiteTippingGiftItem } from "@/lib/tipping-gifts"
+export type { VipNameColors } from "@/lib/vip-name-colors"
 export type { InteractionGateAction, InteractionGateCondition, InteractionGateRule, InteractionGateSettings } from "@/lib/site-settings-app-state"
+export type { LeftSidebarDisplayMode } from "@/lib/site-settings-app-state"
+export type { PostSlugGenerationMode } from "@/lib/site-settings-app-state"
+export type { RegistrationEmailTemplateSettings } from "@/lib/site-settings-app-state"
 
 export interface SiteSettingsData {
   siteName: string
@@ -36,6 +43,7 @@ export interface SiteSettingsData {
   siteDescription: string
   siteLogoText: string
   siteLogoPath?: string | null
+  siteIconPath?: string | null
   siteSeoKeywords: string[]
   pointName: string
   postLinkDisplayMode: PostLinkDisplayMode
@@ -56,9 +64,12 @@ export interface SiteSettingsData {
   homeHotRecentWindowHours: number
   homeSidebarStatsCardEnabled: boolean
   homeSidebarAnnouncementsEnabled: boolean
+  leftSidebarDisplayMode: LeftSidebarDisplayMode
+  postSlugGenerationMode: PostSlugGenerationMode
   footerCopyrightText: string
   footerBrandingVisible: boolean
   vipLevelIcons: VipLevelIcons
+  vipNameColors: VipNameColors
   footerLinks: FooterLinkItem[]
   headerAppLinks: SiteHeaderAppLinkItem[]
   headerAppIconName: string
@@ -86,8 +97,12 @@ export interface SiteSettingsData {
   inviteRewardInvitee: number
   registerInitialPoints: number
   registrationEnabled: boolean
+  authPageShowcaseEnabled: boolean
   registrationRequireInviteCode: boolean
   registerInviteCodeEnabled: boolean
+  registerInviteCodeHelpEnabled: boolean
+  registerInviteCodeHelpTitle: string
+  registerInviteCodeHelpUrl: string
   inviteCodePurchaseEnabled: boolean
   boardApplicationEnabled: boolean
   inviteCodePrice: number
@@ -151,9 +166,12 @@ export interface SiteSettingsData {
   registerPhoneVerification: boolean
   registerNicknameEnabled: boolean
   registerNicknameRequired: boolean
+  registerNicknameMinLength: number
+  registerNicknameMaxLength: number
   registerGenderEnabled: boolean
   registerGenderRequired: boolean
   registerInviterEnabled: boolean
+  registrationEmailTemplates: RegistrationEmailTemplateSettings
   authGithubEnabled: boolean
   authGoogleEnabled: boolean
   authPasskeyEnabled: boolean
@@ -173,6 +191,21 @@ export interface SiteSettingsData {
   uploadMaxFileSizeMb: number
   uploadAvatarMaxFileSizeMb: number
   markdownImageUploadEnabled: boolean
+  imageWatermarkEnabled: boolean
+  imageWatermarkText: string
+  imageWatermarkPosition: ImageWatermarkPosition
+  imageWatermarkOpacity: number
+  imageWatermarkFontSize: number
+  imageWatermarkMargin: number
+  imageWatermarkColor: string
+  imageWatermarkLogoPath: string
+  imageWatermarkLogoScalePercent: number
+  attachmentUploadEnabled: boolean
+  attachmentDownloadEnabled: boolean
+  attachmentMinUploadLevel: number
+  attachmentMinUploadVipLevel: number
+  attachmentAllowedExtensions: string[]
+  attachmentMaxFileSizeMb: number
   markdownEmojiMapJson?: string | null
   markdownEmojiMap: Array<{ shortcode: string; label: string; icon: string }>
   appStateJson?: string | null
@@ -347,10 +380,22 @@ function mapSiteSettings(record: {
     appStateJson: record.appStateJson,
     enabledFallback: true,
   })
+  const leftSidebarDisplaySettings = resolveLeftSidebarDisplaySettings({
+    appStateJson: record.appStateJson,
+    modeFallback: "DEFAULT",
+  })
+  const postSlugGenerationSettings = resolvePostSlugGenerationSettings({
+    appStateJson: record.appStateJson,
+    modeFallback: "TITLE_TIMESTAMP",
+  })
   const footerCopyrightSettings = resolveFooterCopyrightSettings({
     appStateJson: record.appStateJson,
     textFallback: `${record.siteName} @ ${new Date().getFullYear()}`,
     brandingVisibleFallback: true,
+  })
+  const siteBrandingSettings = resolveSiteBrandingSettings({
+    appStateJson: record.appStateJson,
+    iconPathFallback: "",
   })
   const homeFeedPostListLoadSettings = resolveHomeFeedPostListLoadSettings({
     appStateJson: record.appStateJson,
@@ -363,6 +408,9 @@ function mapSiteSettings(record: {
   const vipLevelIcons = resolveVipLevelIconSettings({
     appStateJson: record.appStateJson,
   })
+  const vipNameColors = resolveVipNameColorSettings({
+    appStateJson: record.appStateJson,
+  })
   const markdownImageUploadSettings = resolveMarkdownImageUploadSettings({
     appStateJson: record.appStateJson,
     enabledFallback: true,
@@ -370,6 +418,27 @@ function mapSiteSettings(record: {
   const uploadObjectStorageSettings = resolveUploadObjectStorageSettings({
     appStateJson: record.appStateJson,
     forcePathStyleFallback: true,
+  })
+  const imageWatermarkSettings = resolveImageWatermarkSettings({
+    appStateJson: record.appStateJson,
+    enabledFallback: false,
+    textFallback: "",
+    positionFallback: "BOTTOM_RIGHT",
+    opacityFallback: 22,
+    fontSizeFallback: 24,
+    marginFallback: 24,
+    colorFallback: "#FFFFFF",
+    logoPathFallback: "",
+    logoScalePercentFallback: 16,
+  })
+  const attachmentFeatureSettings = resolveAttachmentFeatureSettings({
+    appStateJson: record.appStateJson,
+    uploadEnabledFallback: false,
+    downloadEnabledFallback: false,
+    minUploadLevelFallback: 0,
+    minUploadVipLevelFallback: 0,
+    allowedExtensionsFallback: ["zip", "rar", "7z", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt"],
+    maxFileSizeMbFallback: 20,
   })
   const commentAccessSettings = resolveCommentAccessSettings({
     appStateJson: record.appStateJson,
@@ -394,6 +463,22 @@ function mapSiteSettings(record: {
   const registrationRewardSettings = resolveRegistrationRewardSettings({
     appStateJson: record.appStateJson,
     initialPointsFallback: 0,
+  })
+  const registrationEmailTemplateSettings = resolveRegistrationEmailTemplateSettings({
+    appStateJson: record.appStateJson,
+    siteNameFallback: record.siteName,
+  })
+  const registerNicknameLengthSettings = resolveRegisterNicknameLengthSettings({
+    appStateJson: record.appStateJson,
+    minLengthFallback: 1,
+    maxLengthFallback: 20,
+  })
+  const registerInviteCodeHelpSettings = resolveRegisterInviteCodeHelpSettings({
+    appStateJson: record.appStateJson,
+  })
+  const authPageShowcaseSettings = resolveAuthPageShowcaseSettings({
+    appStateJson: record.appStateJson,
+    enabledFallback: true,
   })
   const postJackpotSettings = resolvePostJackpotSettings({
     appStateJson: record.appStateJson,
@@ -444,6 +529,7 @@ function mapSiteSettings(record: {
     siteDescription: record.siteDescription,
     siteLogoText: record.siteLogoText,
     siteLogoPath: record.siteLogoPath,
+    siteIconPath: siteBrandingSettings.iconPath || null,
     siteSeoKeywords: String(record.siteSeoKeywords || "").split(/[，,\n]+/).map((item) => item.trim()).filter(Boolean),
     pointName: record.pointName,
     postLinkDisplayMode: record.postLinkDisplayMode === "ID" ? "ID" : "SLUG",
@@ -464,9 +550,12 @@ function mapSiteSettings(record: {
     homeHotRecentWindowHours: homeHotFeedSettings.recentWindowHours,
     homeSidebarStatsCardEnabled: record.homeSidebarStatsCardEnabled,
     homeSidebarAnnouncementsEnabled: homeSidebarAnnouncementSettings.enabled,
+    leftSidebarDisplayMode: leftSidebarDisplaySettings.mode,
+    postSlugGenerationMode: postSlugGenerationSettings.mode,
     footerCopyrightText: footerCopyrightSettings.text,
     footerBrandingVisible: footerCopyrightSettings.brandingVisible,
     vipLevelIcons,
+    vipNameColors,
     footerLinks: parseFooterLinks(record.footerLinksJson),
     headerAppLinks: parseSiteHeaderAppLinks(record.headerAppLinksJson),
     headerAppIconName: normalizeHeaderAppIconName(record.headerAppIconName),
@@ -494,8 +583,12 @@ function mapSiteSettings(record: {
     inviteRewardInvitee: record.inviteRewardInvitee,
     registerInitialPoints: registrationRewardSettings.initialPoints,
     registrationEnabled: record.registrationEnabled,
+    authPageShowcaseEnabled: authPageShowcaseSettings.enabled,
     registrationRequireInviteCode: record.registrationRequireInviteCode,
     registerInviteCodeEnabled: record.registerInviteCodeEnabled,
+    registerInviteCodeHelpEnabled: registerInviteCodeHelpSettings.enabled,
+    registerInviteCodeHelpTitle: registerInviteCodeHelpSettings.title,
+    registerInviteCodeHelpUrl: registerInviteCodeHelpSettings.url,
     inviteCodePurchaseEnabled: record.inviteCodePurchaseEnabled,
     boardApplicationEnabled: boardApplicationSettings.enabled,
     inviteCodePrice: inviteCodePurchasePrices.normal,
@@ -559,9 +652,12 @@ function mapSiteSettings(record: {
     registerPhoneVerification: record.registerPhoneVerification,
     registerNicknameEnabled: record.registerNicknameEnabled,
     registerNicknameRequired: record.registerNicknameRequired,
+    registerNicknameMinLength: registerNicknameLengthSettings.minLength,
+    registerNicknameMaxLength: registerNicknameLengthSettings.maxLength,
     registerGenderEnabled: record.registerGenderEnabled,
     registerGenderRequired: record.registerGenderRequired,
     registerInviterEnabled: record.registerInviterEnabled,
+    registrationEmailTemplates: registrationEmailTemplateSettings,
     authGithubEnabled: authProviderSettings.githubEnabled,
     authGoogleEnabled: authProviderSettings.googleEnabled,
     authPasskeyEnabled: authProviderSettings.passkeyEnabled,
@@ -597,6 +693,21 @@ function mapSiteSettings(record: {
     uploadS3AccessKeyId: uploadStorageSensitiveConfig.accessKeyId,
     uploadS3SecretAccessKey: uploadStorageSensitiveConfig.secretAccessKey,
     markdownImageUploadEnabled: markdownImageUploadSettings.enabled,
+    imageWatermarkEnabled: imageWatermarkSettings.enabled,
+    imageWatermarkText: imageWatermarkSettings.text,
+    imageWatermarkPosition: imageWatermarkSettings.position,
+    imageWatermarkOpacity: imageWatermarkSettings.opacity,
+    imageWatermarkFontSize: imageWatermarkSettings.fontSize,
+    imageWatermarkMargin: imageWatermarkSettings.margin,
+    imageWatermarkColor: imageWatermarkSettings.color,
+    imageWatermarkLogoPath: imageWatermarkSettings.logoPath,
+    imageWatermarkLogoScalePercent: imageWatermarkSettings.logoScalePercent,
+    attachmentUploadEnabled: attachmentFeatureSettings.uploadEnabled,
+    attachmentDownloadEnabled: attachmentFeatureSettings.downloadEnabled,
+    attachmentMinUploadLevel: attachmentFeatureSettings.minUploadLevel,
+    attachmentMinUploadVipLevel: attachmentFeatureSettings.minUploadVipLevel,
+    attachmentAllowedExtensions: attachmentFeatureSettings.allowedExtensions,
+    attachmentMaxFileSizeMb: attachmentFeatureSettings.maxFileSizeMb,
     markdownEmojiMap: parseMarkdownEmojiMapJson(record.markdownEmojiMapJson),
     appStateJson: record.appStateJson,
   }
@@ -659,13 +770,30 @@ const getPersistentSiteSettings = unstable_cache(
   { tags: [SITE_SETTINGS_CACHE_TAG] },
 )
 
+function isMissingIncrementalCacheInUnstableCacheError(error: unknown) {
+  return error instanceof Error
+    && error.message.includes("Invariant: incrementalCache missing in unstable_cache")
+}
+
+async function resolveServerSiteSettings(): Promise<ServerSiteSettingsData> {
+  try {
+    return await getPersistentSiteSettings()
+  } catch (error) {
+    if (!isMissingIncrementalCacheInUnstableCacheError(error)) {
+      throw error
+    }
+
+    return readSiteSettingsFromDB()
+  }
+}
+
 export async function getSiteSettings(): Promise<SiteSettingsData> {
-  return toPublicSiteSettings(await getPersistentSiteSettings())
+  return toPublicSiteSettings(await resolveServerSiteSettings())
 }
 
 /** 仅服务端内部使用（mailer、lottery 等），包含 smtp 等敏感字段，禁止序列化到客户端 */
 export async function getServerSiteSettings(): Promise<ServerSiteSettingsData> {
-  return getPersistentSiteSettings()
+  return resolveServerSiteSettings()
 }
 
 export async function getSensitiveWordPage(options: { page?: number; pageSize?: number } = {}) {
@@ -673,7 +801,7 @@ export async function getSensitiveWordPage(options: { page?: number; pageSize?: 
   const pageSize = [20, 50, 100].includes(requestedPageSize) ? requestedPageSize : 20
   const requestedPage = normalizePositiveInteger(options.page, 1)
 
-  const { total, active, reject, review } = await getSensitiveWordStats()
+  const { total, active, reject, replace } = await getSensitiveWordStats()
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const page = Math.min(requestedPage, totalPages)
@@ -686,7 +814,7 @@ export async function getSensitiveWordPage(options: { page?: number; pageSize?: 
       id: item.id,
       word: item.word,
       matchType: item.matchType,
-      actionType: item.actionType,
+      actionType: normalizeSensitiveActionType(item.actionType),
       status: item.status,
       createdAt: item.createdAt.toISOString(),
     })),
@@ -694,7 +822,7 @@ export async function getSensitiveWordPage(options: { page?: number; pageSize?: 
       total,
       active,
       reject,
-      review,
+      replace,
     },
     pagination: {
       page,

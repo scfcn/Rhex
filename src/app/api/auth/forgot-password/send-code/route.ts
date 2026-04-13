@@ -3,6 +3,7 @@ import { apiError, apiSuccess, createRouteHandler, readJsonBody, requireStringFi
 import { canSendEmail } from "@/lib/mailer"
 import { getRequestIp } from "@/lib/request-ip"
 import { sendPasswordResetCode } from "@/lib/password-reset"
+import { createRequestWriteGuardOptions } from "@/lib/write-guard-policies"
 import { withRequestWriteGuard } from "@/lib/write-guard"
 
 function isValidEmail(value: string) {
@@ -41,15 +42,12 @@ export const POST = createRouteHandler(async ({ request }) => {
     apiError(403, "该账号未激活，无法找回密码")
   }
 
-  return withRequestWriteGuard({
+  return withRequestWriteGuard(createRequestWriteGuardOptions("auth-forgot-password-send-code", {
     request,
-    scope: "auth-forgot-password-send-code",
-    cooldownMs: 15_000,
-    cooldownMessage: "验证码已发送，如未收到请 15 秒后重试",
-    dedupeKey: email,
-    dedupeWindowMs: 3_000,
-    releaseOnError: true,
-  }, async () => {
+    input: {
+      email,
+    },
+  }), async () => {
     const result = await sendPasswordResetCode({
       email,
       ip: getRequestIp(request),

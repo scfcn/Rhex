@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/rbutton"
 import { toast } from "@/components/ui/toast"
 import { formatNumber } from "@/lib/formatters"
 
@@ -51,7 +51,7 @@ export function RedeemCodeCard({ pointName, currentPoints }: RedeemCodeCardProps
           value={code}
           onChange={(event) => setCode(event.target.value.toUpperCase())}
           placeholder="请输入兑换码"
-          className="h-11 flex-1 rounded-full border border-border bg-background px-4 text-sm uppercase tracking-[0.2em] outline-none"
+          className="h-11 flex-1 rounded-full border border-border bg-background px-4 text-sm uppercase tracking-[0.2em] outline-hidden"
         />
         <Button disabled={isPending || !code.trim()}>{isPending ? "兑换中..." : `兑换${pointName}`}</Button>
       </form>

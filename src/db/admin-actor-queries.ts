@@ -165,6 +165,7 @@ export function findManagedZoneContext(zoneId: string) {
       id: true,
       slug: true,
       name: true,
+      showInHomeFeed: true,
     },
   })
 }

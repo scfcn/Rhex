@@ -35,7 +35,7 @@ export function EditorHeader({
   return (
     <>
       {isFullscreen ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background/95 px-3 py-3 backdrop-blur sm:px-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background/95 px-3 py-3 backdrop-blur-sm sm:px-5">
           <div>
             <p className="text-sm font-medium text-foreground">全屏编辑器</p>
             <p className="text-xs text-muted-foreground">可按 Esc 快速退出全屏</p>
@@ -200,7 +200,7 @@ export function EditorBody({
         onSelect={onSelect}
         onPaste={onPaste}
         disabled={disabled}
-        className="w-full resize-none overflow-y-auto rounded-none border-0 bg-transparent pl-2 pr-0 py-1 font-mono text-sm leading-7 outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full resize-none overflow-y-auto rounded-none border-0 bg-transparent pl-2 pr-0 py-1 font-mono text-sm leading-7 outline-hidden placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60"
         placeholder={placeholder}
         style={textareaStyle}
       />
@@ -210,7 +210,7 @@ export function EditorBody({
       >
         <div
           ref={lineMeasureContainerRef}
-          className="box-border whitespace-pre-wrap break-words"
+          className="box-border whitespace-pre-wrap wrap-break-word"
         >
           {logicalLines.map((line, index) => (
             <div

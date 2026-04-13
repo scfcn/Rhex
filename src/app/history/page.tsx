@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 
-import { ReadingHistoryPanel } from "@/components/reading-history-panel"
+import { ReadingHistoryPanel } from "@/components/post/reading-history-panel"
 import { SiteHeader } from "@/components/site-header"
 import { getSiteSettings } from "@/lib/site-settings"
 

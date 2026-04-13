@@ -1,20 +1,21 @@
 import { apiSuccess, createUserRouteHandler, readJsonBody, requireStringField } from "@/lib/api-route"
 import { markConversationAsRead } from "@/lib/messages"
 import { logRouteWriteSuccess } from "@/lib/route-metadata"
+import { revalidateUserSurfaceCache } from "@/lib/user-surface"
+import { createRequestWriteGuardOptions } from "@/lib/write-guard-policies"
 import { withRequestWriteGuard } from "@/lib/write-guard"
 
 export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   const body = await readJsonBody(request)
   const conversationId = requireStringField(body, "conversationId", "缺少会话信息")
 
-  return withRequestWriteGuard({
+  return withRequestWriteGuard(createRequestWriteGuardOptions("messages-read", {
     request,
     userId: currentUser.id,
-    scope: "messages-read",
-    cooldownMs: 500,
-    dedupeKey: `${currentUser.id}:${conversationId}`,
-    dedupeWindowMs: 1_000,
-  }, async () => {
+    input: {
+      conversationId,
+    },
+  }), async () => {
     await markConversationAsRead(conversationId, currentUser.id)
 
     logRouteWriteSuccess({
@@ -24,6 +25,8 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
       userId: currentUser.id,
       targetId: conversationId,
     })
+
+    revalidateUserSurfaceCache(currentUser.id)
 
     return apiSuccess(undefined, "已读状态已更新")
   })

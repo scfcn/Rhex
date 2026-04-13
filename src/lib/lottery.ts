@@ -65,6 +65,7 @@ export interface LotteryConditionGroupSummary {
 export interface LotteryViewModel {
   status: LotteryStatus
   triggerMode: LotteryTriggerMode
+  renderedAt: string
   startsAt: string | null
   endsAt: string | null
   participantGoal: number | null
@@ -163,9 +164,14 @@ function buildConditionGroupLabel(index: number, total: number) {
 }
 
 export function determineLotteryTriggerMode(input: { endsAt?: Date | null; participantGoal?: number | null }) {
+  if (input.endsAt) {
+    return LotteryTriggerMode.MANUAL
+  }
+
   if (input.participantGoal && input.participantGoal > 0) {
     return LotteryTriggerMode.AUTO_PARTICIPANT_COUNT
   }
+
   return LotteryTriggerMode.MANUAL
 }
 
@@ -259,7 +265,7 @@ export function normalizeLotteryConfig(raw: unknown): { success: boolean; messag
   }
 
   if (participantGoal && endsAt) {
-    return { success: false, message: "自动开奖模式下请不要同时设置结束时间" }
+    return { success: false, message: "结束时间与目标参与人数不能同时设置，请二选一" }
   }
 
   return {
@@ -664,6 +670,7 @@ export function mapLotteryView(post: LotteryPostRelations, currentUserId?: numbe
   return {
     status: post.lotteryStatus ?? LotteryStatus.DRAFT,
     triggerMode: post.lotteryTriggerMode ?? LotteryTriggerMode.MANUAL,
+    renderedAt: new Date().toISOString(),
     startsAt: post.lotteryStartsAt?.toISOString() ?? null,
     endsAt: post.lotteryEndsAt?.toISOString() ?? null,
     participantGoal: post.lotteryParticipantGoal ?? null,

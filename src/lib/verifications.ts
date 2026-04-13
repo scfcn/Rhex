@@ -8,6 +8,7 @@ import {
   updateUserVerificationById,
 } from "@/db/verification-queries"
 import { getCurrentUser } from "@/lib/auth"
+import { enforceSensitiveText } from "@/lib/content-safety"
 import { parseVerificationFormSchema, type VerificationFormField } from "@/lib/verification-form-schema"
 export type { VerificationFieldType, VerificationFormField } from "@/lib/verification-form-schema"
 
@@ -228,21 +229,44 @@ export async function submitVerificationApplication(input: {
     }
   }
 
+  const sanitizedFormResponse = Object.fromEntries(await Promise.all(Object.entries(normalizedFormResponse).map(async ([key, value]) => {
+    if (!value) {
+      return [key, ""] as const
+    }
+
+    const safety = await enforceSensitiveText({ scene: "verification.content", text: value })
+    return [key, safety.sanitizedText] as const
+  })))
+  const contentSafety = formFields.length === 0 && input.content?.trim()
+    ? await enforceSensitiveText({ scene: "verification.content", text: String(input.content).trim() })
+    : null
+  const customDescriptionSafety = customDescription
+    ? await enforceSensitiveText({ scene: "verification.customDescription", text: customDescription })
+    : null
   const content = formFields.length > 0
-    ? buildVerificationContentFromFields(formFields, normalizedFormResponse)
-    : String(input.content ?? "").trim()
+    ? buildVerificationContentFromFields(formFields, sanitizedFormResponse)
+    : (contentSafety?.sanitizedText ?? "")
 
   if (!content) {
     throw new Error(formFields.length > 0 ? "请完善认证申请表单" : "请填写申请说明")
   }
 
-  return createUserVerificationApplication({
+  const application = await createUserVerificationApplication({
     userId: input.userId,
     verificationTypeId: input.verificationTypeId,
     content,
-    customDescription: customDescription || null,
-    formResponseJson: formFields.length > 0 ? JSON.stringify(normalizedFormResponse) : null,
+    customDescription: customDescriptionSafety?.sanitizedText || null,
+    formResponseJson: formFields.length > 0 ? JSON.stringify(sanitizedFormResponse) : null,
   })
+
+  return {
+    ...application,
+    contentAdjusted: Boolean(
+      contentSafety?.wasReplaced
+      || customDescriptionSafety?.wasReplaced
+      || Object.keys(normalizedFormResponse).some((key) => sanitizedFormResponse[key] !== normalizedFormResponse[key]),
+    ),
+  }
 }
 
 export async function unbindCurrentUserVerification(userId: number) {

@@ -4,6 +4,7 @@ import { apiError } from "@/lib/api-route"
 import { extractSummaryFromContent } from "@/lib/content"
 import { enforceSensitiveText } from "@/lib/content-safety"
 import { createPostMentionNotifications, stripPostContentUserLinks } from "@/lib/post-mentions"
+import { normalizePostAttachmentInputs, syncPostAttachments } from "@/lib/post-attachments"
 import { buildPostContentDocument, getAllPostContentText, getPostContentMeta, serializePostContentDocument } from "@/lib/post-content"
 import { normalizeManualTags, syncPostTaxonomy } from "@/lib/post-editor"
 import { getSiteSettings } from "@/lib/site-settings"
@@ -67,6 +68,16 @@ export async function updatePostFlow(input: {
   const canEditNormally = isAdmin || (editDeadline > Date.now())
 
   if (canEditNormally && !appendedContent) {
+    const normalizedAttachments = await normalizePostAttachmentInputs(rawBody?.attachments, {
+      settings,
+      user: {
+        id: input.currentUser.id,
+        role: input.currentUser.role,
+      },
+      uploadOwnerUserIds: isAdmin ? [input.currentUser.id, post.authorId] : [post.authorId],
+      skipFeatureEnabledCheck: true,
+      skipUploadPermissionCheck: true,
+    })
     const titleSafety = await enforceSensitiveText({ scene: "post.title", text: title })
     const contentSafety = await enforceSensitiveText({ scene: "post.content", text: content })
     const loginUnlockSafety = loginUnlockContent ? await enforceSensitiveText({ scene: "post.content", text: loginUnlockContent }) : null
@@ -86,34 +97,34 @@ export async function updatePostFlow(input: {
       meta: existingContentMeta,
     }))
     const summary = extractSummaryFromContent(getAllPostContentText(serializedContent))
-    const shouldReview = Boolean(
-      titleSafety.shouldReview
-      || contentSafety.shouldReview
-      || loginUnlockSafety?.shouldReview
-      || replyUnlockSafety?.shouldReview
-      || purchaseUnlockSafety?.shouldReview
-      || tagsSafety?.shouldReview,
+    const contentAdjusted = Boolean(
+      titleSafety.wasReplaced
+      || contentSafety.wasReplaced
+      || loginUnlockSafety?.wasReplaced
+      || replyUnlockSafety?.wasReplaced
+      || purchaseUnlockSafety?.wasReplaced
+      || tagsSafety?.wasReplaced,
     )
 
     let finalContent = serializedContent
+    let mentionUserIds = [] as number[]
 
     await runPostUpdateTransaction(async (tx) => {
       const activityAt = new Date()
       let nextContent = serializedContent
       let nextSummary = summary
 
-      if (!shouldReview) {
-        const mentionResult = await createPostMentionNotifications({
-          tx,
-          postId: input.postId,
-          senderId: input.currentUser.id,
-          senderName: input.currentUser.id === post.authorId ? "楼主" : "管理员",
-          rawPostContent: serializedContent,
-          excludeUserIds: [post.authorId],
-        })
-        nextContent = mentionResult.content
-        nextSummary = extractSummaryFromContent(getAllPostContentText(stripPostContentUserLinks(mentionResult.content))) || summary
-      }
+      const mentionResult = await createPostMentionNotifications({
+        tx,
+        postId: input.postId,
+        senderId: input.currentUser.id,
+        senderName: input.currentUser.id === post.authorId ? "楼主" : "管理员",
+        rawPostContent: serializedContent,
+        excludeUserIds: [post.authorId],
+      })
+      nextContent = mentionResult.content
+      nextSummary = extractSummaryFromContent(getAllPostContentText(stripPostContentUserLinks(mentionResult.content))) || summary
+      mentionUserIds = mentionResult.mentionUserIds
 
       finalContent = nextContent
 
@@ -128,8 +139,12 @@ export async function updatePostFlow(input: {
           commentsVisibleToAuthorOnly,
           minViewLevel,
           minViewVipLevel,
-          reviewNote: titleSafety.shouldReview || contentSafety.shouldReview || tagsSafety?.shouldReview ? "编辑内容命中敏感词规则，请复核" : undefined,
         },
+      })
+
+      await syncPostAttachments(tx, {
+        postId: input.postId,
+        attachments: normalizedAttachments,
       })
     })
 
@@ -138,7 +153,8 @@ export async function updatePostFlow(input: {
     return {
       post,
       mode: "edit" as const,
-      shouldReview,
+      contentAdjusted,
+      mentionUserIds,
     }
   }
 
@@ -155,22 +171,22 @@ export async function updatePostFlow(input: {
 
   const appendSafety = await enforceSensitiveText({ scene: "post.content", text: appendedContent })
   const nextSortOrder = (post.appendices[0]?.sortOrder ?? -1) + 1
+  let mentionUserIds = [] as number[]
 
   await runPostUpdateTransaction(async (tx) => {
     const activityAt = new Date()
     let nextAppendedContent = appendSafety.sanitizedText
 
-    if (!appendSafety.shouldReview) {
-      const mentionResult = await createPostMentionNotifications({
-        tx,
-        postId: input.postId,
-        senderId: input.currentUser.id,
-        senderName: input.currentUser.id === post.authorId ? "楼主" : "管理员",
-        rawPostContent: appendSafety.sanitizedText,
-        excludeUserIds: [post.authorId],
-      })
-      nextAppendedContent = mentionResult.content
-    }
+    const mentionResult = await createPostMentionNotifications({
+      tx,
+      postId: input.postId,
+      senderId: input.currentUser.id,
+      senderName: input.currentUser.id === post.authorId ? "楼主" : "管理员",
+      rawPostContent: appendSafety.sanitizedText,
+      excludeUserIds: [post.authorId],
+    })
+    nextAppendedContent = mentionResult.content
+    mentionUserIds = mentionResult.mentionUserIds
 
     await tx.post.update({
       where: { id: input.postId },
@@ -179,7 +195,6 @@ export async function updatePostFlow(input: {
         lastCommentedAt: activityAt,
         appendedContent: nextAppendedContent,
         lastAppendedAt: activityAt,
-        reviewNote: appendSafety.shouldReview ? "追加内容命中敏感词审核规则，请复核" : undefined,
         appendices: {
           create: {
             content: nextAppendedContent,
@@ -193,6 +208,7 @@ export async function updatePostFlow(input: {
   return {
     post,
     mode: "append" as const,
-    shouldReview: appendSafety.shouldReview,
+    contentAdjusted: appendSafety.wasReplaced,
+    mentionUserIds,
   }
 }

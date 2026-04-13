@@ -48,6 +48,7 @@ export const GET = createRouteHandler(async ({ request, routeContext }) => {
     minReplyVipLevel: 0,
     requirePostReview: zone.requirePostReview ?? false,
     requireCommentReview: zone.requireCommentReview ?? false,
+    showInHomeFeed: true,
   }, "view")
 
   if (!permission.allowed) {

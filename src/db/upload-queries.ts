@@ -4,9 +4,16 @@ import type { SavedUploadFile } from "@/lib/upload"
 
 const uploadSelect = {
   id: true,
+  userId: true,
+  bucketType: true,
+  originalName: true,
   urlPath: true,
   fileName: true,
+  fileExt: true,
+  mimeType: true,
+  fileSize: true,
   fileHash: true,
+  storagePath: true,
 } satisfies Prisma.UploadSelect
 
 /**
@@ -48,6 +55,31 @@ export async function createUploadRecord(input: CreateUploadInput) {
       storagePath: saved.storagePath,
       urlPath: saved.urlPath,
     },
+    select: uploadSelect,
+  })
+}
+
+export async function findUploadsByIdsForUser(userId: number, uploadIds: string[], tx?: Prisma.TransactionClient) {
+  if (uploadIds.length === 0) {
+    return []
+  }
+
+  const client = tx ?? prisma
+  return client.upload.findMany({
+    where: {
+      id: {
+        in: uploadIds,
+      },
+      userId,
+    },
+    select: uploadSelect,
+  })
+}
+
+export async function findUploadById(uploadId: string, tx?: Prisma.TransactionClient) {
+  const client = tx ?? prisma
+  return client.upload.findUnique({
+    where: { id: uploadId },
     select: uploadSelect,
   })
 }

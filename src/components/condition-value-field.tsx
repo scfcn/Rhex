@@ -1,5 +1,13 @@
 "use client"
 
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import type { AccessThresholdOption } from "@/lib/access-threshold-options"
 
 export type ConditionValueFieldMode = "text" | "number" | "user-level" | "vip-level" | "datetime-local"
@@ -65,22 +73,28 @@ export function ConditionValueField({
   vipLevelOptions = [],
   onChange,
   disabled = false,
-  className = "h-11 rounded-full border border-border bg-background px-4 text-sm outline-none",
+  className = "h-11 rounded-full border border-border bg-background px-4 text-sm outline-hidden",
 }: ConditionValueFieldProps) {
   const selectOptions = getConditionSelectOptions(mode, userLevelOptions, vipLevelOptions)
 
   if (selectOptions && selectOptions.length > 0) {
+    const selectedValue = value || selectOptions[0]?.value || ""
+
     return (
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={className}
+      <Select
+        value={selectedValue}
+        onValueChange={onChange}
         disabled={disabled}
       >
-        {selectOptions.map((option) => (
-          <option key={option.value} value={option.value}>{option.label}</option>
-        ))}
-      </select>
+        <SelectTrigger className={className}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {selectOptions.map((option) => (
+            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     )
   }
 
@@ -91,7 +105,7 @@ export function ConditionValueField({
       : "text"
 
   return (
-    <input
+    <Input
       type={inputType}
       value={mode === "datetime-local" ? normalizeDateTimeLocalValue(value) : value}
       onChange={(event) => onChange(event.target.value)}

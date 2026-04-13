@@ -2,7 +2,7 @@ import BigNumber from "bignumber.js"
 
 export { YinYangContractPage } from "@/components/yinyang-contract-page"
 
-export { YinYangContractAdminPage } from "@/components/yinyang-contract-admin-page"
+export { YinYangContractAdminPage } from "@/components/admin/yinyang-contract-admin-page"
 import { createSystemNotification } from "@/lib/notification-writes"
 import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
 import {
@@ -28,93 +28,14 @@ import {
   updateDailyStat,
   type YinYangChallengeDetailRow,
 } from "@/db/yinyang-contract-queries"
-import { getBusinessDayRange, formatDateTime } from "@/lib/formatters"
+import { getBusinessDayRange } from "@/lib/formatters"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getYinYangContractAppConfig } from "@/lib/app-config"
 import { enforceSensitiveText } from "@/lib/content-safety"
 import { PublicRouteError } from "@/lib/public-route-error"
 import { parsePositiveSafeInteger } from "@/lib/shared/safe-integer"
 import { getUserDisplayName } from "@/lib/user-display"
-
-
-
-
-export type YinYangOption = "A" | "B"
-export type YinYangChallengeStatus = "OPEN" | "LOCKED" | "SETTLED" | "CANCELLED"
-
-export type YinYangChallengeCard = {
-  id: string
-  creatorId: number
-  creatorName: string
-  challengerId: number | null
-  challengerName: string | null
-  status: YinYangChallengeStatus
-  question: string
-  optionA: string
-  optionB: string
-  correctOption: YinYangOption | null
-  selectedOption: YinYangOption | null
-  isCorrect: boolean | null
-  stakePoints: number
-  rewardPoints: number
-  taxPoints: number
-  winnerId: number | null
-  loserId: number | null
-  createdAt: string
-  settledAt: string | null
-  expiresAt: string | null
-}
-
-export type YinYangMyStats = {
-  userId: number | null
-  pointName: string
-  points: number
-  winCount: number
-
-  loseCount: number
-  todayProfitPoints: number
-  todayLossPoints: number
-  totalProfitPoints: number
-  totalLossPoints: number
-  dailyCreateLimit: number
-  dailyAcceptLimit: number
-  createdToday: number
-  acceptedToday: number
-}
-
-export type YinYangLeaderboardUser = {
-  userId: number
-  userName: string
-  winCount: number
-  loseCount: number
-  todayProfitPoints: number
-  todayLossPoints: number
-  totalProfitPoints: number
-  totalLossPoints: number
-  winRate: number
-  badge: "阴阳王" | null
-}
-
-export type YinYangLobbyData = {
-  summary: YinYangMyStats
-  openChallenges: YinYangChallengeCard[]
-  recentChallenges: YinYangChallengeCard[]
-  winnerLeaderboard: YinYangLeaderboardUser[]
-  earnerLeaderboard: YinYangLeaderboardUser[]
-  kings: {
-    previousKing: string | null
-    currentKing: string | null
-  }
-  config: {
-    entryLabel: string
-    pointName: string
-    minStakePoints: number
-    maxStakePoints: number
-    taxRateBps: number
-    dailyCreateLimit: number
-    dailyAcceptLimit: number
-  }
-}
+import { formatYinYangChallengeTime, type YinYangChallengeCard, type YinYangLeaderboardUser, type YinYangLobbyData, type YinYangMyStats, type YinYangOption, type YinYangChallengeStatus } from "@/lib/yinyang-contract-shared"
 
 
 type CurrentUser = {
@@ -606,9 +527,5 @@ export async function acceptYinYangChallenge(user: CurrentUser, input: AcceptCha
 
   return getYinYangLobbyData(refreshedUser)
 }
-
-
-
-export function formatYinYangChallengeTime(value: string | null) {
-  return value ? formatDateTime(value) : "-"
-}
+export { formatYinYangChallengeTime }
+export type { YinYangChallengeCard, YinYangLeaderboardUser, YinYangLobbyData, YinYangMyStats, YinYangOption, YinYangChallengeStatus }

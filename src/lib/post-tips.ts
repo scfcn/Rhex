@@ -311,6 +311,7 @@ async function createPostSupportBaseTransaction(params: {
       pointName: params.pointName,
       amount: params.amount,
       gift: params.gift ?? null,
+      recipientUserId: post.authorId,
     }
   })
 }

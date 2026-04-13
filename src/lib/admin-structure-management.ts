@@ -6,6 +6,7 @@ export interface ZoneItem {
   icon: string
   sortOrder: number
   hiddenFromSidebar: boolean
+  showInHomeFeed: boolean
   boardCount: number
   postCount: number
   followerCount: number
@@ -54,6 +55,8 @@ export interface BoardItem {
   followerCount: number
   todayPostCount: number
   treasuryPoints: number
+  showInHomeFeed: boolean | null
+  effectiveShowInHomeFeed: boolean
   requirePostReview: boolean | null
   requireCommentReview: boolean | null
   postPointDelta: number | null

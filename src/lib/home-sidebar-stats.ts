@@ -1,3 +1,6 @@
+import { unstable_cache, revalidateTag } from "next/cache"
+import { cache } from "react"
+
 import { findHomeSidebarStats } from "@/db/home-sidebar-queries"
 
 export interface HomeSidebarStatsData {
@@ -6,42 +9,27 @@ export interface HomeSidebarStatsData {
   userCount: number
 }
 
-const HOME_SIDEBAR_STATS_CACHE_TTL_MS = 60_000
+export const HOME_SIDEBAR_STATS_CACHE_TAG = "home-sidebar-stats"
 
-let cachedHomeSidebarStats: HomeSidebarStatsData | null = null
-let homeSidebarStatsCacheExpiry = 0
-let homeSidebarStatsCachePromise: Promise<HomeSidebarStatsData> | null = null
+const HOME_SIDEBAR_STATS_REVALIDATE_SECONDS = 60
 
-function setHomeSidebarStatsCache(stats: HomeSidebarStatsData) {
-  cachedHomeSidebarStats = stats
-  homeSidebarStatsCacheExpiry = Date.now() + HOME_SIDEBAR_STATS_CACHE_TTL_MS
-}
+const getPersistentHomeSidebarStats = unstable_cache(
+  async (): Promise<HomeSidebarStatsData> => findHomeSidebarStats(),
+  [HOME_SIDEBAR_STATS_CACHE_TAG],
+  {
+    tags: [HOME_SIDEBAR_STATS_CACHE_TAG],
+    revalidate: HOME_SIDEBAR_STATS_REVALIDATE_SECONDS,
+  },
+)
 
-export function invalidateHomeSidebarStatsCache() {
-  cachedHomeSidebarStats = null
-  homeSidebarStatsCacheExpiry = 0
-  homeSidebarStatsCachePromise = null
-}
+const getCachedHomeSidebarStats = cache(async () => {
+  return getPersistentHomeSidebarStats()
+})
 
-async function getMemoryCachedHomeSidebarStats(): Promise<HomeSidebarStatsData> {
-  if (cachedHomeSidebarStats && Date.now() < homeSidebarStatsCacheExpiry) {
-    return cachedHomeSidebarStats
-  }
-
-  if (!homeSidebarStatsCachePromise) {
-    homeSidebarStatsCachePromise = findHomeSidebarStats()
-      .then((stats) => {
-        setHomeSidebarStatsCache(stats)
-        return stats
-      })
-      .finally(() => {
-        homeSidebarStatsCachePromise = null
-      })
-  }
-
-  return homeSidebarStatsCachePromise
+export function revalidateHomeSidebarStatsCache() {
+  revalidateTag(HOME_SIDEBAR_STATS_CACHE_TAG, "max")
 }
 
 export async function getHomeSidebarStats(): Promise<HomeSidebarStatsData> {
-  return getMemoryCachedHomeSidebarStats()
+  return getCachedHomeSidebarStats()
 }

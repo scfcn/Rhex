@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/rbutton"
 import { formatNumber } from "@/lib/formatters"
 
 

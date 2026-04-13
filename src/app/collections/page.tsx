@@ -1,8 +1,8 @@
 import Link from "next/link"
 import type { Metadata } from "next"
 
-import { ForumPageShell } from "@/components/forum-page-shell"
-import { HomeSidebarPanels } from "@/components/home-sidebar-panels"
+import { ForumPageShell } from "@/components/forum/forum-page-shell"
+import { HomeSidebarPanels } from "@/components/home/home-sidebar-panels"
 import { PageNumberPagination } from "@/components/page-number-pagination"
 import { SiteHeader } from "@/components/site-header"
 import { getHomeAnnouncements } from "@/lib/announcements"
@@ -128,6 +128,7 @@ export default async function FavoriteCollectionDirectoryPage(props: {
                 siteName={settings.siteName}
                 siteDescription={settings.siteDescription}
                 siteLogoPath={settings.siteLogoPath}
+                siteIconPath={settings.siteIconPath}
               />
             </div>
           )}

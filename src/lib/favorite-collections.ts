@@ -3,6 +3,7 @@ import { postListInclude } from "@/db/queries"
 import type { Prisma } from "@/db/types"
 import { decodeTimestampCursor, encodeTimestampCursor } from "@/lib/cursor-pagination"
 import { apiError } from "@/lib/api-route"
+import { enforceSensitiveText } from "@/lib/content-safety"
 import { resolvePagination } from "@/db/helpers"
 import { getAnonymousMaskDisplayIdentity } from "@/lib/post-anonymous"
 import { mapListPost } from "@/lib/post-map"
@@ -102,22 +103,28 @@ function createCollectionSummary(collection: {
   }
 }
 
-function normalizeCollectionInput(input: Record<string, unknown>) {
+async function normalizeCollectionInput(input: Record<string, unknown>) {
   const title = normalizeTrimmedText(input.title, FAVORITE_COLLECTION_TITLE_MAX_LENGTH)
   if (!title) {
     apiError(400, "合集名称不能为空")
   }
 
+  const description = normalizeTrimmedText(input.description, FAVORITE_COLLECTION_DESCRIPTION_MAX_LENGTH) || null
   const visibility = input.visibility === "PUBLIC" ? "PUBLIC" as const : "PRIVATE" as const
   const allowOtherUsersToContribute = visibility === "PUBLIC" && normalizeBoolean(input.allowOtherUsersToContribute, false)
   const requireContributionApproval = allowOtherUsersToContribute && normalizeBoolean(input.requireContributionApproval, false)
+  const [titleSafety, descriptionSafety] = await Promise.all([
+    enforceSensitiveText({ scene: "favoriteCollection.title", text: title }),
+    description ? enforceSensitiveText({ scene: "favoriteCollection.description", text: description }) : Promise.resolve(null),
+  ])
 
   return {
-    title,
-    description: normalizeTrimmedText(input.description, FAVORITE_COLLECTION_DESCRIPTION_MAX_LENGTH) || null,
+    title: titleSafety.sanitizedText,
+    description: descriptionSafety?.sanitizedText || null,
     visibility,
     allowOtherUsersToContribute,
     requireContributionApproval,
+    contentAdjusted: titleSafety.wasReplaced || Boolean(descriptionSafety?.wasReplaced),
   }
 }
 
@@ -561,7 +568,7 @@ export async function createFavoriteCollection(params: {
   input: Record<string, unknown>
   postId?: string
 }) {
-  const normalized = normalizeCollectionInput(params.input)
+  const normalized = await normalizeCollectionInput(params.input)
 
   const created = await prisma.favoriteCollection.create({
     data: {
@@ -586,7 +593,10 @@ export async function createFavoriteCollection(params: {
     })
   }
 
-  return created
+  return {
+    ...created,
+    contentAdjusted: normalized.contentAdjusted,
+  }
 }
 
 export async function updateFavoriteCollection(params: {
@@ -594,7 +604,7 @@ export async function updateFavoriteCollection(params: {
   collectionId: string
   input: Record<string, unknown>
 }) {
-  const normalized = normalizeCollectionInput(params.input)
+  const normalized = await normalizeCollectionInput(params.input)
   const existing = await prisma.favoriteCollection.findUnique({
     where: { id: params.collectionId },
     select: {
@@ -607,14 +617,25 @@ export async function updateFavoriteCollection(params: {
     apiError(404, "合集不存在或无权修改")
   }
 
-  return prisma.favoriteCollection.update({
+  const updated = await prisma.favoriteCollection.update({
     where: { id: params.collectionId },
-    data: normalized,
+    data: {
+      title: normalized.title,
+      description: normalized.description,
+      visibility: normalized.visibility,
+      allowOtherUsersToContribute: normalized.allowOtherUsersToContribute,
+      requireContributionApproval: normalized.requireContributionApproval,
+    },
     select: {
       id: true,
       title: true,
     },
   })
+
+  return {
+    ...updated,
+    contentAdjusted: normalized.contentAdjusted,
+  }
 }
 
 export async function deleteFavoriteCollection(params: {

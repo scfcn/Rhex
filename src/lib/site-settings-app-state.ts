@@ -1,5 +1,7 @@
 import { parseNonNegativeSafeInteger } from "@/lib/shared/safe-integer"
+import { buildDefaultRegistrationEmailTemplateSettings, normalizeRegistrationEmailTemplateSettings, type RegistrationEmailTemplateSettings } from "@/lib/email-template-settings"
 import { getDefaultTippingGiftItemsFromAmounts, normalizeTippingGiftItems, type SiteTippingGiftItem } from "@/lib/tipping-gifts"
+import { normalizeVipNameColors, type VipNameColors } from "@/lib/vip-name-colors"
 import { normalizeVipLevelIcons, type VipLevelIcons } from "@/lib/vip-level-icons"
 import { normalizePostListLoadMode, type PostListLoadMode } from "@/lib/post-list-load-mode"
 
@@ -30,6 +32,57 @@ function readSiteSettingsState(raw: string | null | undefined) {
 
 function normalizeNonNegativeInteger(value: unknown, fallback: number) {
   return parseNonNegativeSafeInteger(value) ?? fallback
+}
+
+function normalizeFileExtensionList(value: unknown, fallback: string[]) {
+  if (!Array.isArray(value)) {
+    return fallback
+  }
+
+  const normalized = Array.from(new Set(
+    value
+      .map((item) => (typeof item === "string" ? item.trim().toLowerCase().replace(/^\./, "") : ""))
+      .filter(Boolean),
+  ))
+
+  return normalized.length > 0 ? normalized : fallback
+}
+
+function normalizeHexColor(value: unknown, fallback: string) {
+  const normalized = typeof value === "string" ? value.trim().toUpperCase() : ""
+  return /^#(?:[0-9A-F]{3}|[0-9A-F]{6})$/.test(normalized) ? normalized : fallback
+}
+
+export type LeftSidebarDisplayMode = "DEFAULT" | "HIDDEN" | "DOCKED"
+
+export function normalizeLeftSidebarDisplayMode(value: unknown, fallback: LeftSidebarDisplayMode = "DEFAULT"): LeftSidebarDisplayMode {
+  const normalized = typeof value === "string" ? value.trim().toUpperCase() : ""
+
+  switch (normalized) {
+    case "DEFAULT":
+    case "HIDDEN":
+    case "DOCKED":
+      return normalized
+    default:
+      return fallback
+  }
+}
+
+export type ImageWatermarkPosition = "TOP_LEFT" | "TOP_RIGHT" | "BOTTOM_LEFT" | "BOTTOM_RIGHT" | "CENTER"
+
+function normalizeImageWatermarkPosition(value: unknown, fallback: ImageWatermarkPosition): ImageWatermarkPosition {
+  const normalized = typeof value === "string" ? value.trim().toUpperCase() : ""
+
+  switch (normalized) {
+    case "TOP_LEFT":
+    case "TOP_RIGHT":
+    case "BOTTOM_LEFT":
+    case "BOTTOM_RIGHT":
+    case "CENTER":
+      return normalized as ImageWatermarkPosition
+    default:
+      return fallback
+  }
 }
 
 export interface CheckInMakeUpPriceSettings {
@@ -82,13 +135,53 @@ export interface UploadObjectStorageSettings {
   forcePathStyle: boolean
 }
 
+export interface ImageWatermarkSettings {
+  enabled: boolean
+  text: string
+  position: ImageWatermarkPosition
+  opacity: number
+  fontSize: number
+  margin: number
+  color: string
+  logoPath: string
+  logoScalePercent: number
+}
+
+export interface AttachmentFeatureSettings {
+  uploadEnabled: boolean
+  downloadEnabled: boolean
+  minUploadLevel: number
+  minUploadVipLevel: number
+  allowedExtensions: string[]
+  maxFileSizeMb: number
+}
+
 export interface HomeSidebarAnnouncementSettings {
   enabled: boolean
+}
+
+export interface LeftSidebarDisplaySettings {
+  mode: LeftSidebarDisplayMode
 }
 
 export interface FooterCopyrightSettings {
   text: string
   brandingVisible: boolean
+}
+
+export interface SiteBrandingSettings {
+  iconPath: string
+}
+
+export interface RegisterNicknameLengthSettings {
+  minLength: number
+  maxLength: number
+}
+
+export type PostSlugGenerationMode = "TITLE_TIMESTAMP" | "TIME36" | "PINYIN_TIME36" | "TITLE_TIME36"
+
+export interface PostSlugGenerationSettings {
+  mode: PostSlugGenerationMode
 }
 
 export interface HomeFeedPostListLoadSettings {
@@ -150,10 +243,21 @@ export interface AuthProviderSettings {
   passkeyEnabled: boolean
 }
 
+export interface AuthPageShowcaseSettings {
+  enabled: boolean
+}
+
 export type VipLevelIconSettings = VipLevelIcons
+export type VipNameColorSettings = VipNameColors
 
 export interface RegistrationRewardSettings {
   initialPoints: number
+}
+
+export interface RegisterInviteCodeHelpSettings {
+  enabled: boolean
+  title: string
+  url: string
 }
 
 export interface CheckInStreakSettings {
@@ -189,6 +293,8 @@ export interface BoardTreasurySettings {
 export interface BoardApplicationSettings {
   enabled: boolean
 }
+
+export type { RegistrationEmailTemplateSettings } from "@/lib/email-template-settings"
 
 export function resolveTippingGiftSettings(options: {
   appStateJson?: string | null
@@ -484,6 +590,245 @@ export function mergeMarkdownImageUploadSettings(
   return JSON.stringify(root)
 }
 
+export function resolveImageWatermarkSettings(options: {
+  appStateJson?: string | null
+  enabledFallback?: boolean
+  textFallback?: string
+  positionFallback?: ImageWatermarkPosition
+  opacityFallback?: number
+  fontSizeFallback?: number
+  marginFallback?: number
+  colorFallback?: string
+  logoPathFallback?: string
+  logoScalePercentFallback?: number
+} = {}): ImageWatermarkSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const imageWatermark = isRecord(siteSettingsState.imageWatermark)
+    ? siteSettingsState.imageWatermark
+    : {}
+
+  return {
+    enabled: typeof imageWatermark.enabled === "boolean"
+      ? imageWatermark.enabled
+      : options.enabledFallback ?? false,
+    text: typeof imageWatermark.text === "string"
+      ? imageWatermark.text.trim().slice(0, 120)
+      : (options.textFallback ?? "").trim().slice(0, 120),
+    position: normalizeImageWatermarkPosition(imageWatermark.position, options.positionFallback ?? "BOTTOM_RIGHT"),
+    opacity: Math.min(100, Math.max(0, normalizeNonNegativeInteger(imageWatermark.opacity, normalizeNonNegativeInteger(options.opacityFallback, 22)))),
+    fontSize: Math.min(160, Math.max(8, normalizeNonNegativeInteger(imageWatermark.fontSize, normalizeNonNegativeInteger(options.fontSizeFallback, 24)))),
+    margin: Math.min(200, Math.max(0, normalizeNonNegativeInteger(imageWatermark.margin, normalizeNonNegativeInteger(options.marginFallback, 24)))),
+    color: normalizeHexColor(imageWatermark.color, normalizeHexColor(options.colorFallback, "#FFFFFF")),
+    logoPath: typeof imageWatermark.logoPath === "string"
+      ? imageWatermark.logoPath.trim().slice(0, 1000)
+      : (options.logoPathFallback ?? "").trim().slice(0, 1000),
+    logoScalePercent: Math.min(60, Math.max(1, normalizeNonNegativeInteger(imageWatermark.logoScalePercent, normalizeNonNegativeInteger(options.logoScalePercentFallback, 16)))),
+  }
+}
+
+export function mergeImageWatermarkSettings(
+  appStateJson: string | null | undefined,
+  input: ImageWatermarkSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    imageWatermark: {
+      enabled: Boolean(input.enabled),
+      text: String(input.text ?? "").trim().slice(0, 120),
+      position: normalizeImageWatermarkPosition(input.position, "BOTTOM_RIGHT"),
+      opacity: Math.min(100, Math.max(0, normalizeNonNegativeInteger(input.opacity, 22))),
+      fontSize: Math.min(160, Math.max(8, normalizeNonNegativeInteger(input.fontSize, 24))),
+      margin: Math.min(200, Math.max(0, normalizeNonNegativeInteger(input.margin, 24))),
+      color: normalizeHexColor(input.color, "#FFFFFF"),
+      logoPath: String(input.logoPath ?? "").trim().slice(0, 1000),
+      logoScalePercent: Math.min(60, Math.max(1, normalizeNonNegativeInteger(input.logoScalePercent, 16))),
+    },
+  }
+
+  return JSON.stringify(root)
+}
+
+export function resolveRegistrationEmailTemplateSettings(options: {
+  appStateJson?: string | null
+  siteNameFallback?: string
+} = {}): RegistrationEmailTemplateSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const defaults = buildDefaultRegistrationEmailTemplateSettings(options.siteNameFallback ?? "社区站点")
+
+  return normalizeRegistrationEmailTemplateSettings(siteSettingsState.registrationEmailTemplates, defaults)
+}
+
+export function mergeRegistrationEmailTemplateSettings(
+  appStateJson: string | null | undefined,
+  input: RegistrationEmailTemplateSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+  const defaults = buildDefaultRegistrationEmailTemplateSettings("社区站点")
+  const normalized = normalizeRegistrationEmailTemplateSettings(input, defaults)
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    registrationEmailTemplates: normalized,
+  }
+
+  return JSON.stringify(root)
+}
+
+export function resolveAttachmentFeatureSettings(options: {
+  appStateJson?: string | null
+  uploadEnabledFallback?: boolean
+  downloadEnabledFallback?: boolean
+  minUploadLevelFallback?: number
+  minUploadVipLevelFallback?: number
+  allowedExtensionsFallback?: string[]
+  maxFileSizeMbFallback?: number
+} = {}): AttachmentFeatureSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const attachments = isRecord(siteSettingsState.attachments)
+    ? siteSettingsState.attachments
+    : {}
+  const fallbackAllowedExtensions = Array.from(new Set(
+    (options.allowedExtensionsFallback ?? ["zip", "rar", "7z", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt"])
+      .map((item) => item.trim().toLowerCase().replace(/^\./, ""))
+      .filter(Boolean),
+  ))
+
+  return {
+    uploadEnabled: typeof attachments.uploadEnabled === "boolean"
+      ? attachments.uploadEnabled
+      : (typeof attachments.enabled === "boolean" ? attachments.enabled : options.uploadEnabledFallback ?? false),
+    downloadEnabled: typeof attachments.downloadEnabled === "boolean"
+      ? attachments.downloadEnabled
+      : (typeof attachments.enabled === "boolean" ? attachments.enabled : options.downloadEnabledFallback ?? false),
+    minUploadLevel: normalizeNonNegativeInteger(attachments.minUploadLevel, normalizeNonNegativeInteger(options.minUploadLevelFallback, 0)),
+    minUploadVipLevel: normalizeNonNegativeInteger(attachments.minUploadVipLevel, normalizeNonNegativeInteger(options.minUploadVipLevelFallback, 0)),
+    allowedExtensions: normalizeFileExtensionList(attachments.allowedExtensions, fallbackAllowedExtensions),
+    maxFileSizeMb: Math.max(1, normalizeNonNegativeInteger(attachments.maxFileSizeMb, normalizeNonNegativeInteger(options.maxFileSizeMbFallback, 20))),
+  }
+}
+
+export function mergeAttachmentFeatureSettings(
+  appStateJson: string | null | undefined,
+  input: AttachmentFeatureSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+  const allowedExtensions = Array.from(new Set(
+    input.allowedExtensions
+      .map((item) => item.trim().toLowerCase().replace(/^\./, ""))
+      .filter(Boolean),
+  ))
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    attachments: {
+      uploadEnabled: Boolean(input.uploadEnabled),
+      downloadEnabled: Boolean(input.downloadEnabled),
+      minUploadLevel: normalizeNonNegativeInteger(input.minUploadLevel, 0),
+      minUploadVipLevel: normalizeNonNegativeInteger(input.minUploadVipLevel, 0),
+      allowedExtensions: allowedExtensions.length > 0 ? allowedExtensions : ["zip", "rar", "7z", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt"],
+      maxFileSizeMb: Math.max(1, normalizeNonNegativeInteger(input.maxFileSizeMb, 20)),
+    },
+  }
+
+  return JSON.stringify(root)
+}
+
+export function resolveRegisterNicknameLengthSettings(options: {
+  appStateJson?: string | null
+  minLengthFallback?: number
+  maxLengthFallback?: number
+} = {}): RegisterNicknameLengthSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const registerNicknameLengths = isRecord(siteSettingsState.registerNicknameLengths)
+    ? siteSettingsState.registerNicknameLengths
+    : {}
+  const minLength = Math.min(
+    50,
+    Math.max(
+      1,
+      normalizeNonNegativeInteger(
+        registerNicknameLengths.minLength,
+        normalizeNonNegativeInteger(options.minLengthFallback, 1),
+      ),
+    ),
+  )
+
+  return {
+    minLength,
+    maxLength: Math.min(
+      50,
+      Math.max(
+        minLength,
+        normalizeNonNegativeInteger(
+          registerNicknameLengths.maxLength,
+          normalizeNonNegativeInteger(options.maxLengthFallback, 20),
+        ),
+      ),
+    ),
+  }
+}
+
+export function mergeRegisterNicknameLengthSettings(
+  appStateJson: string | null | undefined,
+  input: RegisterNicknameLengthSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+  const minLength = Math.min(50, Math.max(1, normalizeNonNegativeInteger(input.minLength, 1)))
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    registerNicknameLengths: {
+      minLength,
+      maxLength: Math.min(50, Math.max(minLength, normalizeNonNegativeInteger(input.maxLength, 20))),
+    },
+  }
+
+  return JSON.stringify(root)
+}
+
+export function resolveSiteBrandingSettings(options: {
+  appStateJson?: string | null
+  iconPathFallback?: string
+} = {}): SiteBrandingSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const siteBranding = isRecord(siteSettingsState.siteBranding)
+    ? siteSettingsState.siteBranding
+    : {}
+  const resolvedIconPath = typeof siteBranding.iconPath === "string"
+    ? siteBranding.iconPath.trim().slice(0, 1000)
+    : ""
+  const fallbackIconPath = typeof options.iconPathFallback === "string"
+    ? options.iconPathFallback.trim().slice(0, 1000)
+    : ""
+
+  return {
+    iconPath: resolvedIconPath || fallbackIconPath,
+  }
+}
+
+export function mergeSiteBrandingSettings(
+  appStateJson: string | null | undefined,
+  input: SiteBrandingSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    siteBranding: {
+      iconPath: typeof input.iconPath === "string" ? input.iconPath.trim().slice(0, 1000) : "",
+    },
+  }
+
+  return JSON.stringify(root)
+}
+
 export function resolveFooterCopyrightSettings(options: {
   appStateJson?: string | null
   textFallback?: string
@@ -524,6 +869,46 @@ export function mergeFooterCopyrightSettings(
   return JSON.stringify(root)
 }
 
+export function normalizePostSlugGenerationMode(
+  value: unknown,
+  fallback: PostSlugGenerationMode = "TITLE_TIMESTAMP",
+): PostSlugGenerationMode {
+  return value === "TIME36" || value === "PINYIN_TIME36" || value === "TITLE_TIME36"
+    ? value
+    : fallback
+}
+
+export function resolvePostSlugGenerationSettings(options: {
+  appStateJson?: string | null
+  modeFallback?: PostSlugGenerationMode
+} = {}): PostSlugGenerationSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const postSlugGeneration = isRecord(siteSettingsState.postSlugGeneration)
+    ? siteSettingsState.postSlugGeneration
+    : {}
+
+  return {
+    mode: normalizePostSlugGenerationMode(postSlugGeneration.mode, options.modeFallback),
+  }
+}
+
+export function mergePostSlugGenerationSettings(
+  appStateJson: string | null | undefined,
+  input: PostSlugGenerationSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    postSlugGeneration: {
+      mode: normalizePostSlugGenerationMode(input.mode),
+    },
+  }
+
+  return JSON.stringify(root)
+}
+
 export function resolveHomeSidebarAnnouncementSettings(options: {
   appStateJson?: string | null
   enabledFallback?: boolean
@@ -551,6 +936,37 @@ export function mergeHomeSidebarAnnouncementSettings(
     ...siteSettingsState,
     homeSidebarAnnouncement: {
       enabled: input.enabled,
+    },
+  }
+
+  return JSON.stringify(root)
+}
+
+export function resolveLeftSidebarDisplaySettings(options: {
+  appStateJson?: string | null
+  modeFallback?: LeftSidebarDisplayMode
+} = {}): LeftSidebarDisplaySettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const leftSidebarDisplay = isRecord(siteSettingsState.leftSidebarDisplay)
+    ? siteSettingsState.leftSidebarDisplay
+    : {}
+
+  return {
+    mode: normalizeLeftSidebarDisplayMode(leftSidebarDisplay.mode, options.modeFallback),
+  }
+}
+
+export function mergeLeftSidebarDisplaySettings(
+  appStateJson: string | null | undefined,
+  input: LeftSidebarDisplaySettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    leftSidebarDisplay: {
+      mode: normalizeLeftSidebarDisplayMode(input.mode),
     },
   }
 
@@ -819,6 +1235,37 @@ export function mergeVipLevelIconSettings(
   return JSON.stringify(root)
 }
 
+export function resolveVipNameColorSettings(options: {
+  appStateJson?: string | null
+} = {}): VipNameColorSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const vipNameColors = isRecord(siteSettingsState.vipNameColors)
+    ? siteSettingsState.vipNameColors
+    : {}
+
+  return normalizeVipNameColors({
+    normal: typeof vipNameColors.normal === "string" ? vipNameColors.normal : undefined,
+    vip1: typeof vipNameColors.vip1 === "string" ? vipNameColors.vip1 : undefined,
+    vip2: typeof vipNameColors.vip2 === "string" ? vipNameColors.vip2 : undefined,
+    vip3: typeof vipNameColors.vip3 === "string" ? vipNameColors.vip3 : undefined,
+  })
+}
+
+export function mergeVipNameColorSettings(
+  appStateJson: string | null | undefined,
+  input: VipNameColorSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    vipNameColors: normalizeVipNameColors(input),
+  }
+
+  return JSON.stringify(root)
+}
+
 export function resolveAuthProviderSettings(options: {
   appStateJson?: string | null
   githubEnabledFallback?: boolean
@@ -950,6 +1397,39 @@ export function mergePostRedPacketSettings(
     ...siteSettingsState,
     postRedPacket: {
       randomClaimProbability: Math.max(0, Math.min(100, normalizeNonNegativeInteger(input.randomClaimProbability, 0))),
+    },
+  }
+
+  return JSON.stringify(root)
+}
+
+export function resolveAuthPageShowcaseSettings(options: {
+  appStateJson?: string | null
+  enabledFallback?: boolean
+} = {}): AuthPageShowcaseSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const authPageShowcase = isRecord(siteSettingsState.authPageShowcase)
+    ? siteSettingsState.authPageShowcase
+    : {}
+
+  return {
+    enabled: typeof authPageShowcase.enabled === "boolean"
+      ? authPageShowcase.enabled
+      : options.enabledFallback ?? true,
+  }
+}
+
+export function mergeAuthPageShowcaseSettings(
+  appStateJson: string | null | undefined,
+  input: AuthPageShowcaseSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    authPageShowcase: {
+      enabled: Boolean(input.enabled),
     },
   }
 
@@ -1254,6 +1734,49 @@ export function mergeRegistrationRewardSettings(
     ...siteSettingsState,
     registrationRewards: {
       initialPoints: normalizeNonNegativeInteger(input.initialPoints, 0),
+    },
+  }
+
+  return JSON.stringify(root)
+}
+
+export function resolveRegisterInviteCodeHelpSettings(options: {
+  appStateJson?: string | null
+  enabledFallback?: boolean
+  titleFallback?: string
+  urlFallback?: string
+} = {}): RegisterInviteCodeHelpSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const registerInviteCodeHelp = isRecord(siteSettingsState.registerInviteCodeHelp)
+    ? siteSettingsState.registerInviteCodeHelp
+    : {}
+
+  return {
+    enabled: typeof registerInviteCodeHelp.enabled === "boolean"
+      ? registerInviteCodeHelp.enabled
+      : options.enabledFallback ?? false,
+    title: typeof registerInviteCodeHelp.title === "string"
+      ? registerInviteCodeHelp.title.trim()
+      : options.titleFallback ?? "",
+    url: typeof registerInviteCodeHelp.url === "string"
+      ? registerInviteCodeHelp.url.trim()
+      : options.urlFallback ?? "",
+  }
+}
+
+export function mergeRegisterInviteCodeHelpSettings(
+  appStateJson: string | null | undefined,
+  input: RegisterInviteCodeHelpSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    registerInviteCodeHelp: {
+      enabled: Boolean(input.enabled),
+      title: input.title.trim(),
+      url: input.url.trim(),
     },
   }
 

@@ -1,9 +1,9 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 
-import { CreatePostForm } from "@/components/create-post-form"
+import { CreatePostForm } from "@/components/post/create-post-form"
 import { SiteHeader } from "@/components/site-header"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/rbutton"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { buildUserLevelThresholdOptions, buildVipLevelThresholdOptions } from "@/lib/access-threshold-options"
 import { getCurrentUser } from "@/lib/auth"
@@ -147,10 +147,18 @@ export default async function WritePage(props: PageProps<"/write">) {
                   currentUser={{
                     username: user.username,
                     nickname: user.nickname,
+                    role: user.role,
                     level: user.level,
                     points: user.points,
                     vipLevel: user.vipLevel,
                     vipExpiresAt: user.vipExpiresAt?.toISOString?.() ? user.vipExpiresAt.toISOString() : (user.vipExpiresAt as unknown as string | null),
+                  }}
+                  attachmentFeature={{
+                    uploadEnabled: settings.attachmentUploadEnabled,
+                    minUploadLevel: settings.attachmentMinUploadLevel,
+                    minUploadVipLevel: settings.attachmentMinUploadVipLevel,
+                    allowedExtensions: settings.attachmentAllowedExtensions,
+                    maxFileSizeMb: settings.attachmentMaxFileSizeMb,
                   }}
                   viewLevelOptions={viewLevelOptions}
                   viewVipLevelOptions={viewVipLevelOptions}
@@ -176,6 +184,21 @@ export default async function WritePage(props: PageProps<"/write">) {
                     bountyPoints: editingPost.bountyPoints,
                     pollOptions: editingPost.pollOptions.map((item) => item.content),
                     tags: editingPost.tags.map((item) => item.tag.name),
+                    attachments: editingPost.attachments.map((attachment) => ({
+                      id: attachment.id,
+                      sourceType: attachment.sourceType,
+                      uploadId: attachment.uploadId ?? null,
+                      name: attachment.name,
+                      externalUrl: attachment.externalUrl ?? null,
+                      externalCode: attachment.externalCode ?? null,
+                      fileSize: attachment.fileSize ?? attachment.upload?.fileSize ?? null,
+                      fileExt: attachment.fileExt ?? attachment.upload?.fileExt ?? null,
+                      mimeType: attachment.mimeType ?? attachment.upload?.mimeType ?? null,
+                      minDownloadLevel: attachment.minDownloadLevel,
+                      minDownloadVipLevel: attachment.minDownloadVipLevel,
+                      pointsCost: attachment.pointsCost,
+                      requireReplyUnlock: attachment.requireReplyUnlock,
+                    })),
                     redPacketConfig: editingPost.redPacket && rewardPoolConfig
                       ? {
                           mode: rewardPoolConfig.mode,
@@ -220,10 +243,18 @@ export default async function WritePage(props: PageProps<"/write">) {
                 currentUser={{
                   username: user.username,
                   nickname: user.nickname,
+                  role: user.role,
                   level: user.level,
                   points: user.points,
                   vipLevel: user.vipLevel,
                   vipExpiresAt: user.vipExpiresAt?.toISOString?.() ? user.vipExpiresAt.toISOString() : (user.vipExpiresAt as unknown as string | null),
+                }}
+                attachmentFeature={{
+                  uploadEnabled: settings.attachmentUploadEnabled,
+                  minUploadLevel: settings.attachmentMinUploadLevel,
+                  minUploadVipLevel: settings.attachmentMinUploadVipLevel,
+                  allowedExtensions: settings.attachmentAllowedExtensions,
+                  maxFileSizeMb: settings.attachmentMaxFileSizeMb,
                 }}
                 viewLevelOptions={viewLevelOptions}
                 viewVipLevelOptions={viewVipLevelOptions}

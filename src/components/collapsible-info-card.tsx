@@ -108,7 +108,7 @@ export function CollapsibleInfoCard({
       ) : null}
 
       {open ? (
-        <div className="relative overflow-hidden rounded-[22px] border border-border bg-card shadow-sm shadow-black/5">
+        <div className="relative overflow-hidden rounded-[22px] border border-border bg-card shadow-xs shadow-black/5">
           <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-primary/10 blur-2xl" />
           <div className="pointer-events-none absolute -bottom-10 left-6 h-20 w-20 rounded-full bg-accent blur-2xl" />
           <div className="absolute bottom-3 right-3 top-3 z-10 flex w-[120px] flex-col items-end justify-between">
@@ -117,7 +117,7 @@ export function CollapsibleInfoCard({
               {summaryActions}
             </div>
           </div>
-          <div className="relative grid gap-3 p-4 pr-[9.5rem] md:grid-cols-[auto_minmax(0,1fr)] md:items-center">
+          <div className="relative grid gap-3 p-4 pr-38 md:grid-cols-[auto_minmax(0,1fr)] md:items-center">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] text-foreground/90">
               <LevelIcon icon={icon} className="h-full w-full text-[2rem]" svgClassName="[&>svg]:block" />
             </div>

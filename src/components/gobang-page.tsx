@@ -19,7 +19,7 @@ interface GobangPageProps {
 }
 
 type ChallengePolicy = { mode: "FREE" | "PAID"; remainingFree: number; remainingPaid: number }
-type CreateMatchResult = { matches: GobangMatch[]; policy: ChallengePolicy }
+type CreateMatchResult = { matches: GobangMatch[]; policy: ChallengePolicy; summary: PlayerSummary }
 type PlayerSummary = GobangPlayerSummary
 type ApiResponse<T> = { code: number; message?: string; data?: T }
 
@@ -323,14 +323,14 @@ export function GobangPage({ config, initialMatches, initialSummary }: GobangPag
     }))
   }, [])
 
-  const refreshMatches = useCallback(async () => {
+  const refreshMatches = useCallback(async (message?: string) => {
     const response = await fetch("/api/gobang", { cache: "no-store" })
     const result = await response.json() as ApiResponse<{ matches: GobangMatch[]; summary: PlayerSummary }>
     if (!response.ok || !result.data) {
-      setGameState((prev: GobangViewState) => ({ ...prev, message: result.message ?? "加载对局失败" }))
+      setGameState((prev: GobangViewState) => ({ ...prev, message: result.message ?? message ?? "加载对局失败" }))
       return
     }
-    syncFromMatches(result.data.matches, result.data.summary)
+    syncFromMatches(result.data.matches, result.data.summary, message)
   }, [syncFromMatches])
 
   const handleMount = useCallback((node: HTMLDivElement | null) => {
@@ -347,15 +347,14 @@ export function GobangPage({ config, initialMatches, initialSummary }: GobangPag
       const response = await fetch("/api/gobang", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create" }) })
       const result = await response.json() as ApiResponse<CreateMatchResult>
       if (!response.ok || !result.data) {
-        await refreshMatches()
-        setGameState((prev: GobangViewState) => ({ ...prev, message: result.message ?? "开始游戏失败", isLoadingAI: false }))
+        await refreshMatches(result.message ?? "开始游戏失败")
         return
       }
       const createdMatch = result.data.matches.find((item) => item.status === "ONGOING") ?? result.data.matches[0] ?? null
       if (createdMatch?.moves.at(-1)?.playerId === 0) playMoveSound("ai")
-      syncFromMatches(result.data.matches, { freeRemaining: result.data.policy.remainingFree, freeTotal: gameState.freeTotal, freeUsed: Math.max(0, gameState.freeTotal - result.data.policy.remainingFree), paidRemaining: result.data.policy.remainingPaid, paidTotal: gameState.paidTotal, paidUsed: Math.max(0, gameState.paidTotal - result.data.policy.remainingPaid), pointName: gameState.pointName, points: gameState.points, challengeStatus: "in_progress" }, result.message)
+      syncFromMatches(result.data.matches, result.data.summary, result.message)
     })
-  }, [gameState.freeTotal, gameState.paidTotal, gameState.pointName, gameState.points, playMoveSound, refreshMatches, startTransition, syncFromMatches])
+  }, [playMoveSound, refreshMatches, startTransition, syncFromMatches])
 
   const handleDropChess = useCallback((r: number, c: number) => {
     if (!activeMatch || boardDisabled) return
@@ -375,9 +374,13 @@ export function GobangPage({ config, initialMatches, initialSummary }: GobangPag
       const aiMove = nextMatch.moves.find((move) => move.step === previousMoveCount + 2 && move.playerId === 0) ?? null
       if (playerMove) playMoveSound("user")
       if (aiMove && latestAfterMove?.id === aiMove.id) window.setTimeout(() => playMoveSound("ai"), 400)
+      if (nextMatch.status === "FINISHED" || result.data.winnerId !== null) {
+        await refreshMatches(result.message)
+        return
+      }
       syncFromMatches(nextMatches, { freeRemaining: gameState.freeCount, freeTotal: gameState.freeTotal, freeUsed: gameState.freeUsed, paidRemaining: gameState.paidRemain, paidTotal: gameState.paidTotal, paidUsed: gameState.paidUsed, pointName: gameState.pointName, points: gameState.points, challengeStatus: "in_progress" }, result.message)
     })
-  }, [activeMatch, boardDisabled, gameState.freeCount, gameState.freeTotal, gameState.freeUsed, gameState.paidRemain, gameState.paidTotal, gameState.paidUsed, gameState.pointName, gameState.points, matches, playMoveSound, startTransition, syncFromMatches])
+  }, [activeMatch, boardDisabled, gameState.freeCount, gameState.freeTotal, gameState.freeUsed, gameState.paidRemain, gameState.paidTotal, gameState.paidUsed, gameState.pointName, gameState.points, matches, playMoveSound, refreshMatches, startTransition, syncFromMatches])
 
   const handleSwitchHistory = useCallback((direction: "prev" | "next") => {
     if (!filteredHistoryMatches.length || selectedHistoryIndex < 0) return
@@ -394,7 +397,7 @@ export function GobangPage({ config, initialMatches, initialSummary }: GobangPag
           <div className="gobang-rules-header"><p className="gobang-rules-title">规则说明</p><button type="button" className="gobang-rules-toggle" onClick={() => setRulesCollapsed((value) => !value)} aria-expanded={!rulesCollapsed}>{rulesCollapsed ? "展开" : "收起"}</button></div>
           {!rulesCollapsed ? <div className="gobang-rules-list">{ruleItems.map((rule) => <p key={rule} className="gobang-rule-item">{rule}</p>)}</div> : null}
         </div>
-        <div className="gobang-stage rounded-[28px] bg-gradient-to-br from-card via-card to-secondary/20 shadow-[0_18px_48px_hsl(var(--foreground)/0.08)] backdrop-blur-sm md:p-4">
+        <div className="gobang-stage rounded-[28px] bg-linear-to-br from-card via-card to-secondary/20 shadow-[0_18px_48px_hsl(var(--foreground)/0.08)] backdrop-blur-xs md:p-4">
           <ChessBoard board={currentBoard} disabled={boardDisabled} onDropChess={handleDropChess} lastMove={latestMove} winningLine={winningLine} showNoRegretOverlay={showNoRegret} />
           <div className="gobang-actions mt-3 flex items-center justify-center"><button type="button" className="gobang-easter-egg-button" onClick={triggerNoRegretEasterEgg}>悔棋</button></div>
           <GameControls gameState={gameState} canViewPreviousResult={historyMatches.length > 0} onStartGame={handleStartGame} onViewPreviousResult={() => setShowPreviousResult(true)} />

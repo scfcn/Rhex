@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 
-import { ForumPageShell } from "@/components/forum-page-shell"
-import { HomeSidebarPanels } from "@/components/home-sidebar-panels"
+import { ForumPageShell } from "@/components/forum/forum-page-shell"
+import { HomeSidebarPanels } from "@/components/home/home-sidebar-panels"
 import { SiteHeader } from "@/components/site-header"
 import { LevelIcon } from "@/components/level-icon"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -78,6 +78,7 @@ export default async function FunsPage() {
                 siteName={settings.siteName}
                 siteDescription={settings.siteDescription}
                 siteLogoPath={settings.siteLogoPath}
+                siteIconPath={settings.siteIconPath}
               />
             </aside>
           )}

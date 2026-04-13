@@ -1,11 +1,14 @@
 import { NotificationType } from "@/db/types"
+import { enqueueAiReplyForCommentMention } from "@/lib/ai-reply"
 import { apiSuccess, createUserRouteHandler, readJsonBody } from "@/lib/api-route"
 import { createCommentFlow } from "@/lib/comment-create-service"
 import { enqueuePostFollowCommentNotifications } from "@/lib/follow-notifications"
 import { handleCommentCreateSideEffects } from "@/lib/interaction-side-effects"
+import { revalidateHomeSidebarStatsCache } from "@/lib/home-sidebar-stats"
 import { enqueueEvaluateUserLevelProgress } from "@/lib/level-system"
 import { enqueueNotifications } from "@/lib/notification-writes"
 import { logRequestSucceeded } from "@/lib/request-log"
+import { revalidateUserSurfaceCache } from "@/lib/user-surface"
 
 export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   const body = await readJsonBody(request)
@@ -36,6 +39,11 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     page: result.targetPage,
     reviewRequired: result.reviewRequired,
   })
+
+  revalidateUserSurfaceCache(currentUser.id)
+  if (!result.reviewRequired) {
+    revalidateHomeSidebarStatsCache()
+  }
 
   if (!result.reviewRequired) {
     const notifications = [] as Array<{
@@ -97,6 +105,13 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
         ...result.mentionUserIds,
       ],
     })
+
+    void enqueueAiReplyForCommentMention({
+      postId: result.postId,
+      sourceCommentId: result.created.id,
+      triggerUserId: currentUser.id,
+      mentionedUserIds: result.mentionUserIds,
+    })
   }
 
   return apiSuccess({
@@ -107,7 +122,9 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
       view: result.commentView,
       anchor: `comment-${result.created.id}`,
     },
-  }, result.reviewRequired ? (result.contentSafety.shouldReview ? "回复命中敏感词规则，已进入审核" : "当前节点开启回帖审核，回复已进入审核") : result.normalizedReplyToUserName ? `已回复 @${result.normalizedReplyToUserName}` : "回复成功")
+  }, result.reviewRequired
+    ? "当前节点开启回帖审核，回复已进入审核"
+    : `${result.normalizedReplyToUserName ? `已回复 @${result.normalizedReplyToUserName}` : "回复成功"}${result.contentAdjusted ? "，部分内容已自动替换" : ""}`)
 }, {
   errorMessage: "评论失败",
   logPrefix: "[api/comments/create] unexpected error",

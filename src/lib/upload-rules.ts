@@ -1,6 +1,6 @@
 import path from "path"
 
-export const ALLOWED_UPLOAD_FOLDERS = ["avatars", "posts", "comments", "friend-links", "site-logo", "icon"] as const
+export const ALLOWED_UPLOAD_FOLDERS = ["avatars", "posts", "comments", "post-covers", "friend-links", "site-logo", "icon"] as const
 
 export type UploadFolder = (typeof ALLOWED_UPLOAD_FOLDERS)[number]
 
@@ -38,6 +38,34 @@ export function getUploadMimeType(fileName: string) {
       return "image/avif"
     case "svg":
       return "image/svg+xml"
+    case "pdf":
+      return "application/pdf"
+    case "zip":
+      return "application/zip"
+    case "rar":
+      return "application/vnd.rar"
+    case "7z":
+      return "application/x-7z-compressed"
+    case "txt":
+      return "text/plain; charset=utf-8"
+    case "md":
+      return "text/markdown; charset=utf-8"
+    case "doc":
+      return "application/msword"
+    case "docx":
+      return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    case "xls":
+      return "application/vnd.ms-excel"
+    case "xlsx":
+      return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    case "ppt":
+      return "application/vnd.ms-powerpoint"
+    case "pptx":
+      return "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    case "mp3":
+      return "audio/mpeg"
+    case "mp4":
+      return "video/mp4"
     default:
       return "application/octet-stream"
   }

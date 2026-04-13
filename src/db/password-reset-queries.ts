@@ -17,6 +17,7 @@ export function updateUserPasswordById(userId: number, passwordHash: string) {
     where: { id: userId },
     data: {
       passwordHash,
+      sessionInvalidBefore: new Date(),
     },
     select: {
       id: true,

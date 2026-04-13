@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer"
 
+import { renderEmailTemplate } from "@/lib/email-template-settings"
 import { getServerSiteSettings } from "@/lib/site-settings"
 
 export interface MailerTransportConfig {
@@ -72,25 +73,35 @@ async function createMailerContext(config?: MailerTransportConfig) {
 
 export async function sendRegisterVerificationEmail(input: { to: string; code: string }) {
   const { settings, transporter } = await createMailerContext()
+  const variables = {
+    siteName: settings.siteName,
+    code: input.code,
+    username: "",
+  }
 
   await transporter.sendMail({
     from: settings.smtpFrom,
     to: input.to,
-    subject: `${settings.siteName} 验证码`,
-    text: `你的验证码是 ${input.code}，10 分钟内有效。如非本人操作请忽略。`,
-    html: `<div style="font-family:Arial,sans-serif;line-height:1.7;color:#111"><h2>${settings.siteName} 验证码</h2><p>你的验证码是：</p><p style="font-size:28px;font-weight:700;letter-spacing:6px">${input.code}</p><p>验证码 10 分钟内有效，如非本人操作请忽略。</p></div>`,
+    subject: renderEmailTemplate(settings.registrationEmailTemplates.registerVerification.subject, variables),
+    text: renderEmailTemplate(settings.registrationEmailTemplates.registerVerification.text, variables),
+    html: renderEmailTemplate(settings.registrationEmailTemplates.registerVerification.html, variables),
   })
 }
 
 export async function sendResetPasswordVerificationEmail(input: { to: string; code: string; username: string }) {
   const { settings, transporter } = await createMailerContext()
+  const variables = {
+    siteName: settings.siteName,
+    code: input.code,
+    username: input.username,
+  }
 
   await transporter.sendMail({
     from: settings.smtpFrom,
     to: input.to,
-    subject: `${settings.siteName} 找回密码验证码`,
-    text: `用户 ${input.username} 的找回密码验证码是 ${input.code}，10 分钟内有效。如非本人操作，请尽快检查账号安全。`,
-    html: `<div style="font-family:Arial,sans-serif;line-height:1.7;color:#111"><h2>${settings.siteName} 找回密码</h2><p>账号：<strong>${input.username}</strong></p><p>你的找回密码验证码是：</p><p style="font-size:28px;font-weight:700;letter-spacing:6px">${input.code}</p><p>验证码 10 分钟内有效。如非本人操作，请忽略此邮件并尽快检查账号安全。</p></div>`,
+    subject: renderEmailTemplate(settings.registrationEmailTemplates.resetPasswordVerification.subject, variables),
+    text: renderEmailTemplate(settings.registrationEmailTemplates.resetPasswordVerification.text, variables),
+    html: renderEmailTemplate(settings.registrationEmailTemplates.resetPasswordVerification.html, variables),
   })
 }
 

@@ -11,7 +11,7 @@ interface AnnouncementPageContentProps {
 export function AnnouncementPageContent({ items }: AnnouncementPageContentProps) {
   return (
     <div className="space-y-6">
-      <section className="rounded-[28px] border border-border bg-card p-6 shadow-sm shadow-black/5 dark:shadow-black/30">
+      <section className="rounded-[28px] border border-border bg-card p-6 shadow-xs shadow-black/5 dark:shadow-black/30">
         <div className="flex items-center gap-2">
           <Megaphone className="h-5 w-5 text-sky-500" />
           <h1 className="text-2xl font-semibold">站点文档</h1>

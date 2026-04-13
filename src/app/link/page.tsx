@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 
 import { SiteHeader } from "@/components/site-header"
-import { FriendLinkPageContent } from "@/components/friend-link-page-content"
+import { FriendLinkPageContent } from "@/components/friend-links/friend-link-page-content"
 import { getFriendLinkPageData } from "@/lib/friend-links"
 import { getSiteSettings } from "@/lib/site-settings"
 

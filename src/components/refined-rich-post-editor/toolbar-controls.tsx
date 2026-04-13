@@ -5,6 +5,7 @@ import { AlignCenter, AlignLeft, AlignRight, Code2, List, ListOrdered, ListTodo 
 
 import { TOOLBAR_TIPS } from "@/components/refined-rich-post-editor/constants"
 import type { ToolbarTipDefinition } from "@/components/refined-rich-post-editor/types"
+import { Kbd, KbdGroup } from "@/components/ui/kbd"
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select"
 import { Tooltip } from "@/components/ui/tooltip"
 import { resolvePlatformShortcuts, type ClientPlatform } from "@/lib/client-platform"
@@ -47,21 +48,21 @@ function ToolbarTip({ label, shortcuts, description, platform }: ToolbarTipDefin
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[12px] font-semibold text-slate-900 dark:text-slate-50">{label}</span>
+        <span className="text-[12px] font-semibold">{label}</span>
         {shortcutLabels.length > 0 ? (
-          <span className="inline-flex flex-wrap justify-end gap-1">
+          <KbdGroup className="flex-wrap justify-end gap-1">
             {shortcutLabels.map((shortcut) => (
-              <kbd
+              <Kbd
                 key={shortcut}
-                className="rounded-md border border-slate-300/80 bg-white/70 px-1.5 py-0.5 font-mono text-[10px] font-semibold leading-none text-slate-600 shadow-sm dark:border-slate-600/80 dark:bg-slate-900/60 dark:text-slate-200"
+                className="h-5 min-w-fit border border-slate-300/80 bg-white/70 px-1.5 py-0.5 font-mono text-[10px] font-semibold leading-none shadow-xs dark:border-slate-600/80 dark:bg-slate-900/60 "
               >
                 {shortcut}
-              </kbd>
+              </Kbd>
             ))}
-          </span>
+          </KbdGroup>
         ) : null}
       </div>
-      {description ? <p className="text-[11px] leading-4 text-slate-500 dark:text-slate-300/80">{description}</p> : null}
+      {description ? <p className="text-[11px] leading-4 ">{description}</p> : null}
     </div>
   )
 }
@@ -100,7 +101,9 @@ export function ToolButton({
         onMouseDown={onMouseDown}
         onClick={onClick}
         disabled={disabled}
-        className={active ? "shrink-0 rounded-lg bg-accent p-2 text-foreground transition-colors disabled:cursor-not-allowed disabled:opacity-50" : "shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"}
+        className={active
+          ? "shrink-0 rounded-lg bg-accent p-2 text-accent-foreground shadow-xs transition-colors [&>svg]:opacity-100 disabled:cursor-not-allowed disabled:opacity-50"
+          : "shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground hover:[&>svg]:opacity-100 disabled:cursor-not-allowed disabled:opacity-50"}
       >
         {children}
       </button>
@@ -114,7 +117,7 @@ function ToolbarSelectTrigger({ tip, platform, children }: { tip: ToolbarTipDefi
       <SelectTrigger
         aria-label={tip.label}
         title={getToolbarTitle(tip, platform)}
-        className="h-9 w-9 shrink-0 justify-center gap-0.5 rounded-xl border-0 bg-transparent px-0 text-sm font-semibold text-muted-foreground shadow-none hover:bg-accent hover:text-foreground focus:ring-0 focus:ring-offset-0 [&>span]:flex [&>span]:w-auto [&>span]:items-center [&>span]:justify-center [&>span]:text-center [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:opacity-55"
+        className="h-9 w-9 shrink-0 justify-center gap-0.5 rounded-xl border-0 bg-transparent px-0 text-sm font-semibold text-muted-foreground shadow-none hover:bg-accent hover:text-accent-foreground hover:[&>svg]:opacity-100 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none [&>span]:flex [&>span]:w-auto [&>span]:items-center [&>span]:justify-center [&>span]:text-center [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:opacity-55"
       >
         {children}
       </SelectTrigger>
@@ -149,7 +152,7 @@ export function HeadingSelect({ disabled, onOpenChange, onSelect, onMouseDown, p
       <ToolbarSelectTrigger tip={TOOLBAR_TIPS.heading} platform={platform}>
         <HeadingLevelOneIcon />
       </ToolbarSelectTrigger>
-      <SelectContent className="bg-background/100">
+      <SelectContent className="bg-background">
         <SelectItem value="1" className="flex items-center gap-2 pl-3 [&>span:last-child]:inline-flex [&>span:last-child]:items-center [&>span:last-child]:gap-2">
           <HeadingLevelOneIcon />
           一级标题
@@ -193,7 +196,7 @@ export function AlignmentSelect({ disabled, onOpenChange, onSelect, onMouseDown,
       <ToolbarSelectTrigger tip={TOOLBAR_TIPS.alignment} platform={platform}>
         <AlignLeft className="h-4 w-4 shrink-0" />
       </ToolbarSelectTrigger>
-      <SelectContent className="bg-background/100">
+      <SelectContent className="bg-background">
         <SelectItem value="left" className="flex items-center gap-2 pl-3 [&>span:last-child]:inline-flex [&>span:last-child]:items-center [&>span:last-child]:gap-2">
           <AlignLeft className="h-4 w-4 shrink-0" />
           左对齐
@@ -237,7 +240,7 @@ export function ListSelect({ disabled, onOpenChange, onSelect, onMouseDown, plat
       <ToolbarSelectTrigger tip={TOOLBAR_TIPS.list} platform={platform}>
         <List className="h-4 w-4 shrink-0" />
       </ToolbarSelectTrigger>
-      <SelectContent className="bg-background/100">
+      <SelectContent className="bg-background">
         <SelectItem value="unordered" className="flex items-center gap-2 pl-3 [&>span:last-child]:inline-flex [&>span:last-child]:items-center [&>span:last-child]:gap-2">
           <List className="h-4 w-4 shrink-0" />
           无序列表
@@ -285,7 +288,7 @@ export function CodeFormatSelect({ disabled, onOpenChange, onSelect, onMouseDown
       <ToolbarSelectTrigger tip={TOOLBAR_TIPS.code} platform={platform}>
         <Code2 className="h-4 w-4 shrink-0" />
       </ToolbarSelectTrigger>
-      <SelectContent className="bg-background/100">
+      <SelectContent className="bg-background">
         <SelectItem value="inline-code" className="flex items-center gap-2 pl-3 [&>span:last-child]:inline-flex [&>span:last-child]:items-center [&>span:last-child]:gap-2">
           <Code2 className="h-4 w-4 shrink-0" />
           行内代码

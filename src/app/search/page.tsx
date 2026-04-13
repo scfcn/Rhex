@@ -1,10 +1,10 @@
 import type { Metadata } from "next"
+import Link from "next/link"
 
 import { ExternalSearchOptions } from "@/components/external-search-options"
-import { ForumPostStream } from "@/components/forum-post-stream"
+import { ForumPostStream } from "@/components/forum/forum-post-stream"
 import { SearchForm } from "@/components/search-form"
 import { SiteHeader } from "@/components/site-header"
-import { Card, CardContent } from "@/components/ui/card"
 import { readSearchParam } from "@/lib/search-params"
 import { searchPosts } from "@/lib/search"
 import { getSiteSettings } from "@/lib/site-settings"
@@ -36,6 +36,11 @@ export default async function SearchPage(props: PageProps<"/search">) {
         postLinkDisplayMode: settings.postLinkDisplayMode,
       })
     : null
+  const hasKeyword = keyword.length > 0
+  const resultItems = results?.items ?? []
+  const resultSummary = results
+    ? (results.total === null ? `当前页返回 ${resultItems.length} 条结果` : `共找到 ${results.total} 条结果`)
+    : null
 
   function buildSearchHref(params: { before?: string | null; after?: string | null }) {
     const query = new URLSearchParams()
@@ -53,54 +58,111 @@ export default async function SearchPage(props: PageProps<"/search">) {
   }
 
   return (
-    <div className="min-h-screen ">
+    <div className="min-h-screen">
       <SiteHeader />
-      <main className="mx-auto max-w-[1100px] px-4 py-6 lg:px-6">
-        <div className="space-y-6">
-          <Card className="overflow-hidden border-none bg-gradient-to-r from-[#1f1b16] via-[#2e261f] to-[#382c22] text-white shadow-soft">
-            <CardContent className="space-y-5 p-8">
+      <main className="mx-auto max-w-[920px] px-4 py-8 lg:px-6">
+        <div className="space-y-5">
+          <section className="rounded-2xl border border-border bg-card">
+            <div className="space-y-5 p-5 sm:p-6">
               <div>
-                <p className="text-sm text-white/70">论坛搜索</p>
-                <h1 className="mt-2 text-3xl font-semibold">{settings.search.enabled ? "搜索帖子、节点与作者内容" : "站内搜索已关闭"}</h1>
+                <p className="text-xs font-medium tracking-[0.16em] text-muted-foreground uppercase">站内搜索</p>
+                <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">{settings.search.enabled ? "搜索帖子、节点与作者内容" : "站内搜索已关闭"}</h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+                  {settings.search.enabled
+                    ? null
+                    : "当前站内搜索不可用，但你仍然可以输入关键词后继续使用外部搜索引擎查找本站内容。"}
+                </p>
               </div>
               <SearchForm defaultValue={keyword} search={settings.search} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="space-y-4 p-6">
-              {!keyword ? settings.search.enabled ? (
-                <p className="text-sm text-muted-foreground">你可以搜索帖子标题、正文摘要、作者昵称和节点名称。</p>
+              {hasKeyword ? (
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">当前关键词</span>
+                  <span className="rounded-full border border-border bg-background px-3 py-1 font-medium text-foreground">{keyword}</span>
+                </div>
               ) : (
-                <p className="text-sm text-muted-foreground">站内搜索当前已关闭。输入关键词后，使用 Google 或 Bing 继续查找内容。</p>
+                <p className="text-sm text-muted-foreground">输入关键词后即可开始搜索。</p>
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-border bg-card">
+            <div className="border-b border-border px-5 py-4 sm:px-6">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-base font-medium">
+                    {!hasKeyword
+                      ? "开始搜索"
+                      : !settings.search.enabled
+                        ? "外部搜索"
+                        : resultItems.length === 0
+                          ? "没有找到相关内容"
+                          : "搜索结果"}
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {!hasKeyword
+                      ? (settings.search.enabled ? "搜索结果会显示在这里。" : "输入关键词后，可继续使用外部搜索查找本站内容。")
+                      : !settings.search.enabled
+                        ? `站内搜索已关闭，请选择外部搜索继续搜索 “${keyword}”。`
+                        : resultItems.length === 0
+                          ? `没有找到与 “${keyword}” 相关的内容。`
+                          : "按当前关键词返回的内容列表。"}
+                  </p>
+                </div>
+                {hasKeyword && settings.search.enabled && resultSummary ? (
+                  <p className="text-sm text-muted-foreground">{resultSummary}</p>
+                ) : null}
+              </div>
+            </div>
+            <div className="space-y-5 pt-5">
+              {!hasKeyword ? (
+                <div className="rounded-xl border border-dashed border-border bg-background px-4 py-5 text-sm leading-6 text-muted-foreground">
+                  {settings.search.enabled
+                    ? "支持搜索帖子标题、正文摘要、作者昵称和节点名称。输入更短、更明确的关键词通常更容易找到结果。"
+                    : "站内搜索当前已关闭。输入关键词后，可直接使用下方的外部搜索选项继续查找。"}
+                </div>
               ) : !settings.search.enabled ? (
+                <ExternalSearchOptions keyword={keyword} engines={settings.search.externalEngines} variant="panel" />
+              ) : resultItems.length === 0 ? (
                 <>
-                  <p className="text-sm text-muted-foreground">站内搜索当前已关闭，请选择外部搜索引擎继续搜索 “{keyword}”。</p>
+                  <div className="rounded-xl border border-dashed border-border bg-background px-4 py-5 text-sm leading-6 text-muted-foreground">
+                    试试缩短关键词、替换近义词，或者直接使用外部搜索扩大范围。
+                  </div>
                   <ExternalSearchOptions keyword={keyword} engines={settings.search.externalEngines} variant="panel" />
                 </>
-              ) : results!.items.length === 0 ? (
-                <p className="text-sm text-muted-foreground">没有找到相关内容，试试更短的关键词或其他表达方式。</p>
               ) : (
                 <>
-                  <p className="text-sm text-muted-foreground">
-                    {results!.total === null ? `当前页返回 ${results!.items.length} 条结果` : `共找到 ${results!.total} 条结果`}
-                  </p>
-                  <ForumPostStream posts={results!.items} />
-                  <div className="flex items-center justify-between pt-2">
-                    <a href={results!.hasPrevPage && results!.prevCursor ? buildSearchHref({ before: results!.prevCursor }) : "#"} className={results!.hasPrevPage ? "" : "pointer-events-none opacity-50"}>
-                      <span className="rounded-full border border-border bg-card px-4 py-2 text-sm">上一页</span>
-                    </a>
-                    <span className="text-sm text-muted-foreground">按游标分页浏览搜索结果</span>
-                    <a href={results!.hasNextPage && results!.nextCursor ? buildSearchHref({ after: results!.nextCursor }) : "#"} className={results!.hasNextPage ? "" : "pointer-events-none opacity-50"}>
-                      <span className="rounded-full border border-border bg-card px-4 py-2 text-sm">下一页</span>
-                    </a>
+                  <ForumPostStream posts={resultItems} />
+                  <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+                    <PaginationLink
+                      href={results!.hasPrevPage && results!.prevCursor ? buildSearchHref({ before: results!.prevCursor }) : null}
+                      label="上一页"
+                    />
+                    <p className="text-sm text-muted-foreground">使用上一页和下一页继续浏览当前关键词的结果。</p>
+                    <PaginationLink
+                      href={results!.hasNextPage && results!.nextCursor ? buildSearchHref({ after: results!.nextCursor }) : null}
+                      label="下一页"
+                    />
                   </div>
                 </>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         </div>
       </main>
     </div>
+  )
+}
+
+function PaginationLink({ href, label }: { href: string | null; label: string }) {
+  const className = "inline-flex items-center justify-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium transition-colors"
+
+  if (!href) {
+    return <span className={`${className} pointer-events-none opacity-50`}>{label}</span>
+  }
+
+  return (
+    <Link href={href} className={`${className} hover:bg-muted`}>
+      {label}
+    </Link>
   )
 }

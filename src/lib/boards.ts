@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache"
 import { cache } from "react"
 
 import { findFollowRecord } from "@/db/follow-queries"
@@ -12,6 +13,7 @@ import { dedupeAndMapPinnedPosts, extractPinnedPostIds } from "@/lib/pinned-post
 import { mapListPost } from "@/lib/post-map"
 import { findActiveBoardsWithZoneAndPostCount, findBoardBySlugWithZoneAndPostCount, findBoardModeratorsByBoardId } from "@/db/board-read-queries"
 import type { SitePostItem } from "@/lib/posts"
+import { TAXONOMY_CACHE_TAGS } from "@/lib/taxonomy-cache"
 import { getUserDisplayName } from "@/lib/user-display"
 
 
@@ -44,60 +46,11 @@ export interface SiteBoardItem {
   postListLoadMode: PostListLoadMode
 }
 
+type ActiveBoardRecord = Awaited<ReturnType<typeof findActiveBoardsWithZoneAndPostCount>>[number]
+type BoardBySlugRecord = NonNullable<Awaited<ReturnType<typeof findBoardBySlugWithZoneAndPostCount>>>
+type SiteBoardRecord = ActiveBoardRecord | BoardBySlugRecord
 
-const getCachedBoards = cache(async (): Promise<SiteBoardItem[]> => {
-  const boards = await findActiveBoardsWithZoneAndPostCount()
-
-
-  return boards.map((board) => {
-    const settings = resolveBoardSettings(board.zone, board)
-    const sidebarConfig = normalizeBoardSidebarConfig(board.configJson)
-
-    return {
-      id: board.id,
-      zoneId: board.zoneId,
-      name: board.name,
-      slug: board.slug,
-      icon: board.iconPath ?? "💬",
-      description: board.description ?? `${board.name} 节点讨论区`,
-      sidebarLinks: sidebarConfig.links,
-      rulesMarkdown: sidebarConfig.rulesMarkdown,
-      count: board._count.posts,
-      allowedPostTypes: settings.allowedPostTypes,
-      requirePostReview: settings.requirePostReview,
-      requireCommentReview: settings.requireCommentReview,
-      minViewPoints: settings.minViewPoints,
-      minViewLevel: settings.minViewLevel,
-      minPostPoints: settings.minPostPoints,
-      minPostLevel: settings.minPostLevel,
-      minReplyPoints: settings.minReplyPoints,
-      minReplyLevel: settings.minReplyLevel,
-      minViewVipLevel: settings.minViewVipLevel,
-
-      minPostVipLevel: settings.minPostVipLevel,
-      minReplyVipLevel: settings.minReplyVipLevel,
-      postListDisplayMode: resolvePostListDisplayMode(board.zone?.postListDisplayMode, board.postListDisplayMode),
-      postListLoadMode: resolvePostListLoadMode(board.zone?.postListLoadMode, board.postListLoadMode),
-    }
-  })
-})
-
-export async function getBoards(): Promise<SiteBoardItem[]> {
-  return getCachedBoards()
-}
-
-export async function getFeaturedBoards(limit: number): Promise<SiteBoardItem[]> {
-  const boards = await getCachedBoards()
-  return boards.slice(0, Math.max(0, limit))
-}
-
-const getCachedBoardBySlug = cache(async (slug: string): Promise<SiteBoardItem | null> => {
-  const board = await findBoardBySlugWithZoneAndPostCount(slug)
-
-  if (!board) {
-    return null
-  }
-
+function mapSiteBoard(board: SiteBoardRecord): SiteBoardItem {
   const settings = resolveBoardSettings(board.zone, board)
   const sidebarConfig = normalizeBoardSidebarConfig(board.configJson)
 
@@ -112,6 +65,7 @@ const getCachedBoardBySlug = cache(async (slug: string): Promise<SiteBoardItem |
     rulesMarkdown: sidebarConfig.rulesMarkdown,
     count: board._count.posts,
     allowedPostTypes: settings.allowedPostTypes,
+    requirePostReview: settings.requirePostReview,
     requireCommentReview: settings.requireCommentReview,
     minViewPoints: settings.minViewPoints,
     minViewLevel: settings.minViewLevel,
@@ -120,17 +74,47 @@ const getCachedBoardBySlug = cache(async (slug: string): Promise<SiteBoardItem |
     minReplyPoints: settings.minReplyPoints,
     minReplyLevel: settings.minReplyLevel,
     minViewVipLevel: settings.minViewVipLevel,
-
     minPostVipLevel: settings.minPostVipLevel,
     minReplyVipLevel: settings.minReplyVipLevel,
-    requirePostReview: settings.requirePostReview,
     postListDisplayMode: resolvePostListDisplayMode(board.zone?.postListDisplayMode, board.postListDisplayMode),
     postListLoadMode: resolvePostListLoadMode(board.zone?.postListLoadMode, board.postListLoadMode),
   }
-})
+}
+
+const getPersistentBoards = unstable_cache(
+  async (): Promise<SiteBoardItem[]> => {
+    const boards = await findActiveBoardsWithZoneAndPostCount()
+    return boards.map((board) => mapSiteBoard(board))
+  },
+  ["boards:list"],
+  { tags: [...TAXONOMY_CACHE_TAGS] },
+)
+
+const getPersistentBoardBySlug = unstable_cache(
+  async (slug: string): Promise<SiteBoardItem | null> => {
+    const board = await findBoardBySlugWithZoneAndPostCount(slug)
+
+    if (!board) {
+      return null
+    }
+
+    return mapSiteBoard(board)
+  },
+  ["boards:by-slug"],
+  { tags: [...TAXONOMY_CACHE_TAGS] },
+)
+
+export async function getBoards(): Promise<SiteBoardItem[]> {
+  return getPersistentBoards()
+}
+
+export async function getFeaturedBoards(limit: number): Promise<SiteBoardItem[]> {
+  const boards = await getPersistentBoards()
+  return boards.slice(0, Math.max(0, limit))
+}
 
 export async function getBoardBySlug(slug: string): Promise<SiteBoardItem | null> {
-  return getCachedBoardBySlug(slug)
+  return getPersistentBoardBySlug(slug)
 }
 
 export interface BoardModeratorItem {

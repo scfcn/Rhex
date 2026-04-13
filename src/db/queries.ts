@@ -1,4 +1,5 @@
 import type { Prisma } from "@/db/types"
+import { postAttachmentSelect } from "@/db/post-attachment-queries"
 
 
 export const postListInclude = {
@@ -81,6 +82,12 @@ const postDetailBaseInclude = {
     orderBy: {
       sortOrder: "asc",
     },
+  },
+  attachments: {
+    orderBy: {
+      sortOrder: "asc",
+    },
+    select: postAttachmentSelect,
   },
 } satisfies Prisma.PostInclude
 

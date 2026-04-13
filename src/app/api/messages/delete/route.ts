@@ -1,20 +1,24 @@
 import { apiSuccess, createUserRouteHandler, readJsonBody, requireStringField } from "@/lib/api-route"
 import { deleteConversationForUser } from "@/lib/messages"
 import { logRouteWriteSuccess } from "@/lib/route-metadata"
+import { revalidateUserSurfaceCache } from "@/lib/user-surface"
+import { createRequestWriteGuardOptions } from "@/lib/write-guard-policies"
 import { withRequestWriteGuard } from "@/lib/write-guard"
 
 export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   const body = await readJsonBody(request)
   const conversationId = requireStringField(body, "conversationId", "缺少会话信息")
 
-  return withRequestWriteGuard({
+  return withRequestWriteGuard(createRequestWriteGuardOptions("messages-delete", {
     request,
     userId: currentUser.id,
-    scope: "messages-delete",
-    cooldownMs: 1_000,
-    dedupeKey: `${currentUser.id}:${conversationId}`,
-  }, async () => {
+    input: {
+      conversationId,
+    },
+  }), async () => {
     await deleteConversationForUser(conversationId, currentUser.id)
+
+    revalidateUserSurfaceCache(currentUser.id)
 
     logRouteWriteSuccess({
       scope: "messages-delete",

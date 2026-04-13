@@ -4,25 +4,24 @@ import { ArrowRight, CheckCircle2, Crown, Flame, Heart, MessageSquareText, Recei
 
 import { ChangeType } from "@/db/types"
 import { BadgeCenter } from "@/components/badge-center"
-import { BoardApplicationPanel } from "@/components/board-application-panel"
-import { BrowsingSettingsPanel } from "@/components/browsing-settings-panel"
+import { BoardApplicationPanel } from "@/components/board/board-application-panel"
+import { BrowsingSettingsPanel } from "@/components/profile/browsing-settings-panel"
 import { InviteCodePurchaseCard } from "@/components/invite-code-purchase-card"
 import { InviteLinkCopyButton } from "@/components/invite-link-copy-button"
 import { LevelBadge } from "@/components/level-badge"
-import { FavoriteCollectionManager } from "@/components/favorite-collection-manager"
-import { PostListLink } from "@/components/post-list-link"
-import { ProfileAccountBindingSettings } from "@/components/profile-account-binding-settings"
-import { ProfileEditForm } from "@/components/profile-edit-form"
-import { ProfileNotificationSettings } from "@/components/profile-notification-settings"
-import { ReadingHistoryPanel } from "@/components/reading-history-panel"
+import { FavoriteCollectionManager } from "@/components/collection/favorite-collection-manager"
+import { ForumPostStream } from "@/components/forum/forum-post-stream"
+import { ProfileAccountBindingSettings } from "@/components/profile/profile-account-binding-settings"
+import { ProfileEditForm } from "@/components/profile/profile-edit-form"
+import { ProfileNotificationSettings } from "@/components/profile/profile-notification-settings"
+import { ReadingHistoryPanel } from "@/components/post/reading-history-panel"
 import { RedeemCodeCard } from "@/components/redeem-code-card"
-import { SettingsTabs } from "@/components/settings-tabs"
-import { UserRecentRepliesList } from "@/components/user-recent-replies-list"
-import { UserBlockToggleButton } from "@/components/user-block-toggle-button"
+import { SettingsTabs } from "@/components/settings/settings-tabs"
+import { UserRecentRepliesList } from "@/components/user/user-recent-replies-list"
+import { UserBlockToggleButton } from "@/components/user/user-block-toggle-button"
 import { VerificationCenter } from "@/components/verification-center"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatDateTime, formatNumber } from "@/lib/formatters"
-import { getPostPath } from "@/lib/post-links"
 import type { SettingsPageData } from "@/app/settings/settings-page-loader"
 import { followTabs, postManagementTabs, profileTabs } from "@/app/settings/settings-page-loader"
 
@@ -74,6 +73,7 @@ export function SettingsPageContent({ data }: { data: SettingsPageData }) {
           favoritePosts={data.favoritePosts}
           favoriteCollections={data.favoriteCollections}
           likedPosts={data.likedPosts}
+          listDisplayMode={settings.homeFeedPostListDisplayMode}
           postLinkDisplayMode={settings.postLinkDisplayMode}
         />
       ) : null}
@@ -121,7 +121,7 @@ export function SettingsPageContent({ data }: { data: SettingsPageData }) {
           followedTags={data.followedTags}
           followedPosts={data.followedPosts}
           blockedUsers={data.blockedUsers}
-          postLinkDisplayMode={settings.postLinkDisplayMode}
+          listDisplayMode={settings.homeFeedPostListDisplayMode}
         />
       ) : null}
     </>
@@ -313,6 +313,7 @@ function PostManagementPanel({
   favoritePosts,
   favoriteCollections,
   likedPosts,
+  listDisplayMode,
   postLinkDisplayMode,
 }: {
   currentTab: SettingsPageData["route"]["currentPostTab"]
@@ -321,6 +322,7 @@ function PostManagementPanel({
   favoritePosts: SettingsPageData["favoritePosts"]
   favoriteCollections: SettingsPageData["favoriteCollections"]
   likedPosts: SettingsPageData["likedPosts"]
+  listDisplayMode: SettingsPageData["settings"]["homeFeedPostListDisplayMode"]
   postLinkDisplayMode: "SLUG" | "ID"
 }) {
   return (
@@ -335,11 +337,11 @@ function PostManagementPanel({
         </CardHeader>
       </Card>
 
-      {currentTab === "posts" ? <MyPostsPanel userPosts={userPosts} postLinkDisplayMode={postLinkDisplayMode} /> : null}
+      {currentTab === "posts" ? <MyPostsPanel userPosts={userPosts} listDisplayMode={listDisplayMode} /> : null}
       {currentTab === "replies" ? <MyRepliesPanel replies={replies} postLinkDisplayMode={postLinkDisplayMode} /> : null}
-      {currentTab === "favorites" ? <FavoritesPanel favoritePosts={favoritePosts} postLinkDisplayMode={postLinkDisplayMode} /> : null}
+      {currentTab === "favorites" ? <FavoritesPanel favoritePosts={favoritePosts} listDisplayMode={listDisplayMode} /> : null}
       {currentTab === "collections" ? <CollectionsPanel favoriteCollections={favoriteCollections} /> : null}
-      {currentTab === "likes" ? <MyLikesPanel likedPosts={likedPosts} postLinkDisplayMode={postLinkDisplayMode} /> : null}
+      {currentTab === "likes" ? <MyLikesPanel likedPosts={likedPosts} listDisplayMode={listDisplayMode} /> : null}
     </div>
   )
 }
@@ -359,14 +361,14 @@ function LevelPanel({ levelView, pointName }: { levelView: SettingsPageData["lev
         <CardContent className="p-6 md:p-8">
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/70 px-3 py-1 text-[11px] font-medium text-slate-700 backdrop-blur dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/70 px-3 py-1 text-[11px] font-medium text-slate-700 backdrop-blur-sm dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
                 <Sparkles className="h-3.5 w-3.5" />
                 我的成长等级
               </div>
               <h2 className="mt-4 text-3xl font-semibold tracking-tight">当前已达到 Lv.{levelView.currentLevel.level}</h2>
               <p className="mt-2 text-sm leading-7 text-muted-foreground">这里会展示你当前等级、成长进度，以及升级到下一等级还差哪些条件。</p>
             </div>
-            <div className="rounded-[28px] border border-white/60 bg-white/75 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5">
+            <div className="rounded-[28px] border border-white/60 bg-white/75 p-5 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/5">
               <LevelBadge
                 level={levelView.currentLevel.level}
                 name={levelView.currentLevel.name}
@@ -448,7 +450,13 @@ function LevelPanel({ levelView, pointName }: { levelView: SettingsPageData["lev
   )
 }
 
-function MyPostsPanel({ userPosts, postLinkDisplayMode }: { userPosts: SettingsPageData["userPosts"]; postLinkDisplayMode: "SLUG" | "ID" }) {
+function MyPostsPanel({
+  userPosts,
+  listDisplayMode,
+}: {
+  userPosts: SettingsPageData["userPosts"]
+  listDisplayMode: SettingsPageData["settings"]["homeFeedPostListDisplayMode"]
+}) {
   if (!userPosts) {
     return (
       <Card>
@@ -457,7 +465,7 @@ function MyPostsPanel({ userPosts, postLinkDisplayMode }: { userPosts: SettingsP
     )
   }
 
-  return <PostListPanel title="我的帖子" emptyText="当前还没有发布过帖子。" posts={userPosts} postLinkDisplayMode={postLinkDisplayMode} paginationBase="/settings?tab=post-management&postTab=posts" />
+  return <PostListPanel title="我的帖子" emptyText="当前还没有发布过帖子。" posts={userPosts} listDisplayMode={listDisplayMode} paginationBase="/settings?tab=post-management&postTab=posts" />
 }
 
 function MyRepliesPanel({ replies, postLinkDisplayMode }: { replies: SettingsPageData["replies"]; postLinkDisplayMode: "SLUG" | "ID" }) {
@@ -501,7 +509,7 @@ function FollowsPanel({
   followedTags,
   followedPosts,
   blockedUsers,
-  postLinkDisplayMode,
+  listDisplayMode,
 }: {
   currentTab: SettingsPageData["route"]["currentFollowTab"]
   followedBoards: SettingsPageData["followedBoards"]
@@ -510,7 +518,7 @@ function FollowsPanel({
   followedTags: SettingsPageData["followedTags"]
   followedPosts: SettingsPageData["followedPosts"]
   blockedUsers: SettingsPageData["blockedUsers"]
-  postLinkDisplayMode: "SLUG" | "ID"
+  listDisplayMode: SettingsPageData["settings"]["homeFeedPostListDisplayMode"]
 }) {
   return (
     <div className="space-y-4">
@@ -528,7 +536,7 @@ function FollowsPanel({
       {currentTab === "users" ? <FollowUsersPanel followedUsers={followedUsers} /> : null}
       {currentTab === "followers" ? <FollowersPanel followers={followers} /> : null}
       {currentTab === "tags" ? <FollowTagsPanel followedTags={followedTags} /> : null}
-      {currentTab === "posts" ? <FollowPostsPanel followedPosts={followedPosts} postLinkDisplayMode={postLinkDisplayMode} /> : null}
+      {currentTab === "posts" ? <FollowPostsPanel followedPosts={followedPosts} listDisplayMode={listDisplayMode} /> : null}
       {currentTab === "history" ? <ReadingHistoryTabPanel /> : null}
       {currentTab === "blocks" ? <BlockedUsersPanel blockedUsers={blockedUsers} /> : null}
     </div>
@@ -758,7 +766,13 @@ function FollowTagsPanel({ followedTags }: { followedTags: SettingsPageData["fol
   )
 }
 
-function FollowPostsPanel({ followedPosts, postLinkDisplayMode }: { followedPosts: SettingsPageData["followedPosts"]; postLinkDisplayMode: "SLUG" | "ID" }) {
+function FollowPostsPanel({
+  followedPosts,
+  listDisplayMode,
+}: {
+  followedPosts: SettingsPageData["followedPosts"]
+  listDisplayMode: SettingsPageData["settings"]["homeFeedPostListDisplayMode"]
+}) {
   if (!followedPosts) {
     return (
       <Card>
@@ -767,7 +781,7 @@ function FollowPostsPanel({ followedPosts, postLinkDisplayMode }: { followedPost
     )
   }
 
-  return <PostListPanel title="关注帖子" emptyText="当前还没有关注任何帖子。" posts={followedPosts} postLinkDisplayMode={postLinkDisplayMode} paginationBase="/settings?tab=follows&followTab=posts" />
+  return <PostListPanel title="关注帖子" emptyText="当前还没有关注任何帖子。" posts={followedPosts} listDisplayMode={listDisplayMode} paginationBase="/settings?tab=follows&followTab=posts" />
 }
 
 function BlockedUsersPanel({ blockedUsers }: { blockedUsers: SettingsPageData["blockedUsers"] }) {
@@ -831,7 +845,13 @@ function BlockedUsersPanel({ blockedUsers }: { blockedUsers: SettingsPageData["b
   )
 }
 
-function FavoritesPanel({ favoritePosts, postLinkDisplayMode }: { favoritePosts: SettingsPageData["favoritePosts"]; postLinkDisplayMode: "SLUG" | "ID" }) {
+function FavoritesPanel({
+  favoritePosts,
+  listDisplayMode,
+}: {
+  favoritePosts: SettingsPageData["favoritePosts"]
+  listDisplayMode: SettingsPageData["settings"]["homeFeedPostListDisplayMode"]
+}) {
   if (!favoritePosts) {
     return (
       <Card>
@@ -840,14 +860,20 @@ function FavoritesPanel({ favoritePosts, postLinkDisplayMode }: { favoritePosts:
     )
   }
 
-  return <PostListPanel title="我的收藏" emptyText="当前还没有收藏的帖子。" posts={favoritePosts} postLinkDisplayMode={postLinkDisplayMode} paginationBase="/settings?tab=post-management&postTab=favorites" />
+  return <PostListPanel title="我的收藏" emptyText="当前还没有收藏的帖子。" posts={favoritePosts} listDisplayMode={listDisplayMode} paginationBase="/settings?tab=post-management&postTab=favorites" />
 }
 
 function CollectionsPanel({ favoriteCollections }: { favoriteCollections: SettingsPageData["favoriteCollections"] }) {
   return <FavoriteCollectionManager initialData={favoriteCollections} />
 }
 
-function MyLikesPanel({ likedPosts, postLinkDisplayMode }: { likedPosts: SettingsPageData["likedPosts"]; postLinkDisplayMode: "SLUG" | "ID" }) {
+function MyLikesPanel({
+  likedPosts,
+  listDisplayMode,
+}: {
+  likedPosts: SettingsPageData["likedPosts"]
+  listDisplayMode: SettingsPageData["settings"]["homeFeedPostListDisplayMode"]
+}) {
   if (!likedPosts) {
     return (
       <Card>
@@ -856,20 +882,20 @@ function MyLikesPanel({ likedPosts, postLinkDisplayMode }: { likedPosts: Setting
     )
   }
 
-  return <PostListPanel title="我的点赞" emptyText="当前还没有点赞过帖子。" posts={likedPosts} postLinkDisplayMode={postLinkDisplayMode} paginationBase="/settings?tab=post-management&postTab=likes" />
+  return <PostListPanel title="我的点赞" emptyText="当前还没有点赞过帖子。" posts={likedPosts} listDisplayMode={listDisplayMode} paginationBase="/settings?tab=post-management&postTab=likes" />
 }
 
 function PostListPanel({
   title,
   emptyText,
   posts,
-  postLinkDisplayMode,
+  listDisplayMode,
   paginationBase,
 }: {
   title: string
   emptyText: string
   posts: NonNullable<SettingsPageData["userPosts"]>
-  postLinkDisplayMode: "SLUG" | "ID"
+  listDisplayMode: SettingsPageData["settings"]["homeFeedPostListDisplayMode"]
   paginationBase: string
 }) {
   return (
@@ -882,23 +908,7 @@ function PostListPanel({
       </CardHeader>
       <CardContent className="space-y-4">
         {posts.items.length === 0 ? <p className="text-sm text-muted-foreground">{emptyText}</p> : null}
-        {posts.items.map((post) => {
-          const postPath = getPostPath({ id: post.id, slug: post.slug }, { mode: postLinkDisplayMode })
-
-          return (
-            <div key={post.id} className="rounded-[20px] border border-border bg-card p-4 transition-colors hover:bg-accent/40">
-              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span>{post.board}</span>
-                <span>·</span>
-                <span>{post.publishedAt}</span>
-              </div>
-              <PostListLink href={postPath} visitedPath={postPath} dimWhenRead className="mt-2 inline-block">
-                <h2 className="text-base font-semibold">{post.title}</h2>
-              </PostListLink>
-              <p className="mt-2 text-sm text-muted-foreground">{post.excerpt}</p>
-            </div>
-          )
-        })}
+        {posts.items.length > 0 ? <ForumPostStream posts={posts.items} showBoard listDisplayMode={listDisplayMode} /> : null}
 
         {posts.total > 0 ? (
           <CursorPaginationBar
@@ -963,7 +973,7 @@ function PointsPanel({ pointLogs, currentPoints, pointName }: { pointLogs: Setti
                   </span>
                 </div>
                 {log.pointEffect ? (
-                  <div className="mt-3 rounded-[18px] border border-amber-200 bg-amber-50/70 p-3">
+                  <div className="mt-3 rounded-[18px] border border-amber-200 p-3">
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 font-medium text-amber-800">
                         <Sparkles className="h-3.5 w-3.5" />

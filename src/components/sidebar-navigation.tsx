@@ -4,6 +4,8 @@ import Link from "next/link"
 import { ChevronLeft } from "lucide-react"
 
 import { LevelIcon } from "@/components/level-icon"
+import type { LeftSidebarDisplayMode } from "@/lib/site-settings"
+import { cn } from "@/lib/utils"
 
 interface SidebarZoneItem {
   id: string
@@ -33,26 +35,62 @@ interface SidebarNavigationProps {
   boards: SidebarBoardItem[]
   activeZoneSlug?: string
   activeBoardSlug?: string
+  displayMode?: LeftSidebarDisplayMode
   collapsed?: boolean
   onToggle?: () => void
 }
 
-export function SidebarNavigation({ zones, boards, activeZoneSlug, activeBoardSlug, collapsed = false, onToggle }: SidebarNavigationProps) {
+export function SidebarNavigation({
+  zones,
+  boards,
+  activeZoneSlug,
+  activeBoardSlug,
+  displayMode = "DEFAULT",
+  collapsed = false,
+  onToggle,
+}: SidebarNavigationProps) {
+  if (displayMode === "HIDDEN") {
+    return null
+  }
+
+  const isDocked = displayMode === "DOCKED"
   const baseItemClass = "flex items-center gap-3 rounded-md px-4 py-2 text-sm transition-colors"
-  const activeItemClass = "bg-[linear-gradient(135deg,rgba(255,255,255,0.1)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.08)_50%,rgba(255,255,255,0.08)_75%,transparent_75%,transparent)] bg-[length:8px_8px] font-medium text-foreground"
+  const activeItemClass = "bg-[linear-gradient(135deg,rgba(255,255,255,0.1)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.08)_50%,rgba(255,255,255,0.08)_75%,transparent_75%,transparent)] bg-size-[8px_8px] font-medium text-foreground"
   const inactiveItemClass = "text-muted-foreground hover:bg-accent hover:text-foreground"
   const visibleZones = zones.filter((zone) => !zone.hiddenFromSidebar)
 
   return (
-    <div className="forum-page-sidebar hidden lg:-ml-2 lg:block">
-      <aside className="forum-page-sidebar-inner sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto py-1 pr-4">
-        <div className="space-y-6 py-4">
-          <div>
+    <div
+      className={cn(
+        "forum-page-sidebar hidden lg:-ml-2 lg:block",
+        isDocked && "forum-page-sidebar-docked lg:ml-0",
+      )}
+      data-sidebar-display-mode={displayMode.toLowerCase()}
+    >
+      {isDocked ? (
+        <button
+          type="button"
+          onClick={onToggle}
+          className="forum-page-sidebar-docked-rail"
+          aria-label={collapsed ? "展开左侧导航" : "收起左侧导航"}
+          title={collapsed ? "展开左侧导航" : "收起左侧导航"}
+        >
+          <ChevronLeft className="forum-page-sidebar-docked-rail-icon h-4 w-4 transition-transform" />
+        </button>
+      ) : null}
+
+      <aside className={cn("forum-page-sidebar-inner sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto py-1 pr-4", isDocked && "forum-page-sidebar-docked-inner")}>
+        <div className="py-4">
+          <div className="mb-6">
             <nav className="space-y-1">
               <div className="forum-page-sidebar-home-row flex items-center gap-2">
                 <Link
                   href="/"
-                  className={`${baseItemClass} forum-page-home-link flex-1 ${!activeZoneSlug && !activeBoardSlug ? activeItemClass : inactiveItemClass}`}
+                  className={cn(
+                    baseItemClass,
+                    "forum-page-home-link flex-1",
+                    !activeZoneSlug && !activeBoardSlug ? activeItemClass : inactiveItemClass,
+                  )}
                   title="首页"
                 >
                   <span className="text-lg">🏠</span>
@@ -68,7 +106,7 @@ export function SidebarNavigation({ zones, boards, activeZoneSlug, activeBoardSl
                   <ChevronLeft className="forum-page-sidebar-toggle-icon h-4 w-4 transition-transform" />
                 </button>
               </div>
-    
+
               {visibleZones.map((zone) => {
                 const isActive = activeZoneSlug === zone.slug
 
@@ -76,13 +114,12 @@ export function SidebarNavigation({ zones, boards, activeZoneSlug, activeBoardSl
                   <Link
                     key={zone.id}
                     href={`/zones/${zone.slug}`}
-                    className={`${baseItemClass} forum-page-sidebar-item ${isActive ? activeItemClass : inactiveItemClass}`}
+                    className={cn(baseItemClass, "forum-page-sidebar-item", isActive ? activeItemClass : inactiveItemClass)}
                     title={zone.name}
                   >
                     <LevelIcon icon={zone.icon} className="h-4 w-4 text-lg" svgClassName="[&>svg]:block" />
                     <span className="forum-page-sidebar-item-label">{zone.name}</span>
                   </Link>
-
                 )
               })}
             </nav>
@@ -104,13 +141,12 @@ export function SidebarNavigation({ zones, boards, activeZoneSlug, activeBoardSl
                   <Link
                     key={board.id}
                     href={`/boards/${board.slug}`}
-                    className={`${baseItemClass} forum-page-sidebar-item ${isActive ? activeItemClass : inactiveItemClass}`}
+                    className={cn(baseItemClass, "forum-page-sidebar-item", isActive ? activeItemClass : inactiveItemClass)}
                     title={board.name}
                   >
                     <LevelIcon icon={board.icon} className="h-4 w-4 text-lg" svgClassName="[&>svg]:block" />
                     <span className="forum-page-sidebar-item-label truncate">{board.name}</span>
                   </Link>
-
                 )
               })}
             </nav>

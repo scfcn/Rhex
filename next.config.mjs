@@ -7,8 +7,10 @@ const projectRoot = path.dirname(fileURLToPath(import.meta.url))
 const nextConfig = {
   reactStrictMode: true,
   productionBrowserSourceMaps:false,
+  serverExternalPackages: ["ioredis", "nodemailer"],
   experimental: {
     serverSourceMaps:false,
+    proxyClientMaxBodySize: "64mb",
   },
   turbopack: {
     root: projectRoot,

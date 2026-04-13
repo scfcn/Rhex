@@ -1,8 +1,9 @@
 "use client"
 
 import { useMemo, useRef, useSyncExternalStore } from "react"
+import { createPortal } from "react-dom"
 
-import { MarkdownEditorHelpDialog } from "@/components/markdown-editor-help-dialog"
+import { MarkdownEditorHelpDialog } from "@/components/post/markdown-editor-help-dialog"
 import { TOOLBAR_TIPS } from "@/components/refined-rich-post-editor/constants"
 import {
   Base64Dialog,
@@ -105,10 +106,10 @@ export function RefinedRichPostEditor({
     closeBase64Dialog: panels.base64Dialog.closeDialog,
   })
 
-  return (
-    <div className={viewState.isFullscreen ? "fixed inset-0 z-50 bg-black/45 p-4 md:p-6" : ""}>
+  const editorShell = (
+    <div className={viewState.isFullscreen ? "fixed inset-0 z-[120] bg-black/45 p-4 md:p-6" : ""}>
       <div className={viewState.isFullscreen ? "flex h-full w-full items-center justify-center" : ""}>
-        <div className={viewState.isFullscreen ? "flex h-full max-h-[96vh] w-full max-w-6xl flex-col overflow-x-hidden overflow-y-visible rounded-[28px] border border-border bg-background shadow-2xl" : "overflow-x-hidden overflow-y-visible rounded-[22px] border border-border bg-card shadow-sm"}>
+        <div className={viewState.isFullscreen ? "flex h-full max-h-[96vh] w-full max-w-6xl flex-col overflow-x-hidden overflow-y-visible rounded-[28px] border border-border bg-background shadow-2xl" : "overflow-x-hidden overflow-y-visible rounded-[22px] border border-border bg-card shadow-xs"}>
           <EditorHeader
             activeTab={viewState.activeTab}
             disabled={disabled}
@@ -189,6 +190,14 @@ export function RefinedRichPostEditor({
           </div>
         </div>
       </div>
+    </div>
+  )
+
+  return (
+    <>
+      {viewState.isFullscreen && isClient
+        ? createPortal(editorShell, document.body)
+        : editorShell}
       <MarkdownEditorHelpDialog
         open={panels.helpDialog.open}
         onClose={panels.helpDialog.closeDialog}
@@ -207,6 +216,7 @@ export function RefinedRichPostEditor({
         open={panels.mediaPanel.open}
         isClient={isClient}
         disabled={disabled}
+        anchorRef={panels.mediaPanel.buttonRef}
         position={panels.mediaPanel.position}
         ready={panels.mediaPanel.ready}
         panelRef={panels.mediaPanel.panelRef}
@@ -220,6 +230,7 @@ export function RefinedRichPostEditor({
         open={panels.linkPanel.open}
         isClient={isClient}
         disabled={disabled}
+        anchorRef={panels.linkPanel.buttonRef}
         position={panels.linkPanel.position}
         ready={panels.linkPanel.ready}
         panelRef={panels.linkPanel.panelRef}
@@ -235,12 +246,10 @@ export function RefinedRichPostEditor({
         open={panels.tablePanel.open}
         isClient={isClient}
         disabled={disabled}
+        anchorRef={panels.tablePanel.buttonRef}
         position={panels.tablePanel.position}
         ready={panels.tablePanel.ready}
         panelRef={panels.tablePanel.panelRef}
-        hoverSize={panels.tablePanel.hoverSize}
-        hint={panels.tablePanel.hint}
-        onHoverChange={panels.tablePanel.setHoverSize}
         onClose={panels.tablePanel.close}
         onSelect={commands.handleInsertTable}
       />
@@ -248,10 +257,12 @@ export function RefinedRichPostEditor({
         open={panels.emojiPanel.open}
         isClient={isClient}
         disabled={disabled}
+        anchorRef={panels.emojiPanel.buttonRef}
         position={panels.emojiPanel.position}
         ready={panels.emojiPanel.ready}
         panelRef={panels.emojiPanel.panelRef}
         markdownEmojiMap={markdownEmojiMap}
+        onClose={panels.emojiPanel.close}
         onSelect={(shortcode) => {
           commands.handleEmojiSelect(shortcode)
           panels.emojiPanel.close()
@@ -261,6 +272,7 @@ export function RefinedRichPostEditor({
         open={panels.imagePanel.open}
         isClient={isClient}
         disabled={disabled}
+        anchorRef={panels.imagePanel.buttonRef}
         position={panels.imagePanel.position}
         ready={panels.imagePanel.ready}
         panelRef={panels.imagePanel.panelRef}
@@ -278,6 +290,6 @@ export function RefinedRichPostEditor({
         onContinueUpload={panels.imagePanel.continueUpload}
         onConfirmRemote={commands.handleInsertRemoteImage}
       />
-    </div>
+    </>
   )
 }

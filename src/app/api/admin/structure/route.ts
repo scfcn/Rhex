@@ -2,6 +2,7 @@ import { apiSuccess, createAdminRouteHandler, readJsonBody } from "@/lib/api-rou
 
 import { getRequestIp, writeAdminLog } from "@/lib/admin"
 import { createStructureItem, deleteStructureItem, updateStructureItem } from "@/lib/admin-structure-service"
+import { revalidateTaxonomyStructureCache } from "@/lib/taxonomy-cache"
 
 export const POST = createAdminRouteHandler(async ({ request, adminUser }) => {
   const body = await readJsonBody(request)
@@ -12,6 +13,7 @@ export const POST = createAdminRouteHandler(async ({ request, adminUser }) => {
   })
 
   await writeAdminLog(adminUser.id, result.action, result.targetType, result.targetId, result.detail, getRequestIp(request))
+  revalidateTaxonomyStructureCache()
   return apiSuccess(result.data, result.message)
 }, {
   errorMessage: "创建结构失败",
@@ -29,6 +31,7 @@ export const PUT = createAdminRouteHandler(async ({ request, adminUser }) => {
   })
 
   await writeAdminLog(adminUser.id, result.action, result.targetType, result.targetId, result.detail, getRequestIp(request))
+  revalidateTaxonomyStructureCache()
   return apiSuccess(undefined, result.message)
 }, {
   errorMessage: "更新结构失败",
@@ -47,6 +50,7 @@ export const DELETE = createAdminRouteHandler(async ({ request, adminUser }) => 
   })
 
   await writeAdminLog(adminUser.id, result.action, result.targetType, result.targetId, result.detail, getRequestIp(request))
+  revalidateTaxonomyStructureCache()
   return apiSuccess(undefined, result.message)
 }, {
   errorMessage: "删除结构失败",

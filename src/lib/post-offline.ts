@@ -114,6 +114,7 @@ export async function offlineOwnPost(input: { postId: string; reason?: string | 
     })
 
     return {
+      userId: latestUser.id,
       post: updated,
       price: latestPrice,
       pointName: settings.pointName,

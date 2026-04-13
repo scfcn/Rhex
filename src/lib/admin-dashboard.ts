@@ -88,6 +88,7 @@ export interface AdminStructureData {
     icon: string
     sortOrder: number
     hiddenFromSidebar: boolean
+    showInHomeFeed: boolean
     boardCount: number
     postCount: number
     followerCount: number
@@ -127,6 +128,8 @@ export interface AdminStructureData {
     treasuryPoints: number
     zoneId: string | null
     zoneName: string | null
+    showInHomeFeed: boolean | null
+    effectiveShowInHomeFeed: boolean
     icon: string
     sortOrder: number
     postPointDelta: number | null
@@ -266,6 +269,7 @@ export function mapAdminStructureData(data: AdminStructureRawData, actor: AdminA
         icon: zone.icon ?? "📚",
         sortOrder: zone.sortOrder,
         hiddenFromSidebar: zone.hiddenFromSidebar,
+        showInHomeFeed: settings.showInHomeFeed,
         boardCount: zone._count.boards,
         postCount: relatedBoards.reduce((total, board) => total + board.postCount, 0),
         followerCount: relatedBoards.reduce((total, board) => total + board.followerCount, 0),
@@ -291,6 +295,7 @@ export function mapAdminStructureData(data: AdminStructureRawData, actor: AdminA
       }
     }),
     boardStatus: data.boards.map((board) => {
+      const settings = resolveBoardSettings(board.zone, board)
       const sidebarConfig = normalizeBoardSidebarConfig(board.configJson)
 
       return {
@@ -309,6 +314,8 @@ export function mapAdminStructureData(data: AdminStructureRawData, actor: AdminA
         treasuryPoints: board.treasuryPoints,
         zoneId: board.zoneId ?? null,
         zoneName: board.zone?.name ?? null,
+        showInHomeFeed: board.showInHomeFeed ?? null,
+        effectiveShowInHomeFeed: settings.showInHomeFeed,
         icon: board.iconPath ?? "💬",
         sortOrder: board.sortOrder,
         postPointDelta: board.postPointDelta ?? null,

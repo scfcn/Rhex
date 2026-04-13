@@ -2,6 +2,7 @@ import { togglePostFavorite } from "@/db/interaction-queries"
 import {  apiSuccess, createUserRouteHandler, readJsonBody, requireStringField } from "@/lib/api-route"
 import { handlePostFavoriteSideEffects } from "@/lib/interaction-side-effects"
 import { logRequestSucceeded } from "@/lib/request-log"
+import { revalidateUserSurfaceCache } from "@/lib/user-surface"
 
 export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   const body = await readJsonBody(request)
@@ -17,6 +18,8 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     postId,
     userId: currentUser.id,
   })
+
+  revalidateUserSurfaceCache(currentUser.id)
 
   logRequestSucceeded({
     scope: "posts-favorite",

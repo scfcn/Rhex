@@ -16,9 +16,11 @@ import {
   recordSuccessfulExternalLoginByUserId,
   runExternalAuthTransaction,
 } from "@/db/external-auth-user-queries"
+import { findUserByNicknameInsensitive } from "@/db/user-queries"
 import { apiError } from "@/lib/api-route"
 import { getExternalAuthProviderLabel } from "@/lib/auth-provider-config"
 import { createSystemNotification } from "@/lib/notification-writes"
+import { revalidateHomeSidebarStatsCache } from "@/lib/home-sidebar-stats"
 import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
 import { getRequestIp } from "@/lib/request-ip"
 import { createSessionToken, getSessionCookieName, getSessionCookieOptions } from "@/lib/session"
@@ -97,6 +99,10 @@ async function createUserFromIdentity(input: {
 
   if (!(await isUsernameAvailable(input.username))) {
     apiError(409, "用户名已存在")
+  }
+
+  if (await findUserByNicknameInsensitive(input.username)) {
+    apiError(409, "昵称已被使用，请更换用户名")
   }
 
   const email = trimNormalizedEmail(input.identity.providerEmail)
@@ -257,6 +263,8 @@ async function createUserFromIdentity(input: {
 
     return createdUser
   })
+
+  revalidateHomeSidebarStatsCache()
 
   return user
 }

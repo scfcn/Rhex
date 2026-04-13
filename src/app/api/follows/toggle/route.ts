@@ -2,6 +2,7 @@ import { toggleFollowTarget } from "@/db/follow-queries"
 import { apiError, apiSuccess, createUserRouteHandler, readJsonBody, requireStringField } from "@/lib/api-route"
 import { enqueueUserFollowedNotification } from "@/lib/follow-notifications"
 import { getFollowTargetCopy, normalizeFollowTargetType } from "@/lib/follows"
+import { revalidateUserSurfaceCache } from "@/lib/user-surface"
 import { ensureUsersCanInteract } from "@/lib/user-blocks"
 import { getUserDisplayName } from "@/lib/users"
 
@@ -54,6 +55,10 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
       followerUserId: currentUser.id,
       followerName: getUserDisplayName(currentUser),
     })
+  }
+
+  if (targetType === "user" && result.changed) {
+    revalidateUserSurfaceCache(Number(targetId))
   }
 
   return apiSuccess(

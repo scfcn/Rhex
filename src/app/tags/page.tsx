@@ -1,8 +1,8 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 
-import { ForumPageShell } from "@/components/forum-page-shell"
-import { HomeSidebarPanels } from "@/components/home-sidebar-panels"
+import { ForumPageShell } from "@/components/forum/forum-page-shell"
+import { HomeSidebarPanels } from "@/components/home/home-sidebar-panels"
 import { SiteHeader } from "@/components/site-header"
 import { Card, CardContent } from "@/components/ui/card"
 import { getCurrentUser } from "@/lib/auth"
@@ -88,7 +88,7 @@ export default async function TagsPage(props: PageProps<"/tags">) {
           main={(
             <main className="pb-12 py-1 mt-5">
             <div className="space-y-6">
-              <Card className="overflow-hidden border-none bg-gradient-to-r from-[#1f1b16] via-[#2e261f] to-[#382c22] text-white shadow-soft">
+              <Card className="overflow-hidden border-none bg-linear-to-r from-[#1f1b16] via-[#2e261f] to-[#382c22] text-white shadow-soft">
                 <CardContent className="space-y-5 p-8">
                   <div>
                     <p className="text-sm text-white/70">标签广场</p>
@@ -165,7 +165,7 @@ export default async function TagsPage(props: PageProps<"/tags">) {
           )}
           rightSidebar={(
             <aside className="mt-6 hidden pb-12 lg:block">
-              <HomeSidebarPanels user={sidebarUser} hotTopics={hotTopics} siteName={settings.siteName} siteDescription={settings.siteDescription} siteLogoPath={settings.siteLogoPath} />
+              <HomeSidebarPanels user={sidebarUser} hotTopics={hotTopics} siteName={settings.siteName} siteDescription={settings.siteDescription} siteLogoPath={settings.siteLogoPath} siteIconPath={settings.siteIconPath} />
             </aside>
           )}
         />

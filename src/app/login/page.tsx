@@ -2,9 +2,8 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 
-import { LoginForm } from "@/components/login-form"
-import { SiteHeader } from "@/components/site-header"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { AuthPanelNotice, AuthShell } from "@/components/auth/auth-shell"
+import { LoginForm } from "@/components/auth/login-form"
 import { getCurrentUser } from "@/lib/auth"
 import { readSearchParam } from "@/lib/search-params"
 import { getSiteSettings } from "@/lib/site-settings"
@@ -28,27 +27,24 @@ export default async function LoginPage(props: PageProps<"/login">) {
   }
 
   return (
-    <div className="min-h-screen ">
-      <SiteHeader />
-      <main className="mx-auto max-w-[520px] px-4 py-10 lg:px-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>登录论坛</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {authError ? <p className="mb-4 rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">{authError}</p> : null}
-            <LoginForm settings={settings} />
-            <div className="mt-4 space-y-2 text-center text-sm text-muted-foreground">
-              <p>
-                忘记密码？<Link href="/forgot-password" className="font-medium text-foreground hover:underline">找回密码</Link>
-              </p>
-              <p>
-                还没有账户？<Link href="/register" className="font-medium text-foreground hover:underline">去注册</Link>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </main>
-    </div>
+    <AuthShell
+      showcaseName={settings.siteName}
+      showShowcase={settings.authPageShowcaseEnabled}
+      panelTitle="登录论坛"
+      panelDescription="输入用户名和密码，继续你的社区浏览与互动。"
+      beforeForm={authError ? <AuthPanelNotice tone="destructive" title="登录失败">{authError}</AuthPanelNotice> : null}
+      footer={(
+        <div className="grid w-full grid-cols-2 items-center gap-4 text-sm text-muted-foreground">
+          <p>
+            忘记密码？<Link href="/forgot-password" className="font-medium text-foreground hover:underline">找回密码</Link>
+          </p>
+          <p className="justify-self-end">
+            还没有账户？<Link href="/register" className="font-medium text-foreground hover:underline">去注册</Link>
+          </p>
+        </div>
+      )}
+    >
+      <LoginForm settings={settings} />
+    </AuthShell>
   )
 }

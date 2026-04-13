@@ -1,4 +1,4 @@
-import type { Board, Comment, LotteryCondition, LotteryParticipant, LotteryPrize, LotteryWinner, PollOption, PollVote, Post, PostAppendix, User } from "@/db/types"
+import type { Board, Comment, LotteryCondition, LotteryParticipant, LotteryPrize, LotteryWinner, PollOption, PollVote, Post, PostAppendix, PostAttachment, PostAttachmentSourceType, User } from "@/db/types"
 
 
 
@@ -32,6 +32,18 @@ interface PostDetailRelations {
   lotteryConditions: LotteryCondition[]
   lotteryParticipants: LotteryParticipant[]
   appendices: PostAppendix[]
+  attachments: Array<PostAttachment & {
+    upload: {
+      id: string
+      originalName: string
+      fileName: string
+      fileExt: string
+      mimeType: string
+      fileSize: number
+      storagePath: string
+      urlPath: string
+    } | null
+  }>
   likes?: Array<{ userId: number }>
   favorites?: Array<{ userId: number }>
 }
@@ -105,6 +117,19 @@ export interface SitePostItem {
     floor: number
     content: string
     createdAt: string
+  }>
+  attachments?: Array<{
+    id: string
+    sourceType: PostAttachmentSourceType
+    name: string
+    fileExt?: string | null
+    mimeType?: string | null
+    fileSize?: number | null
+    minDownloadLevel: number
+    minDownloadVipLevel: number
+    pointsCost: number
+    requireReplyUnlock: boolean
+    downloadCount: number
   }>
 
   type: LocalPostType
@@ -234,6 +259,21 @@ function mapPostDetail(
         floor: index + 1,
         content: getPublicPostContentText(item.content),
         createdAt: item.createdAt.toISOString(),
+      })),
+    attachments: post.attachments
+      .sort((left, right) => left.sortOrder - right.sortOrder)
+      .map((attachment) => ({
+        id: attachment.id,
+        sourceType: attachment.sourceType,
+        name: attachment.name,
+        fileExt: attachment.fileExt ?? attachment.upload?.fileExt ?? null,
+        mimeType: attachment.mimeType ?? attachment.upload?.mimeType ?? null,
+        fileSize: attachment.fileSize ?? attachment.upload?.fileSize ?? null,
+        minDownloadLevel: attachment.minDownloadLevel,
+        minDownloadVipLevel: attachment.minDownloadVipLevel,
+        pointsCost: attachment.pointsCost,
+        requireReplyUnlock: attachment.requireReplyUnlock,
+        downloadCount: attachment.downloadCount,
       })),
 
     bounty: post.type === "BOUNTY"

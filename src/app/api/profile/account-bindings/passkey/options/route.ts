@@ -20,7 +20,7 @@ export const POST = createUserRouteHandler(async ({ currentUser }) => {
   const response = NextResponse.json(apiSuccess({ options }, "success"))
 
   clearPasskeyCeremonyState(response, "connect")
-  setPasskeyCeremonyState(response, "connect", {
+  await setPasskeyCeremonyState(response, "connect", {
     flow: "connect",
     challenge: options.challenge,
     connectUserId: currentUser.id,

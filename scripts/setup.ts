@@ -38,6 +38,11 @@ const requiredEnvSpecs: RequiredEnvSpec[] = [
     description: "服务端会话签名密钥",
     example: "请替换为足够长的随机字符串",
   },
+  {
+    key: "REDIS_URL",
+    description: "Redis 连接串，用于请求写保护和验证码消费锁",
+    example: "redis://127.0.0.1:6379",
+  },
 ]
 
 function readEnvValue(key: string) {

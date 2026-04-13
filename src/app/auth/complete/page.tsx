@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 
-import { PendingExternalAuthPanel } from "@/components/pending-external-auth-panel"
+import { PendingExternalAuthPanel } from "@/components/auth/pending-external-auth-panel"
 import { SiteHeader } from "@/components/site-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { readPendingExternalAuthState } from "@/lib/auth-flow-state"

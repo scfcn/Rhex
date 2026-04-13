@@ -3,7 +3,7 @@
 import {  useCallback, useMemo, useRef, useState } from "react"
 import { Highlighter, ImagePlus, List, SmilePlus, Table2, TextQuote } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/rbutton"
 import { getMarkdownEditorKeydownResult, type MarkdownEditorUpdate } from "@/lib/markdown-editor-shortcuts"
 import { DEFAULT_MARKDOWN_EMOJI_ITEMS, type MarkdownEmojiItem } from "@/lib/markdown-emoji"
 
@@ -242,7 +242,7 @@ export function RichPostEditor({ value, onChange, placeholder, minHeight = 260 }
         value={value}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={handleTextareaKeyDown}
-        className="w-full min-w-0 rounded-[18px] border border-border bg-background px-3 py-3 text-sm leading-7 outline-none sm:rounded-[20px] sm:px-4"
+        className="w-full min-w-0 rounded-[18px] border border-border bg-background px-3 py-3 text-sm leading-7 outline-hidden sm:rounded-[20px] sm:px-4"
 
         style={{ minHeight }}
         placeholder={placeholder}

@@ -78,7 +78,10 @@ export function findUserStatus(userId: number) {
 export function updateUserPasswordHash(userId: number, passwordHash: string) {
   return prisma.user.update({
     where: { id: userId },
-    data: { passwordHash },
+    data: {
+      passwordHash,
+      sessionInvalidBefore: new Date(),
+    },
   })
 }
 

@@ -15,6 +15,7 @@ import {
   updateUserVip,
 } from "@/db/admin-user-action-queries"
 import { createGrantedUserBadge, findBadgeSummaryById, findGrantedUserBadge, runBadgeTransaction } from "@/db/badge-queries"
+import { findUserByNicknameInsensitive } from "@/db/user-queries"
 import { createSystemNotification } from "@/lib/notification-writes"
 
 import { apiError } from "@/lib/api-route"
@@ -32,6 +33,7 @@ import {
 import { enforceSensitiveText } from "@/lib/content-safety"
 import { parseBusinessDateTime } from "@/lib/formatters"
 import { ensureCanModerateUser, isScopedModerator, isSiteAdmin } from "@/lib/moderator-permissions"
+import { getServerSiteSettings } from "@/lib/site-settings"
 import { mergeUserProfileSettings } from "@/lib/user-profile-settings"
 import { validateProfilePayload } from "@/lib/validators"
 import { normalizeConfigurableVipLevel } from "@/lib/vip-status"
@@ -154,7 +156,10 @@ export const adminUserActionHandlers: Record<string, AdminActionDefinition> = {
     const userId = normalizePositiveUserId(context.targetId)
     if (!userId) apiError(400, "用户标识不合法")
 
-    const currentUser = await findUserUsername(userId)
+    const [currentUser, settings] = await Promise.all([
+      findUserUsername(userId),
+      getServerSiteSettings(),
+    ])
     if (!currentUser) apiError(404, "用户不存在")
 
     const validated = validateProfilePayload({
@@ -163,6 +168,9 @@ export const adminUserActionHandlers: Record<string, AdminActionDefinition> = {
       introduction: readAdminActionString(context.body, "introduction"),
       email: readAdminActionString(context.body, "email"),
       gender: readAdminActionString(context.body, "gender"),
+    }, {
+      nicknameMinLength: settings.registerNicknameMinLength,
+      nicknameMaxLength: settings.registerNicknameMaxLength,
     })
     if (!validated.success || !validated.data) {
       apiError(400, validated.message ?? "资料参数不正确")
@@ -176,6 +184,11 @@ export const adminUserActionHandlers: Record<string, AdminActionDefinition> = {
     const nicknameSafety = await enforceSensitiveText({ scene: "profile.nickname", text: validated.data.nickname })
     const bioSafety = await enforceSensitiveText({ scene: "profile.bio", text: validated.data.bio })
     const introductionSafety = await enforceSensitiveText({ scene: "profile.introduction", text: validated.data.introduction })
+    const existingNicknameUser = await findUserByNicknameInsensitive(nicknameSafety.sanitizedText, userId)
+
+    if (existingNicknameUser) {
+      apiError(409, "昵称已被使用")
+    }
 
     try {
       await updateUserBasicProfile({

@@ -62,7 +62,7 @@ export const POST = createRouteHandler(async ({ request }) => {
 
     clearPasskeyCeremonyState(response, "register")
     clearPendingExternalAuthState(response)
-    setPendingExternalAuthState(response, result.state)
+    await setPendingExternalAuthState(response, result.state)
 
     return response
   }

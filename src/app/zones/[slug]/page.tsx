@@ -3,12 +3,12 @@ import { notFound, redirect } from "next/navigation"
 
 import { AccessDeniedCard } from "@/components/access-denied-card"
 import { CollapsibleInfoCard } from "@/components/collapsible-info-card"
-import { ForumPageShell } from "@/components/forum-page-shell"
-import { ForumPostStream } from "@/components/forum-post-stream"
-import { InfiniteForumPostStream } from "@/components/infinite-forum-post-stream"
+import { ForumPageShell } from "@/components/forum/forum-page-shell"
+import { ForumPostStream } from "@/components/forum/forum-post-stream"
+import { InfiniteForumPostStream } from "@/components/forum/infinite-forum-post-stream"
 import { PageNumberPagination } from "@/components/page-number-pagination"
 
-import { HomeSidebarPanels } from "@/components/home-sidebar-panels"
+import { HomeSidebarPanels } from "@/components/home/home-sidebar-panels"
 import { SiteHeader } from "@/components/site-header"
 
 import { getHomeAnnouncements } from "@/lib/announcements"
@@ -24,7 +24,7 @@ import { readSearchParam } from "@/lib/search-params"
 import { buildMetadataKeywords } from "@/lib/seo"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getZoneBoards, getZoneBySlug, getZonePosts, getZones } from "@/lib/zones"
-import { RssSubscribeButton } from "@/components/rss-subscribe-button"
+import { RssSubscribeButton } from "@/components/rss/rss-subscribe-button"
 
 
 function buildZonePageHref(slug: string, page = 1) {
@@ -84,6 +84,7 @@ export default async function ZonePage(props: PageProps<"/zones/[slug]">) {
     minReplyVipLevel: 0,
     requirePostReview: zone.requirePostReview ?? false,
     requireCommentReview: zone.requireCommentReview ?? false,
+    showInHomeFeed: true,
   }, "view")
 
   const rawPage = readSearchParam(searchParams?.page)
@@ -201,6 +202,7 @@ export default async function ZonePage(props: PageProps<"/zones/[slug]">) {
                 siteName={settings.siteName}
                 siteDescription={settings.siteDescription}
                 siteLogoPath={settings.siteLogoPath}
+                siteIconPath={settings.siteIconPath}
               />
             </aside>
           )}

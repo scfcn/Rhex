@@ -1,4 +1,7 @@
+import { randomUUID } from "crypto"
+
 import { normalizeIp } from "@/lib/request-ip"
+import { persistSessionRecord, readPersistedSessionRecord, revokePersistedSession } from "@/lib/session-store"
 
 const SESSION_COOKIE_NAME = "bbs_session"
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7
@@ -15,23 +18,11 @@ function getSessionSecret() {
 }
 
 function encodeBase64Url(value: string) {
-  const bytes = new TextEncoder().encode(value)
-  let binary = ""
-
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte)
-  })
-
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "")
+  return Buffer.from(value, "utf8").toString("base64url")
 }
 
 function decodeBase64Url(value: string) {
-  const normalized = value.replace(/-/g, "+").replace(/_/g, "/")
-  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=")
-  const binary = atob(padded)
-  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
-
-  return new TextDecoder().decode(bytes)
+  return Buffer.from(value, "base64url").toString("utf8")
 }
 
 async function importSigningKey() {
@@ -73,6 +64,7 @@ export interface SessionUser {
   username: string
   issuedAt: number
   expiresAt: number
+  sessionId?: string
   ip?: string
 }
 
@@ -80,22 +72,7 @@ interface ParseSessionTokenOptions {
   requestIp?: string | null
 }
 
-export async function createSessionToken(username: string, ip?: string | null) {
-  const now = Math.floor(Date.now() / 1000)
-  const normalizedIp = normalizeIp(ip ?? null)
-  const payloadObject: SessionUser = {
-    username,
-    issuedAt: now,
-    expiresAt: now + SESSION_TTL_SECONDS,
-    ...(normalizedIp ? { ip: normalizedIp } : {}),
-  }
-  const payload = encodeBase64Url(JSON.stringify(payloadObject))
-  const signature = await sign(payload)
-
-  return `${payload}.${signature}`
-}
-
-export async function parseSessionToken(token: string | undefined, options?: ParseSessionTokenOptions) {
+async function readSignedSessionPayload(token: string | undefined): Promise<SessionUser | null> {
   if (!token) {
     return null
   }
@@ -141,20 +118,89 @@ export async function parseSessionToken(token: string | undefined, options?: Par
       return null
     }
 
-    const requestIp = normalizeIp(options?.requestIp ?? null)
-    if (sessionIp && requestIp && sessionIp !== requestIp) {
-      return null
-    }
+    const sessionId = typeof parsed.sessionId === "string" ? parsed.sessionId.trim() : ""
 
     return {
       username: parsed.username,
       issuedAt: parsed.issuedAt,
       expiresAt: parsed.expiresAt,
+      ...(sessionId ? { sessionId } : {}),
       ...(sessionIp ? { ip: sessionIp } : {}),
     }
   } catch {
     return null
   }
+}
+
+export async function createSessionToken(username: string, ip?: string | null) {
+  const now = Math.floor(Date.now() / 1000)
+  const normalizedIp = normalizeIp(ip ?? null)
+  const sessionId = randomUUID()
+  const payloadObject: SessionUser = {
+    username,
+    issuedAt: now,
+    expiresAt: now + SESSION_TTL_SECONDS,
+    sessionId,
+    ...(normalizedIp ? { ip: normalizedIp } : {}),
+  }
+  const payload = encodeBase64Url(JSON.stringify(payloadObject))
+  const signature = await sign(payload)
+
+  await persistSessionRecord({
+    sessionId,
+    username,
+    issuedAt: payloadObject.issuedAt,
+    expiresAt: payloadObject.expiresAt,
+    ...(normalizedIp ? { ip: normalizedIp } : {}),
+  })
+
+  return `${payload}.${signature}`
+}
+
+export async function parseSessionToken(token: string | undefined, options?: ParseSessionTokenOptions) {
+  const session = await readSignedSessionPayload(token)
+
+  if (!session) {
+    return null
+  }
+
+  const requestIp = normalizeIp(options?.requestIp ?? null)
+  if (session.ip && requestIp && session.ip !== requestIp) {
+    return null
+  }
+
+  if (session.sessionId) {
+    try {
+      const persistedSession = await readPersistedSessionRecord(session.sessionId)
+
+      if (!persistedSession) {
+        return null
+      }
+
+      if (
+        persistedSession.username !== session.username
+        || persistedSession.issuedAt !== session.issuedAt
+        || persistedSession.expiresAt !== session.expiresAt
+        || (persistedSession.ip ?? null) !== (session.ip ?? null)
+      ) {
+        return null
+      }
+    } catch {
+      return null
+    }
+  }
+
+  return session
+}
+
+export async function revokeSessionToken(token: string | undefined) {
+  const session = await readSignedSessionPayload(token)
+
+  if (!session?.sessionId) {
+    return false
+  }
+
+  return revokePersistedSession(session.sessionId)
 }
 
 export function shouldRenewSession(session: SessionUser, now = Math.floor(Date.now() / 1000)) {
@@ -163,6 +209,22 @@ export function shouldRenewSession(session: SessionUser, now = Math.floor(Date.n
 
 export function getSessionCookieName() {
   return SESSION_COOKIE_NAME
+}
+
+export function readSessionTokenFromCookieHeader(cookieHeader: string | null | undefined) {
+  if (!cookieHeader) {
+    return undefined
+  }
+
+  for (const chunk of cookieHeader.split(/;\s*/)) {
+    const [name, ...valueParts] = chunk.split("=")
+
+    if (name === SESSION_COOKIE_NAME && valueParts.length > 0) {
+      return valueParts.join("=")
+    }
+  }
+
+  return undefined
 }
 
 export function getSessionMaxAge() {

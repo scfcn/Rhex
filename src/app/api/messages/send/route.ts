@@ -1,6 +1,8 @@
 import { apiSuccess, createUserRouteHandler, readJsonBody, requireNumberField, readOptionalStringField } from "@/lib/api-route"
 import { sendDirectMessage } from "@/lib/messages"
 import { logRouteWriteSuccess } from "@/lib/route-metadata"
+import { revalidateUserSurfaceCache } from "@/lib/user-surface"
+import { createRequestWriteGuardOptions } from "@/lib/write-guard-policies"
 import { withRequestWriteGuard } from "@/lib/write-guard"
 
 export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
@@ -8,14 +10,18 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   const recipientId = requireNumberField(body, "recipientId", "缺少接收方信息")
   const content = readOptionalStringField(body, "body")
 
-  return withRequestWriteGuard({
+  return withRequestWriteGuard(createRequestWriteGuardOptions("messages-send", {
     request,
     userId: currentUser.id,
-    scope: "messages-send",
-    cooldownMs: 1_000,
-    dedupeKey: `${currentUser.id}:${recipientId}:${content}`,
-  }, async () => {
+    input: {
+      recipientId,
+      body: content,
+    },
+  }), async () => {
     const data = await sendDirectMessage(currentUser.id, recipientId, content)
+
+    revalidateUserSurfaceCache(currentUser.id)
+    revalidateUserSurfaceCache(recipientId)
 
     logRouteWriteSuccess({
       scope: "messages-send",
@@ -26,10 +32,11 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
       extra: {
         conversationId: data.conversationId,
         messageId: data.id,
+        contentAdjusted: data.contentAdjusted,
       },
     })
 
-    return apiSuccess(data, "发送成功")
+    return apiSuccess(data, data.contentAdjusted ? "发送成功，部分内容已自动替换" : "发送成功")
   })
 }, {
   errorMessage: "发送失败",

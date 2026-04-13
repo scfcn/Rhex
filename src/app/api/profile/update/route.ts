@@ -1,6 +1,7 @@
 import { VerificationChannel } from "@/db/types"
 
 import { prisma } from "@/db/client"
+import { findUserByNicknameInsensitive } from "@/db/user-queries"
 import { apiError, apiSuccess, createUserRouteHandler, readJsonBody } from "@/lib/api-route"
 
 import { enforceSensitiveText } from "@/lib/content-safety"
@@ -9,6 +10,7 @@ import { validateProfilePayload } from "@/lib/validators"
 import { verifyCode } from "@/lib/verification"
 import { logRouteWriteSuccess } from "@/lib/route-metadata"
 import { getSiteSettings } from "@/lib/site-settings"
+import { revalidateUserSurfaceCache } from "@/lib/user-surface"
 import { isUserProfileVisibility, mapLegacyVisibilityBoolean, mergeUserProfileSettings, resolveUserProfileSettings, type UserProfileVisibility } from "@/lib/user-profile-settings"
 import { resolveVipTierPrice } from "@/lib/vip-tier-pricing"
 
@@ -59,8 +61,12 @@ function toProfileUpdateResponse(input: {
 export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ request, currentUser }) => {
 
   const body = await readJsonBody(request)
+  const settings = await getSiteSettings()
 
-  const validated = validateProfilePayload(body)
+  const validated = validateProfilePayload(body, {
+    nicknameMinLength: settings.registerNicknameMinLength,
+    nicknameMaxLength: settings.registerNicknameMaxLength,
+  })
 
   if (!validated.success || !validated.data) {
     apiError(400, validated.message ?? "参数错误")
@@ -74,23 +80,20 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
   const avatarPath = typeof body.avatarPath === "string" ? body.avatarPath.trim() : ""
   const emailCode = typeof body.emailCode === "string" ? body.emailCode.trim() : ""
 
-  const [dbUser, settings] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: currentUser.id },
-      select: {
-        id: true,
-        username: true,
-        nickname: true,
-        gender: true,
-        avatarPath: true,
-        email: true,
-        emailVerifiedAt: true,
-        signature: true,
-        points: true,
-      },
-    }),
-    getSiteSettings(),
-  ])
+  const dbUser = await prisma.user.findUnique({
+    where: { id: currentUser.id },
+    select: {
+      id: true,
+      username: true,
+      nickname: true,
+      gender: true,
+      avatarPath: true,
+      email: true,
+      emailVerifiedAt: true,
+      signature: true,
+      points: true,
+    },
+  })
 
   if (!dbUser) {
     apiError(404, "用户不存在")
@@ -206,15 +209,7 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
     }
   }
 
-  const existingNicknameUser = await prisma.user.findFirst({
-    where: {
-      nickname: nextNickname,
-      id: {
-        not: currentUser.id,
-      },
-    },
-    select: { id: true },
-  })
+  const existingNicknameUser = await findUserByNicknameInsensitive(nextNickname, currentUser.id)
 
   if (existingNicknameUser) {
     apiError(409, "昵称已被使用")
@@ -292,8 +287,8 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
   })
 
   const messageParts: string[] = []
-  if (bioSafety.shouldReview || nicknameSafety.shouldReview || introductionSafety.shouldReview) {
-    messageParts.push("资料已更新，部分内容命中敏感词审核规则")
+  if (bioSafety.wasReplaced || nicknameSafety.wasReplaced || introductionSafety.wasReplaced) {
+    messageParts.push("资料已更新，部分内容已按规则替换")
   } else {
     messageParts.push("资料已更新")
   }
@@ -322,6 +317,8 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
       introductionVisibility,
     },
   })
+
+  revalidateUserSurfaceCache(currentUser.id)
 
   const updatedProfileSettings = resolveUserProfileSettings(updated.signature)
 

@@ -3,6 +3,9 @@ import { requireActiveCurrentUserRecord } from "@/db/current-user"
 import { apiError, apiSuccess, createCustomRouteHandler, readJsonBody } from "@/lib/api-route"
 import { getCheckInOverview, submitCheckInAction } from "@/lib/check-in-service"
 import { logRouteWriteSuccess } from "@/lib/route-metadata"
+import { revalidateUserSurfaceCache } from "@/lib/user-surface"
+import { createRequestWriteGuardOptions } from "@/lib/write-guard-policies"
+import { withRequestWriteGuard } from "@/lib/write-guard"
 
 async function buildCheckInContext(): Promise<Awaited<ReturnType<typeof requireActiveCurrentUserRecord>>> {
   try {
@@ -38,30 +41,48 @@ export const POST = createCustomRouteHandler(async ({ request, context: user }) 
     }
   }
 
-  const result = await submitCheckInAction(user, body)
+  const writeGuardInput = !body || typeof body !== "object" || Array.isArray(body)
+    ? {
+        action: "check-in",
+        date: "",
+      }
+    : {
+        action: body.action === "make-up" ? "make-up" : "check-in",
+        date: typeof body.date === "string" ? body.date.trim() : "",
+      }
 
-  if (!result.alreadyCheckedIn) {
-    logRouteWriteSuccess({
-      scope: "check-in",
-      action: result.makeUpCost !== undefined ? "make-up" : "check-in",
-    }, {
-      userId: user.id,
-      targetId: result.date,
-      extra: {
-        makeUpCost: result.makeUpCost ?? 0,
-        alreadyCheckedIn: false,
-      },
-    })
-  }
+  return withRequestWriteGuard(createRequestWriteGuardOptions("check-in-submit", {
+    request,
+    userId: user.id,
+    input: writeGuardInput,
+  }), async () => {
+    const result = await submitCheckInAction(user, body)
 
-  return apiSuccess({
-    points: result.points,
-    alreadyCheckedIn: result.alreadyCheckedIn,
-    date: result.date,
-    currentStreak: result.currentStreak,
-    maxStreak: result.maxStreak,
-    ...(typeof result.makeUpCost === "number" ? { makeUpCost: result.makeUpCost } : {}),
-  }, result.message)
+    if (!result.alreadyCheckedIn) {
+      logRouteWriteSuccess({
+        scope: "check-in",
+        action: result.makeUpCost !== undefined ? "make-up" : "check-in",
+      }, {
+        userId: user.id,
+        targetId: result.date,
+        extra: {
+          makeUpCost: result.makeUpCost ?? 0,
+          alreadyCheckedIn: false,
+        },
+      })
+
+      revalidateUserSurfaceCache(user.id)
+    }
+
+    return apiSuccess({
+      points: result.points,
+      alreadyCheckedIn: result.alreadyCheckedIn,
+      date: result.date,
+      currentStreak: result.currentStreak,
+      maxStreak: result.maxStreak,
+      ...(typeof result.makeUpCost === "number" ? { makeUpCost: result.makeUpCost } : {}),
+    }, result.message)
+  })
 }, {
   buildContext: buildCheckInContext,
   errorMessage: "签到失败",

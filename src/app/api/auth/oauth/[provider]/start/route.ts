@@ -61,7 +61,7 @@ export async function GET(request: Request, props: OAuthProviderRouteProps) {
     const response = NextResponse.redirect(authorization.url)
 
     clearOAuthFlowState(response, params.provider)
-    setOAuthFlowState(response, params.provider, {
+    await setOAuthFlowState(response, params.provider, {
       provider: params.provider,
       state: authorization.state,
       codeVerifier: authorization.codeVerifier,

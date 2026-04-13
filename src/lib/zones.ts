@@ -1,4 +1,4 @@
-import { cache } from "react"
+import { unstable_cache } from "next/cache"
 
 import { resolvePagination } from "@/db/helpers"
 import { countZoneNormalPosts, findAllZonesWithBoards, findGlobalPinnedPosts, findZoneBoardIdsBySlug, findZoneBoardListBySlug, findZoneNormalPosts, findZonePinnedPosts, findZoneWithBoardsBySlug } from "@/db/taxonomy-queries"
@@ -7,6 +7,7 @@ import { getAnonymousMaskDisplayIdentity } from "@/lib/post-anonymous"
 import { mapListPost } from "@/lib/post-map"
 import { normalizePostListLoadMode, type PostListLoadMode } from "@/lib/post-list-load-mode"
 import { normalizePostListDisplayMode, type PostListDisplayMode } from "@/lib/post-list-display"
+import { TAXONOMY_CACHE_TAGS } from "@/lib/taxonomy-cache"
 
 import type { SitePostItem } from "@/lib/posts"
 
@@ -29,13 +30,13 @@ export interface SiteZoneItem {
   postListLoadMode: PostListLoadMode
 }
 
+type ZoneListRecord = Awaited<ReturnType<typeof findAllZonesWithBoards>>[number]
+type ZoneBySlugRecord = NonNullable<Awaited<ReturnType<typeof findZoneWithBoardsBySlug>>>
+type ZoneBoardListRecord = NonNullable<Awaited<ReturnType<typeof findZoneBoardListBySlug>>>
+type SiteZoneRecord = ZoneListRecord | ZoneBySlugRecord
 
-
-const getCachedZones = cache(async (): Promise<SiteZoneItem[]> => {
-  const zones = await findAllZonesWithBoards()
-
-
-  return zones.map((zone) => ({
+function mapSiteZone(zone: SiteZoneRecord): SiteZoneItem {
+  return {
     id: zone.id,
     slug: zone.slug,
     name: zone.name,
@@ -51,65 +52,64 @@ const getCachedZones = cache(async (): Promise<SiteZoneItem[]> => {
     minViewVipLevel: zone.minViewVipLevel ?? 0,
     postListDisplayMode: normalizePostListDisplayMode(zone.postListDisplayMode),
     postListLoadMode: normalizePostListLoadMode(zone.postListLoadMode),
-  }))
-
-
-})
-
-export async function getZones(): Promise<SiteZoneItem[]> {
-  return getCachedZones()
+  }
 }
 
-const getCachedZoneBySlug = cache(async (slug: string) => {
-  const zone = await findZoneWithBoardsBySlug(slug)
+const getPersistentZones = unstable_cache(
+  async (): Promise<SiteZoneItem[]> => {
+    const zones = await findAllZonesWithBoards()
+    return zones.map((zone) => mapSiteZone(zone))
+  },
+  ["zones:list"],
+  { tags: [...TAXONOMY_CACHE_TAGS] },
+)
 
-  if (!zone) {
-    return null
-  }
+const getPersistentZoneBySlug = unstable_cache(
+  async (slug: string): Promise<SiteZoneItem | null> => {
+    const zone = await findZoneWithBoardsBySlug(slug)
 
-  return {
-    id: zone.id,
-    slug: zone.slug,
-    name: zone.name,
-    description: zone.description ?? `${zone.name} 分区`,
-    icon: zone.icon ?? "📚",
-    hiddenFromSidebar: zone.hiddenFromSidebar ?? false,
-    boardSlugs: zone.boards.map((board: (typeof zone.boards)[number]) => board.slug),
-    count: zone.boards.reduce((total: number, board: (typeof zone.boards)[number]) => total + board._count.posts, 0),
-    requirePostReview: zone.requirePostReview ?? false,
-    requireCommentReview: zone.requireCommentReview ?? false,
-    minViewPoints: (zone as { minViewPoints?: number | null }).minViewPoints ?? 0,
-    minViewLevel: (zone as { minViewLevel?: number | null }).minViewLevel ?? 0,
-    minViewVipLevel: zone.minViewVipLevel ?? 0,
-    postListDisplayMode: normalizePostListDisplayMode(zone.postListDisplayMode),
-    postListLoadMode: normalizePostListLoadMode(zone.postListLoadMode),
-  }
+    if (!zone) {
+      return null
+    }
 
+    return mapSiteZone(zone)
+  },
+  ["zones:by-slug"],
+  { tags: [...TAXONOMY_CACHE_TAGS] },
+)
 
-})
+const getPersistentZoneBoards = unstable_cache(
+  async (slug: string) => {
+    const zone = await findZoneBoardListBySlug(slug)
 
+    if (!zone) {
+      return []
+    }
+
+    return zone.boards.map((board: ZoneBoardListRecord["boards"][number]) => ({
+      id: board.id,
+      name: board.name,
+      slug: board.slug,
+      icon: board.iconPath ?? "💬",
+      description: board.description ?? `${board.name} 节点讨论区`,
+      count: board._count.posts,
+    }))
+  },
+  ["zones:board-list"],
+  { tags: [...TAXONOMY_CACHE_TAGS] },
+)
+
+export async function getZones(): Promise<SiteZoneItem[]> {
+  return getPersistentZones()
+}
 
 export async function getZoneBySlug(slug: string) {
-  return getCachedZoneBySlug(slug)
+  return getPersistentZoneBySlug(slug)
 }
 
 
 export async function getZoneBoards(slug: string) {
-  const zone = await findZoneBoardListBySlug(slug)
-
-
-  if (!zone) {
-    return []
-  }
-
-  return zone.boards.map((board) => ({
-    id: board.id,
-    name: board.name,
-    slug: board.slug,
-    icon: board.iconPath ?? "💬",
-    description: board.description ?? `${board.name} 节点讨论区`,
-    count: board._count.posts,
-  }))
+  return getPersistentZoneBoards(slug)
 }
 
 export interface ZonePostPageResult {

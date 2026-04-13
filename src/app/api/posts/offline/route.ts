@@ -1,7 +1,9 @@
 import { revalidatePath } from "next/cache"
 
 import { apiSuccess, createRouteHandler, readJsonBody, requireStringField } from "@/lib/api-route"
+import { revalidateHomeSidebarStatsCache } from "@/lib/home-sidebar-stats"
 import { offlineOwnPost } from "@/lib/post-offline"
+import { revalidateUserSurfaceCache } from "@/lib/user-surface"
 
 export const POST = createRouteHandler(async ({ request }) => {
   const body = await readJsonBody(request)
@@ -10,6 +12,8 @@ export const POST = createRouteHandler(async ({ request }) => {
 
   const result = await offlineOwnPost({ postId, reason })
 
+  revalidateHomeSidebarStatsCache()
+  revalidateUserSurfaceCache(result.userId)
   revalidatePath(`/posts/${result.post.slug}`)
   revalidatePath("/")
   revalidatePath("/admin")

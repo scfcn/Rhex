@@ -1,31 +1,13 @@
-import type { SidebarUserCardData } from "@/components/sidebar-user-card"
-import { countSidebarUserBoardFollows, countSidebarUserFavorites, findHomeSidebarHotTopics, findSidebarCurrentUser, findSidebarUserCheckInRecord } from "@/db/home-sidebar-queries"
+import type { SidebarUserCardData } from "@/components/user/sidebar-user-card"
+import { findHomeSidebarHotTopics } from "@/db/home-sidebar-queries"
 import type { getCurrentUser } from "@/lib/auth"
 import { applyAnonymousIdentityToPost, getAnonymousMaskDisplayIdentity } from "@/lib/post-anonymous"
-import { getUserCheckInStreakSummary } from "@/lib/check-in-streak-service"
-import { getLocalDateKey } from "@/lib/date-key"
 import { formatMonthDayTime } from "@/lib/formatters"
 import { getLevelBadgeData } from "@/lib/level-badge"
 import type { SiteSettingsData } from "@/lib/site-settings"
+import { resolveUserSurfaceSnapshot, type UserSurfaceSnapshot } from "@/lib/user-surface"
 import { getUserDisplayName } from "@/lib/users"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
-
-function hasPersistedCheckInStreakSummary(progress: {
-  checkInDays: number
-  currentCheckInStreak: number
-  maxCheckInStreak: number
-  lastCheckInDate: string | null
-} | null | undefined) {
-  if (!progress) {
-    return false
-  }
-
-  if (progress.checkInDays === 0) {
-    return true
-  }
-
-  return progress.maxCheckInStreak > 0 || progress.lastCheckInDate !== null
-}
 
 export async function getHomeSidebarHotTopics(limit = 5) {
   const [posts, anonymousMaskIdentity] = await Promise.all([
@@ -58,54 +40,9 @@ export async function getHomeSidebarHotTopics(limit = 5) {
   }))
 }
 
-export async function getSidebarCurrentUserStats(username: string) {
-  const user = await findSidebarCurrentUser(username)
-  const todayKey = getLocalDateKey()
-
-  if (!user) {
-    return {
-      boardCount: 0,
-      favoriteCount: 0,
-      followerCount: 0,
-      postCount: 0,
-      receivedLikeCount: 0,
-      points: 0,
-      checkedInToday: false,
-      currentCheckInStreak: 0,
-      maxCheckInStreak: 0,
-    }
-  }
-
-  const streakSummary = hasPersistedCheckInStreakSummary(user.levelProgress)
-    ? {
-        currentStreak: user.levelProgress?.currentCheckInStreak ?? 0,
-        maxStreak: user.levelProgress?.maxCheckInStreak ?? 0,
-      }
-    : await getUserCheckInStreakSummary(user.id)
-  const [boardCount, favoriteCount, checkInRecord] = await Promise.all([
-    countSidebarUserBoardFollows(user.id),
-    countSidebarUserFavorites(user.id),
-    findSidebarUserCheckInRecord(user.id, todayKey),
-  ])
-
-  return {
-    boardCount,
-    favoriteCount,
-    followerCount: user._count.followedByUsers,
-    postCount: user.postCount,
-    receivedLikeCount: user.likeReceivedCount,
-    points: user.points,
-    checkedInToday: Boolean(checkInRecord),
-    currentCheckInStreak: streakSummary.currentStreak,
-    maxCheckInStreak: streakSummary.maxStreak,
-  }
-}
-
 type SidebarUserSource = Awaited<ReturnType<typeof getCurrentUser>> | null
 
-type SidebarUserStats = Awaited<ReturnType<typeof getSidebarCurrentUserStats>> | null
-
-export async function buildSidebarUser(user: SidebarUserSource, stats: SidebarUserStats, settings: SiteSettingsData): Promise<SidebarUserCardData | null> {
+export async function buildSidebarUser(user: SidebarUserSource, snapshot: UserSurfaceSnapshot | null, settings: SiteSettingsData): Promise<SidebarUserCardData | null> {
   if (!user) {
     return null
   }
@@ -132,12 +69,12 @@ export async function buildSidebarUser(user: SidebarUserSource, stats: SidebarUs
     levelIcon: levelBadge.icon,
     vipLevel: user.vipLevel ?? 0,
     vipExpiresAt: user.vipExpiresAt?.toString?.() ?? null,
-    boardCount: stats?.boardCount ?? 0,
-    favoriteCount: stats?.favoriteCount ?? 0,
-    followerCount: stats?.followerCount ?? 0,
-    postCount: stats?.postCount ?? 0,
-    receivedLikeCount: stats?.receivedLikeCount ?? 0,
-    points: stats?.points ?? user.points ?? 0,
+    boardCount: snapshot?.boardCount ?? 0,
+    favoriteCount: snapshot?.favoriteCount ?? 0,
+    followerCount: snapshot?.followerCount ?? 0,
+    postCount: snapshot?.postCount ?? 0,
+    receivedLikeCount: snapshot?.receivedLikeCount ?? 0,
+    points: snapshot?.points ?? user.points ?? 0,
     pointName: settings.pointName,
     checkInEnabled: settings.checkInEnabled,
     checkInReward,
@@ -147,9 +84,9 @@ export async function buildSidebarUser(user: SidebarUserSource, stats: SidebarUs
     checkInVip2MakeUpCardPrice: settings.checkInVip2MakeUpCardPrice,
     checkInVip3MakeUpCardPrice: settings.checkInVip3MakeUpCardPrice,
     checkInMakeUpCountsTowardStreak: settings.checkInMakeUpCountsTowardStreak,
-    checkedInToday: stats?.checkedInToday ?? false,
-    currentCheckInStreak: stats?.currentCheckInStreak ?? 0,
-    maxCheckInStreak: stats?.maxCheckInStreak ?? 0,
+    checkedInToday: snapshot?.checkedInToday ?? false,
+    currentCheckInStreak: snapshot?.currentCheckInStreak ?? 0,
+    maxCheckInStreak: snapshot?.maxCheckInStreak ?? 0,
   }
 }
 
@@ -158,6 +95,6 @@ export async function resolveSidebarUser(user: SidebarUserSource, settings: Site
     return null
   }
 
-  const stats = await getSidebarCurrentUserStats(user.username)
-  return buildSidebarUser(user, stats, settings)
+  const snapshot = await resolveUserSurfaceSnapshot(user)
+  return buildSidebarUser(user, snapshot, settings)
 }

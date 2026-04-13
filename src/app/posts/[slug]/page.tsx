@@ -1,26 +1,28 @@
 import type { Metadata } from "next"
 import { MessageCircle } from "lucide-react"
 import { cookies } from "next/headers"
+import Script from "next/script"
 import { notFound } from "next/navigation"
 
 
 import { AccessDeniedCard } from "@/components/access-denied-card"
-import { CommentReplyToggleButton } from "@/components/comment-reply-toggle-button"
-import { CommentThread } from "@/components/comment-thread"
-import { ForumPageShell } from "@/components/forum-page-shell"
+import { CommentReplyToggleButton } from "@/components/comment/comment-reply-toggle-button"
+import { CommentThread } from "@/components/comment/comment-thread"
+import { ForumPageShell } from "@/components/forum/forum-page-shell"
 import { MarkdownContent } from "@/components/markdown-content"
-import { PostAppendixTimeline } from "@/components/post-appendix-timeline"
-import { PostBodyCopyMenu } from "@/components/post-body-copy-menu"
-import { PostDetailHeader } from "@/components/post-detail-header"
+import { PostAppendixTimeline } from "@/components/post/post-appendix-timeline"
+import { PostAttachmentList } from "@/components/post/post-attachment-list"
+import { PostBodyCopyMenu } from "@/components/post/post-body-copy-menu"
+import { PostDetailHeader } from "@/components/post/post-detail-header"
 
-import { PostAdminPanel } from "@/components/post-admin-panel"
-import { PostEditPanel } from "@/components/post-edit-panel"
-import { PostEngagementBar } from "@/components/post-engagement-bar"
-import { PostRewardPoolHighlightBar } from "@/components/post-reward-pool-highlight-bar"
-import { PostReadingHistoryRecorder } from "@/components/post-reading-history-recorder"
-import { PostSidebarPanels } from "@/components/post-sidebar-panels"
-import { RestrictedPostBlock } from "@/components/restricted-post-block"
-import { BountyPanel, LotteryPanel, PollPanel } from "@/components/post-type-panels"
+import { PostAdminPanel } from "@/components/admin/post-admin-panel"
+import { PostEditPanel } from "@/components/post/post-edit-panel"
+import { PostEngagementBar } from "@/components/post/post-engagement-bar"
+import { PostRewardPoolHighlightBar } from "@/components/post/post-reward-pool-highlight-bar"
+import { PostReadingHistoryRecorder } from "@/components/post/post-reading-history-recorder"
+import { PostSidebarPanels } from "@/components/post/post-sidebar-panels"
+import { RestrictedPostBlock } from "@/components/post/restricted-post-block"
+import { BountyPanel, LotteryPanel, PollPanel } from "@/components/post/post-type-panels"
 
 import { SiteHeader } from "@/components/site-header"
 
@@ -41,6 +43,7 @@ import { canUseAnonymousIdentityForPostReply, getAnonymousMaskDisplayIdentity } 
 import { isImageOnlyMarkdown } from "@/lib/markdown/render"
 import { getPostTipSummary } from "@/lib/post-tips"
 import { getPostOfflineActionMeta } from "@/lib/post-offline"
+import { getPurchasedPostAttachmentIds, resolveAttachmentViewerState } from "@/lib/post-attachments"
 
 import { getPurchasedPostBlockBuyerCounts, getPurchasedPostBlockIds } from "@/lib/post-unlock"
 
@@ -167,6 +170,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
   )
 
   const purchasedBlockIdsPromise = canViewRestrictedPost ? getPurchasedPostBlockIds(basePost.id, currentUser?.id) : Promise.resolve(new Set<string>())
+  const purchasedAttachmentIdsPromise = canViewRestrictedPost ? getPurchasedPostAttachmentIds(basePost.id, currentUser?.id) : Promise.resolve(new Set<string>())
   const purchasedBlockBuyerCountsPromise = canViewRestrictedPost ? getPurchasedPostBlockBuyerCounts(basePost.id) : Promise.resolve(new Map<string, number>())
   const tipSummaryPromise = canViewRestrictedPost ? getPostTipSummary(basePost.id, currentUser?.id) : Promise.resolve(undefined)
   const redPacketSummaryPromise = canViewRestrictedPost ? getPostRedPacketSummary(basePost.id, currentUser?.id) : Promise.resolve(undefined)
@@ -190,11 +194,12 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
       viewMode: currentCommentView,
     })
 
-  const [userReplyCount, purchasedBlockIds, purchasedBlockBuyerCounts, tipSummary, redPacketSummary, postOfflineMeta, commentResult, sidebarData, boards, zones] = await Promise.all([
+  const [userReplyCount, purchasedBlockIds, purchasedAttachmentIds, purchasedBlockBuyerCounts, tipSummary, redPacketSummary, postOfflineMeta, commentResult, sidebarData, boards, zones] = await Promise.all([
 
 
     userReplyCountPromise,
     purchasedBlockIdsPromise,
+    purchasedAttachmentIdsPromise,
     purchasedBlockBuyerCountsPromise,
     tipSummaryPromise,
     redPacketSummaryPromise,
@@ -312,6 +317,24 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
       })
     : []
   const hasAppendices = Boolean(displayPost.appendices && displayPost.appendices.length > 0)
+  const displayAttachments = (displayPost.attachments ?? []).map((attachment) => {
+    const replyRequirementSatisfied = attachment.requireReplyUnlock && userReplyCount >= 1
+    const viewerState = resolveAttachmentViewerState({
+      attachment,
+      pointName: settings.pointName,
+      siteEnabled: attachment.sourceType === "EXTERNAL_LINK" ? true : settings.attachmentDownloadEnabled,
+      viewer: currentUser,
+      userReplyCount,
+      hasPurchasedAccess: purchasedAttachmentIds.has(attachment.id),
+      isOwnerOrAdmin: isOwnerOrManager,
+    })
+
+    return {
+      ...attachment,
+      replyRequirementSatisfied,
+      ...viewerState,
+    }
+  })
   const hasRewardPoolHighlight = Boolean(
     displayPost.redPacket?.enabled
     && displayPost.redPacket.status === "ACTIVE"
@@ -333,7 +356,9 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
   return (
     <div className="min-h-screen">
       <SiteHeader />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <Script id={`post-jsonld-${displayPost.id}`} type="application/ld+json">
+        {JSON.stringify(jsonLd)}
+      </Script>
 
       <main className="mx-auto max-w-[1200px] px-1">
         <ForumPageShell
@@ -370,7 +395,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                     reportLabel={displayPost.title}
                   >
                     <Card className={hasRewardPoolHighlight || hasAppendices ? "rounded-b-none" : undefined}>
-                      <CardContent className="pt-4 px-4 pb-4 sm:px-6 sm:pb-6 md:px-8 md:pb-8">
+                      <CardContent>
                       {displayPost.status === "NORMAL" && canViewRestrictedPost ? (
                         <PostReadingHistoryRecorder
                           postId={displayPost.id}
@@ -394,6 +419,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                       <div className="mt-6 space-y-4">
                         {displayPost.bounty ? (
                           <BountyPanel
+                            key={`${displayPost.id}:${displayPost.bounty.isResolved ? "resolved" : "open"}:${displayPost.bounty.acceptedAnswerAuthor ?? ""}`}
                             postId={displayPost.id}
                             points={displayPost.bounty.points}
                             pointName={settings.pointName}
@@ -433,6 +459,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
 
 
                        {displayPost.poll ? <PollPanel postId={displayPost.id} totalVotes={displayPost.poll.totalVotes} hasVoted={displayPost.poll.hasVoted} expiresAt={displayPost.poll.expiresAt} options={displayPost.poll.options} /> : null}
+                        {displayAttachments.length > 0 ? <PostAttachmentList attachments={displayAttachments} pointName={settings.pointName} /> : null}
 
                         </div>
 
@@ -530,6 +557,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                     ) : null}
                     {canViewComments ? (
                       <CommentThread
+                        key={`${displayPost.id}:${currentSort}:${currentCommentView}:${commentResult.page}:${commentResult.total}`}
                         threadId={displayPost.id}
                         comments={commentResult.items}
                         postId={displayPost.id}
@@ -574,6 +602,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                 siteName={settings.siteName}
                 siteDescription={settings.siteDescription}
                 siteLogoPath={settings.siteLogoPath}
+                siteIconPath={settings.siteIconPath}
               />
             </aside>
           )}

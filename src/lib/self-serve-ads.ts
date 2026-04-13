@@ -10,6 +10,7 @@ import { createSystemNotification, submitSelfServeAdOrderTransaction } from "@/d
 
 import { getCurrentUser } from "@/lib/auth"
 import { getSelfServeAdsAppConfig as loadSelfServeAdsAppConfig } from "@/lib/app-config"
+import { enforceSensitiveText } from "@/lib/content-safety"
 import { serializeDateTime } from "@/lib/formatters"
 import { buildSelfServeAdPriceMap, getSelfServeAdPrice, toSelfServeAdConfig, validateSelfServeAdPurchaseDraft } from "@/lib/self-serve-ads.shared"
 
@@ -89,6 +90,9 @@ export async function submitSelfServeAdOrder(input: SelfServeAdPurchaseDraft) {
   if (!validation.success) throw new Error(validation.firstError ?? "广告表单校验失败")
 
   const { title, linkUrl, imageUrl, textColor, backgroundColor, durationMonths } = validation.normalized
+  const titleSafety = slotType === "TEXT" && title
+    ? await enforceSensitiveText({ scene: "selfServeAd.title", text: title })
+    : null
 
 
   const pricePoints = getSelfServeAdPrice(config, slotType, durationMonths)
@@ -104,7 +108,7 @@ export async function submitSelfServeAdOrder(input: SelfServeAdPurchaseDraft) {
     appCode: "self-serve-ads",
     slotType,
     slotIndex,
-    title: slotType === "TEXT" ? title : null,
+    title: slotType === "TEXT" ? (titleSafety?.sanitizedText ?? title) : null,
     linkUrl,
     imageUrl,
     textColor,
@@ -118,7 +122,10 @@ export async function submitSelfServeAdOrder(input: SelfServeAdPurchaseDraft) {
     throw new Error(`${settings.pointName}不足，无法购买广告位`)
   }
 
-  return result.order
+  return {
+    ...result.order,
+    contentAdjusted: Boolean(titleSafety?.wasReplaced),
+  }
 
 }
 
@@ -172,13 +179,17 @@ export async function reviewSelfServeAdOrder(input: {
   })
   if (!adminDraftValidation.success) throw new Error(adminDraftValidation.firstError ?? "广告表单校验失败")
   const { title, linkUrl, imageUrl, textColor, backgroundColor } = adminDraftValidation.normalized
+  const titleSafety = existing.slotType === "TEXT" && title
+    ? await enforceSensitiveText({ scene: "selfServeAd.title", text: title })
+    : null
+  const sanitizedTitle = titleSafety?.sanitizedText ?? title
 
 
   if (input.action === "approve") {
     const startsAt = new Date()
     const endsAt = new Date(startsAt)
     endsAt.setMonth(endsAt.getMonth() + durationMonths)
-    const updated = await updateSelfServeOrder(existing.id, { slotIndex, title, linkUrl, imageUrl, textColor, backgroundColor, durationMonths, status: "APPROVED", reviewNote, startsAt, endsAt })
+    const updated = await updateSelfServeOrder(existing.id, { slotIndex, title: sanitizedTitle, linkUrl, imageUrl, textColor, backgroundColor, durationMonths, status: "APPROVED", reviewNote, startsAt, endsAt })
     await createSystemNotification({
       userId: existing.userId,
       relatedId: existing.id,
@@ -190,7 +201,7 @@ export async function reviewSelfServeAdOrder(input: {
   }
 
   if (input.action === "reject") {
-    const updated = await updateSelfServeOrder(existing.id, { slotIndex, title, linkUrl, imageUrl, textColor, backgroundColor, durationMonths, status: "REJECTED", reviewNote })
+    const updated = await updateSelfServeOrder(existing.id, { slotIndex, title: sanitizedTitle, linkUrl, imageUrl, textColor, backgroundColor, durationMonths, status: "REJECTED", reviewNote })
     await createSystemNotification({
       userId: existing.userId,
       relatedId: existing.id,
@@ -207,7 +218,7 @@ export async function reviewSelfServeAdOrder(input: {
 
   const updated = await updateSelfServeOrder(existing.id, {
     slotIndex,
-    title,
+    title: sanitizedTitle,
     linkUrl,
     imageUrl,
     textColor,

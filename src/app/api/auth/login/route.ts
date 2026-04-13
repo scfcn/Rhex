@@ -11,6 +11,7 @@ import { createSessionToken, getSessionCookieName, getSessionCookieOptions } fro
 import { getServerSiteSettings } from "@/lib/site-settings"
 import { verifyTurnstileToken } from "@/lib/turnstile"
 import { validateAuthPayload } from "@/lib/validators"
+import { createRequestWriteGuardOptions } from "@/lib/write-guard-policies"
 import { withRequestWriteGuard } from "@/lib/write-guard"
 
 export const POST = createRouteHandler(async ({ request }) => {
@@ -27,12 +28,10 @@ export const POST = createRouteHandler(async ({ request }) => {
   const powNonce = readOptionalStringField(body, "powNonce")
   const settings = await getServerSiteSettings()
 
-  return withRequestWriteGuard({
+  return withRequestWriteGuard(createRequestWriteGuardOptions("auth-login", {
     request,
-    scope: "auth-login",
-    cooldownMs: 2_000,
-    cooldownMessage: "登录尝试过于频繁，请稍后再试",
-  }, async () => {
+    input: undefined,
+  }), async () => {
     if (settings.loginCaptchaMode === "TURNSTILE") {
       if (!settings.turnstileSiteKey || !settings.turnstileSecretKey) {
         apiError(500, "站点未完成 Turnstile 验证码配置，请联系管理员")

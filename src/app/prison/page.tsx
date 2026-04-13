@@ -1,9 +1,10 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { UserStatus } from "@/db/types"
+import { getHomeAnnouncements } from "@/lib/announcements"
 
-import { ForumPageShell } from "@/components/forum-page-shell"
-import { HomeSidebarPanels } from "@/components/home-sidebar-panels"
+import { ForumPageShell } from "@/components/forum/forum-page-shell"
+import { HomeSidebarPanels } from "@/components/home/home-sidebar-panels"
 import { SiteHeader } from "@/components/site-header"
 import { prisma } from "@/db/client"
 import { getCurrentUser } from "@/lib/auth"
@@ -45,7 +46,7 @@ export default async function PrisonPage(props: PageProps<"/prison">) {
     : { status: activeStatus === "BANNED" ? UserStatus.BANNED : UserStatus.MUTED }
   const settingsPromise = getSiteSettings()
 
-  const [users, mutedCount, bannedCount, boards, zones, currentUser, hotTopics, settings] = await Promise.all([
+  const [users, mutedCount, bannedCount, boards, zones, currentUser, hotTopics, settings, announcements] = await Promise.all([
     prisma.user.findMany({
       where,
       orderBy: [{ updatedAt: "desc" }],
@@ -66,6 +67,8 @@ export default async function PrisonPage(props: PageProps<"/prison">) {
     getCurrentUser(),
     settingsPromise.then((settings) => getHomeSidebarHotTopics(settings.homeSidebarHotTopicsCount)),
     settingsPromise,
+    getHomeAnnouncements(3),
+    
   ])
 
   const sidebarUser = await resolveSidebarUser(currentUser, settings)
@@ -81,7 +84,7 @@ export default async function PrisonPage(props: PageProps<"/prison">) {
           main={(
             <main className="py-1 pb-12 mt-6">
               <div className="space-y-6">
-          <section className="rounded-[30px] border border-border bg-card px-6 py-8 shadow-sm sm:px-8 lg:px-10">
+          <section className="rounded-[30px] border border-border bg-card px-6 py-8 shadow-xs sm:px-8 lg:px-10">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
               <div className="max-w-3xl">
                 <div className="inline-flex items-center rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
@@ -101,7 +104,7 @@ export default async function PrisonPage(props: PageProps<"/prison">) {
             </div>
           </section>
 
-          <section className="rounded-[24px] border border-border bg-card p-4 shadow-sm">
+          <section className="rounded-[24px] border border-border bg-card p-4 shadow-xs">
             <div className="flex flex-wrap gap-2">
               {statusTabs.map((tab) => {
                 const active = tab.key === activeStatus
@@ -120,7 +123,7 @@ export default async function PrisonPage(props: PageProps<"/prison">) {
             </div>
           </section>
 
-          <section className="rounded-[24px] border border-border bg-card shadow-sm">
+          <section className="rounded-[24px] border border-border bg-card shadow-xs">
             <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
               <div>
                 <h2 className="text-base font-semibold">禁闭名单</h2>
@@ -185,7 +188,8 @@ export default async function PrisonPage(props: PageProps<"/prison">) {
           )}
           rightSidebar={(
             <aside className="mt-6 hidden pb-12 lg:block">
-              <HomeSidebarPanels user={sidebarUser} hotTopics={hotTopics} siteName={settings.siteName} siteDescription={settings.siteDescription} siteLogoPath={settings.siteLogoPath} />
+              <HomeSidebarPanels user={sidebarUser} hotTopics={hotTopics} announcements={announcements}
+                showAnnouncements={settings.homeSidebarAnnouncementsEnabled} siteName={settings.siteName} siteDescription={settings.siteDescription} siteLogoPath={settings.siteLogoPath} siteIconPath={settings.siteIconPath} />
             </aside>
           )}
         />

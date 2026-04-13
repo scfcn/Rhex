@@ -1,14 +1,19 @@
-import { createHmac, timingSafeEqual } from "node:crypto"
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto"
 
 import type { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 
 import type { OAuthFlowState, PasskeyCeremonyState, PendingExternalAuthState } from "@/lib/external-auth-types"
+import { createRedisKey, getRedis, hasRedisUrl } from "@/lib/redis"
 
 const PENDING_AUTH_COOKIE_NAME = "bbs_pending_auth"
 const PASSKEY_REGISTER_COOKIE_NAME = "bbs_passkey_register"
 const PASSKEY_LOGIN_COOKIE_NAME = "bbs_passkey_login"
 const PASSKEY_CONNECT_COOKIE_NAME = "bbs_passkey_connect"
+
+interface SignedAuthFlowPointer {
+  nonce: string
+}
 
 function getAuthFlowSecret() {
   const secret = process.env.AUTH_FLOW_SECRET?.trim() || process.env.SESSION_SECRET?.trim()
@@ -92,13 +97,62 @@ function clearCookie(response: NextResponse, cookieName: string) {
   response.cookies.set(cookieName, "", getCookieOptions(0))
 }
 
-function setCookie<T extends object>(response: NextResponse, cookieName: string, value: T, ttlSeconds: number) {
-  response.cookies.set(cookieName, createSignedValue(value, ttlSeconds), getCookieOptions(ttlSeconds))
+function getRedisAuthFlowKey(cookieName: string, nonce: string) {
+  return createRedisKey("auth-flow", cookieName, nonce)
+}
+
+async function setCookie<T extends object>(response: NextResponse, cookieName: string, value: T, ttlSeconds: number) {
+  if (!hasRedisUrl()) {
+    response.cookies.set(cookieName, createSignedValue(value, ttlSeconds), getCookieOptions(ttlSeconds))
+    return
+  }
+
+  const nonce = randomUUID()
+  const expiresAt = Date.now() + ttlSeconds * 1000
+
+  await getRedis().set(
+    getRedisAuthFlowKey(cookieName, nonce),
+    JSON.stringify({
+      ...value,
+      expiresAt,
+    }),
+    "EX",
+    ttlSeconds,
+  )
+
+  response.cookies.set(cookieName, createSignedValue<SignedAuthFlowPointer>({ nonce }, ttlSeconds), getCookieOptions(ttlSeconds))
 }
 
 async function readCookieValue<T extends object>(cookieName: string) {
   const cookieStore = await cookies()
   const rawValue = cookieStore.get(cookieName)?.value
+
+  if (!hasRedisUrl()) {
+    return parseSignedValue<T>(rawValue)
+  }
+
+  const pointer = parseSignedValue<SignedAuthFlowPointer>(rawValue)
+
+  if (pointer?.nonce) {
+    const rawStoredValue = await getRedis().get(getRedisAuthFlowKey(cookieName, pointer.nonce))
+
+    if (!rawStoredValue) {
+      return null
+    }
+
+    try {
+      const parsed = JSON.parse(rawStoredValue) as T & { expiresAt?: number }
+
+      if (!parsed || typeof parsed !== "object" || typeof parsed.expiresAt !== "number" || parsed.expiresAt <= Date.now()) {
+        return null
+      }
+
+      return parsed
+    } catch {
+      return null
+    }
+  }
+
   return parseSignedValue<T>(rawValue)
 }
 
@@ -106,8 +160,8 @@ export function buildOAuthStateCookieName(provider: string) {
   return `bbs_oauth_${provider}`
 }
 
-export function setOAuthFlowState(response: NextResponse, provider: string, value: OAuthFlowState, ttlSeconds = 600) {
-  setCookie(response, buildOAuthStateCookieName(provider), value, ttlSeconds)
+export async function setOAuthFlowState(response: NextResponse, provider: string, value: OAuthFlowState, ttlSeconds = 600) {
+  await setCookie(response, buildOAuthStateCookieName(provider), value, ttlSeconds)
 }
 
 export async function readOAuthFlowState(provider: string) {
@@ -118,8 +172,8 @@ export function clearOAuthFlowState(response: NextResponse, provider: string) {
   clearCookie(response, buildOAuthStateCookieName(provider))
 }
 
-export function setPendingExternalAuthState(response: NextResponse, value: PendingExternalAuthState, ttlSeconds = 900) {
-  setCookie(response, PENDING_AUTH_COOKIE_NAME, value, ttlSeconds)
+export async function setPendingExternalAuthState(response: NextResponse, value: PendingExternalAuthState, ttlSeconds = 900) {
+  await setCookie(response, PENDING_AUTH_COOKIE_NAME, value, ttlSeconds)
 }
 
 export async function readPendingExternalAuthState() {
@@ -142,8 +196,8 @@ function getPasskeyCeremonyCookieName(flow: "register" | "login" | "connect") {
   return PASSKEY_LOGIN_COOKIE_NAME
 }
 
-export function setPasskeyCeremonyState(response: NextResponse, flow: "register" | "login" | "connect", value: PasskeyCeremonyState, ttlSeconds = 600) {
-  setCookie(response, getPasskeyCeremonyCookieName(flow), value, ttlSeconds)
+export async function setPasskeyCeremonyState(response: NextResponse, flow: "register" | "login" | "connect", value: PasskeyCeremonyState, ttlSeconds = 600) {
+  await setCookie(response, getPasskeyCeremonyCookieName(flow), value, ttlSeconds)
 }
 
 export async function readPasskeyCeremonyState(flow: "register" | "login" | "connect") {

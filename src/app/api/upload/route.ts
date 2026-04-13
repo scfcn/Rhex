@@ -3,6 +3,7 @@ import { logRouteWriteSuccess } from "@/lib/route-metadata"
 import { getSiteSettings } from "@/lib/site-settings"
 import { prepareUploadedFile, saveUploadedFile } from "@/lib/upload"
 import { normalizeUploadExtension, normalizeUploadFolder } from "@/lib/upload-rules"
+import { createRequestWriteGuardOptions } from "@/lib/write-guard-policies"
 import { withRequestWriteGuard } from "@/lib/write-guard"
 import { createUploadRecord, findExistingUpload } from "@/db/upload-queries"
 
@@ -39,17 +40,19 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     apiError(400, `上传文件不能超过 ${maxSizeMb}MB`)
   }
 
-  const preparedFile = await prepareUploadedFile(file)
+  const preparedFile = await prepareUploadedFile(file, {
+    folder,
+    settings,
+  })
 
-  return withRequestWriteGuard({
+  return withRequestWriteGuard(createRequestWriteGuardOptions("upload-file", {
     request,
     userId: currentUser.id,
-    scope: "upload-file",
-    cooldownMs: 0,
-    dedupeKey: `${currentUser.id}:${folder}:${preparedFile.fileHash}`,
-    dedupeWindowMs: 10_000,
-    releaseOnError: true,
-  }, async () => {
+    input: {
+      folder,
+      fileHash: preparedFile.fileHash,
+    },
+  }), async () => {
     // 同用户、同 bucket、相同内容 → 直接复用已有记录，跳过写盘和入库
     const existing = await findExistingUpload(currentUser.id, folder, preparedFile.fileHash)
     if (existing) {

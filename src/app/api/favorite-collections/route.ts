@@ -47,7 +47,9 @@ export const POST = createUserRouteHandler<unknown>(async ({ request, currentUse
       input: body.collection && typeof body.collection === "object" ? body.collection as Record<string, unknown> : {},
       postId: typeof body.postId === "string" ? body.postId.trim() : undefined,
     })
-    return apiSuccess(created, body.postId ? "合集已创建，帖子已加入" : "合集已创建")
+    return apiSuccess(created, body.postId
+      ? (created.contentAdjusted ? "合集已创建，帖子已加入，部分内容已自动替换" : "合集已创建，帖子已加入")
+      : (created.contentAdjusted ? "合集已创建，部分内容已自动替换" : "合集已创建"))
   }
 
   if (action === "add-post") {
@@ -65,7 +67,7 @@ export const POST = createUserRouteHandler<unknown>(async ({ request, currentUse
       collectionId: typeof body.collectionId === "string" ? body.collectionId.trim() : "",
       input: body.collection && typeof body.collection === "object" ? body.collection as Record<string, unknown> : {},
     })
-    return apiSuccess(updated, "合集已更新")
+    return apiSuccess(updated, updated.contentAdjusted ? "合集已更新，部分内容已自动替换" : "合集已更新")
   }
 
   if (action === "delete") {

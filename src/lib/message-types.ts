@@ -20,6 +20,7 @@ export interface MessageBubbleItem {
   id: string
   body: string
   createdAt: string
+  occurredAt?: string
   senderId: number
   senderName: string
   senderAvatarPath?: string | null
@@ -43,6 +44,7 @@ export interface MessageSendResult {
   content: string
   createdAt: string
   occurredAt: string
+  contentAdjusted?: boolean
 }
 
 export interface MessageHistoryResult {
@@ -54,7 +56,12 @@ export interface MessageStreamEvent {
   type: "message.created" | "conversation.read" | "heartbeat"
   conversationId?: string
   messageId?: string
+  content?: string
+  createdAtLabel?: string
   senderId?: number
+  senderUsername?: string
+  senderDisplayName?: string
+  senderAvatarPath?: string | null
   recipientId?: number
   occurredAt: string
 }

@@ -20,6 +20,7 @@ import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
 import { verifyPowCaptchaSolution } from "@/lib/pow-captcha"
 import { getRequestIp } from "@/lib/request-ip"
 import { getServerSiteSettings } from "@/lib/site-settings"
+import { isEquivalentNickname } from "@/lib/nickname"
 import { verifyTurnstileToken } from "@/lib/turnstile"
 import { validateAuthPayload } from "@/lib/validators"
 import { verifyCode } from "@/lib/verification"
@@ -63,8 +64,8 @@ interface RegisterContext {
 }
 
 
-function assertRegisterPayload(body: unknown): RegisterPayload {
-  const validated = validateAuthPayload(body)
+function assertRegisterPayload(body: unknown, options: { nicknameMinLength: number; nicknameMaxLength: number }): RegisterPayload {
+  const validated = validateAuthPayload(body, options)
 
   if (!validated.success || !validated.data) {
     apiError(400, validated.message ?? "参数错误")
@@ -183,7 +184,7 @@ async function ensureRegisterTargetsAvailable(context: RegisterContext) {
     apiError(409, "手机号已被使用")
   }
 
-  if (payload.nickname && existingUser?.nickname === sanitizedNickname) {
+  if (payload.nickname && existingUser?.nickname && isEquivalentNickname(existingUser.nickname, sanitizedNickname)) {
     apiError(409, "昵称已被使用")
   }
 }
@@ -209,9 +210,12 @@ async function verifyRegisterContactCodes(context: RegisterContext) {
 }
 
 export async function createRegisterFlow(options: RegisterFlowOptions): Promise<RegisterFlowResult> {
-  const payload = assertRegisterPayload(options.body)
-  const body = options.body as Record<string, unknown>
   const settings = await getServerSiteSettings()
+  const payload = assertRegisterPayload(options.body, {
+    nicknameMinLength: settings.registerNicknameMinLength,
+    nicknameMaxLength: settings.registerNicknameMaxLength,
+  })
+  const body = options.body as Record<string, unknown>
   const registerIp = getRequestIp(options.request)
   const userAgent = options.request.headers.get("user-agent")
   const nicknameSafety = payload.nickname
@@ -370,6 +374,6 @@ export async function createRegisterFlow(options: RegisterFlowOptions): Promise<
     user,
     registerIp,
     invited: Boolean(payload.inviterUsername || payload.inviteCode),
-    successMessage: nicknameSafety?.shouldReview ? "注册成功，昵称已按规则处理" : "注册成功",
+    successMessage: nicknameSafety?.wasReplaced ? "注册成功，昵称已按规则替换" : "注册成功",
   }
 }

@@ -17,6 +17,7 @@ import {
 } from "@/db/report-queries"
 import { resolvePagination } from "@/db/helpers"
 import { apiError } from "@/lib/api-route"
+import { enforceSensitiveText } from "@/lib/content-safety"
 
 
 
@@ -25,20 +26,6 @@ import type { AdminReportListResult } from "@/lib/admin-report-management"
 import { getPostCommentPath, getPostPath } from "@/lib/post-links"
 import { getSiteSettings, type PostLinkDisplayMode } from "@/lib/site-settings"
 import { getUserDisplayName } from "@/lib/users"
-
-
-export const REPORT_REASON_OPTIONS = [
-  "垃圾广告",
-  "骚扰辱骂",
-  "违规内容",
-  "侵权抄袭",
-  "色情低俗",
-  "诈骗引流",
-  "人身攻击",
-  "其他",
-] as const
-
-export type ReportReasonType = (typeof REPORT_REASON_OPTIONS)[number]
 
 export interface CreateReportInput {
   reporterId: number
@@ -186,14 +173,21 @@ export async function createReport(input: CreateReportInput) {
   }
 
 
-  return await createReportRecord({
+  const reasonDetailSafety = normalizedReasonDetail
+    ? await enforceSensitiveText({ scene: "report.reasonDetail", text: normalizedReasonDetail })
+    : null
+  const report = await createReportRecord({
     reporterId: input.reporterId,
     targetType: input.targetType,
     targetId: input.targetId,
     reasonType: normalizedReasonType,
-    reasonDetail: normalizedReasonDetail,
+    reasonDetail: reasonDetailSafety?.sanitizedText ?? null,
   })
 
+  return {
+    ...report,
+    contentAdjusted: Boolean(reasonDetailSafety?.wasReplaced),
+  }
 }
 
 export async function getAdminReports(options: { page?: number; pageSize?: number } = {}): Promise<AdminReportListResult> {

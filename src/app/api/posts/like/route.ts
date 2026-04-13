@@ -4,6 +4,9 @@ import { apiError, apiSuccess, createUserRouteHandler, readJsonBody } from "@/li
 import { handlePostLikeSideEffects } from "@/lib/interaction-side-effects"
 import { enqueueNotification } from "@/lib/notification-writes"
 import { logRequestSucceeded } from "@/lib/request-log"
+import { revalidateUserSurfaceCache } from "@/lib/user-surface"
+import { createRequestWriteGuardOptions } from "@/lib/write-guard-policies"
+import { withRequestWriteGuard } from "@/lib/write-guard"
 
 export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   const body = await readJsonBody(request)
@@ -13,41 +16,53 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     apiError(400, "缺少帖子参数")
   }
 
-  const result = await togglePostLike({
+  return withRequestWriteGuard(createRequestWriteGuardOptions("posts-like", {
+    request,
     userId: currentUser.id,
-    postId,
-    senderName: currentUser.nickname ?? currentUser.username,
-  })
-
-  await handlePostLikeSideEffects({
-    liked: result.liked,
-    postId,
-    userId: currentUser.id,
-    targetUserId: result.targetUserId,
-  })
-
-  if (result.liked && result.notificationTargetUserId) {
-    void enqueueNotification({
-      userId: result.notificationTargetUserId,
-      type: NotificationType.LIKE,
-      senderId: currentUser.id,
-      relatedType: "POST",
-      relatedId: postId,
-      title: "你的帖子收到了赞",
-      content: `${currentUser.nickname ?? currentUser.username} 赞了你的帖子：${result.postTitle}`,
+    input: {
+      postId,
+    },
+  }), async () => {
+    const result = await togglePostLike({
+      userId: currentUser.id,
+      postId,
+      senderName: currentUser.nickname ?? currentUser.username,
     })
-  }
 
-  logRequestSucceeded({
-    scope: "posts-like",
-    action: "toggle-post-like",
-    userId: currentUser.id,
-    targetId: postId,
-  }, {
-    liked: result.liked,
+    await handlePostLikeSideEffects({
+      liked: result.liked,
+      postId,
+      userId: currentUser.id,
+      targetUserId: result.targetUserId,
+    })
+
+    if (result.targetUserId) {
+      revalidateUserSurfaceCache(result.targetUserId)
+    }
+
+    if (result.liked && result.notificationTargetUserId) {
+      void enqueueNotification({
+        userId: result.notificationTargetUserId,
+        type: NotificationType.LIKE,
+        senderId: currentUser.id,
+        relatedType: "POST",
+        relatedId: postId,
+        title: "你的帖子收到了赞",
+        content: `${currentUser.nickname ?? currentUser.username} 赞了你的帖子：${result.postTitle}`,
+      })
+    }
+
+    logRequestSucceeded({
+      scope: "posts-like",
+      action: "toggle-post-like",
+      userId: currentUser.id,
+      targetId: postId,
+    }, {
+      liked: result.liked,
+    })
+
+    return apiSuccess({ liked: result.liked }, result.liked ? "点赞成功" : "已取消点赞")
   })
-
-  return apiSuccess({ liked: result.liked }, result.liked ? "点赞成功" : "已取消点赞")
 }, {
   errorMessage: "帖子点赞失败",
   logPrefix: "[api/posts/like] unexpected error",

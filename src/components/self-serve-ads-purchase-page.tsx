@@ -3,9 +3,9 @@
 import { useMemo, useState, useTransition } from "react"
 import Link from "next/link"
 
-import { PickerPopover, PickerTriggerField, normalizeHexColor } from "@/components/admin-picker-popover"
-import { Button } from "@/components/ui/button"
-import { showConfirm } from "@/components/ui/confirm-dialog"
+import { ColorPicker as UIColorPicker } from "@/components/ui/color-picker"
+import { Button } from "@/components/ui/rbutton"
+import { showConfirm } from "@/components/ui/alert-dialog"
 import { toast } from "@/components/ui/toast"
 
 import { SELF_SERVE_AD_BACKGROUND_COLORS, SELF_SERVE_AD_DURATION_OPTIONS, SELF_SERVE_AD_TEXT_COLORS, validateSelfServeAdPurchaseDraft, type SelfServeAdPurchaseDraft, type SelfServeAdSlotType } from "@/lib/self-serve-ads.shared"
@@ -87,7 +87,7 @@ export function SelfServeAdsPurchasePage({ slotType, slotIndex, pointName, price
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[28px] border border-border bg-card p-6 shadow-sm shadow-black/5 dark:shadow-black/30">
+      <section className="rounded-[28px] border border-border bg-card p-6 shadow-xs shadow-black/5 dark:shadow-black/30">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold">购买{slotType === "IMAGE" ? "图片" : "文字"}广告位</h1>
@@ -131,7 +131,7 @@ export function SelfServeAdsPurchasePage({ slotType, slotIndex, pointName, price
             {SELF_SERVE_AD_DURATION_OPTIONS.map((option) => {
               const active = option.months === form.durationMonths
               return (
-                <button key={option.months} type="button" onClick={() => updateForm("durationMonths", option.months)} className={active ? "rounded-[14px] border border-foreground bg-foreground px-2.5 py-2.5 text-xs font-medium text-background shadow-sm" : "rounded-[14px] border border-border bg-background px-2.5 py-2.5 text-xs text-muted-foreground transition hover:border-foreground/20 hover:bg-accent hover:text-foreground"}>
+                <button key={option.months} type="button" onClick={() => updateForm("durationMonths", option.months)} className={active ? "rounded-[14px] border border-foreground bg-foreground px-2.5 py-2.5 text-xs font-medium text-background shadow-xs" : "rounded-[14px] border border-border bg-background px-2.5 py-2.5 text-xs text-muted-foreground transition hover:border-foreground/20 hover:bg-accent hover:text-foreground"}>
                   <div>{option.label}</div>
                   <div className="mt-1 text-[11px]">{prices[slotType][option.months]} {pointName}</div>
                 </button>
@@ -172,45 +172,20 @@ function Field({ label, hint, error, meta, children, className = "", useLabel = 
 }
 
 function getInputClassName(hasError: boolean) {
-  return `h-10 w-full rounded-[16px] border bg-background px-3 text-sm outline-none transition ${hasError ? "border-destructive focus-visible:ring-1 focus-visible:ring-destructive/40" : "border-border focus-visible:ring-1 focus-visible:ring-ring/40"}`
+  return `h-10 w-full rounded-[16px] border bg-background px-3 text-sm outline-hidden transition ${hasError ? "border-destructive focus-visible:ring-1 focus-visible:ring-destructive/40" : "border-border focus-visible:ring-1 focus-visible:ring-ring/40"}`
 }
 
 function ColorPicker({ label, value, presets, onChange }: { label: string; value: string; presets: readonly string[]; onChange: (value: string) => void }) {
-  const [open, setOpen] = useState(false)
-  const normalizedValue = normalizeHexColor(value, presets[0] ?? "#0f172a")
-
   return (
-    <div className="relative space-y-1.5">
-      <p className="text-xs font-medium">{label}</p>
-      <PickerTriggerField value={value || normalizedValue} previewColor={value || normalizedValue} fallbackColor={presets[0] ?? "#0f172a"} onClick={() => setOpen((current) => !current)} />
-      {open ? (
-        <div className="absolute left-0 top-full z-20 mt-2 w-[280px]">
-          <PickerPopover title={`选择${label}`} onClose={() => setOpen(false)}>
-            <div className="flex items-center gap-2">
-              <input type="color" value={normalizedValue} onChange={(event) => onChange(event.target.value)} className="h-8 w-10 cursor-pointer rounded-lg border border-border bg-background p-0.5" aria-label={`选择${label}`} />
-              <input value={value} onChange={(event) => onChange(event.target.value)} className="h-8 w-28 rounded-full border border-border bg-background px-3 text-xs outline-none" />
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-1.5">
-              {presets.map((preset) => {
-                const active = normalizedValue.toLowerCase() === preset.toLowerCase()
-                return (
-                  <button
-                    key={`${label}-${preset}`}
-                    type="button"
-                    className={active ? "h-7 w-7 rounded-full ring-2 ring-foreground/20 ring-offset-1 ring-offset-background" : "h-7 w-7 rounded-full border border-border"}
-                    style={{ backgroundColor: preset }}
-                    onClick={() => {
-                      onChange(preset)
-                      setOpen(false)
-                    }}
-                    aria-label={`使用颜色 ${preset}`}
-                  />
-                )
-              })}
-            </div>
-          </PickerPopover>
-        </div>
-      ) : null}
-    </div>
+    <UIColorPicker
+      label={label}
+      value={value}
+      onChange={onChange}
+      presets={presets}
+      fallbackColor={presets[0] ?? "#0f172a"}
+      popoverTitle={`选择${label}`}
+      containerClassName="space-y-1.5"
+    />
   )
 }
+

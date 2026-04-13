@@ -1,15 +1,10 @@
 import { createHash } from "crypto"
 
-import { Prisma } from "@/db/types"
-
-import { createRequestControl, deleteExpiredRequestControlsForKey, deleteRequestControlById, purgeExpiredRequestControls } from "@/db/write-guard-queries"
 import { apiError } from "@/lib/api-route"
-
-
+import { acquireRedisLease, type RedisLease } from "@/lib/redis-lease"
+import { createRedisKey } from "@/lib/redis"
 import { logRequestFailed, logRequestStarted, logRequestSucceeded } from "@/lib/request-log"
 import { getRequestIp } from "@/lib/request-ip"
-
-
 
 export interface WriteGuardIdentity {
   userId?: number | null
@@ -32,7 +27,6 @@ const DEFAULT_COOLDOWN_MS = 3_000
 const DEFAULT_DEDUPE_WINDOW_MS = 5_000
 const RATE_LIMIT_KIND = "rate"
 const DEDUPE_KIND = "dedupe"
-const PURGE_SAMPLING_RATE = 0.01
 
 
 function normalizeIdentity(identity?: WriteGuardIdentity) {
@@ -51,62 +45,48 @@ function createStableHash(input: string) {
   return createHash("sha256").update(input).digest("hex")
 }
 
-function isUniqueConstraintError(error: unknown) {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002"
-}
-
-function shouldPurgeExpiredRequestControls() {
-  return Math.random() < PURGE_SAMPLING_RATE
-}
-
-async function createRequestControlRecord(params: {
+function buildWriteGuardRedisKey(params: {
   scope: string
   identity: string
   kind: string
   fingerprint?: string | null
-  expiresAt: Date
+}) {
+  return createRedisKey(
+    "write-guard",
+    params.kind,
+    createStableHash([
+      params.scope,
+      params.identity,
+      params.fingerprint ?? "",
+    ].join(":")),
+  )
+}
+
+async function createWriteGuardLease(params: {
+  scope: string
+  identity: string
+  kind: string
+  fingerprint?: string | null
+  ttlMs: number
   message: string
 }) {
-  try {
-    const now = new Date()
+  const lease = await acquireRedisLease({
+    key: buildWriteGuardRedisKey(params),
+    ttlMs: params.ttlMs,
+  })
 
-    await deleteExpiredRequestControlsForKey({
-      scope: params.scope,
-      identity: params.identity,
-      kind: params.kind,
-      fingerprint: params.fingerprint ?? null,
-      now,
-    })
-
-    if (shouldPurgeExpiredRequestControls()) {
-      await purgeExpiredRequestControls(now)
-    }
-
-    const created = await createRequestControl({
-      scope: params.scope,
-      identity: params.identity,
-      kind: params.kind,
-      fingerprint: params.fingerprint ?? null,
-      expiresAt: params.expiresAt,
-    })
-
-    return created.id
-
-
-  } catch (error) {
-    if (isUniqueConstraintError(error)) {
-      apiError(params.kind === RATE_LIMIT_KIND ? 429 : 409, params.message)
-    }
-    throw error
+  if (!lease) {
+    apiError(params.kind === RATE_LIMIT_KIND ? 429 : 409, params.message)
   }
+
+  return lease
 }
 
 export async function withWriteGuard<T>(options: WriteGuardOptions, task: () => Promise<T>): Promise<T> {
   const identity = normalizeIdentity(options.identity)
-  const now = Date.now()
   const cooldownMs = Math.max(0, options.cooldownMs ?? DEFAULT_COOLDOWN_MS)
   const dedupeWindowMs = Math.max(0, options.dedupeWindowMs ?? DEFAULT_DEDUPE_WINDOW_MS)
-  const createdControlIds: string[] = []
+  const createdLeases: RedisLease[] = []
 
   logRequestStarted({
     scope: options.scope,
@@ -117,26 +97,26 @@ export async function withWriteGuard<T>(options: WriteGuardOptions, task: () => 
 
   try {
     if (cooldownMs > 0) {
-      const controlId = await createRequestControlRecord({
+      const lease = await createWriteGuardLease({
         scope: options.scope,
         identity,
         kind: RATE_LIMIT_KIND,
-        expiresAt: new Date(now + cooldownMs),
+        ttlMs: cooldownMs,
         message: options.cooldownMessage ?? "操作过于频繁，请稍后再试",
       })
-      createdControlIds.push(controlId)
+      createdLeases.push(lease)
     }
 
     if (options.dedupeKey) {
-      const controlId = await createRequestControlRecord({
+      const lease = await createWriteGuardLease({
         scope: options.scope,
         identity,
         kind: DEDUPE_KIND,
         fingerprint: createStableHash(options.dedupeKey),
-        expiresAt: new Date(now + dedupeWindowMs),
+        ttlMs: dedupeWindowMs,
         message: "请求重复，请勿重复提交",
       })
-      createdControlIds.push(controlId)
+      createdLeases.push(lease)
     }
 
     const result = await task()
@@ -148,8 +128,8 @@ export async function withWriteGuard<T>(options: WriteGuardOptions, task: () => 
     })
     return result
   } catch (error) {
-    if (options.releaseOnError && createdControlIds.length > 0) {
-      await Promise.all(createdControlIds.map((id) => deleteRequestControlById(id)))
+    if (options.releaseOnError && createdLeases.length > 0) {
+      await Promise.allSettled(createdLeases.map((lease) => lease.release()))
     }
 
     logRequestFailed({

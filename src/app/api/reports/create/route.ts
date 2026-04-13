@@ -2,6 +2,8 @@ import { TargetType } from "@/db/types"
 
 import { apiError, apiSuccess, createUserRouteHandler, readJsonBody, readOptionalStringField, requireStringField } from "@/lib/api-route"
 import { createReport } from "@/lib/reports"
+import { createRequestWriteGuardOptions } from "@/lib/write-guard-policies"
+import { withRequestWriteGuard } from "@/lib/write-guard"
 
 export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   const body = await readJsonBody(request)
@@ -14,15 +16,26 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     apiError(400, "不支持的举报类型")
   }
 
-  await createReport({
-    reporterId: currentUser.id,
-    targetType,
-    targetId,
-    reasonType,
-    reasonDetail: reasonDetail || null,
-  })
+  return withRequestWriteGuard(createRequestWriteGuardOptions("reports-create", {
+    request,
+    userId: currentUser.id,
+    input: {
+      targetType,
+      targetId,
+      reasonType,
+      reasonDetail,
+    },
+  }), async () => {
+    const result = await createReport({
+      reporterId: currentUser.id,
+      targetType,
+      targetId,
+      reasonType,
+      reasonDetail: reasonDetail || null,
+    })
 
-  return apiSuccess(undefined, "举报已提交，管理员会尽快处理")
+    return apiSuccess(undefined, result.contentAdjusted ? "举报已提交，部分内容已自动替换，管理员会尽快处理" : "举报已提交，管理员会尽快处理")
+  })
 }, {
   errorMessage: "举报提交失败",
   logPrefix: "[api/reports/create] unexpected error",

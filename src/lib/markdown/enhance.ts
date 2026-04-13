@@ -140,7 +140,7 @@ function enhanceMarkdownLinks(container: HTMLElement) {
 
 function createBrokenImagePlaceholder(image: HTMLImageElement) {
   const placeholder = document.createElement("div")
-  placeholder.className = "md-image-fallback my-4 rounded-2xl border border-dashed border-amber-300/80 bg-amber-50/80 px-4 py-5 text-sm text-amber-900 shadow-sm dark:border-amber-800/70 dark:bg-amber-950/20 dark:text-amber-100"
+  placeholder.className = "md-image-fallback my-4 rounded-2xl border border-dashed border-amber-300/80 bg-amber-50/80 px-4 py-5 text-sm text-amber-900 shadow-xs dark:border-amber-800/70 dark:bg-amber-950/20 dark:text-amber-100"
 
   const title = document.createElement("p")
   title.className = "font-medium"
@@ -309,7 +309,7 @@ function createBase64TokenElement(original: string, decoded: string) {
   const wrapper = document.createElement("span")
   wrapper.dataset.base64Token = "true"
   wrapper.dataset.base64State = "collapsed"
-  wrapper.className = "md-base64-token my-1 inline-flex max-w-full flex-wrap items-center gap-2 rounded-2xl border border-sky-200/80 bg-sky-50/80 px-2.5 py-1.5 align-middle shadow-sm shadow-sky-100/80 dark:border-sky-500/20 dark:bg-sky-500/10 dark:shadow-none"
+  wrapper.className = "md-base64-token my-1 inline-flex max-w-full flex-wrap items-center gap-2 rounded-2xl border border-sky-200/80 bg-sky-50/80 px-2.5 py-1.5 align-middle shadow-xs shadow-sky-100/80 dark:border-sky-500/20 dark:bg-sky-500/10 dark:shadow-none"
 
   const source = document.createElement("code")
   source.className = "max-w-full break-all rounded-xl bg-white/85 px-2.5 py-1.5 font-mono text-[12px] leading-6 text-sky-900 dark:bg-slate-950/80 dark:text-sky-100"

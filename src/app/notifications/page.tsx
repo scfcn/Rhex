@@ -1,8 +1,8 @@
 import type { Metadata } from "next"
 
-import { NotificationsPagination } from "@/components/notifications-pagination"
-import { NotificationsToolbar } from "@/components/notifications-toolbar"
-import { NotificationListItem } from "@/components/notification-list-item"
+import { NotificationsPagination } from "@/components/notification/notifications-pagination"
+import { NotificationsToolbar } from "@/components/notification/notifications-toolbar"
+import { NotificationListItem } from "@/components/notification/notification-list-item"
 import { SiteHeader } from "@/components/site-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getCurrentUser } from "@/lib/auth"

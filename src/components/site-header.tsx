@@ -8,10 +8,11 @@ import { MobileHeaderQuickActions } from "@/components/mobile-header-quick-actio
 import { ThemeToggle } from "@/components/theme-toggle"
 import { getCurrentUser } from "@/lib/auth"
 import { getBoards } from "@/lib/boards"
-import { getHeaderQuickActionsState, getHeaderUnreadCounts } from "@/lib/header"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/rbutton"
 import { SearchForm } from "@/components/search-form"
+import { resolveSiteIconPath } from "@/lib/site-branding"
 import { getSiteSettings } from "@/lib/site-settings"
+import { resolveUserSurfaceSnapshot } from "@/lib/user-surface"
 import { getZones } from "@/lib/zones"
 
 function formatUnreadBadge(count: number) {
@@ -22,7 +23,7 @@ function formatUnreadBadge(count: number) {
   return count > 9 ? "9+" : String(count)
 }
 
-function SiteLogoMark({ logoPath }: { logoPath?: string | null }) {
+function SiteLogoMark({ logoPath, iconPath }: { logoPath?: string | null; iconPath?: string | null }) {
   if (logoPath) {
     return (
       <div className="relative h-8 w-8 overflow-hidden rounded-md border border-border bg-background">
@@ -33,17 +34,17 @@ function SiteLogoMark({ logoPath }: { logoPath?: string | null }) {
 
   return (
     <div className="flex h-8 w-8 items-center justify-center rounded-md">
-      <Image src="/icon.svg" alt="" width={16} height={16} className="h-8 w-8" />
+      <Image src={resolveSiteIconPath(iconPath)} alt="" width={16} height={16} className="h-8 w-8" />
     </div>
   )
 }
 
 export async function SiteHeader() {
   const [user, settings, zones, boards] = await Promise.all([getCurrentUser(), getSiteSettings(), getZones(), getBoards()])
-  const [{ unreadNotificationCount, unreadMessageCount }, { checkedInToday }] = await Promise.all([
-    getHeaderUnreadCounts(user?.id),
-    getHeaderQuickActionsState(user?.id),
-  ])
+  const surfaceSnapshot = await resolveUserSurfaceSnapshot(user)
+  const unreadNotificationCount = surfaceSnapshot?.unreadNotificationCount ?? 0
+  const unreadMessageCount = surfaceSnapshot?.unreadMessageCount ?? 0
+  const checkedInToday = surfaceSnapshot?.checkedInToday ?? false
   const headerUser = user
     ? {
         username: user.username,
@@ -55,12 +56,12 @@ export async function SiteHeader() {
     : null
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/70 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b border-border/70 bg-background/80 backdrop-blur-sm supports-backdrop-filter:bg-background/60">
       <div className="mx-auto max-w-[1200px] px-1">
         <div className="grid h-14 grid-cols-1 gap-6 lg:grid-cols-12">
           <div className="-mr-6 hidden h-14 items-center lg:col-span-2 lg:flex">
             <Link href="/" className="flex items-center gap-2 text-xl leading-none">
-              <SiteLogoMark logoPath={settings.siteLogoPath} />
+              <SiteLogoMark logoPath={settings.siteLogoPath} iconPath={settings.siteIconPath} />
               <div className="hidden font-bold tracking-tight sm:inline-block">{settings.siteLogoText}</div>
             </Link>
           </div>
@@ -68,7 +69,7 @@ export async function SiteHeader() {
           <div className="flex h-14 items-center justify-between gap-3 lg:col-span-10">
             <div className="flex items-center gap-2 lg:hidden">
               <Link href="/" className="flex items-center gap-2 text-base font-bold leading-none">
-                <SiteLogoMark logoPath={settings.siteLogoPath} />
+                <SiteLogoMark logoPath={settings.siteLogoPath} iconPath={settings.siteIconPath} />
                 <span className="sr-only">{settings.siteLogoText}</span>
               </Link>
               <MobileHeaderQuickActions

@@ -1,8 +1,10 @@
+import { NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
 
 import { prisma } from "@/db/client"
 import { apiError, apiSuccess, createUserRouteHandler, readJsonBody, requireStringField } from "@/lib/api-route"
 import { logRouteWriteSuccess } from "@/lib/route-metadata"
+import { getSessionClearedCookieOptions, getSessionCookieName, readSessionTokenFromCookieHeader, revokeSessionToken } from "@/lib/session"
 
 
 export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
@@ -39,8 +41,13 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   const passwordHash = await bcrypt.hash(newPassword, 10)
   await prisma.user.update({
     where: { id: user.id },
-    data: { passwordHash },
+    data: {
+      passwordHash,
+      sessionInvalidBefore: new Date(),
+    },
   })
+
+  await revokeSessionToken(readSessionTokenFromCookieHeader(request.headers.get("cookie")))
 
   logRouteWriteSuccess({
     scope: "profile-password",
@@ -50,7 +57,10 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     targetId: String(currentUser.id),
   })
 
-  return apiSuccess(undefined, "密码已更新")
+  const response = NextResponse.json(apiSuccess(undefined, "密码已更新，请重新登录"))
+  response.cookies.set(getSessionCookieName(), "", getSessionClearedCookieOptions())
+
+  return response
 
 }, {
   errorMessage: "修改密码失败",

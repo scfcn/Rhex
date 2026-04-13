@@ -32,6 +32,21 @@ export interface LocalPostDraft {
   redPacketUnitPoints: string
   redPacketTotalPoints: string
   redPacketPacketCount: string
+  attachments: Array<{
+    id?: string
+    sourceType: "UPLOAD" | "EXTERNAL_LINK"
+    uploadId: string
+    name: string
+    externalUrl: string
+    externalCode: string
+    fileSize: number | null
+    fileExt: string
+    mimeType: string
+    minDownloadLevel: string
+    minDownloadVipLevel: string
+    pointsCost: string
+    requireReplyUnlock: boolean
+  }>
 }
 
 export interface StoredLocalPostDraft {
@@ -77,6 +92,7 @@ export function createEmptyLocalPostDraft(boardSlug = ""): LocalPostDraft {
     redPacketUnitPoints: "10",
     redPacketTotalPoints: "10",
     redPacketPacketCount: "1",
+    attachments: [],
   }
 }
 
@@ -120,7 +136,7 @@ export function savePostDraftToStorage(mode: PostDraftMode, draft: LocalPostDraf
   return payload
 }
 
-export function loadPostDraftFromStorage(mode: PostDraftMode, postId?: string) {
+export function loadPostDraftFromStorage(mode: PostDraftMode, postId?: string): StoredLocalPostDraft | null {
   if (typeof window === "undefined") {
     return null
   }
@@ -142,6 +158,25 @@ export function loadPostDraftFromStorage(mode: PostDraftMode, postId?: string) {
         ...createEmptyLocalPostDraft(parsed.data.boardSlug || ""),
         ...parsed.data,
         manualTags: Array.isArray(parsed.data.manualTags) ? parsed.data.manualTags.filter((item): item is string => typeof item === "string") : [],
+        attachments: Array.isArray(parsed.data.attachments)
+          ? parsed.data.attachments
+              .filter((item): item is LocalPostDraft["attachments"][number] => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+              .map((item) => ({
+                id: typeof item.id === "string" && item.id.trim() ? item.id.trim() : undefined,
+                sourceType: (item.sourceType === "EXTERNAL_LINK" ? "EXTERNAL_LINK" : "UPLOAD") as "UPLOAD" | "EXTERNAL_LINK",
+                uploadId: typeof item.uploadId === "string" ? item.uploadId : "",
+                name: typeof item.name === "string" ? item.name : "",
+                externalUrl: typeof item.externalUrl === "string" ? item.externalUrl : "",
+                externalCode: typeof item.externalCode === "string" ? item.externalCode : "",
+                fileSize: typeof item.fileSize === "number" && Number.isFinite(item.fileSize) ? item.fileSize : null,
+                fileExt: typeof item.fileExt === "string" ? item.fileExt : "",
+                mimeType: typeof item.mimeType === "string" ? item.mimeType : "",
+                minDownloadLevel: typeof item.minDownloadLevel === "string" ? item.minDownloadLevel : "0",
+                minDownloadVipLevel: typeof item.minDownloadVipLevel === "string" ? item.minDownloadVipLevel : "0",
+                pointsCost: typeof item.pointsCost === "string" ? item.pointsCost : "0",
+                requireReplyUnlock: Boolean(item.requireReplyUnlock),
+              }) satisfies LocalPostDraft["attachments"][number])
+          : [],
       },
     }
   } catch {

@@ -3,14 +3,14 @@ import Link from "next/link"
 import { Crown, ShieldCheck } from "lucide-react"
 
 import { SiteHeader } from "@/components/site-header"
-import { VipActionPanel } from "@/components/vip-action-panel"
-import { VipBadge } from "@/components/vip-badge"
-import { Button } from "@/components/ui/button"
+import { VipActionPanel } from "@/components/vip/vip-action-panel"
+import { VipBadge } from "@/components/vip/vip-badge"
+import { Button } from "@/components/ui/rbutton"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getCurrentUser } from "@/lib/auth"
 import { formatDateTime, formatNumber } from "@/lib/formatters"
 import { getSiteSettings } from "@/lib/site-settings"
-import { getVipLevel, isVipActive } from "@/lib/vip-status"
+import { getVipLevel, getVipNameClass, isVipActive } from "@/lib/vip-status"
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettings()
@@ -90,7 +90,7 @@ export default async function VipPage() {
       <SiteHeader />
       <main className="mx-auto max-w-[1000px] px-4 py-8 lg:px-6">
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <Card className="overflow-hidden border-none bg-gradient-to-r from-violet-700 via-fuchsia-700 to-purple-700 text-white shadow-soft">
+          <Card className="overflow-hidden border-none bg-linear-to-r from-violet-700 via-fuchsia-700 to-purple-700 text-white shadow-soft">
             <CardContent className="p-8">
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15">
@@ -111,7 +111,7 @@ export default async function VipPage() {
 
 
                   </div>
-                  <p className="mt-3 text-xl font-semibold">{profileName}</p>
+                  <p className={`mt-3 text-xl font-semibold ${getVipNameClass(vipActive, vipUser?.vipLevel, { emphasize: true, interactive: false })}`}>{profileName}</p>
                   <p className="mt-1 text-sm text-white/75">{vipActive ? `你当前已开通 VIP${currentLevel}，可进入受限内容区域。` : `你当前还不是 VIP，可直接在下方使用${settings.pointName}购买开通。`}</p>
 
 

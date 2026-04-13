@@ -314,6 +314,19 @@ enum FavoriteCollectionSubmissionStatus {
   REJECTED
 }
 
+enum AiReplyTaskStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum AiReplyTaskSourceType {
+  POST
+  COMMENT
+}
+
 model User {
   id                               Int                            @id @default(autoincrement())
   username                         String                         @unique
@@ -373,6 +386,8 @@ model User {
   pointLogs                        PointLog[]
   postBlockPurchases               PostBlockPurchase[]            @relation("PostBlockPurchaseBuyer")
   postBlockSales                   PostBlockPurchase[]            @relation("PostBlockPurchaseSeller")
+  postAttachmentPurchases          PostAttachmentPurchase[]       @relation("PostAttachmentPurchaseBuyer")
+  postAttachmentSales              PostAttachmentPurchase[]       @relation("PostAttachmentPurchaseSeller")
   vipOrders                        VipOrder[]
   postTipsSent                     PostTip[]                      @relation("PostTipSender")
   postTipsReceived                 PostTip[]                      @relation("PostTipReceiver")
@@ -411,6 +426,8 @@ model User {
   moderatedBoardScopes             ModeratorBoardScope[]
   boardApplications                BoardApplication[]             @relation("boardApplicationApplicant")
   reviewedBoardApplications        BoardApplication[]             @relation("boardApplicationReviewer")
+  aiReplyTasksTriggered            AiReplyTask[]                  @relation("AiReplyTaskTriggerUser")
+  aiReplyTasksAssigned             AiReplyTask[]                  @relation("AiReplyTaskAgentUser")
 
   @@index([role])
   @@index([status])
@@ -609,6 +626,7 @@ model Zone {
   icon                 String?
   sortOrder            Int                  @default(0)
   hiddenFromSidebar    Boolean              @default(false)
+  showInHomeFeed       Boolean              @default(true)
   requirePostReview    Boolean              @default(false)
   requireCommentReview Boolean              @default(false)
   postPointDelta       Int                  @default(0)
@@ -648,6 +666,7 @@ model Board {
   sortOrder            Int                   @default(0)
   status               BoardStatus           @default(ACTIVE)
   allowPost            Boolean               @default(true)
+  showInHomeFeed       Boolean?
   requirePostReview    Boolean?
   requireCommentReview Boolean?
   postPointDelta       Int?
@@ -760,6 +779,11 @@ enum PinScope {
   BOARD
 }
 
+enum PostAttachmentSourceType {
+  UPLOAD
+  EXTERNAL_LINK
+}
+
 model Post {
   id                            String                         @id @default(cuid())
   boardId                       String
@@ -829,8 +853,11 @@ model Post {
   redPacket                     PostRedPacket?
   redPacketClaims               PostRedPacketClaim[]
   blockPurchases                PostBlockPurchase[]
+  attachments                   PostAttachment[]
+  attachmentPurchases           PostAttachmentPurchase[]
   commentEffectFeedbacks        CommentEffectFeedback[]
   followers                     PostFollow[]
+  aiReplyTasks                  AiReplyTask[]
 
   @@index([boardId])
   @@index([authorId])
@@ -944,6 +971,8 @@ model Comment {
   lotteryParticipants   LotteryParticipant[]
   redPacketClaims       PostRedPacketClaim[]
   effectFeedback        CommentEffectFeedback?
+  aiReplyTasksAsSource  AiReplyTask[]            @relation("AiReplyTaskSourceComment")
+  aiReplyTaskGenerated  AiReplyTask?             @relation("AiReplyTaskGeneratedComment")
 
   @@index([postId])
   @@index([userId])
@@ -1450,10 +1479,57 @@ model Upload {
   urlPath      String
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postAttachments PostAttachment[]
 
   @@unique([userId, bucketType, fileHash])
   @@index([fileHash])
   @@index([userId, createdAt])
+}
+
+model PostAttachment {
+  id                  String                   @id @default(cuid())
+  postId              String
+  uploadId            String?
+  sourceType          PostAttachmentSourceType
+  name                String
+  fileExt             String?
+  mimeType            String?
+  fileSize            Int?
+  externalUrl         String?
+  externalCode        String?
+  minDownloadLevel    Int                      @default(0)
+  minDownloadVipLevel Int                      @default(0)
+  pointsCost          Int                      @default(0)
+  requireReplyUnlock  Boolean                  @default(false)
+  downloadCount       Int                      @default(0)
+  sortOrder           Int                      @default(0)
+  createdAt           DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime                 @updatedAt @db.Timestamptz(3)
+  post                Post                     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  upload              Upload?                  @relation(fields: [uploadId], references: [id], onDelete: SetNull)
+  purchases           PostAttachmentPurchase[]
+
+  @@index([postId, sortOrder])
+  @@index([postId, downloadCount])
+  @@index([uploadId])
+}
+
+model PostAttachmentPurchase {
+  id           String         @id
+  postId       String
+  attachmentId String
+  buyerId      Int
+  sellerId     Int
+  pointsCost   Int
+  createdAt    DateTime       @default(now()) @db.Timestamptz(3)
+  post         Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+  attachment   PostAttachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  buyer        User           @relation("PostAttachmentPurchaseBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  seller       User           @relation("PostAttachmentPurchaseSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@unique([attachmentId, buyerId])
+  @@index([postId, buyerId])
+  @@index([sellerId, createdAt])
 }
 
 model FriendLink {
@@ -1801,6 +1877,38 @@ model SiteSetting {
   updatedAt                     DateTime @updatedAt @db.Timestamptz(3)
 }
 
+model AiReplyTask {
+  id                 String                @id @default(cuid())
+  sourceType         AiReplyTaskSourceType
+  sourceKey          String                @unique
+  status             AiReplyTaskStatus     @default(PENDING)
+  postId             String
+  sourceCommentId    String?
+  generatedCommentId String?               @unique
+  triggerUserId      Int
+  agentUserId        Int
+  attemptCount       Int                   @default(0)
+  maxAttempts        Int                   @default(3)
+  scheduledAt        DateTime              @default(now()) @db.Timestamptz(3)
+  startedAt          DateTime?             @db.Timestamptz(3)
+  finishedAt         DateTime?             @db.Timestamptz(3)
+  errorMessage       String?
+  resultExcerpt      String?
+  createdAt          DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime              @updatedAt @db.Timestamptz(3)
+  post               Post                  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  sourceComment      Comment?              @relation("AiReplyTaskSourceComment", fields: [sourceCommentId], references: [id], onDelete: Cascade)
+  generatedComment   Comment?              @relation("AiReplyTaskGeneratedComment", fields: [generatedCommentId], references: [id], onDelete: SetNull)
+  triggerUser        User                  @relation("AiReplyTaskTriggerUser", fields: [triggerUserId], references: [id], onDelete: Cascade)
+  agentUser          User                  @relation("AiReplyTaskAgentUser", fields: [agentUserId], references: [id], onDelete: Cascade)
+
+  @@index([status, scheduledAt, createdAt])
+  @@index([postId, createdAt])
+  @@index([sourceCommentId])
+  @@index([agentUserId, createdAt])
+  @@index([triggerUserId, createdAt])
+}
+
 model PostTip {
   id         String   @id @default(cuid())
   postId     String
@@ -2005,21 +2113,6 @@ model VerificationCode {
   @@index([channel, target, purpose, consumedAt, createdAt])
   @@index([expiresAt])
   @@index([userId])
-}
-
-model RequestControl {
-  id          String   @id @default(cuid())
-  scope       String
-  identity    String
-  kind        String
-  fingerprint String?
-  expiresAt   DateTime
-  createdAt   DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
-
-  @@unique([scope, identity, kind, fingerprint])
-  @@index([expiresAt])
-  @@index([scope, identity, kind])
 }
 
 model UserCheckInLog {

@@ -15,6 +15,7 @@ import {
   updatePostPinState,
   updatePostStatus,
 } from "@/db/admin-post-action-queries"
+import { revalidateHomeSidebarStatsCache } from "@/lib/home-sidebar-stats"
 import { ensureCanManageBoard, ensureCanManagePost, getAvailablePinScopes } from "@/lib/moderator-permissions"
 import { createSystemNotification } from "@/lib/notification-writes"
 
@@ -44,12 +45,14 @@ export const adminPostActionHandlers: Record<string, AdminActionDefinition> = {
   "post.hide": defineAdminAction({ targetType: "POST", revalidatePaths: ["/", "/admin"], buildDetail: () => "管理员下线帖子" }, async (context) => {
     await ensureCanManagePost(context.actor, context.targetId)
     await updatePostStatus(context.targetId, PostStatus.OFFLINE)
+    revalidateHomeSidebarStatsCache()
     await writeAdminActionLog(context, adminPostActionHandlers["post.hide"].metadata)
     return { message: "帖子已下线" }
   }),
   "post.show": defineAdminAction({ targetType: "POST", revalidatePaths: ["/", "/admin"], buildDetail: () => "管理员上线帖子" }, async (context) => {
     await ensureCanManagePost(context.actor, context.targetId)
     await updatePostStatus(context.targetId, PostStatus.NORMAL, null)
+    revalidateHomeSidebarStatsCache()
 
     await writeAdminActionLog(context, adminPostActionHandlers["post.show"].metadata)
     return { message: "帖子已上线" }
@@ -78,6 +81,7 @@ export const adminPostActionHandlers: Record<string, AdminActionDefinition> = {
   "post.approve": defineAdminAction({ targetType: "POST", revalidatePaths: ["/", "/admin"], buildDetail: () => "管理员审核通过帖子" }, async (context) => {
     const post = await ensureCanManagePost(context.actor, context.targetId)
     await updatePostStatus(context.targetId, PostStatus.NORMAL, context.message || null, new Date())
+    revalidateHomeSidebarStatsCache()
 
     if (post.authorId !== context.adminUserId) {
       void createSystemNotification({
@@ -98,6 +102,7 @@ export const adminPostActionHandlers: Record<string, AdminActionDefinition> = {
   "post.reject": defineAdminAction({ targetType: "POST", revalidatePaths: ["/", "/admin"], buildDetail: () => "管理员驳回帖子审核" }, async (context) => {
     const post = await ensureCanManagePost(context.actor, context.targetId)
     await updatePostStatus(context.targetId, PostStatus.OFFLINE, context.message || "审核未通过")
+    revalidateHomeSidebarStatsCache()
 
     if (post.authorId !== context.adminUserId) {
       void createSystemNotification({

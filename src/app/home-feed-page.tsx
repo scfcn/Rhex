@@ -2,16 +2,16 @@ import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import type { ReactNode } from "react"
 
-import { ForumFeedList } from "@/components/forum-feed-list"
-import { ForumPageShell } from "@/components/forum-page-shell"
-import { HomeSidebarPanels } from "@/components/home-sidebar-panels"
-import { InfiniteForumFeed } from "@/components/infinite-forum-feed"
+import { ForumFeedList } from "@/components/forum/forum-feed-list"
+import { ForumPageShell } from "@/components/forum/forum-page-shell"
+import { HomeSidebarPanels } from "@/components/home/home-sidebar-panels"
+import { InfiniteForumFeed } from "@/components/forum/infinite-forum-feed"
 import { PageNumberPagination } from "@/components/page-number-pagination"
-import { RssUniversePageClient } from "@/components/rss-universe-page-client"
-import { RssUniverseFeedView } from "@/components/rss-universe-feed-view"
+import { RssUniversePageClient } from "@/components/rss/rss-universe-page-client"
+import { RssUniverseFeedView } from "@/components/rss/rss-universe-feed-view"
 import { SelfServeAdsSidebar } from "@/components/self-serve-ads-sidebar"
 import { SiteHeader } from "@/components/site-header"
-import { AutoCheckInOnHomeEnter } from "@/components/auto-check-in-on-home-enter"
+import { AutoCheckInOnHomeEnter } from "@/components/home/auto-check-in-on-home-enter"
 import { getHomeAnnouncements } from "@/lib/announcements"
 import { getCurrentUser } from "@/lib/auth"
 import { hasHomeAutoCheckInBadgeEffect } from "@/lib/badge-functional-effects"
@@ -238,6 +238,7 @@ export async function HomeFeedPage({
                 siteName={settings.siteName}
                 siteDescription={settings.siteDescription}
                 siteLogoPath={settings.siteLogoPath}
+                siteIconPath={settings.siteIconPath}
               />
             </div>
           )}

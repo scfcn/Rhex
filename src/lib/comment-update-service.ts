@@ -62,22 +62,22 @@ export async function updateCommentFlow(input: {
 
   const updated = await updateCommentContentById(commentId, {
     content: resolvedComment.content,
-    reviewNote: contentSafety.shouldReview ? "评论编辑内容命中敏感词规则，请复核" : null,
+    reviewNote: null,
   })
 
-  if (!contentSafety.shouldReview) {
-    await createCommentMentionNotifications({
-      commentId: updated.id,
-      senderId: input.currentUser.id,
-      senderName: input.currentUser.nickname || input.currentUser.username || "用户",
-      content: resolvedComment.content,
-      mentionUserIds: resolvedComment.mentions.map((item) => item.id),
-      excludeUserIds: [updated.replyToUserId ?? 0],
-    })
-  }
+  await createCommentMentionNotifications({
+    commentId: updated.id,
+    senderId: input.currentUser.id,
+    senderName: input.currentUser.nickname || input.currentUser.username || "用户",
+    content: resolvedComment.content,
+    mentionUserIds: resolvedComment.mentions.map((item) => item.id),
+    excludeUserIds: [updated.replyToUserId ?? 0],
+  })
 
   return {
     updated,
     contentSafety,
+    contentAdjusted: contentSafety.wasReplaced,
+    mentionUserIds: resolvedComment.mentions.map((item) => item.id),
   }
 }

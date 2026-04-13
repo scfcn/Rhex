@@ -20,6 +20,7 @@ import {
   updateJackpotStatus,
 } from "@/db/post-red-packet-queries"
 import { applyPointDelta, prepareScopedPointDelta, prepareScopedProbability } from "@/lib/point-center"
+import { apiError } from "@/lib/api-route"
 import { getBusinessDayRange, formatRelativeTime } from "@/lib/formatters"
 import { buildJackpotEffectFeedback } from "@/lib/post-reward-effect-feedback-builders"
 import {
@@ -121,7 +122,7 @@ export async function assertPostRedPacketDailyLimit(params: { senderId: number; 
   const usedPoints = aggregate._sum.totalPoints ?? 0
   const totalUsedPoints = addSafeIntegers(usedPoints, params.totalPoints)
   if (totalUsedPoints === null || totalUsedPoints > settings.postRedPacketDailyLimit) {
-    throw new Error(`今日发红包累计${settings.pointName}已超上限（${settings.postRedPacketDailyLimit}）`)
+    apiError(400, `今日发红包累计${settings.pointName}已超上限（${settings.postRedPacketDailyLimit}）`)
   }
 }
 

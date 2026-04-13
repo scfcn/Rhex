@@ -244,6 +244,14 @@ export const FONT_SIZE_PRESETS = {
   },
 } as const satisfies Record<FontSizePreset, { label: string; size: string; preview: string }>
 
+const THEME_PRESET_SCRIPT_VALUES = Object.fromEntries(
+  Object.entries(THEME_PRESETS).map(([key, preset]) => [key, preset.values]),
+) as Record<string, (typeof THEME_PRESETS)[keyof typeof THEME_PRESETS]["values"]>
+
+const FONT_SIZE_PRESET_SCRIPT_VALUES = Object.fromEntries(
+  Object.entries(FONT_SIZE_PRESETS).map(([key, preset]) => [key, preset.size]),
+) as Record<FontSizePreset, string>
+
 export const DEFAULT_CUSTOM_THEME_CONFIG: CustomThemeConfig = {
   light: {
     primary: "#3b82f6",
@@ -587,6 +595,119 @@ export function resetCustomThemeConfig() {
   saveCustomThemeConfig(DEFAULT_CUSTOM_THEME_CONFIG)
 }
 
+export function getThemeInitScript() {
+  return `
+    (function () {
+      try {
+        var root = document.documentElement;
+        var preference = window.localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});
+        var preset = window.localStorage.getItem(${JSON.stringify(THEME_PRESET_STORAGE_KEY)});
+        var fontSizePreset = window.localStorage.getItem(${JSON.stringify(FONT_SIZE_PRESET_STORAGE_KEY)});
+        var customThemeConfigRaw = window.localStorage.getItem(${JSON.stringify(CUSTOM_THEME_STORAGE_KEY)});
+        var customThemeVariablesRaw = window.localStorage.getItem(${JSON.stringify(CUSTOM_THEME_VARIABLES_STORAGE_KEY)});
+        var presetValuesMap = ${JSON.stringify(THEME_PRESET_SCRIPT_VALUES)};
+        var fontSizeValuesMap = ${JSON.stringify(FONT_SIZE_PRESET_SCRIPT_VALUES)};
+        var variableNames = ${JSON.stringify(THEME_VARIABLE_NAMES)};
+        var resolvedPreference = preference === "dark" || preference === "light" || preference === "system" ? preference : "light";
+        var resolvedMode = resolvedPreference === "system"
+          ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+          : resolvedPreference;
+        var resolvedPreset = preset === "custom"
+          ? "custom"
+          : (preset && presetValuesMap[preset] ? preset : "default");
+
+        root.classList.toggle("dark", resolvedMode === "dark");
+        root.style.colorScheme = resolvedMode;
+        root.dataset.themePreset = resolvedPreset;
+
+        var applyVariableMap = function (map) {
+          for (var i = 0; i < variableNames.length; i += 1) {
+            var variableName = variableNames[i];
+            var variableValue = map && typeof map[variableName] === "string" ? map[variableName] : "";
+            if (variableValue) {
+              root.style.setProperty("--" + variableName, variableValue);
+            } else {
+              root.style.removeProperty("--" + variableName);
+            }
+          }
+        };
+
+        if (resolvedPreset === "custom") {
+          var customThemeVariables = null;
+          var customThemeConfig = null;
+
+          try {
+            customThemeVariables = customThemeVariablesRaw ? JSON.parse(customThemeVariablesRaw) : null;
+          } catch (_error) {
+            customThemeVariables = null;
+          }
+
+          try {
+            customThemeConfig = customThemeConfigRaw ? JSON.parse(customThemeConfigRaw) : null;
+          } catch (_error) {
+            customThemeConfig = null;
+          }
+
+          applyVariableMap(customThemeVariables && customThemeVariables[resolvedMode] && typeof customThemeVariables[resolvedMode] === "object"
+            ? customThemeVariables[resolvedMode]
+            : null);
+
+          var typography = customThemeConfig && customThemeConfig.typography && typeof customThemeConfig.typography === "object"
+            ? customThemeConfig.typography
+            : null;
+
+          if (typography && typeof typography.fontFamily === "string" && typography.fontFamily.trim()) {
+            root.style.setProperty("--theme-font-family", typography.fontFamily);
+          } else {
+            root.style.removeProperty("--theme-font-family");
+          }
+
+          if (typography && typeof typography.fontSize === "string" && typography.fontSize.trim()) {
+            root.style.fontSize = typography.fontSize;
+          } else {
+            root.style.fontSize = fontSizeValuesMap.normal;
+          }
+
+          root.removeAttribute("data-font-size-preset");
+
+          var customCss = customThemeConfig && typeof customThemeConfig.customCss === "string"
+            ? customThemeConfig.customCss.trim()
+            : "";
+          if (customCss) {
+            var existingStyleElement = document.getElementById(${JSON.stringify(CUSTOM_THEME_STYLE_ELEMENT_ID)});
+            var styleElement = existingStyleElement instanceof HTMLStyleElement
+              ? existingStyleElement
+              : Object.assign(document.createElement("style"), { id: ${JSON.stringify(CUSTOM_THEME_STYLE_ELEMENT_ID)} });
+            styleElement.textContent = customCss;
+            if (!styleElement.parentNode) {
+              document.head.appendChild(styleElement);
+            }
+          }
+        } else {
+          var presetValues = presetValuesMap[resolvedPreset] && presetValuesMap[resolvedPreset][resolvedMode]
+            ? presetValuesMap[resolvedPreset][resolvedMode]
+            : {};
+          var resolvedFontSizePreset = fontSizePreset && fontSizeValuesMap[fontSizePreset]
+            ? fontSizePreset
+            : "normal";
+
+          applyVariableMap(presetValues);
+          root.style.removeProperty("--theme-font-family");
+          root.dataset.fontSizePreset = resolvedFontSizePreset;
+          root.style.fontSize = fontSizeValuesMap[resolvedFontSizePreset];
+
+          var customStyleElement = document.getElementById(${JSON.stringify(CUSTOM_THEME_STYLE_ELEMENT_ID)});
+          if (customStyleElement) {
+            customStyleElement.remove();
+          }
+        }
+      } catch (_error) {
+        // Ignore theme bootstrap failures and fall back to client sync.
+      }
+    })();
+  `
+}
+
 export interface ThemeLocalSettingsSnapshot {
   preference: ThemePreference
   preset: ThemePreset
@@ -780,17 +901,4 @@ export function applyTheme(preference: ThemePreference, preset: ThemePreset = "d
     document.getElementById(CUSTOM_THEME_STYLE_ELEMENT_ID)?.remove()
     applyFontSizePreset(fontSizePreset)
   }
-}
-
-export function getThemeInitScript() {
-  const themePresetValues = Object.fromEntries(
-    Object.entries(THEME_PRESETS).map(([presetName, presetDefinition]) => [presetName, presetDefinition.values]),
-  )
-  const fontSizePresetValues = Object.fromEntries(
-    Object.entries(FONT_SIZE_PRESETS).map(([presetName, presetDefinition]) => [presetName, presetDefinition.size]),
-  )
-
-  const defaultCustomVariables = buildCustomThemeVariables(DEFAULT_CUSTOM_THEME_CONFIG)
-
-  return `(function(){try{var themeStorageKey="${THEME_STORAGE_KEY}";var presetStorageKey="${THEME_PRESET_STORAGE_KEY}";var fontSizeStorageKey="${FONT_SIZE_PRESET_STORAGE_KEY}";var customThemeStorageKey="${CUSTOM_THEME_STORAGE_KEY}";var customThemeVariablesStorageKey="${CUSTOM_THEME_VARIABLES_STORAGE_KEY}";var customThemeStyleElementId="${CUSTOM_THEME_STYLE_ELEMENT_ID}";var presetMap=${JSON.stringify(themePresetValues)};var fontSizeMap=${JSON.stringify(fontSizePresetValues)};var defaultCustomVariables=${JSON.stringify(defaultCustomVariables)};var defaultCustomConfig=${JSON.stringify(DEFAULT_CUSTOM_THEME_CONFIG)};var variableNames=${JSON.stringify(THEME_VARIABLE_NAMES)};var storedTheme=window.localStorage.getItem(themeStorageKey);var preference=storedTheme==="dark"||storedTheme==="light"||storedTheme==="system"?storedTheme:"light";var storedPreset=window.localStorage.getItem(presetStorageKey);var preset=storedPreset==="custom"||storedPreset&&presetMap[storedPreset]?storedPreset:"default";var storedFontSize=window.localStorage.getItem(fontSizeStorageKey);var fontSizePreset=storedFontSize&&fontSizeMap[storedFontSize]?storedFontSize:"normal";var media=window.matchMedia("(prefers-color-scheme: dark)");var resolvedTheme=preference==="system"?(media.matches?"dark":"light"):preference;var root=document.documentElement;root.classList.toggle("dark",resolvedTheme==="dark");root.style.colorScheme=resolvedTheme;root.dataset.themePreset=preset;root.dataset.fontSizePreset=fontSizePreset;var customConfigRaw=window.localStorage.getItem(customThemeStorageKey);var customTypography=defaultCustomConfig.typography;var customCss=defaultCustomConfig.customCss||\"\";try{if(customConfigRaw){var parsedConfig=JSON.parse(customConfigRaw)||defaultCustomConfig;var parsedTypography=parsedConfig&&parsedConfig.typography&&typeof parsedConfig.typography===\"object\"?parsedConfig.typography:null;customTypography={fontFamily:parsedTypography&&typeof parsedTypography.fontFamily===\"string\"&&parsedTypography.fontFamily.trim()?parsedTypography.fontFamily:defaultCustomConfig.typography.fontFamily,fontSize:parsedTypography&&typeof parsedTypography.fontSize===\"string\"&&/^[0-9]+px$/i.test(parsedTypography.fontSize.trim())?parsedTypography.fontSize.trim():defaultCustomConfig.typography.fontSize};customCss=parsedConfig&&typeof parsedConfig.customCss===\"string\"?parsedConfig.customCss.replace(/\\r\\n/g,\"\\n\").replace(/\\u0000/g,\"\").trim():\"\";}}catch(configError){customTypography=defaultCustomConfig.typography;customCss=defaultCustomConfig.customCss||\"\";}var styleElement=document.getElementById(customThemeStyleElementId);if(preset===\"custom\"){root.style.setProperty(\"--theme-font-family\",customTypography.fontFamily);root.style.fontSize=customTypography.fontSize;if(customCss){if(!styleElement){styleElement=document.createElement(\"style\");styleElement.id=customThemeStyleElementId;document.head.appendChild(styleElement);}styleElement.textContent=customCss;}else if(styleElement){styleElement.remove();}}else{root.style.removeProperty(\"--theme-font-family\");root.style.fontSize=fontSizeMap[fontSizePreset]||fontSizeMap.normal||\"${DEFAULT_THEME_FONT_SIZE}\";if(styleElement){styleElement.remove();}}var customVariablesRaw=window.localStorage.getItem(customThemeVariablesStorageKey);var customVariables=defaultCustomVariables;try{if(customVariablesRaw){customVariables=JSON.parse(customVariablesRaw)||defaultCustomVariables;}}catch(innerError){customVariables=defaultCustomVariables;}var values=preset===\"custom\"?((customVariables&&customVariables[resolvedTheme])||defaultCustomVariables[resolvedTheme]||{}):((presetMap[preset]&&presetMap[preset][resolvedTheme])||{});for(var i=0;i<variableNames.length;i++){var key=variableNames[i];var value=values[key];if(typeof value===\"string\"&&value.length>0){root.style.setProperty(\"--\"+key,value);}else{root.style.removeProperty(\"--\"+key);}}}catch(error){document.documentElement.style.colorScheme=\"light\";document.documentElement.style.fontSize=\"${DEFAULT_THEME_FONT_SIZE}\";document.documentElement.style.removeProperty(\"--theme-font-family\");var fallbackStyleElement=document.getElementById(\"${CUSTOM_THEME_STYLE_ELEMENT_ID}\");if(fallbackStyleElement){fallbackStyleElement.remove();}}})();`
 }

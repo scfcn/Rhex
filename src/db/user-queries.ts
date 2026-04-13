@@ -196,6 +196,28 @@ export function findUserAccountSettingsById(userId: number) {
   })
 }
 
+export function findUserByNicknameInsensitive(nickname: string, excludeUserId?: number) {
+  return prisma.user.findFirst({
+    where: {
+      nickname: {
+        equals: nickname,
+        mode: "insensitive",
+      },
+      ...(typeof excludeUserId === "number"
+        ? {
+            id: {
+              not: excludeUserId,
+            },
+          }
+        : {}),
+    },
+    select: {
+      id: true,
+      nickname: true,
+    },
+  })
+}
+
 export function countUserFavorites(userId: number) {
   return prisma.favorite.count({
     where: { userId },

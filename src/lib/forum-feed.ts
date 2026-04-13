@@ -209,7 +209,7 @@ export async function getLatestFeed(
   }
 
   const anonymousMaskIdentity = await getAnonymousMaskDisplayIdentity()
-  const globalPinnedPosts = await findGlobalPinnedPosts()
+  const globalPinnedPosts = await findGlobalPinnedPosts({ homeVisibleOnly: true })
   const pinnedPostIds = extractPinnedPostIds(globalPinnedPosts)
   const total = await countLatestFeedPosts(pinnedPostIds)
   const pagination = resolvePagination({ page, pageSize }, total, [pageSize], pageSize)

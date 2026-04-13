@@ -23,24 +23,31 @@ import { enforceInteractionGate } from "@/lib/interaction-gates"
 import { createPostMentionNotifications, stripPostContentUserLinks } from "@/lib/post-mentions"
 import type { PreparedPointDelta } from "@/lib/point-center"
 import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
+import { normalizePostAttachmentInputs, syncPostAttachments } from "@/lib/post-attachments"
 import { buildPostContentDocument, getAllPostContentText, serializePostContentDocument } from "@/lib/post-content"
 import { createPostRedPacketAfterPostCreated, normalizePostRedPacketConfig } from "@/lib/post-red-packets"
 import type { StoredPostRewardPoolConfig } from "@/lib/post-reward-pool-config"
 import { normalizeManualTags, syncPostTaxonomy } from "@/lib/post-editor"
 import { getBoardTreasuryCreditFromConfiguredCharge } from "@/lib/board-treasury"
 import { POINT_LOG_EVENT_TYPES } from "@/lib/point-log-events"
+import {  buildPostSlug } from "@/lib/post-slug"
 import { getSiteSettings } from "@/lib/site-settings"
 import { validatePostPayload } from "@/lib/validators"
 
-function createPostSlug(title: string) {
-  const normalized = title
-    .toLowerCase()
-    .replace(/[^a-z0-9\u4e00-\u9fa5\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-")
-    .slice(0, 50)
+const MAX_POST_SLUG_RETRY_COUNT = 8
 
-  return `${normalized || "post"}-${Date.now()}`
+function isPostSlugUniqueConstraintError(error: unknown) {
+  if (!error || typeof error !== "object" || !("code" in error) || (error as { code?: string }).code !== "P2002") {
+    return false
+  }
+
+  const metaTarget = "meta" in error && typeof error.meta === "object" && error.meta && "target" in error.meta
+    ? error.meta.target
+    : null
+
+  return Array.isArray(metaTarget)
+    ? metaTarget.some((item) => item === "slug")
+    : true
 }
 
 export async function createPostFlow(body: unknown) {
@@ -203,143 +210,182 @@ export async function createPostFlow(body: unknown) {
     apiError(400, `当前${settings.pointName}不足，无法在该节点发布此帖子`)
   }
 
-  const shouldPending = Boolean(boardContext.settings.requirePostReview || titleSafety.shouldReview || contentSafety.shouldReview || loginUnlockSafety?.shouldReview || replyUnlockSafety?.shouldReview || purchaseUnlockSafety?.shouldReview || tagsSafety?.shouldReview)
-
-  const post = await runPostCreateTransaction(async (tx) => {
-    const lotteryData = normalizedLottery?.data
-    const postCreateData: Prisma.PostUncheckedCreateInput = {
-      title: titleSafety.sanitizedText,
-      slug: createPostSlug(titleSafety.sanitizedText),
-      content: serializedContent,
-      coverPath,
-      summary: summary || titleSafety.sanitizedText,
-      boardId: boardContext.board.id,
-      authorId: author.id,
-      isAnonymous,
-      type: postType,
-      status: shouldPending ? "PENDING" : "NORMAL",
-      commentsVisibleToAuthorOnly,
-      minViewLevel,
-      minViewVipLevel,
-      bountyPoints: postType === "BOUNTY" ? bountyPoints : null,
-      pollExpiresAt: postType === "POLL" ? pollExpiresAt : null,
-      lotteryStatus: postType === "LOTTERY" ? (shouldPending ? "DRAFT" : "ACTIVE") : null,
-      lotteryTriggerMode: postType === "LOTTERY"
-        ? determineLotteryTriggerMode({ endsAt: lotteryData?.endsAt ?? null, participantGoal: lotteryData?.participantGoal ?? null })
-        : null,
-      lotteryStartsAt: postType === "LOTTERY" ? (lotteryData?.startsAt ?? new Date()) : null,
-      lotteryEndsAt: postType === "LOTTERY" ? (lotteryData?.endsAt ?? null) : null,
-      lotteryParticipantGoal: postType === "LOTTERY" ? (lotteryData?.participantGoal ?? null) : null,
-      editableUntil: new Date(Date.now() + Math.max(0, settings.postEditableMinutes) * 60 * 1000),
-      publishedAt: shouldPending ? null : new Date(),
-      reviewNote: titleSafety.shouldReview || contentSafety.shouldReview || tagsSafety?.shouldReview ? "命中敏感词规则，已进入审核" : null,
-      pollOptions: postType === "POLL" ? { create: pollOptions.map((option, index) => ({ content: option, sortOrder: index })) } : undefined,
-      lotteryPrizes: postType === "LOTTERY" ? { create: (lotteryData?.prizes ?? []).map((prize, index) => ({ title: prize.title, description: prize.description, quantity: prize.quantity, sortOrder: index })) } : undefined,
-      lotteryConditions: postType === "LOTTERY" ? { create: (lotteryData?.conditions ?? []).map((condition, index) => ({ type: condition.type, operator: condition.operator ?? "GTE", value: condition.value, description: condition.description, groupKey: condition.groupKey ?? "default", sortOrder: index })) } : undefined,
-    }
-
-    const createdPost = await createPostRecord(tx, postCreateData)
-    await updateAuthorAfterPostCreated(tx, author.id, new Date())
-
-    let authorPointBalanceCursor = author.points
-
-    if (preparedPostDelta.finalDelta !== 0) {
-      const postDeltaResult = await applyPointDelta({
-        tx,
-        userId: author.id,
-        beforeBalance: authorPointBalanceCursor,
-        prepared: preparedPostDelta,
-        pointName: settings.pointName,
-        reason: "在指定节点发帖",
-        eventType: POINT_LOG_EVENT_TYPES.BOARD_POST_CHARGE,
-        eventData: {
-          boardId: boardContext.board.id,
-          postId: createdPost.id,
-          configuredCharge: boardContext.settings.postPointDelta,
-          appliedFinalDelta: preparedPostDelta.finalDelta,
-        },
-        relatedType: "POST",
-        relatedId: createdPost.id,
-      })
-      authorPointBalanceCursor = postDeltaResult.afterBalance
-
-      const treasuryCredit = getBoardTreasuryCreditFromConfiguredCharge(
-        boardContext.settings.postPointDelta,
-        postDeltaResult.finalDelta,
-      )
-      if (treasuryCredit > 0) {
-        await incrementBoardTreasuryPoints(tx, boardContext.board.id, treasuryCredit)
-      }
-    }
-
-    if (preparedBountyDelta) {
-      const bountyResult = await applyPointDelta({
-        tx,
-        userId: author.id,
-        beforeBalance: authorPointBalanceCursor,
-        prepared: preparedBountyDelta,
-        pointName: settings.pointName,
-        reason: "发布悬赏帖冻结积分",
-        relatedType: "POST",
-        relatedId: createdPost.id,
-      })
-      authorPointBalanceCursor = bountyResult.afterBalance
-    }
-
-    if (isAnonymous && settings.anonymousPostPrice > 0) {
-      const anonymousPreparedDelta: PreparedPointDelta = {
-        scopeKey: "POST_CREATE",
-        baseDelta: -settings.anonymousPostPrice,
-        finalDelta: -settings.anonymousPostPrice,
-        appliedRules: [],
-      }
-      const anonymousResult = await applyPointDelta({
-        tx,
-        userId: author.id,
-        beforeBalance: authorPointBalanceCursor,
-        prepared: anonymousPreparedDelta,
-        pointName: settings.pointName,
-        reason: "匿名发布帖子",
-        relatedType: "POST",
-        relatedId: createdPost.id,
-      })
-      authorPointBalanceCursor = anonymousResult.afterBalance
-    }
-
-    await createPostRedPacketAfterPostCreated({
-      tx,
-      postId: createdPost.id,
-      senderId: author.id,
-      senderBalanceBeforeChange: authorPointBalanceCursor,
-      config: normalizedRedPacket.data,
-      pointName: settings.pointName,
-    })
-
-    await incrementBoardPostCount(tx, boardContext.board.id)
-
-    if (!shouldPending) {
-      const mentionResult = await createPostMentionNotifications({
-        tx,
-        postId: createdPost.id,
-        senderId: author.id,
-        senderName: isAnonymous && anonymousMaskUser
-          ? (anonymousMaskUser.nickname ?? anonymousMaskUser.username)
-          : (author.nickname ?? author.username),
-        rawPostContent: serializedContent,
-      })
-
-      if (mentionResult.content !== serializedContent) {
-        await updatePostContentAndSummary(
-          tx,
-          createdPost.id,
-          mentionResult.content,
-          extractSummaryFromContent(getAllPostContentText(stripPostContentUserLinks(mentionResult.content))) || titleSafety.sanitizedText,
-        )
-      }
-    }
-
-    return createdPost
+  const normalizedAttachments = await normalizePostAttachmentInputs(rawBody?.attachments, {
+    settings,
+    user: author,
   })
+
+  const shouldPending = Boolean(boardContext.settings.requirePostReview)
+  const contentAdjusted = Boolean(
+    titleSafety.wasReplaced
+    || contentSafety.wasReplaced
+    || loginUnlockSafety?.wasReplaced
+    || replyUnlockSafety?.wasReplaced
+    || purchaseUnlockSafety?.wasReplaced
+    || tagsSafety?.wasReplaced,
+  )
+  let slug = buildPostSlug(titleSafety.sanitizedText, settings.postSlugGenerationMode)
+  let post = null as Awaited<ReturnType<typeof createPostRecord>> | null
+  let mentionUserIds = [] as number[]
+
+  for (let attempt = 0; attempt < MAX_POST_SLUG_RETRY_COUNT; attempt += 1) {
+    try {
+      post = await runPostCreateTransaction(async (tx) => {
+        const lotteryData = normalizedLottery?.data
+        const postCreateData: Prisma.PostUncheckedCreateInput = {
+          title: titleSafety.sanitizedText,
+          slug,
+          content: serializedContent,
+          coverPath,
+          summary: summary || titleSafety.sanitizedText,
+          boardId: boardContext.board.id,
+          authorId: author.id,
+          isAnonymous,
+          type: postType,
+          status: shouldPending ? "PENDING" : "NORMAL",
+          commentsVisibleToAuthorOnly,
+          minViewLevel,
+          minViewVipLevel,
+          bountyPoints: postType === "BOUNTY" ? bountyPoints : null,
+          pollExpiresAt: postType === "POLL" ? pollExpiresAt : null,
+          lotteryStatus: postType === "LOTTERY" ? (shouldPending ? "DRAFT" : "ACTIVE") : null,
+          lotteryTriggerMode: postType === "LOTTERY"
+            ? determineLotteryTriggerMode({ endsAt: lotteryData?.endsAt ?? null, participantGoal: lotteryData?.participantGoal ?? null })
+            : null,
+          lotteryStartsAt: postType === "LOTTERY" ? (lotteryData?.startsAt ?? new Date()) : null,
+          lotteryEndsAt: postType === "LOTTERY" ? (lotteryData?.endsAt ?? null) : null,
+          lotteryParticipantGoal: postType === "LOTTERY" ? (lotteryData?.participantGoal ?? null) : null,
+          editableUntil: new Date(Date.now() + Math.max(0, settings.postEditableMinutes) * 60 * 1000),
+          publishedAt: shouldPending ? null : new Date(),
+          reviewNote: shouldPending ? "当前节点开启发帖审核，帖子已进入审核" : null,
+          pollOptions: postType === "POLL" ? { create: pollOptions.map((option, index) => ({ content: option, sortOrder: index })) } : undefined,
+          lotteryPrizes: postType === "LOTTERY" ? { create: (lotteryData?.prizes ?? []).map((prize, index) => ({ title: prize.title, description: prize.description, quantity: prize.quantity, sortOrder: index })) } : undefined,
+          lotteryConditions: postType === "LOTTERY" ? { create: (lotteryData?.conditions ?? []).map((condition, index) => ({ type: condition.type, operator: condition.operator ?? "GTE", value: condition.value, description: condition.description, groupKey: condition.groupKey ?? "default", sortOrder: index })) } : undefined,
+        }
+
+        const createdPost = await createPostRecord(tx, postCreateData)
+        if (normalizedAttachments.length > 0) {
+          await syncPostAttachments(tx, {
+            postId: createdPost.id,
+            attachments: normalizedAttachments,
+          })
+        }
+        await updateAuthorAfterPostCreated(tx, author.id, new Date())
+
+        let authorPointBalanceCursor = author.points
+
+        if (preparedPostDelta.finalDelta !== 0) {
+          const postDeltaResult = await applyPointDelta({
+            tx,
+            userId: author.id,
+            beforeBalance: authorPointBalanceCursor,
+            prepared: preparedPostDelta,
+            pointName: settings.pointName,
+            reason: "在指定节点发帖",
+            eventType: POINT_LOG_EVENT_TYPES.BOARD_POST_CHARGE,
+            eventData: {
+              boardId: boardContext.board.id,
+              postId: createdPost.id,
+              configuredCharge: boardContext.settings.postPointDelta,
+              appliedFinalDelta: preparedPostDelta.finalDelta,
+            },
+            relatedType: "POST",
+            relatedId: createdPost.id,
+          })
+          authorPointBalanceCursor = postDeltaResult.afterBalance
+
+          const treasuryCredit = getBoardTreasuryCreditFromConfiguredCharge(
+            boardContext.settings.postPointDelta,
+            postDeltaResult.finalDelta,
+          )
+          if (treasuryCredit > 0) {
+            await incrementBoardTreasuryPoints(tx, boardContext.board.id, treasuryCredit)
+          }
+        }
+
+        if (preparedBountyDelta) {
+          const bountyResult = await applyPointDelta({
+            tx,
+            userId: author.id,
+            beforeBalance: authorPointBalanceCursor,
+            prepared: preparedBountyDelta,
+            pointName: settings.pointName,
+            reason: "发布悬赏帖冻结积分",
+            relatedType: "POST",
+            relatedId: createdPost.id,
+          })
+          authorPointBalanceCursor = bountyResult.afterBalance
+        }
+
+        if (isAnonymous && settings.anonymousPostPrice > 0) {
+          const anonymousPreparedDelta: PreparedPointDelta = {
+            scopeKey: "POST_CREATE",
+            baseDelta: -settings.anonymousPostPrice,
+            finalDelta: -settings.anonymousPostPrice,
+            appliedRules: [],
+          }
+          const anonymousResult = await applyPointDelta({
+            tx,
+            userId: author.id,
+            beforeBalance: authorPointBalanceCursor,
+            prepared: anonymousPreparedDelta,
+            pointName: settings.pointName,
+            reason: "匿名发布帖子",
+            relatedType: "POST",
+            relatedId: createdPost.id,
+          })
+          authorPointBalanceCursor = anonymousResult.afterBalance
+        }
+
+        await createPostRedPacketAfterPostCreated({
+          tx,
+          postId: createdPost.id,
+          senderId: author.id,
+          senderBalanceBeforeChange: authorPointBalanceCursor,
+          config: normalizedRedPacket.data,
+          pointName: settings.pointName,
+        })
+
+        await incrementBoardPostCount(tx, boardContext.board.id)
+
+        if (!shouldPending) {
+          const mentionResult = await createPostMentionNotifications({
+            tx,
+            postId: createdPost.id,
+            senderId: author.id,
+            senderName: isAnonymous && anonymousMaskUser
+              ? (anonymousMaskUser.nickname ?? anonymousMaskUser.username)
+              : (author.nickname ?? author.username),
+            rawPostContent: serializedContent,
+          })
+          mentionUserIds = mentionResult.mentionUserIds
+
+          if (mentionResult.content !== serializedContent) {
+            await updatePostContentAndSummary(
+              tx,
+              createdPost.id,
+              mentionResult.content,
+              extractSummaryFromContent(getAllPostContentText(stripPostContentUserLinks(mentionResult.content))) || titleSafety.sanitizedText,
+            )
+          }
+        }
+
+        return createdPost
+      })
+
+      break
+    } catch (error) {
+      if (!isPostSlugUniqueConstraintError(error) || attempt === MAX_POST_SLUG_RETRY_COUNT - 1) {
+        throw error
+      }
+
+      slug = buildPostSlug(titleSafety.sanitizedText, settings.postSlugGenerationMode)
+    }
+  }
+
+  if (!post) {
+    apiError(500, "帖子 slug 生成失败，请稍后再试")
+  }
 
   await syncPostTaxonomy(post.id, titleSafety.sanitizedText, serializedContent, sanitizedManualTags)
 
@@ -347,5 +393,7 @@ export async function createPostFlow(body: unknown) {
     post,
     author,
     shouldPending,
+    contentAdjusted,
+    mentionUserIds,
   }
 }

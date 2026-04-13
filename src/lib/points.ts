@@ -3,7 +3,6 @@ import type { PointLogEventDataValue, PointLogEventType } from "@/lib/point-log-
 
 import { countUserPointLogs, findUserPointLogsCursor } from "@/db/point-log-queries"
 import { decodeTimestampCursor, encodeTimestampCursor } from "@/lib/cursor-pagination"
-import { formatDateTime } from "@/lib/formatters"
 import { resolvePointLogAuditPresentation, type PointLogEffectMetadata, type PointLogTaxMetadata } from "@/lib/point-log-audit"
 
 import { withRuntimeFallback } from "@/lib/runtime-errors"
@@ -67,7 +66,7 @@ export async function getUserPointLogs(userId: number, options: { pageSize?: num
           eventData: log.eventData,
           relatedType: log.relatedType,
           relatedId: log.relatedId,
-          createdAt: formatDateTime(log.createdAt),
+          createdAt: log.createdAt.toISOString(),
         }
       }),
       pageSize,

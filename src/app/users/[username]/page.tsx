@@ -3,24 +3,24 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { AccessDeniedCard } from "@/components/access-denied-card"
-import { AnonymousUserIndicator } from "@/components/anonymous-user-indicator"
-import { ForumPostStream } from "@/components/forum-post-stream"
+import { AnonymousUserIndicator } from "@/components/user/anonymous-user-indicator"
+import { ForumPostStream } from "@/components/forum/forum-post-stream"
 import { LevelBadge } from "@/components/level-badge"
 import { MarkdownContent } from "@/components/markdown-content"
-import { UserProfileBadgeShowcase } from "@/components/user-profile-badge-showcase"
-import { ReportDialog } from "@/components/report-dialog"
+import { UserProfileBadgeShowcase } from "@/components/user/user-profile-badge-showcase"
+import { ReportDialog } from "@/components/post/report-dialog"
 import { SiteHeader } from "@/components/site-header"
-import { UserPublicCollectionsPanel } from "@/components/user-public-collections-panel"
-import { UserRecentActivityPanel } from "@/components/user-recent-activity-panel"
-import { UserRecentRepliesList } from "@/components/user-recent-replies-list"
-import { UserAvatar } from "@/components/user-avatar"
-import { UserProfileOverviewCard } from "@/components/user-profile-overview-card"
-import { UserStatusBadge } from "@/components/user-status-badge"
-import { UserVerificationBadge } from "@/components/user-verification-badge"
+import { UserPublicCollectionsPanel } from "@/components/user/user-public-collections-panel"
+import { UserRecentActivityPanel } from "@/components/user/user-recent-activity-panel"
+import { UserRecentRepliesList } from "@/components/user/user-recent-replies-list"
+import { UserAvatar } from "@/components/user/user-avatar"
+import { UserProfileOverviewCard } from "@/components/user/user-profile-overview-card"
+import { UserStatusBadge } from "@/components/user/user-status-badge"
+import { UserVerificationBadge } from "@/components/user/user-verification-badge"
 import { canViewUserProfileVisibility } from "@/lib/user-profile-settings"
-import { VipDisplayName } from "@/components/vip-display-name"
-import { VipBadge } from "@/components/vip-badge"
-import { Button } from "@/components/ui/button"
+import { VipDisplayName } from "@/components/vip/vip-display-name"
+import { VipBadge } from "@/components/vip/vip-badge"
+import { Button } from "@/components/ui/rbutton"
 import { Card, CardContent } from "@/components/ui/card"
 import { getCurrentUser } from "@/lib/auth"
 import { getGrantedBadgesForUser } from "@/lib/badges"
@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils"
 import { getUserProfile, getUserPosts, getUserRecentReplies } from "@/lib/users"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
 
-const profileCardClassName = "rounded-2xl border border-[#e8e8e8] shadow-sm"
+const profileCardClassName = "rounded-2xl border  shadow-xs"
 
 const identityTagClassNames = {
   vip: "rounded-full bg-violet-100 px-3 py-1 text-xs font-medium text-violet-700 dark:bg-violet-400/15 dark:text-violet-200",
@@ -41,7 +41,7 @@ const identityTagClassNames = {
   sky: "rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700 dark:bg-sky-400/15 dark:text-sky-200",
   danger: "rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700 dark:bg-red-500/15 dark:text-red-200",
   warning: "rounded-full bg-yellow-100 px-3 py-1 text-xs font-medium text-yellow-700 dark:bg-yellow-500/15 dark:text-yellow-200",
-  plain: "rounded-full bg-secondary px-3 py-1 text-xs font-medium text-muted-foreground dark:bg-white/[0.06] dark:text-slate-300",
+  plain: "rounded-full bg-secondary px-3 py-1 text-xs font-medium text-muted-foreground dark:bg-white/6 dark:text-slate-300",
 } satisfies Record<"plain" | "vip" | "level" | "orange" | "sky" | "danger" | "warning", string>
 
 export async function generateMetadata(props: PageProps<"/users/[username]">): Promise<Metadata> {
@@ -148,7 +148,7 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
             <Card className={cn("relative", profileCardClassName)}>
               <CardContent className="p-5">
                 <div className="flex flex-col text-left">
-                  {isRestrictedUser ? <UserStatusBadge status={user.status} compact className="absolute right-4 top-4 shadow-sm" /> : null}
+                  {isRestrictedUser ? <UserStatusBadge status={user.status} compact className="absolute right-4 top-4 shadow-xs" /> : null}
                   <div className="flex items-start gap-4">
                     <UserAvatar
                       name={user.displayName || user.username}
@@ -266,11 +266,11 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
                   key: "introduction",
                   label: "介绍",
                   content: !canViewIntroduction ? (
-                    <div className="rounded-xl border border-dashed border-[#e8e8e8] px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/[0.02]">
+                    <div className="rounded-xl border border-dashed  px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/2">
                       {user.introductionVisibility === "MEMBERS" ? "该用户将介绍设置为登录后可见。" : "该用户未公开介绍。"}
                     </div>
                   ) : introduction ? (
-                    <div className="rounded-2xl border border-border/70 bg-card px-4 py-4 shadow-sm">
+                    <div className="rounded-2xl border border-border/70 bg-card px-4 py-4 shadow-xs">
                       <MarkdownContent
                         content={introduction}
                         markdownEmojiMap={settings.markdownEmojiMap}
@@ -278,7 +278,7 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
                       />
                     </div>
                   ) : (
-                    <div className="rounded-xl border border-dashed border-[#e8e8e8] px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/[0.02]">
+                    <div className="rounded-xl border border-dashed  px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/2">
                       这个用户还没有填写详细介绍。
                     </div>
                   ),
@@ -288,11 +288,11 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
                   label: "帖子",
                   count: posts.length,
                   content: !canViewRecentActivity ? (
-                    <div className="rounded-xl border border-dashed border-[#e8e8e8] px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/[0.02]">
+                    <div className="rounded-xl border border-dashed  px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/2">
                       {user.activityVisibility === "MEMBERS" ? "该用户将最近帖子设置为登录后可见。" : "该用户未公开最近帖子。"}
                     </div>
                   ) : posts.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-[#e8e8e8] px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/[0.02]">
+                    <div className="rounded-xl border border-dashed  px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/2">
                       最近还没有发布帖子。
                     </div>
                   ) : (
@@ -312,7 +312,7 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
                   content: canViewRecentActivity
                     ? <UserRecentRepliesList replies={recentReplies} postLinkDisplayMode={settings.postLinkDisplayMode} />
                     : (
-                      <div className="rounded-xl border border-dashed border-[#e8e8e8] px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/[0.02]">
+                      <div className="rounded-xl border border-dashed  px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/2">
                         {user.activityVisibility === "MEMBERS" ? "该用户将最近回复设置为登录后可见。" : "该用户未公开最近回复。"}
                       </div>
                     ),

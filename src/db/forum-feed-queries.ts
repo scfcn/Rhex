@@ -1,4 +1,5 @@
 import { prisma } from "@/db/client"
+import { buildHomeVisiblePostWhere } from "@/db/home-feed-visibility"
 import type { Prisma } from "@/db/types"
 
 export type FeedQuerySort = "latest" | "new" | "hot" | "weekly" | "following"
@@ -107,6 +108,7 @@ function buildFeedWhere(
   }
 
   return {
+    ...buildHomeVisiblePostWhere(),
     status: "NORMAL",
     id: excludedPostIds.length > 0 ? { notIn: excludedPostIds } : undefined,
     OR: followClauses.length > 0 ? followClauses : undefined,
@@ -255,7 +257,10 @@ export function countFollowingFeedPosts(filters: { boardIds: string[]; authorIds
 
 export function findLatestTopicPosts(limit: number) {
   return prisma.post.findMany({
-    where: { status: "NORMAL" },
+    where: {
+      ...buildHomeVisiblePostWhere(),
+      status: "NORMAL",
+    },
     orderBy: { createdAt: "desc" },
     take: limit,
     include: {
@@ -267,7 +272,13 @@ export function findLatestTopicPosts(limit: number) {
 
 export function findLatestReplyComments(limit: number) {
   return prisma.comment.findMany({
-    where: { status: "NORMAL", post: { status: "NORMAL" } },
+    where: {
+      status: "NORMAL",
+      post: {
+        ...buildHomeVisiblePostWhere(),
+        status: "NORMAL",
+      },
+    },
     orderBy: { createdAt: "desc" },
     take: limit,
     select: {

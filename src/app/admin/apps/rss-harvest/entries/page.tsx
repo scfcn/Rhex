@@ -2,10 +2,10 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 
-import { AdminModuleSearch } from "@/components/admin-module-search"
-import { RssEntryAdminPage } from "@/components/rss-entry-admin-page"
-import { AdminShell } from "@/components/admin-shell"
-import { Button } from "@/components/ui/button"
+import { AdminModuleSearch } from "@/components/admin/admin-module-search"
+import { RssEntryAdminPage } from "@/components/admin/rss-entry-admin-page"
+import { AdminShell } from "@/components/admin/admin-shell"
+import { Button } from "@/components/ui/rbutton"
 import { requireAdminUser } from "@/lib/admin"
 import { getRssEntryAdminPageData } from "@/lib/rss-entry-admin"
 import { getSiteSettings } from "@/lib/site-settings"
@@ -38,19 +38,23 @@ export default async function RssHarvestEntriesPage(props: { searchParams: Promi
   })
 
   return (
-    <AdminShell currentTab="/admin/apps" adminName={admin.nickname ?? admin.username}>
+    <AdminShell
+      currentKey="apps"
+      adminName={admin.nickname ?? admin.username}
+      headerDescription="查看 RSS 入库内容，执行审核、编辑和批量处理。"
+      headerSearch={<AdminModuleSearch className="w-full" />}
+      breadcrumbs={[
+        { label: "后台控制台", href: "/admin" },
+        { label: "应用中心", href: "/admin/apps" },
+        { label: "RSS 抓取中心", href: "/admin/apps/rss-harvest" },
+        { label: "RSS 采集数据" },
+      ]}
+    >
       <div className="space-y-6">
-        <div className="flex flex-col gap-4 rounded-[24px] border border-border bg-card px-5 py-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">RSS 模块</p>
-            <h2 className="text-lg font-semibold">RSS 采集数据后台</h2>
-          </div>
-          <div className="flex flex-wrap gap-2 md:ml-auto">
-            <Link href="/admin/apps/rss-harvest">
-              <Button type="button" variant="outline">返回任务页</Button>
-            </Link>
-            <AdminModuleSearch className="md:w-[360px]" />
-          </div>
+        <div className="flex justify-end">
+          <Link href="/admin/apps/rss-harvest">
+            <Button type="button" variant="outline">返回任务页</Button>
+          </Link>
         </div>
 
         <RssEntryAdminPage initialData={data} />

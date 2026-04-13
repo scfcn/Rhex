@@ -1,12 +1,10 @@
 import crypto from "node:crypto"
 
-import { createRequestControl, purgeExpiredRequestControls } from "@/db/write-guard-queries"
-import { Prisma } from "@/db/types"
 import { PublicRouteError } from "@/lib/public-route-error"
+import { createRedisKey } from "@/lib/redis"
+import { acquireRedisLease } from "@/lib/redis-lease"
 
 const BUILTIN_CAPTCHA_CONSUME_SCOPE = "builtin-captcha-consume"
-const BUILTIN_CAPTCHA_CONSUME_KIND = "captcha"
-const BUILTIN_CAPTCHA_PURGE_SAMPLING_RATE = 0.01
 
 export function hasBuiltinCaptchaSecret() {
   return Boolean(process.env.CAPTCHA_SECRET_KEY?.trim())
@@ -31,33 +29,14 @@ function base64UrlDecode(input: string) {
   return Buffer.from(input, "base64url").toString("utf8")
 }
 
-function isUniqueConstraintError(error: unknown) {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002"
-}
-
-function shouldPurgeExpiredBuiltinCaptchaControls() {
-  return Math.random() < BUILTIN_CAPTCHA_PURGE_SAMPLING_RATE
-}
-
 async function consumeBuiltinCaptchaToken(tokenNonce: string, expiresAt: number) {
-  try {
-    if (shouldPurgeExpiredBuiltinCaptchaControls()) {
-      await purgeExpiredRequestControls(new Date())
-    }
+  const lease = await acquireRedisLease({
+    key: createRedisKey(BUILTIN_CAPTCHA_CONSUME_SCOPE, tokenNonce),
+    ttlMs: Math.max(1, expiresAt - Date.now()),
+  })
 
-    await createRequestControl({
-      scope: BUILTIN_CAPTCHA_CONSUME_SCOPE,
-      identity: "builtin",
-      kind: BUILTIN_CAPTCHA_CONSUME_KIND,
-      fingerprint: tokenNonce,
-      expiresAt: new Date(expiresAt),
-    })
-  } catch (error) {
-    if (isUniqueConstraintError(error)) {
-      throw new PublicRouteError("验证码已被使用，请刷新后重试")
-    }
-
-    throw error
+  if (!lease) {
+    throw new PublicRouteError("验证码已被使用，请刷新后重试")
   }
 }
 

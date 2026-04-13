@@ -149,12 +149,10 @@ export async function createCommentFlow(input: {
   }
 
   const resolvedComment = resolveMentionsInText(contentSafety.sanitizedText, mentionUsers)
-  const reviewRequired = Boolean(postContext.settings.requireCommentReview || contentSafety.shouldReview)
-  const reviewNote = contentSafety.shouldReview
-    ? "评论命中敏感词规则，已进入审核"
-    : postContext.settings.requireCommentReview
-      ? "当前节点开启回帖审核，评论已进入审核"
-      : null
+  const reviewRequired = Boolean(postContext.settings.requireCommentReview)
+  const reviewNote = postContext.settings.requireCommentReview
+    ? "当前节点开启回帖审核，评论已进入审核"
+    : null
 
   const created = await createCommentWithRelations({
     postId,
@@ -177,7 +175,7 @@ export async function createCommentFlow(input: {
     boardId: postContext.post.boardId,
   })
 
-  const pageSize = 15
+  const pageSize = Math.min(50, Math.max(1, settings.commentPageSize || 15))
   const totalRootComments = normalizedParentId
     ? null
     : await countRootCommentsByPostId({
@@ -213,6 +211,7 @@ export async function createCommentFlow(input: {
     mentionUserIds: resolvedComment.mentions.map((mention) => mention.id),
     senderName,
     contentSafety,
+    contentAdjusted: contentSafety.wasReplaced,
     reviewRequired,
   }
 }

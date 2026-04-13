@@ -35,10 +35,6 @@ type PanelDraftState = {
   linkText: string
   linkUrl: string
   base64Text: string
-  tableHoverSize: {
-    rows: number
-    columns: number
-  }
 }
 
 const CLOSED_FLOATING_PANELS = {
@@ -62,7 +58,6 @@ const DEFAULT_PANEL_DRAFT: PanelDraftState = {
   linkText: "",
   linkUrl: "",
   base64Text: "",
-  tableHoverSize: { rows: 0, columns: 0 },
 }
 
 export function useEditorPanels({
@@ -137,14 +132,6 @@ export function useEditorPanels({
 
   const closeTablePanel = useCallback(() => {
     setOpenPanels((current) => ({ ...current, table: false }))
-    setPanelDraft((current) => (
-      current.tableHoverSize.rows || current.tableHoverSize.columns
-        ? {
-            ...current,
-            tableHoverSize: { rows: 0, columns: 0 },
-          }
-        : current
-    ))
   }, [])
 
   const closeImagePanel = useCallback(() => {
@@ -177,9 +164,8 @@ export function useEditorPanels({
   }, [openPanels.emoji, toggleFloatingPanel])
 
   const toggleTablePanel = useCallback(() => {
-    setPanelDraftValue("tableHoverSize", { rows: 0, columns: 0 })
     toggleFloatingPanel("table", !openPanels.table)
-  }, [openPanels.table, setPanelDraftValue, toggleFloatingPanel])
+  }, [openPanels.table, toggleFloatingPanel])
 
   const toggleLinkPanel = useCallback(() => {
     const nextOpen = !openPanels.link
@@ -294,14 +280,6 @@ export function useEditorPanels({
       ? "将以远程图片地址插入到当前光标位置。"
       : "请输入有效的 HTTP/HTTPS 图片地址"
   }, [panelDraft.remoteImageAlt, panelDraft.remoteImageUrl])
-
-  const tableHint = useMemo(() => {
-    if (!panelDraft.tableHoverSize.rows || !panelDraft.tableHoverSize.columns) {
-      return "移动鼠标选择要插入的表格尺寸"
-    }
-
-    return `${panelDraft.tableHoverSize.rows} 行 × ${panelDraft.tableHoverSize.columns} 列`
-  }, [panelDraft.tableHoverSize.columns, panelDraft.tableHoverSize.rows])
 
   const base64Preview = useMemo(() => (
     panelDraft.base64Text ? encodeBase64(panelDraft.base64Text) : ""
@@ -509,9 +487,6 @@ export function useEditorPanels({
       ready: tablePanelReady,
       panelRef: tablePanelRef,
       buttonRef: tableButtonRef,
-      hoverSize: panelDraft.tableHoverSize,
-      hint: tableHint,
-      setHoverSize: (nextValue: { rows: number; columns: number }) => setPanelDraftValue("tableHoverSize", nextValue),
       toggle: toggleTablePanel,
       close: closeTablePanel,
     },

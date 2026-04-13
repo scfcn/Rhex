@@ -1,4 +1,5 @@
 import { normalizePostType, type LocalPostType } from "@/lib/post-types"
+import { nicknameContainsWhitespace, normalizeNickname } from "@/lib/nickname"
 import { parseNonNegativeSafeInteger, parsePositiveSafeInteger } from "@/lib/shared/safe-integer"
 
 
@@ -18,6 +19,11 @@ interface PostPayloadValidationOptions {
 interface CommentPayloadValidationOptions {
   contentMinLength?: number
   contentMaxLength?: number
+}
+
+interface NicknameValidationOptions {
+  nicknameMinLength?: number
+  nicknameMaxLength?: number
 }
 
 function getField(body: unknown, key: string): unknown {
@@ -64,7 +70,16 @@ function validateNotificationWebhookUrl(notificationWebhookUrl: string) {
   return null
 }
 
-export function validateAuthPayload(body: unknown): ValidationResult<{
+function resolveNicknameLengthRange(options: NicknameValidationOptions = {}) {
+  const nicknameMinLength = Math.min(50, Math.max(1, options.nicknameMinLength ?? 1))
+
+  return {
+    nicknameMinLength,
+    nicknameMaxLength: Math.min(50, Math.max(nicknameMinLength, options.nicknameMaxLength ?? 20)),
+  }
+}
+
+export function validateAuthPayload(body: unknown, options: NicknameValidationOptions = {}): ValidationResult<{
   username: string
   password: string
   nickname: string
@@ -78,7 +93,8 @@ export function validateAuthPayload(body: unknown): ValidationResult<{
 }> {
   const username = normalizeString(getField(body, "username"))
   const password = normalizeString(getField(body, "password"))
-  const nickname = normalizeString(getField(body, "nickname"))
+  const rawNickname = getField(body, "nickname")
+  const nickname = normalizeNickname(rawNickname)
   const inviterUsername = normalizeString(getField(body, "inviterUsername"))
   const inviteCode = normalizeString(getField(body, "inviteCode")).toUpperCase()
   const email = normalizeString(getField(body, "email"))
@@ -103,8 +119,18 @@ export function validateAuthPayload(body: unknown): ValidationResult<{
     return { success: false, message: "密码长度需为 6-64 位" }
   }
 
-  if (nickname.length > 20) {
-    return { success: false, message: "昵称长度不能超过 20 个字符" }
+  const { nicknameMinLength, nicknameMaxLength } = resolveNicknameLengthRange(options)
+
+  if (nicknameContainsWhitespace(rawNickname)) {
+    return { success: false, message: "昵称不能包含空格" }
+  }
+
+  if (nickname && nickname.length < nicknameMinLength) {
+    return { success: false, message: `昵称长度不能少于 ${nicknameMinLength} 个字符` }
+  }
+
+  if (nickname.length > nicknameMaxLength) {
+    return { success: false, message: `昵称长度不能超过 ${nicknameMaxLength} 个字符` }
   }
 
   if (email && !isValidEmail(email)) {
@@ -362,14 +388,15 @@ export function validateNotificationSettingsPayload(body: unknown, options?: {
   }
 }
 
-export function validateProfilePayload(body: unknown): ValidationResult<{
+export function validateProfilePayload(body: unknown, options: NicknameValidationOptions = {}): ValidationResult<{
   nickname: string
   bio: string
   introduction: string
   email: string
   gender: string
 }> {
-  const nickname = normalizeString(getField(body, "nickname"))
+  const rawNickname = getField(body, "nickname")
+  const nickname = normalizeNickname(rawNickname)
   const bio = normalizeString(getField(body, "bio"))
   const introduction = normalizeString(getField(body, "introduction"))
   const email = normalizeString(getField(body, "email"))
@@ -379,8 +406,18 @@ export function validateProfilePayload(body: unknown): ValidationResult<{
     return { success: false, message: "昵称不能为空" }
   }
 
-  if (nickname.length > 20) {
-    return { success: false, message: "昵称长度不能超过 20 个字符" }
+  const { nicknameMinLength, nicknameMaxLength } = resolveNicknameLengthRange(options)
+
+  if (nicknameContainsWhitespace(rawNickname)) {
+    return { success: false, message: "昵称不能包含空格" }
+  }
+
+  if (nickname.length < nicknameMinLength) {
+    return { success: false, message: `昵称长度不能少于 ${nicknameMinLength} 个字符` }
+  }
+
+  if (nickname.length > nicknameMaxLength) {
+    return { success: false, message: `昵称长度不能超过 ${nicknameMaxLength} 个字符` }
   }
 
   if (bio.length > 200) {

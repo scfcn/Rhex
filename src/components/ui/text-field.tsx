@@ -35,7 +35,7 @@ export function TextField({
         placeholder={placeholder}
         required={required}
         className={cn(
-          "h-11 w-full rounded-full border border-border px-4 text-sm outline-none",
+          "h-11 w-full rounded-full border border-border px-4 text-sm outline-hidden",
           background === "card" ? "bg-card" : "bg-background",
           inputClassName,
         )}

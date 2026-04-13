@@ -1,6 +1,7 @@
 import { CommentStatus, PostStatus, Prisma } from "@/db/types"
 
 import { prisma } from "@/db/client"
+import { buildHomeVisiblePostWhere } from "@/db/home-feed-visibility"
 import { getBusinessDayRange } from "@/lib/formatters"
 
 export async function findHomeSidebarStats() {
@@ -67,6 +68,7 @@ export async function findHomeSidebarHotTopics(limit: number) {
   // 优先取上海业务日内有活动的热门帖子，老帖当天被顶起也会进入今日热帖。
   const todayPosts = await prisma.post.findMany({
     where: {
+      ...buildHomeVisiblePostWhere(),
       status: "NORMAL",
       activityAt: { gte: todayStart },
     },
@@ -85,6 +87,7 @@ export async function findHomeSidebarHotTopics(limit: number) {
 
   const historyPosts = await prisma.post.findMany({
     where: {
+      ...buildHomeVisiblePostWhere(),
       status: "NORMAL",
       ...(todayIds.length > 0 ? { id: { notIn: todayIds } } : {}),
     },

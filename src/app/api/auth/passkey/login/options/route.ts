@@ -16,7 +16,7 @@ export const POST = createRouteHandler(async () => {
   const response = NextResponse.json(apiSuccess({ options }, "success"))
 
   clearPasskeyCeremonyState(response, "login")
-  setPasskeyCeremonyState(response, "login", {
+  await setPasskeyCeremonyState(response, "login", {
     flow: "login",
     challenge: options.challenge,
   })

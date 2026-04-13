@@ -9,6 +9,7 @@ import {
 
 import { apiError } from "@/lib/api-route"
 import { defineAdminAction, writeAdminActionLog, type AdminActionDefinition } from "@/lib/admin-action-types"
+import { revalidateHomeSidebarStatsCache } from "@/lib/home-sidebar-stats"
 import { ensureCanEditBoard, ensureCanManageComment } from "@/lib/moderator-permissions"
 import { createSystemNotification } from "@/lib/notification-writes"
 
@@ -22,6 +23,7 @@ export const adminModerationActionHandlers: Record<string, AdminActionDefinition
       reviewedById: context.adminUserId,
       reviewedAt: new Date(),
     })
+    revalidateHomeSidebarStatsCache()
 
     if (comment.userId !== context.adminUserId) {
       await createSystemNotification({
@@ -50,6 +52,7 @@ export const adminModerationActionHandlers: Record<string, AdminActionDefinition
       reviewedById: context.adminUserId,
       reviewedAt: new Date(),
     })
+    revalidateHomeSidebarStatsCache()
 
     if (comment.userId !== context.adminUserId) {
       await createSystemNotification({
@@ -78,6 +81,7 @@ export const adminModerationActionHandlers: Record<string, AdminActionDefinition
       reviewedById: context.adminUserId,
       reviewedAt: new Date(),
     })
+    revalidateHomeSidebarStatsCache()
 
     if (comment.userId !== context.adminUserId) {
       await createSystemNotification({
@@ -106,6 +110,7 @@ export const adminModerationActionHandlers: Record<string, AdminActionDefinition
       reviewedById: context.adminUserId,
       reviewedAt: new Date(),
     })
+    revalidateHomeSidebarStatsCache()
 
     if (comment.userId !== context.adminUserId) {
       await createSystemNotification({

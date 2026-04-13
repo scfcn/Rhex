@@ -256,7 +256,16 @@ async function ensureSiteSettings() {
     uploadAllowedImageTypes: "jpg,jpeg,png,gif,webp",
     uploadMaxFileSizeMb: 5,
     uploadAvatarMaxFileSizeMb: 2,
-    appStateJson: "{}",
+    appStateJson: JSON.stringify({
+      __siteSettings: {
+        authPageShowcase: {
+          enabled: true,
+        },
+        leftSidebarDisplay: {
+          mode: "DEFAULT",
+        },
+      },
+    }),
   }
 
   return prisma.siteSetting.create({ data: siteSettingsData })

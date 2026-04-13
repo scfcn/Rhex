@@ -20,6 +20,7 @@ export interface EffectiveBoardSettings {
   minViewVipLevel: number
   minPostVipLevel: number
   minReplyVipLevel: number
+  showInHomeFeed: boolean
   moderatorsCanWithdrawBoardTreasury?: boolean
 }
 
@@ -65,6 +66,7 @@ export function resolveBoardSettings(zone?: Partial<Zone> | null, board?: Partia
     minViewVipLevel: board?.minViewVipLevel ?? zone?.minViewVipLevel ?? 0,
     minPostVipLevel: board?.minPostVipLevel ?? zone?.minPostVipLevel ?? 0,
     minReplyVipLevel: board?.minReplyVipLevel ?? zone?.minReplyVipLevel ?? 0,
+    showInHomeFeed: board?.showInHomeFeed ?? zone?.showInHomeFeed ?? true,
     moderatorsCanWithdrawBoardTreasury: Boolean(
       boardTreasury
       && typeof boardTreasury === "object"

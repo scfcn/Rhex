@@ -127,14 +127,14 @@ function renderMediaTag(tagName: "video" | "audio", src: string) {
 
   if (tagName === "video") {
     return [
-      '<div class="my-6 overflow-hidden rounded-2xl border border-border bg-black shadow-sm">',
+      '<div class="my-6 overflow-hidden rounded-2xl border border-border bg-black shadow-xs">',
       `<video class="block w-full max-h-[70vh] bg-black" controls preload="metadata" playsInline src="${escapeHtml(normalizedSrc)}"></video>`,
       "</div>",
     ].join("")
   }
 
   return [
-    '<div class="my-6 rounded-2xl border border-border bg-card p-4 shadow-sm">',
+    '<div>',
     `<audio class="block w-full" controls preload="metadata" src="${escapeHtml(normalizedSrc)}"></audio>`,
     "</div>",
   ].join("")
@@ -541,6 +541,12 @@ function renderMarkdownChunk(markdown: MarkdownIt, source: string, env: Markdown
   return (markdown as MarkdownIt & { render: (input: string, renderEnv?: MarkdownRenderEnv) => string }).render(source, env)
 }
 
+function stripUnsafeScriptTags(html: string) {
+  return html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<script\b[^>]*\/?>/gi, "")
+}
+
 export function isImageOnlyMarkdownHtml(html: string) {
   const normalized = html
     .replace(/<!--[\s\S]*?-->/g, "")
@@ -589,7 +595,7 @@ export function renderMarkdown(input: string, emojiItems: MarkdownEmojiItem[]) {
 
   flushMarkdownBuffer()
 
-  const html = htmlChunks.join("\n")
+  const html = stripUnsafeScriptTags(htmlChunks.join("\n"))
     .replace(/<center>/g, '<center class="my-3 block text-center">')
     .replace(/<p>/g, '<p class="my-3 leading-7 text-foreground">')
     .replace(/<p align="left">/g, '<p align="left" class="my-3 leading-7 text-left text-foreground">')
@@ -608,8 +614,8 @@ export function renderMarkdown(input: string, emojiItems: MarkdownEmojiItem[]) {
     .replace(/<th>/g, '<th class="border border-border px-3 py-2 text-left font-medium">')
     .replace(/<td>/g, '<td class="border border-border px-3 py-2 align-top">')
     .replace(/<pre>/g, '<pre class="my-4 overflow-x-auto rounded-2xl bg-secondary p-4">')
-    .replace(/<pre class="md-code-block">/g, '<pre class="md-code-block group my-5 overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50 text-sm text-slate-900 shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:shadow-lg">')
-    .replace(/<pre class="md-code-block md-mermaid-source" data-mermaid-source="true">/g, '<pre class="md-code-block md-mermaid-source group my-5 overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50 text-sm text-slate-900 shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:shadow-lg" data-mermaid-source="true">')
+    .replace(/<pre class="md-code-block">/g, '<pre class="md-code-block group my-5 overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50 text-sm text-slate-900 shadow-xs dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:shadow-lg">')
+    .replace(/<pre class="md-code-block md-mermaid-source" data-mermaid-source="true">/g, '<pre class="md-code-block md-mermaid-source group my-5 overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50 text-sm text-slate-900 shadow-xs dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:shadow-lg" data-mermaid-source="true">')
     .replace(/<div class="md-code-header">/g, '<div class="md-code-header flex items-center justify-between gap-3 border-b border-slate-200 bg-white/80 px-4 py-2 text-[11px] uppercase tracking-[0.24em] text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">')
     .replace(/<code>/g, '<code class="rounded bg-secondary px-1 py-0.5">')
     .replace(/<code class="language-/g, '<code class="hljs block min-w-full overflow-x-auto bg-transparent p-4 font-mono text-[13px] leading-6 language-')

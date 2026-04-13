@@ -1,6 +1,7 @@
 import { prisma } from "@/db/client"
 import { ConversationKind } from "@/db/types"
 import { createUserRouteHandler } from "@/lib/api-route"
+import { formatMonthDayTime } from "@/lib/formatters"
 import {
   buildCursorPayload,
   buildHeartbeatPayload,
@@ -14,6 +15,7 @@ import {
   type MessageStreamEvent,
   type MessageStreamCursor,
 } from "@/lib/message-event-bus"
+import { getUserDisplayName } from "@/lib/user-display"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -30,8 +32,14 @@ function mapMessageRowToEnvelope(
   userId: number,
   message: {
     id: string
+    body: string
     createdAt: Date
     senderId: number
+    sender: {
+      username: string
+      nickname: string | null
+      avatarPath: string | null
+    }
     conversationId: string
     conversation: {
       participants: Array<{
@@ -48,7 +56,12 @@ function mapMessageRowToEnvelope(
       type: "message.created",
       conversationId: message.conversationId,
       messageId: message.id,
+      content: message.body,
+      createdAtLabel: formatMonthDayTime(message.createdAt),
       senderId: message.senderId,
+      senderUsername: message.sender.username,
+      senderDisplayName: getUserDisplayName(message.sender),
+      senderAvatarPath: message.sender.avatarPath,
       recipientId: message.conversation.participants[0]?.userId ?? userId,
       occurredAt: cursor.createdAt,
     },
@@ -110,8 +123,16 @@ async function findMessageEventsAfterCursor(userId: number, cursor: MessageStrea
     take: MESSAGE_CATCH_UP_BATCH_SIZE,
     select: {
       id: true,
+      body: true,
       createdAt: true,
       senderId: true,
+      sender: {
+        select: {
+          username: true,
+          nickname: true,
+          avatarPath: true,
+        },
+      },
       conversationId: true,
       conversation: {
         select: {

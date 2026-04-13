@@ -19,7 +19,12 @@ export function findRegistrationConflict(input: {
   }
 
   if (input.nickname) {
-    or.push({ nickname: input.nickname })
+    or.push({
+      nickname: {
+        equals: input.nickname,
+        mode: "insensitive",
+      },
+    })
   }
 
   return prisma.user.findFirst({
@@ -85,4 +90,3 @@ export function runRegisterTransaction<T>(
 ) {
   return prisma.$transaction(callback)
 }
-

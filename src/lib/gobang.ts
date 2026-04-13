@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 
 export { GobangPage } from "@/components/gobang-page"
-export { GobangAdminPage } from "@/components/gobang-admin-page"
+export { GobangAdminPage } from "@/components/admin/gobang-admin-page"
 
 import { countGobangMatchesInRange, createGobangMatchRecord, findGobangUserPoints, finishGobangMatch, finishGobangMatchNow, getGobangMatchRow, getGobangMoves, insertGobangMove, insertGobangMoveNow, listGobangMatchRows, listGobangMovesByMatchIds, runGobangTransaction, type GobangMatchRow, type GobangMoveRow, updateGobangMatchTimestamp } from "@/db/gobang-queries"
 
@@ -288,61 +288,79 @@ function resolveChallengePolicy(
     winReward: number
   },
 ) {
-  const isVip = (user.vipLevel ?? 0) > 0
-  const freeLimit = config.dailyFreeGames + (isVip ? config.dailyVipFreeGames : 0)
-  const totalLimit = isVip ? config.dailyVipGameLimit : config.dailyNormalGameLimit
-  const remainingTotal = Math.max(0, totalLimit - todayCounts.total)
-  const remainingFree = Math.max(0, Math.min(freeLimit - todayCounts.total, remainingTotal))
-  const remainingPaid = Math.max(0, remainingTotal - remainingFree)
+  const quota = resolveChallengeQuota(user, todayCounts, config)
 
-  if (remainingFree > 0) {
+  if (quota.remainingFree > 0) {
     return {
       mode: "FREE" as ChallengeMode,
       ticketCost: 0,
       winReward: config.winReward,
-      remainingFree,
-      remainingPaid,
+      remainingFree: quota.remainingFree,
+      remainingPaid: quota.remainingPaid,
     }
   }
 
-  if (remainingPaid > 0) {
+  if (quota.remainingPaid > 0) {
     return {
       mode: "PAID" as ChallengeMode,
       ticketCost: config.ticketCost,
       winReward: config.ticketCost + config.winReward,
-      remainingFree,
-      remainingPaid,
+      remainingFree: quota.remainingFree,
+      remainingPaid: quota.remainingPaid,
     }
   }
 
   throw new Error("今日挑战次数已用完")
 }
 
+function resolveChallengeQuota(
+  user: CurrentUser,
+  todayCounts: { total: number; paid: number },
+  config: {
+    dailyFreeGames: number
+    dailyVipFreeGames: number
+    dailyNormalGameLimit: number
+    dailyVipGameLimit: number
+    ticketCost: number
+    winReward: number
+  },
+) {
+  const isVip = isVipActive(user)
+  const freeTotal = config.dailyFreeGames + (isVip ? config.dailyVipFreeGames : 0)
+  const totalLimit = isVip ? config.dailyVipGameLimit : config.dailyNormalGameLimit
+  const remainingTotal = Math.max(0, totalLimit - todayCounts.total)
+  const remainingFree = Math.max(0, Math.min(freeTotal - todayCounts.total, remainingTotal))
+  const paidTotal = Math.max(0, totalLimit - freeTotal)
+  const remainingPaid = Math.max(0, remainingTotal - remainingFree)
+
+  return {
+    freeTotal,
+    paidTotal,
+    remainingFree,
+    remainingPaid,
+  }
+}
+
 export async function getGobangPlayerSummary(user: CurrentUser): Promise<GobangPlayerSummary> {
 
-  const [config, todayCounts, settings] = await Promise.all([
+  const [config, todayCounts, settings, latestUser] = await Promise.all([
     getGobangPluginConfig(),
     countTodayMatches(user.id),
     getSiteSettings(),
+    findGobangUserPoints(user.id),
   ])
-
-  const isVip = isVipActive(user)
-
-  const freeTotal = config.dailyFreeGames + (isVip ? config.dailyVipFreeGames : 0)
-  const totalLimit = isVip ? config.dailyVipGameLimit : config.dailyNormalGameLimit
-  const paidTotal = Math.max(0, totalLimit - freeTotal)
-  const policy = resolveChallengePolicy(user, todayCounts, config)
+  const quota = resolveChallengeQuota(user, todayCounts, config)
 
   return {
     pointName: settings.pointName,
-    points: user.points ?? 0,
+    points: latestUser?.points ?? user.points ?? 0,
 
-    freeTotal,
-    freeUsed: Math.min(todayCounts.total, freeTotal),
-    freeRemaining: policy.remainingFree,
-    paidTotal,
-    paidUsed: Math.min(todayCounts.paid, paidTotal),
-    paidRemaining: policy.remainingPaid,
+    freeTotal: quota.freeTotal,
+    freeUsed: Math.min(todayCounts.total, quota.freeTotal),
+    freeRemaining: quota.remainingFree,
+    paidTotal: quota.paidTotal,
+    paidUsed: Math.min(todayCounts.paid, quota.paidTotal),
+    paidRemaining: quota.remainingPaid,
     challengeStatus: todayCounts.total > 0 ? "in_progress" : "not_started",
   }
 }
@@ -441,6 +459,7 @@ export async function createGobangMatch(user: CurrentUser) {
   return {
     matches: await listGobangMatches(user.id),
     policy,
+    summary: await getGobangPlayerSummary(user),
   }
 }
 

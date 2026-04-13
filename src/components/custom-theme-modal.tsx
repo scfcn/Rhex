@@ -1,20 +1,24 @@
 "use client"
 
-import { type ReactNode, useState } from "react"
+import { useState } from "react"
 
-import { AdminModal } from "@/components/admin-modal"
+import {
+  SettingsInputField,
+  SettingsSection,
+  SettingsTextareaField,
+} from "@/components/admin/admin-settings-fields"
+import { AdminSettingsSubTabs } from "@/components/admin/admin-settings-sub-tabs"
+import { Modal } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   DEFAULT_THEME_FONT_FAMILY,
   DEFAULT_THEME_FONT_SIZE,
   DEFAULT_CUSTOM_THEME_CONFIG,
-  THEME_STORAGE_KEY,
-  applyTheme,
   buildCustomThemeRawCss,
   readStoredCustomThemeConfig,
   resetCustomThemeConfig,
   resolveStoredCustomThemeConfig,
-  resolveStoredThemePreference,
   saveCustomThemeConfig,
   setStoredThemePreset,
   type CustomThemeConfig,
@@ -80,30 +84,15 @@ function CustomThemeModalContent({
   }
 
   function handleDisableCustomTheme() {
-    if (typeof window === "undefined") {
-      onClose()
-      return
-    }
-
-    const preference = resolveStoredThemePreference(window.localStorage.getItem(THEME_STORAGE_KEY))
-
     setStoredThemePreset("default")
-    applyTheme(preference, "default")
     onClose()
   }
 
   function handleSave() {
-    if (typeof window === "undefined") {
-      onClose()
-      return
-    }
-
     const normalizedDraft = resolveStoredCustomThemeConfig(draft)
-    const preference = resolveStoredThemePreference(window.localStorage.getItem(THEME_STORAGE_KEY))
 
     saveCustomThemeConfig(normalizedDraft)
     setStoredThemePreset("custom")
-    applyTheme(preference, "custom")
     onClose()
   }
 
@@ -113,7 +102,7 @@ function CustomThemeModalContent({
   }
 
   return (
-    <AdminModal
+    <Modal
       open={open}
       onClose={onClose}
       title="自定义主题"
@@ -148,28 +137,26 @@ function CustomThemeModalContent({
           <p className="mt-1">说明 4：CSS Tab 里的附加 CSS 会在自定义主题启用时直接注入页面，适合做更大范围的覆盖。</p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <TabButton active={activeTab === "palette"} onClick={() => setActiveTab("palette")}>调色</TabButton>
-          <TabButton active={activeTab === "css"} onClick={() => setActiveTab("css")}>CSS</TabButton>
-        </div>
+        <AdminSettingsSubTabs
+          items={[
+            { key: "palette", label: "调色", onSelect: () => setActiveTab("palette") },
+            { key: "css", label: "CSS", onSelect: () => setActiveTab("css") },
+          ]}
+          activeKey={activeTab}
+        />
 
         {activeTab === "palette" ? (
           <div className="space-y-4">
-            <section className="space-y-4 rounded-[22px] border border-border bg-card p-4">
-              <div>
-                <p className="text-sm font-semibold">字体与字号</p>
-                <p className="mt-1 text-xs leading-6 text-muted-foreground">字体建议填写完整 CSS font-family 栈；字号填数字即可，保存后会自动规范成 px。</p>
-              </div>
-
-              <label className="space-y-2">
-                <span className="text-sm font-medium">字体栈</span>
-                <input
-                  value={draft.typography.fontFamily}
-                  onChange={(event) => updateTypography("fontFamily", event.target.value)}
-                  className="h-11 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-none"
-                  placeholder={DEFAULT_THEME_FONT_FAMILY}
-                />
-              </label>
+            <SettingsSection
+              title="字体与字号"
+              description="字体建议填写完整 CSS font-family 栈；字号填数字即可，保存后会自动规范成 px。"
+            >
+              <SettingsInputField
+                label="字体栈"
+                value={draft.typography.fontFamily}
+                onChange={(value) => updateTypography("fontFamily", value)}
+                placeholder={DEFAULT_THEME_FONT_FAMILY}
+              />
 
               <div className="flex flex-wrap gap-2">
                 {fontFamilySuggestions.map((suggestion) => (
@@ -187,20 +174,20 @@ function CustomThemeModalContent({
               <label className="space-y-2">
                 <span className="text-sm font-medium">基础字号</span>
                 <div className="grid grid-cols-[minmax(0,1fr)_64px] gap-3">
-                  <input
+                  <Input
                     type="number"
                     min={12}
                     max={24}
                     step={1}
                     value={draft.typography.fontSize.replace(/px$/i, "")}
                     onChange={(event) => updateTypography("fontSize", event.target.value)}
-                    className="h-11 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-none"
+                    className="h-11 rounded-xl bg-background px-4 text-sm"
                     placeholder={DEFAULT_THEME_FONT_SIZE.replace(/px$/i, "")}
                   />
-                  <div className="flex h-11 items-center justify-center rounded-[18px] border border-border bg-secondary/30 text-sm text-muted-foreground">px</div>
+                  <div className="flex h-11 items-center justify-center rounded-xl bg-muted/40 text-sm text-muted-foreground">px</div>
                 </div>
               </label>
-            </section>
+            </SettingsSection>
 
             <div className="grid gap-4 lg:grid-cols-2">
               <ThemeModeCard
@@ -224,56 +211,39 @@ function CustomThemeModalContent({
           </div>
         ) : (
           <div className="space-y-4">
-            <section className="space-y-3 rounded-[22px] border border-border bg-card p-4">
-              <div>
-                <p className="text-sm font-semibold">附加自定义 CSS</p>
-                <p className="mt-1 text-xs leading-6 text-muted-foreground">这里写的 CSS 会在自定义主题启用时额外注入页面。适合改间距、圆角、阴影、局部字体、隐藏元素等，不影响调色面板生成的变量。</p>
-              </div>
-              <textarea
+            <SettingsSection
+              title="附加自定义 CSS"
+              description="这里写的 CSS 会在自定义主题启用时额外注入页面。适合改间距、圆角、阴影、局部字体、隐藏元素等，不影响调色面板生成的变量。"
+            >
+              <SettingsTextareaField
+                label="CSS"
                 value={draft.customCss}
-                onChange={(event) => updateCustomCss(event.target.value)}
-                className="min-h-[220px] w-full rounded-[18px] border border-border bg-background px-4 py-3 font-mono text-xs leading-6 text-foreground outline-none"
+                onChange={updateCustomCss}
+                rows={10}
+                className="[&>span]:sr-only"
                 placeholder={`body {\n  letter-spacing: 0.01em;\n}\n\n.markdown-body {\n  line-height: 1.9;\n}`}
+                textareaClassName="font-mono text-xs leading-6"
               />
-            </section>
+            </SettingsSection>
 
-            <section className="space-y-3 rounded-[22px] border border-border bg-card p-4">
-              <div>
-                <p className="text-sm font-semibold">最终 CSS 预览</p>
-                <p className="mt-1 text-xs leading-6 text-muted-foreground">这是“调色变量 + 字体字号 + 附加 CSS”合并后的最终结果，方便你审查。</p>
-              </div>
-              <textarea
-                readOnly
+            <SettingsSection
+              title="最终 CSS 预览"
+              description="这是“调色变量 + 字体字号 + 附加 CSS”合并后的最终结果，方便你审查。"
+            >
+              <SettingsTextareaField
+                label="最终 CSS"
                 value={rawCss}
-                className="min-h-[280px] w-full rounded-[18px] border border-border bg-background px-4 py-3 font-mono text-xs leading-6 text-foreground outline-none"
+                onChange={() => undefined}
+                rows={12}
+                className="[&>span]:sr-only"
+                readOnly
+                textareaClassName="font-mono text-xs leading-6"
               />
-            </section>
+            </SettingsSection>
           </div>
         )}
       </div>
-    </AdminModal>
-  )
-}
-
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  children: ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={active
-        ? "inline-flex h-9 items-center rounded-full bg-foreground px-4 text-sm font-medium text-background"
-        : "inline-flex h-9 items-center rounded-full border border-border bg-background px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"}
-    >
-      {children}
-    </button>
+    </Modal>
   )
 }
 
@@ -329,10 +299,11 @@ function ColorField({
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="h-9 min-w-0 w-full rounded-full border border-border bg-card px-3 text-sm outline-none"
+          className="h-9 min-w-0 w-full rounded-full border border-border bg-card px-3 text-sm outline-hidden"
           placeholder="#3b82f6"
         />
       </div>
     </label>
   )
 }
+

@@ -1,5 +1,14 @@
 export const HOST_APPS = [
   {
+    id: "ai-reply",
+    slug: "ai-reply",
+    name: "AI 助手",
+    description: "配置 AI 代理账号、模型接口、提示词与提及后自动回帖任务。",
+    href: "/admin/apps/ai-reply",
+    adminHref: "/admin/apps/ai-reply",
+    category: "智能",
+  },
+  {
     id: "gobang",
     slug: "gobang",
     name: "五子棋",

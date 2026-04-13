@@ -11,6 +11,9 @@ interface AccessThresholdSelectGroupProps {
   onVipLevelChange: (value: string) => void
   levelLabel?: string
   vipLevelLabel?: string
+  levelDescriptionBuilder?: (option: AccessThresholdOption | undefined) => string | undefined
+  vipLevelDescriptionBuilder?: (option: AccessThresholdOption | undefined) => string | undefined
+  disabled?: boolean
 }
 
 export function AccessThresholdSelectGroup({
@@ -22,9 +25,14 @@ export function AccessThresholdSelectGroup({
   onVipLevelChange,
   levelLabel = "最低浏览等级",
   vipLevelLabel = "最低 VIP 浏览等级",
+  levelDescriptionBuilder,
+  vipLevelDescriptionBuilder,
+  disabled = false,
 }: AccessThresholdSelectGroupProps) {
   const currentLevelOption = levelOptions.find((item) => item.value === levelValue) ?? levelOptions[0]
   const currentVipLevelOption = vipLevelOptions.find((item) => item.value === vipLevelValue) ?? vipLevelOptions[0]
+  const levelDescription = levelDescriptionBuilder ? levelDescriptionBuilder(currentLevelOption) : currentLevelOption?.description
+  const vipLevelDescription = vipLevelDescriptionBuilder ? vipLevelDescriptionBuilder(currentVipLevelOption) : currentVipLevelOption?.description
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -33,13 +41,14 @@ export function AccessThresholdSelectGroup({
         <select
           value={levelValue}
           onChange={(event) => onLevelChange(event.target.value)}
-          className="h-11 w-full rounded-full border border-border bg-card px-4 text-sm outline-none"
+          className="h-11 w-full rounded-full border border-border bg-card px-4 text-sm outline-hidden"
+          disabled={disabled}
         >
           {levelOptions.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
-        <p className="text-xs leading-6 text-muted-foreground">{currentLevelOption?.description}</p>
+        {levelDescription ? <p className="text-xs leading-6 text-muted-foreground">{levelDescription}</p> : null}
       </div>
 
       <div className="space-y-2">
@@ -47,13 +56,14 @@ export function AccessThresholdSelectGroup({
         <select
           value={vipLevelValue}
           onChange={(event) => onVipLevelChange(event.target.value)}
-          className="h-11 w-full rounded-full border border-border bg-card px-4 text-sm outline-none"
+          className="h-11 w-full rounded-full border border-border bg-card px-4 text-sm outline-hidden"
+          disabled={disabled}
         >
           {vipLevelOptions.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
-        <p className="text-xs leading-6 text-muted-foreground">{currentVipLevelOption?.description}</p>
+        {vipLevelDescription ? <p className="text-xs leading-6 text-muted-foreground">{vipLevelDescription}</p> : null}
       </div>
     </div>
   )

@@ -1,8 +1,8 @@
 import type { Metadata } from "next"
 
-import { FavoriteCollectionDetail } from "@/components/favorite-collection-detail"
-import { ForumPageShell } from "@/components/forum-page-shell"
-import { HomeSidebarPanels } from "@/components/home-sidebar-panels"
+import { FavoriteCollectionDetail } from "@/components/collection/favorite-collection-detail"
+import { ForumPageShell } from "@/components/forum/forum-page-shell"
+import { HomeSidebarPanels } from "@/components/home/home-sidebar-panels"
 import { SiteHeader } from "@/components/site-header"
 import { getHomeAnnouncements } from "@/lib/announcements"
 import { getCurrentUser } from "@/lib/auth"
@@ -94,6 +94,7 @@ export default async function FavoriteCollectionDetailPage(props: {
                 siteName={settings.siteName}
                 siteDescription={settings.siteDescription}
                 siteLogoPath={settings.siteLogoPath}
+                siteIconPath={settings.siteIconPath}
               />
             </div>
           )}

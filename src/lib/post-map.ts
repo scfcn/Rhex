@@ -170,6 +170,7 @@ export function mapListPost(post: ListPostSource, anonymousMaskIdentity: Anonymo
       ? {
           status: post.lotteryStatus ?? LotteryStatus.DRAFT,
           triggerMode: post.lotteryTriggerMode ?? LotteryTriggerMode.MANUAL,
+          renderedAt: new Date().toISOString(),
           startsAt: post.lotteryStartsAt?.toISOString() ?? null,
           endsAt: post.lotteryEndsAt?.toISOString() ?? null,
           participantGoal: post.lotteryParticipantGoal ?? null,

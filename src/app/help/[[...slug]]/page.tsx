@@ -1,9 +1,9 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 
-import { ForumPageShell } from "@/components/forum-page-shell"
+import { ForumPageShell } from "@/components/forum/forum-page-shell"
 import { HelpDocumentPageContent } from "@/components/help-document-page-content"
-import { HomeSidebarPanels } from "@/components/home-sidebar-panels"
+import { HomeSidebarPanels } from "@/components/home/home-sidebar-panels"
 import { SiteHeader } from "@/components/site-header"
 import { getHomeAnnouncements } from "@/lib/announcements"
 import { getCurrentUser } from "@/lib/auth"
@@ -81,6 +81,7 @@ export default async function HelpPage({ params }: HelpPageProps) {
                 siteName={settings.siteName}
                 siteDescription={settings.siteDescription}
                 siteLogoPath={settings.siteLogoPath}
+                siteIconPath={settings.siteIconPath}
               />
             </div>
           )}

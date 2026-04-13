@@ -100,9 +100,54 @@ export const defaultSiteSettingsCreateInput = {
   headerAppIconName: "grid",
   appStateJson: JSON.stringify({
     __siteSettings: {
+      registerNicknameLengths: {
+        minLength: 1,
+        maxLength: 20,
+      },
+      postSlugGeneration: {
+        mode: "TITLE_TIMESTAMP",
+      },
+      siteBranding: {
+        iconPath: "",
+      },
       footerCopyright: {
         text: defaultFooterCopyrightText,
         brandingVisible: true,
+      },
+      imageWatermark: {
+        enabled: false,
+        text: "",
+        position: "BOTTOM_RIGHT",
+        opacity: 22,
+        fontSize: 24,
+        margin: 24,
+        color: "#FFFFFF",
+      },
+      registrationEmailTemplates: {
+        registerVerification: {
+          subject: "{{siteName}} 验证码",
+          text: "你的验证码是 {{code}}，10 分钟内有效。如非本人操作请忽略。",
+          html: "<div style=\"font-family:Arial,sans-serif;line-height:1.7;color:#111\"><h2>{{siteName}} 验证码</h2><p>你的验证码是：</p><p style=\"font-size:28px;font-weight:700;letter-spacing:6px\">{{code}}</p><p>验证码 10 分钟内有效，如非本人操作请忽略。</p></div>",
+        },
+        resetPasswordVerification: {
+          subject: "{{siteName}} 找回密码验证码",
+          text: "用户 {{username}} 的找回密码验证码是 {{code}}，10 分钟内有效。如非本人操作，请尽快检查账号安全。",
+          html: "<div style=\"font-family:Arial,sans-serif;line-height:1.7;color:#111\"><h2>{{siteName}} 找回密码</h2><p>账号：<strong>{{username}}</strong></p><p>你的找回密码验证码是：</p><p style=\"font-size:28px;font-weight:700;letter-spacing:6px\">{{code}}</p><p>验证码 10 分钟内有效。如非本人操作，请忽略此邮件并尽快检查账号安全。</p></div>",
+        },
+      },
+      authPageShowcase: {
+        enabled: true,
+      },
+      leftSidebarDisplay: {
+        mode: "DEFAULT",
+      },
+      attachments: {
+        uploadEnabled: false,
+        downloadEnabled: false,
+        minUploadLevel: 0,
+        minUploadVipLevel: 0,
+        allowedExtensions: ["zip", "rar", "7z", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt"],
+        maxFileSizeMb: 20,
       },
     },
   }),

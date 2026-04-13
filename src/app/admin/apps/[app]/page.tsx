@@ -1,18 +1,20 @@
 import type { Metadata } from "next"
 import { notFound, redirect } from "next/navigation"
 
-import { AdminModuleSearch } from "@/components/admin-module-search"
-import { AdminShell } from "@/components/admin-shell"
+import { AdminModuleSearch } from "@/components/admin/admin-module-search"
+import { AdminShell } from "@/components/admin/admin-shell"
 import type { ReactNode, ComponentType } from "react"
 
 import { requireAdminUser } from "@/lib/admin"
 import { getHostAppBySlug } from "@/lib/apps"
 
 import { getGobangAppConfig, getSelfServeAdsAppConfig, getYinYangContractAppConfig } from "@/lib/app-config"
-import { GobangAdminPage } from "@/components/gobang-admin-page"
-import { RssHarvestAdminPage } from "@/components/rss-harvest-admin-page"
-import { SelfServeAdsAdminPage } from "@/components/self-serve-ads-admin-page"
-import { YinYangContractAdminPage } from "@/components/yinyang-contract-admin-page"
+import { AiReplyAdminPage } from "@/components/admin/ai-reply-admin-page"
+import { GobangAdminPage } from "@/components/admin/gobang-admin-page"
+import { RssHarvestAdminPage } from "@/components/admin/rss-harvest-admin-page"
+import { SelfServeAdsAdminPage } from "@/components/admin/self-serve-ads-admin-page"
+import { YinYangContractAdminPage } from "@/components/admin/yinyang-contract-admin-page"
+import { getAiReplyAdminData } from "@/lib/ai-reply"
 import { getRssAdminData } from "@/lib/rss-harvest"
 import { getSiteSettings } from "@/lib/site-settings"
 
@@ -23,7 +25,6 @@ type ConfigAdminComponentProps = {
 
 type AppPageRenderResult = {
   content: ReactNode
-  showTitleCard?: boolean
 }
 
 type AppPageRenderer = () => Promise<AppPageRenderResult>
@@ -41,22 +42,22 @@ function renderConfigPage(
 function renderAdminAppShell(params: {
   adminName: string
   appName: string
+  appDescription?: string
   content: ReactNode
-  showTitleCard?: boolean
 }) {
   return (
-    <AdminShell currentTab="/admin/apps" adminName={params.adminName}>
+    <AdminShell
+      currentKey="apps"
+      adminName={params.adminName}
+      headerDescription={params.appDescription ?? `${params.appName} 的后台配置与管理入口。`}
+      headerSearch={<AdminModuleSearch className="w-full" />}
+      breadcrumbs={[
+        { label: "后台控制台", href: "/admin" },
+        { label: "应用中心", href: "/admin/apps" },
+        { label: params.appName },
+      ]}
+    >
       <div className="space-y-6">
-        <div className="flex flex-col gap-4 rounded-[24px] border border-border bg-card px-5 py-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">当前模块</p>
-            <h2 className="text-lg font-semibold">{params.appName}  应用后台</h2>
-          </div>
-          <AdminModuleSearch className="md:ml-auto" />
-        </div>
-
-
-
         {params.content}
       </div>
     </AdminShell>
@@ -87,6 +88,9 @@ export default async function AdminAppPage(props: PageProps<"/admin/apps/[app]">
   }
 
   const appRenderers: Partial<Record<typeof app.slug, AppPageRenderer>> = {
+    "ai-reply": async () => ({
+      content: <AiReplyAdminPage initialData={await getAiReplyAdminData()} />,
+    }),
     gobang: async () => renderConfigPage(
       GobangAdminPage as ComponentType<ConfigAdminComponentProps>,
       "gobang",
@@ -112,12 +116,12 @@ export default async function AdminAppPage(props: PageProps<"/admin/apps/[app]">
     notFound()
   }
 
-  const { content, showTitleCard } = await renderAppPage()
+  const { content } = await renderAppPage()
 
   return renderAdminAppShell({
     adminName: admin.nickname ?? admin.username,
     appName: app.name,
+    appDescription: app.description,
     content,
-    showTitleCard: app.slug === "gobang" ? false : showTitleCard,
   })
 }

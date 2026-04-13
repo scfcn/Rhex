@@ -1,4 +1,5 @@
 import { apiSuccess, createUserRouteHandler, readJsonBody } from "@/lib/api-route"
+import { enqueueAiReplyForCommentMention } from "@/lib/ai-reply"
 import { updateCommentFlow } from "@/lib/comment-update-service"
 import { logRequestSucceeded } from "@/lib/request-log"
 
@@ -21,12 +22,19 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     userId: currentUser.id,
     targetId,
   }, {
-    reviewRequired: result.contentSafety.shouldReview,
+    contentAdjusted: result.contentAdjusted,
+  })
+
+  void enqueueAiReplyForCommentMention({
+    postId: result.updated.postId,
+    sourceCommentId: result.updated.id,
+    triggerUserId: currentUser.id,
+    mentionedUserIds: result.mentionUserIds,
   })
 
   return apiSuccess({
     id: result.updated.id,
-  }, result.contentSafety.shouldReview ? "评论编辑内容命中敏感词规则，已进入审核" : "评论已更新")
+  }, result.contentAdjusted ? "评论已更新，部分内容已自动替换" : "评论已更新")
 }, {
   errorMessage: "评论编辑失败",
   logPrefix: "[api/comments/update] unexpected error",

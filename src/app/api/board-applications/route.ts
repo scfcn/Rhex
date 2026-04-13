@@ -4,7 +4,7 @@ import { submitBoardApplication } from "@/lib/board-applications"
 export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   const body = await readJsonBody(request)
 
-  await submitBoardApplication({
+  const result = await submitBoardApplication({
     applicantId: currentUser.id,
     zoneId: typeof body.zoneId === "string" ? body.zoneId : "",
     name: typeof body.name === "string" ? body.name : "",
@@ -14,7 +14,7 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     reason: typeof body.reason === "string" ? body.reason : "",
   })
 
-  return apiSuccess(undefined, "节点申请已提交，待管理员审核")
+  return apiSuccess(undefined, result.contentAdjusted ? "节点申请已提交，部分内容已自动替换，待管理员审核" : "节点申请已提交，待管理员审核")
 }, {
   errorMessage: "提交节点申请失败",
   logPrefix: "[api/board-applications] unexpected error",

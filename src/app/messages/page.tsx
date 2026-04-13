@@ -6,7 +6,7 @@ import { getMessageCenterData } from "@/lib/messages"
 import { readSearchParam } from "@/lib/search-params"
 import { getSiteSettings } from "@/lib/site-settings"
 
-import { MessagesClient } from "@/components/messages-client"
+import { MessagesClient } from "@/components/message/messages-client"
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettings()
@@ -25,7 +25,7 @@ export default async function MessagesPage(props: PageProps<"/messages">) {
   return (
     <div className="min-h-screen ">
       <SiteHeader />
-      <MessagesClient currentUser={currentUser} initialData={data} conversationId={conversationId} />
+      <MessagesClient key={`${currentUser?.id ?? 0}:${conversationId ?? ""}`} currentUser={currentUser} initialData={data} conversationId={conversationId} />
     </div>
   )
 }

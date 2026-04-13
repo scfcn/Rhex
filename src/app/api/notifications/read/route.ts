@@ -1,11 +1,13 @@
 import { markNotificationAsRead } from "@/db/notification-queries"
 import { apiSuccess, createUserRouteHandler, readJsonBody, requireStringField } from "@/lib/api-route"
+import { revalidateUserSurfaceCache } from "@/lib/user-surface"
 
 export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   const body = await readJsonBody(request)
   const notificationId = requireStringField(body, "notificationId", "缺少通知 ID")
 
   await markNotificationAsRead(currentUser.id, notificationId)
+  revalidateUserSurfaceCache(currentUser.id)
 
   return apiSuccess(undefined, "已标记为已读")
 }, {

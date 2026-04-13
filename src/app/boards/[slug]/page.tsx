@@ -2,14 +2,14 @@ import type { Metadata } from "next"
 import { notFound, redirect } from "next/navigation"
 
 import { AccessDeniedCard } from "@/components/access-denied-card"
-import { BoardSidebarPanels } from "@/components/board-sidebar-panels"
-import { BoardFollowButton } from "@/components/board-follow-button"
+import { BoardSidebarPanels } from "@/components/board/board-sidebar-panels"
+import { BoardFollowButton } from "@/components/board/board-follow-button"
 import { CollapsibleInfoCard } from "@/components/collapsible-info-card"
-import { ForumPageShell } from "@/components/forum-page-shell"
-import { ForumPostStream } from "@/components/forum-post-stream"
-import { InfiniteForumPostStream } from "@/components/infinite-forum-post-stream"
+import { ForumPageShell } from "@/components/forum/forum-page-shell"
+import { ForumPostStream } from "@/components/forum/forum-post-stream"
+import { InfiniteForumPostStream } from "@/components/forum/infinite-forum-post-stream"
 import { PageNumberPagination } from "@/components/page-number-pagination"
-import { RssSubscribeButton } from "@/components/rss-subscribe-button"
+import { RssSubscribeButton } from "@/components/rss/rss-subscribe-button"
 import { SiteHeader } from "@/components/site-header"
 
 
@@ -93,6 +93,7 @@ export default async function BoardPage(props: PageProps<"/boards/[slug]">) {
     minReplyVipLevel: board.minReplyVipLevel ?? 0,
     requirePostReview: board.requirePostReview ?? false,
     requireCommentReview: board.requireCommentReview ?? false,
+    showInHomeFeed: true,
   }, "view")
 
   const rawPage = readSearchParam(searchParams?.page)
@@ -205,6 +206,7 @@ export default async function BoardPage(props: PageProps<"/boards/[slug]">) {
                 siteName={settings.siteName}
                 siteDescription={settings.siteDescription}
                 siteLogoPath={settings.siteLogoPath}
+                siteIconPath={settings.siteIconPath}
               />
             </aside>
           )}

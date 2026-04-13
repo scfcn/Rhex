@@ -1,4 +1,5 @@
 import { prisma } from "@/db/client"
+import { buildHomeVisiblePostWhere } from "@/db/home-feed-visibility"
 import type { Prisma } from "@/db/types"
 import { pinnedPostOrderBy, postListInclude } from "@/db/queries"
 
@@ -175,11 +176,12 @@ function getZonePinnedOrderBy(): Prisma.PostOrderByWithRelationInput[] {
   ]
 }
 
-export function findGlobalPinnedPosts(pageSize?: number) {
-  const normalizedPageSize = typeof pageSize === "number" ? Math.min(Math.max(1, pageSize), 50) : undefined
+export function findGlobalPinnedPosts(options?: { pageSize?: number; homeVisibleOnly?: boolean }) {
+  const normalizedPageSize = typeof options?.pageSize === "number" ? Math.min(Math.max(1, options.pageSize), 50) : undefined
 
   return prisma.post.findMany({
     where: {
+      ...(options?.homeVisibleOnly ? buildHomeVisiblePostWhere() : {}),
       status: "NORMAL",
       pinScope: "GLOBAL",
     },

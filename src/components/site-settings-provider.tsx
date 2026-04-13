@@ -3,17 +3,20 @@
 import { createContext, useContext, useMemo } from "react"
 
 import { DEFAULT_MARKDOWN_EMOJI_ITEMS, type MarkdownEmojiItem } from "@/lib/markdown-emoji"
+import type { LeftSidebarDisplayMode } from "@/lib/site-settings"
 import { DEFAULT_VIP_LEVEL_ICONS, normalizeVipLevelIcons, type VipLevelIcons } from "@/lib/vip-level-icons"
 
 interface SiteSettingsContextValue {
   markdownEmojiMap: MarkdownEmojiItem[]
   markdownImageUploadEnabled: boolean
+  leftSidebarDisplayMode: LeftSidebarDisplayMode
   vipLevelIcons: VipLevelIcons
 }
 
 const defaultSiteSettingsContextValue: SiteSettingsContextValue = {
   markdownEmojiMap: DEFAULT_MARKDOWN_EMOJI_ITEMS,
   markdownImageUploadEnabled: true,
+  leftSidebarDisplayMode: "DEFAULT",
   vipLevelIcons: DEFAULT_VIP_LEVEL_ICONS,
 }
 
@@ -23,15 +26,17 @@ interface SiteSettingsProviderProps {
   children: React.ReactNode
   markdownEmojiMap?: MarkdownEmojiItem[]
   markdownImageUploadEnabled?: boolean
+  leftSidebarDisplayMode?: LeftSidebarDisplayMode
   vipLevelIcons?: VipLevelIcons
 }
 
-export function SiteSettingsProvider({ children, markdownEmojiMap, markdownImageUploadEnabled = true, vipLevelIcons }: SiteSettingsProviderProps) {
+export function SiteSettingsProvider({ children, markdownEmojiMap, markdownImageUploadEnabled = true, leftSidebarDisplayMode = "DEFAULT", vipLevelIcons }: SiteSettingsProviderProps) {
   const value = useMemo<SiteSettingsContextValue>(() => ({
     markdownEmojiMap: markdownEmojiMap && markdownEmojiMap.length > 0 ? markdownEmojiMap : DEFAULT_MARKDOWN_EMOJI_ITEMS,
     markdownImageUploadEnabled,
+    leftSidebarDisplayMode,
     vipLevelIcons: normalizeVipLevelIcons(vipLevelIcons),
-  }), [markdownEmojiMap, markdownImageUploadEnabled, vipLevelIcons])
+  }), [leftSidebarDisplayMode, markdownEmojiMap, markdownImageUploadEnabled, vipLevelIcons])
 
   return <SiteSettingsContext.Provider value={value}>{children}</SiteSettingsContext.Provider>
 }

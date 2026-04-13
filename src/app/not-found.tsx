@@ -12,7 +12,7 @@ export default async function GlobalNotFoundPage() {
       <SiteHeader />
 
       <main className="mx-auto max-w-[1200px] px-1 py-10 lg:px-6 lg:py-16">
-        <section className="mx-auto max-w-4xl rounded-[32px] border border-border bg-card px-6 py-10 shadow-sm sm:px-8 lg:px-12 lg:py-14">
+        <section className="mx-auto max-w-4xl rounded-[32px] border border-border bg-card px-6 py-10 shadow-xs sm:px-8 lg:px-12 lg:py-14">
           <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
@@ -38,7 +38,7 @@ export default async function GlobalNotFoundPage() {
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-border bg-background/80 p-5 shadow-sm">
+            <div className="rounded-[28px] border border-border bg-background/80 p-5 shadow-xs">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent text-foreground">
                 <Compass className="h-7 w-7" />
               </div>

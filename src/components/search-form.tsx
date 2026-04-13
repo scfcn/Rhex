@@ -95,11 +95,13 @@ export function SearchForm({
 
     const nextKeyword = keyword.trim()
     const params = new URLSearchParams(searchParams.toString())
+    params.delete("after")
+    params.delete("before")
+    params.delete("page")
 
     if (!nextKeyword) {
       setExternalSearchMenuOpen(false)
       params.delete("q")
-      params.delete("page")
       router.push(`/search${params.toString() ? `?${params.toString()}` : ""}`)
       return
     }
@@ -112,13 +114,12 @@ export function SearchForm({
 
     setExternalSearchMenuOpen(false)
     params.set("q", nextKeyword)
-    params.set("page", "1")
-    router.push(`/search?${params.toString()}`)
+    router.push(`/search${params.toString() ? `?${params.toString()}` : ""}`)
   }
 
   return (
     <form onSubmit={handleSubmit} className={compact ? "relative w-full" : "relative w-full max-w-2xl"}>
-      <div className={compact ? "relative" : "flex items-center gap-2 rounded-full border border-border bg-background/95 px-4 py-3 text-foreground shadow-sm transition-shadow focus-within:shadow-soft"}>
+      <div className={compact ? "relative" : "flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-foreground transition-colors focus-within:border-foreground/20"}>
         {compact ? (
           <>
             {hasDesktopApps ? (
@@ -170,7 +171,7 @@ export function SearchForm({
             <input
               value={keyword}
               onChange={(event) => handleKeywordChange(event.target.value)}
-              className={`h-9 w-full rounded-full border border-border bg-muted/50 py-2 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary ${hasDesktopApps ? "pl-16" : "pl-10"}`}
+              className={`h-9 w-full rounded-full border border-border bg-muted/50 py-2 pr-4 text-sm focus:outline-hidden focus:ring-2 focus:ring-primary ${hasDesktopApps ? "pl-16" : "pl-10"}`}
               placeholder={searchEnabled ? "搜索节点、帖子、用户..." : "输入关键词后选择 Google 或 Bing"}
               maxLength={50}
               type="search"
@@ -183,11 +184,12 @@ export function SearchForm({
             <input
               value={keyword}
               onChange={(event) => handleKeywordChange(event.target.value)}
-              className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+              className="w-full bg-transparent text-sm text-foreground outline-hidden placeholder:text-muted-foreground"
               placeholder={searchEnabled ? "搜索节点、帖子、作者" : "输入关键词后选择 Google 或 Bing"}
               maxLength={50}
+              type="search"
             />
-            <button type="submit" className="rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90">
+            <button type="submit" className="shrink-0 rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted">
               {searchEnabled ? "搜索" : "继续搜索"}
             </button>
           </>

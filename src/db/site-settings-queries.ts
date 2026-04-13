@@ -112,14 +112,14 @@ export async function createSiteSettingsRecord(data: Prisma.SiteSettingCreateInp
 
 
 export async function getSensitiveWordStats() {
-  const [total, active, reject, review] = await Promise.all([
+  const [total, active, reject, replace] = await Promise.all([
     prisma.sensitiveWord.count(),
     prisma.sensitiveWord.count({ where: { status: true } }),
-    prisma.sensitiveWord.count({ where: { actionType: "REJECT" } }),
-    prisma.sensitiveWord.count({ where: { actionType: "REVIEW" } }),
+    prisma.sensitiveWord.count({ where: { actionType: { not: "REPLACE" } } }),
+    prisma.sensitiveWord.count({ where: { actionType: "REPLACE" } }),
   ])
 
-  return { total, active, reject, review }
+  return { total, active, reject, replace }
 }
 
 export async function findSensitiveWordsPage(skip: number, take: number) {

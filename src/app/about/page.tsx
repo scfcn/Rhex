@@ -2,10 +2,11 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { ArrowRight, Compass, HeartHandshake, LibraryBig, MessageSquareText, Sparkles } from "lucide-react"
 
-import { ForumPageShell } from "@/components/forum-page-shell"
-import { HomeSidebarPanels } from "@/components/home-sidebar-panels"
+import { ForumPageShell } from "@/components/forum/forum-page-shell"
+import { HomeSidebarPanels } from "@/components/home/home-sidebar-panels"
 import { SiteHeader } from "@/components/site-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { getHomeAnnouncements } from "@/lib/announcements"
 
 import { getCurrentUser } from "@/lib/auth"
 import { getBoards } from "@/lib/boards"
@@ -63,12 +64,13 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function AboutPage() {
   const settingsPromise = getSiteSettings()
-  const [settings, boards, zones, currentUser, hotTopics] = await Promise.all([
+  const [settings, boards, zones, currentUser, hotTopics,announcements] = await Promise.all([
     settingsPromise,
     getBoards(),
     getZones(),
     getCurrentUser(),
     settingsPromise.then((settings) => getHomeSidebarHotTopics(settings.homeSidebarHotTopicsCount)),
+    getHomeAnnouncements(3),
   ])
   const sidebarUser = await resolveSidebarUser(currentUser, settings)
 
@@ -82,7 +84,7 @@ export default async function AboutPage() {
           main={(
             <main className="py-1 pb-12 mt-6">
               <div className="space-y-6 ">
-          <section className="rounded-[28px] border border-border bg-card px-5 py-6 shadow-sm sm:px-7 sm:py-8">
+          <section className="rounded-[28px] border border-border bg-card px-5 py-6 shadow-xs sm:px-7 sm:py-8">
             <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
               <div className="max-w-3xl">
                 <div className="inline-flex items-center rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
@@ -116,7 +118,7 @@ export default async function AboutPage() {
           </section>
 
           <section className="grid gap-5 2xl:grid-cols-[1.05fr_0.95fr]">
-            <Card className="shadow-sm">
+            <Card className="shadow-xs">
               <CardHeader>
                 <CardTitle className="text-xl">这是什么样的社区</CardTitle>
               </CardHeader>
@@ -140,7 +142,7 @@ export default async function AboutPage() {
               {highlights.map((item) => {
                 const Icon = item.icon
                 return (
-                  <Card key={item.title} className="shadow-sm">
+                  <Card key={item.title} className="shadow-xs">
                     <CardContent className="p-5">
                       <div className="flex items-start gap-4">
                         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent text-foreground">
@@ -169,7 +171,7 @@ export default async function AboutPage() {
               {principles.map((item) => {
                 const Icon = item.icon
                 return (
-                  <Card key={item.title} className="shadow-sm">
+                  <Card key={item.title} className="shadow-xs">
                     <CardContent className="p-5">
                       <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent text-foreground">
                         <Icon className="h-5 w-5" />
@@ -189,7 +191,8 @@ export default async function AboutPage() {
           )}
           rightSidebar={(
             <aside className="mt-6 hidden pb-12 lg:block">
-              <HomeSidebarPanels user={sidebarUser} hotTopics={hotTopics} siteName={settings.siteName} siteDescription={settings.siteDescription} siteLogoPath={settings.siteLogoPath} />
+              <HomeSidebarPanels user={sidebarUser} hotTopics={hotTopics} announcements={announcements}
+                showAnnouncements={settings.homeSidebarAnnouncementsEnabled} siteName={settings.siteName} siteDescription={settings.siteDescription} siteLogoPath={settings.siteLogoPath} siteIconPath={settings.siteIconPath} />
             </aside>
           )}
         />

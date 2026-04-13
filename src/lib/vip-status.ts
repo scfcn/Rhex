@@ -37,16 +37,16 @@ export function getVipNameClass(isVip?: boolean, level?: number | null, options?
   const baseClassName = [fontWeightClassName, options?.interactive === false ? "" : "hover:underline"].filter(Boolean).join(" ")
 
   if (!isVip || !level || level <= 0) {
-    return baseClassName
+    return [baseClassName, "!text-[var(--vip-name-color-normal)]"].filter(Boolean).join(" ")
   }
 
   if (level >= 3) {
-    return `${baseClassName} text-amber-700 dark:text-amber-300`
+    return [baseClassName, "!text-[var(--vip-name-color-vip3)]"].filter(Boolean).join(" ")
   }
 
   if (level === 2) {
-    return `${baseClassName} text-rose-700 dark:text-rose-300`
+    return [baseClassName, "!text-[var(--vip-name-color-vip2)]"].filter(Boolean).join(" ")
   }
 
-  return `${baseClassName} text-violet-700 dark:text-violet-300`
+  return [baseClassName, "!text-[var(--vip-name-color-vip1)]"].filter(Boolean).join(" ")
 }

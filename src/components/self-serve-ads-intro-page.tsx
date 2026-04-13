@@ -9,7 +9,7 @@ interface SelfServeAdsIntroPageProps {
 export function SelfServeAdsIntroPage({ AppId }: SelfServeAdsIntroPageProps) {
   return (
     <section className="space-y-6">
-      <div className="rounded-[28px] border border-border bg-card p-6 shadow-sm shadow-black/5 dark:shadow-black/30">
+      <div className="rounded-[28px] border border-border bg-card p-6 shadow-xs shadow-black/5 dark:shadow-black/30">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold">自助推广广告位</h1>

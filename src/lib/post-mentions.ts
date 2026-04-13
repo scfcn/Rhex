@@ -65,6 +65,7 @@ export async function createPostMentionNotifications(params: {
     return {
       notifiedCount: 0,
       content: resolved.content,
+      mentionUserIds: resolved.mentions.map((user) => user.id),
     }
   }
 
@@ -86,5 +87,6 @@ export async function createPostMentionNotifications(params: {
   return {
     notifiedCount: notificationTargets.length,
     content: resolved.content,
+    mentionUserIds: resolved.mentions.map((user) => user.id),
   }
 }

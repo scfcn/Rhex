@@ -1,15 +1,14 @@
+import { randomUUID } from "node:crypto"
+
+import { logError } from "@/lib/logger"
+import type { MessageStreamEvent } from "@/lib/message-types"
+import { connectRedisClient, createRedisConnection, createRedisKey, hasRedisUrl } from "@/lib/redis"
+
+export type { MessageStreamEvent } from "@/lib/message-types"
+
 export interface MessageStreamCursor {
   id: string
   createdAt: string
-}
-
-export interface MessageStreamEvent {
-  type: "message.created"
-  conversationId: string
-  messageId: string
-  senderId: number
-  recipientId: number
-  occurredAt: string
 }
 
 type MessageEventListener = (event: MessageStreamEvent) => void
@@ -19,12 +18,25 @@ interface MessageEventSubscriber {
   listener: MessageEventListener
 }
 
+type GlobalMessageEventBusState = {
+  __bbsMessageEventBus?: MessageEventBus
+  __bbsRedisMessageEventBusRuntime?: RedisMessageEventBusRuntime
+}
+
+const globalMessageEventBus = globalThis as typeof globalThis & GlobalMessageEventBusState
+
+function getMessageEventChannel() {
+  return createRedisKey("message-events", "pubsub")
+}
+
 class MessageEventBus {
   private nextSubscriberId = 1
 
   private readonly subscribers = new Map<number, MessageEventSubscriber>()
 
   subscribe(userId: number, listener: MessageEventListener) {
+    void ensureMessageEventBusRuntimeReady()
+
     const subscriberId = this.nextSubscriberId
     this.nextSubscriberId += 1
     this.subscribers.set(subscriberId, { userId, listener })
@@ -34,7 +46,30 @@ class MessageEventBus {
     }
   }
 
-  publish(event: MessageStreamEvent) {
+  async publish(event: MessageStreamEvent) {
+    if (!hasRedisUrl()) {
+      this.publishLocal(event)
+      return
+    }
+
+    try {
+      const runtime = getRedisMessageEventBusRuntime()
+      await runtime.ensureReady()
+      await runtime.publish(event)
+    } catch (error) {
+      logError({
+        scope: "message-event-bus",
+        action: "publish",
+        metadata: {
+          conversationId: event.conversationId,
+          messageId: event.messageId,
+        },
+      }, error)
+      this.publishLocal(event)
+    }
+  }
+
+  publishLocal(event: MessageStreamEvent) {
     for (const subscriber of this.subscribers.values()) {
       if (subscriber.userId !== event.senderId && subscriber.userId !== event.recipientId) {
         continue
@@ -49,14 +84,86 @@ class MessageEventBus {
   }
 }
 
-const globalMessageEventBus = globalThis as typeof globalThis & {
-  __bbsMessageEventBus?: MessageEventBus
+class RedisMessageEventBusRuntime {
+  private readonly runtimeId = randomUUID()
+  private readonly publisher = createRedisConnection()
+  private readonly subscriber = createRedisConnection()
+  private readyPromise: Promise<void> | null = null
+
+  constructor(private readonly bus: MessageEventBus) {}
+
+  async ensureReady() {
+    this.readyPromise ??= this.start()
+      .catch((error) => {
+        this.readyPromise = null
+        throw error
+      })
+
+    return this.readyPromise
+  }
+
+  async publish(event: MessageStreamEvent) {
+    await this.publisher.publish(getMessageEventChannel(), JSON.stringify({
+      event,
+      origin: this.runtimeId,
+    }))
+  }
+
+  private async start() {
+    this.subscriber.on("message", (channel, rawMessage) => {
+      if (channel !== getMessageEventChannel()) {
+        return
+      }
+
+      try {
+        const payload = JSON.parse(rawMessage) as {
+          event?: MessageStreamEvent
+        }
+
+        if (!payload?.event) {
+          return
+        }
+
+        this.bus.publishLocal(payload.event)
+      } catch (error) {
+        logError({
+          scope: "message-event-bus",
+          action: "consume",
+        }, error)
+      }
+    })
+
+    await Promise.all([
+      connectRedisClient(this.publisher),
+      connectRedisClient(this.subscriber),
+    ])
+
+    await this.subscriber.subscribe(getMessageEventChannel())
+  }
 }
 
 export const messageEventBus = globalMessageEventBus.__bbsMessageEventBus ?? new MessageEventBus()
 
 if (!globalMessageEventBus.__bbsMessageEventBus) {
   globalMessageEventBus.__bbsMessageEventBus = messageEventBus
+}
+
+function getRedisMessageEventBusRuntime() {
+  const runtime = globalMessageEventBus.__bbsRedisMessageEventBusRuntime ?? new RedisMessageEventBusRuntime(messageEventBus)
+
+  if (!globalMessageEventBus.__bbsRedisMessageEventBusRuntime) {
+    globalMessageEventBus.__bbsRedisMessageEventBusRuntime = runtime
+  }
+
+  return runtime
+}
+
+export async function ensureMessageEventBusRuntimeReady() {
+  if (!hasRedisUrl()) {
+    return
+  }
+
+  await getRedisMessageEventBusRuntime().ensureReady()
 }
 
 export function buildMessageEventPayload(event: MessageStreamEvent) {
