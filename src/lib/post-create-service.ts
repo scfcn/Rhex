@@ -21,6 +21,7 @@ import { getBusinessDayRange, parseBusinessDateTime } from "@/lib/formatters"
 import { determineLotteryTriggerMode, normalizeLotteryConfig } from "@/lib/lottery"
 import { enforceInteractionGate } from "@/lib/interaction-gates"
 import { createPostMentionNotifications, stripPostContentUserLinks } from "@/lib/post-mentions"
+import { createPostAuctionRecord, enqueuePostAuctionSettlement, normalizePostAuctionConfig } from "@/lib/post-auctions"
 import type { PreparedPointDelta } from "@/lib/point-center"
 import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
 import { normalizePostAttachmentInputs, syncPostAttachments } from "@/lib/post-attachments"
@@ -63,7 +64,7 @@ export async function createPostFlow(body: unknown) {
     apiError(400, validated.message ?? "参数错误")
   }
 
-  const { title, content, isAnonymous, coverPath, boardSlug, postType, bountyPoints, pollOptions, commentsVisibleToAuthorOnly, loginUnlockContent, replyUnlockContent, replyThreshold, purchaseUnlockContent, purchasePrice, minViewLevel, minViewVipLevel, lotteryConfig } = validated.data
+  const { title, content, isAnonymous, coverPath, boardSlug, postType, bountyPoints, auctionConfig, pollOptions, commentsVisibleToAuthorOnly, loginUnlockContent, replyUnlockContent, replyThreshold, purchaseUnlockContent, purchasePrice, minViewLevel, minViewVipLevel, lotteryConfig } = validated.data
 
   const rawBody = body as Record<string, unknown>
   const manualTags = normalizeManualTags(Array.isArray(rawBody?.manualTags)
@@ -77,6 +78,7 @@ export async function createPostFlow(body: unknown) {
   const pollExpiresAt = typeof rawBody?.pollExpiresAt === "string" && rawBody.pollExpiresAt.trim() ? parseBusinessDateTime(rawBody.pollExpiresAt) : null
 
   const normalizedLottery = postType === "LOTTERY" ? normalizeLotteryConfig(lotteryConfig) : null
+  const normalizedAuction = postType === "AUCTION" ? normalizePostAuctionConfig(auctionConfig) : null
   const normalizedRedPacket = await normalizePostRedPacketConfig(redPacketConfig)
   const redPacketTotalPoints = normalizedRedPacket.data?.enabled
     ? normalizedRedPacket.data.mode === "JACKPOT"
@@ -86,6 +88,10 @@ export async function createPostFlow(body: unknown) {
 
   if (postType === "LOTTERY" && (!normalizedLottery?.success || !normalizedLottery.data)) {
     apiError(400, normalizedLottery?.message ?? "抽奖配置不合法")
+  }
+
+  if (postType === "AUCTION" && (!normalizedAuction?.success || !normalizedAuction.data)) {
+    apiError(400, normalizedAuction?.message ?? "拍卖配置不合法")
   }
 
   if (!normalizedRedPacket.success) {
@@ -226,9 +232,11 @@ export async function createPostFlow(body: unknown) {
   )
   let slug = buildPostSlug(titleSafety.sanitizedText, settings.postSlugGenerationMode)
   let post = null as Awaited<ReturnType<typeof createPostRecord>> | null
+  let createdAuction = null as Awaited<ReturnType<typeof createPostAuctionRecord>> | null
   let mentionUserIds = [] as number[]
 
   for (let attempt = 0; attempt < MAX_POST_SLUG_RETRY_COUNT; attempt += 1) {
+    createdAuction = null
     try {
       post = await runPostCreateTransaction(async (tx) => {
         const lotteryData = normalizedLottery?.data
@@ -268,6 +276,14 @@ export async function createPostFlow(body: unknown) {
           await syncPostAttachments(tx, {
             postId: createdPost.id,
             attachments: normalizedAttachments,
+          })
+        }
+        if (postType === "AUCTION" && normalizedAuction?.success && normalizedAuction.data) {
+          createdAuction = await createPostAuctionRecord(tx, {
+            postId: createdPost.id,
+            sellerId: author.id,
+            config: normalizedAuction.data,
+            active: !shouldPending,
           })
         }
         await updateAuthorAfterPostCreated(tx, author.id, new Date())
@@ -389,9 +405,14 @@ export async function createPostFlow(body: unknown) {
 
   await syncPostTaxonomy(post.id, titleSafety.sanitizedText, serializedContent, sanitizedManualTags)
 
+  if (createdAuction?.status === "ACTIVE") {
+    await enqueuePostAuctionSettlement(createdAuction.id, createdAuction.endsAt)
+  }
+
   return {
     post,
     author,
+    auction: createdAuction,
     shouldPending,
     contentAdjusted,
     mentionUserIds,

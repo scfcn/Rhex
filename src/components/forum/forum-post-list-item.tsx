@@ -10,7 +10,7 @@ import { Tooltip } from "@/components/ui/tooltip"
 import { VipNameTooltip } from "@/components/vip/vip-name-tooltip"
 import type { PostRewardPoolMode } from "@/lib/post-reward-pool-config"
 
-import { MessageCircle } from "lucide-react"
+import { MessageCircle, Paperclip } from "lucide-react"
 
 
 
@@ -29,6 +29,7 @@ interface ForumPostListItemProps {
     pinScope?: string | null
     pinLabel?: string | null
     hasRedPacket?: boolean
+    hasAttachments?: boolean
     rewardMode?: PostRewardPoolMode
     minViewLevel?: number
     minViewVipLevel?: number
@@ -59,10 +60,17 @@ interface ForumPostListItemProps {
   }
   showBoard?: boolean
   compactFirstItem?: boolean
+  hideDivider?: boolean
   postLinkDisplayMode?: "SLUG" | "ID"
 }
 
-export function ForumPostListItem({ item, showBoard = true, compactFirstItem = false, postLinkDisplayMode = "SLUG" }: ForumPostListItemProps) {
+export function ForumPostListItem({
+  item,
+  showBoard = true,
+  compactFirstItem = false,
+  hideDivider = false,
+  postLinkDisplayMode = "SLUG",
+}: ForumPostListItemProps) {
 
   const isRestrictedAuthor = item.authorStatus === "BANNED" || item.authorStatus === "MUTED"
   const pinTone = getPostPinTone(item.pinScope, true)
@@ -70,8 +78,9 @@ export function ForumPostListItem({ item, showBoard = true, compactFirstItem = f
 
   return (
     <div className={cn(
-      compactFirstItem ? "flex gap-2.5 border-b pb-2.5 last:border-b-0 sm:gap-3" : "flex gap-2.5 border-b py-2.5 last:border-b-0 sm:gap-3",
-      "rounded-xl px-1.5 transition-all duration-150 hover:bg-accent hover:shadow-xs sm:px-2.5",
+      compactFirstItem ? "flex gap-2.5 pb-2.5 sm:gap-3" : "flex gap-2.5 py-2.5 sm:gap-3",
+      hideDivider ? "border-b-0" : "border-b last:border-b-0",
+      " px-1.5 transition-all duration-150 hover:bg-accent hover:shadow-xs sm:px-2.5",
     )}>
       <Link href={`/users/${item.authorUsername}`} className={cn("shrink-0", isRestrictedAuthor && "grayscale")}>
         <UserAvatar name={item.authorName} avatarPath={item.authorAvatarPath} size="md" isVip={item.authorIsVip} vipLevel={item.authorVipLevel} />
@@ -89,6 +98,13 @@ export function ForumPostListItem({ item, showBoard = true, compactFirstItem = f
               <Tooltip content={item.rewardMode === "JACKPOT" ? "聚宝盆帖" : "红包帖"}>
                 <span aria-label={item.rewardMode === "JACKPOT" ? "聚宝盆帖" : "红包帖"}>
                   <PostRewardPoolIcon mode={item.rewardMode} className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                </span>
+              </Tooltip>
+            ) : null}
+            {item.hasAttachments ? (
+              <Tooltip content="含附件">
+                <span aria-label="含附件">
+                  <Paperclip className="h-3.5 w-3.5 text-muted-foreground sm:h-4 sm:w-4" />
                 </span>
               </Tooltip>
             ) : null}

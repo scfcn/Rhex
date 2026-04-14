@@ -31,7 +31,8 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     }
 
     const settings = await getSiteSettings()
-    const currentExpiresAt = dbUser.vipExpiresAt && dbUser.vipExpiresAt.getTime() > Date.now() ? dbUser.vipExpiresAt : new Date()
+    const vipWasActive = Boolean(dbUser.vipExpiresAt && dbUser.vipExpiresAt.getTime() > Date.now())
+    const currentExpiresAt = vipWasActive && dbUser.vipExpiresAt ? dbUser.vipExpiresAt : new Date()
 
     const vipPlanMap = {
       "purchase.month": { days: 30, level: 1, points: settings.vipMonthlyPrice, label: "月卡 VIP1" },
@@ -85,7 +86,10 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
 
       revalidateUserSurfaceCache(dbUser.id)
 
-      return apiSuccess(undefined, `已成功开通 / 续费 ${plan.label}`)
+      return apiSuccess({
+        expiresAt: nextExpiresAt.toISOString(),
+        mode: vipWasActive ? "renew" : "activate",
+      }, vipWasActive ? "续费成功" : "开通成功")
     }
 
     apiError(400, "不支持的 VIP 操作")

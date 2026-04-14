@@ -19,6 +19,7 @@ import { getVipNameClass } from "@/lib/vip-status"
 
 import { BoardSelectField } from "@/components/board/board-select-field"
 import {
+  AuctionSettingsSection,
   BountySettingsSection,
   CoverConfigModal,
   LotterySettingsSection,
@@ -220,10 +221,9 @@ export function CreatePostForm({
   const canBypassAttachmentPermission = currentUser.role === "ADMIN"
   const meetsAttachmentPermission = currentUser.level >= attachmentFeature.minUploadLevel
     && currentVipLevel >= attachmentFeature.minUploadVipLevel
-  const canConfigureAttachments = isEditMode || canBypassAttachmentPermission || (
-    meetsAttachmentPermission
-  )
-  const shouldShowAttachmentEntry = isEditMode || canConfigureAttachments || draft.attachments.length > 0
+  const canAddAttachments = canBypassAttachmentPermission || meetsAttachmentPermission
+  const canManageAttachments = isEditMode || canAddAttachments || draft.attachments.length > 0
+  const shouldShowAttachmentEntry = canAddAttachments || draft.attachments.length > 0
   const minPostVipLevel = selectedBoard?.minPostVipLevel ?? 0
   const canPostInBoard = currentUser.points >= (selectedBoard?.minPostPoints ?? 0)
     && currentUser.level >= (selectedBoard?.minPostLevel ?? 0)
@@ -632,7 +632,7 @@ export function CreatePostForm({
   }
 
   function addExternalAttachment() {
-    if (!canConfigureAttachments) {
+    if (!canAddAttachments) {
       toast.error("当前账号暂不具备添加附件的权限", "无法添加网盘附件")
       return
     }
@@ -701,7 +701,7 @@ export function CreatePostForm({
       .map((item) => item.trim().toLowerCase().replace(/^\./, ""))
       .filter(Boolean)
 
-    if (!canConfigureAttachments) {
+    if (!canAddAttachments) {
       toast.error("当前账号暂不具备添加附件的权限", "附件上传失败")
       event.target.value = ""
       return
@@ -736,9 +736,6 @@ export function CreatePostForm({
     try {
       const formData = new FormData()
       formData.append("file", file)
-      if (isEditMode && postId) {
-        formData.append("postId", postId)
-      }
 
       const response = await fetch("/api/attachments/upload", {
         method: "POST",
@@ -997,6 +994,29 @@ export function CreatePostForm({
           />
         ) : null}
 
+        {draft.postType === "AUCTION" ? (
+          <AuctionSettingsSection
+            pointName={pointName}
+            auctionMode={draft.auctionMode}
+            auctionPricingRule={draft.auctionPricingRule}
+            auctionStartPrice={draft.auctionStartPrice}
+            auctionIncrementStep={draft.auctionIncrementStep}
+            auctionStartsAt={draft.auctionStartsAt}
+            auctionEndsAt={draft.auctionEndsAt}
+            auctionWinnerOnlyContent={draft.auctionWinnerOnlyContent}
+            auctionWinnerOnlyContentPreview={draft.auctionWinnerOnlyContentPreview}
+            onAuctionModeChange={(value) => updateDraftField("auctionMode", value)}
+            onAuctionPricingRuleChange={(value) => updateDraftField("auctionPricingRule", value)}
+            onAuctionStartPriceChange={(value) => updateDraftField("auctionStartPrice", value)}
+            onAuctionIncrementStepChange={(value) => updateDraftField("auctionIncrementStep", value)}
+            onAuctionStartsAtChange={(value) => updateDraftField("auctionStartsAt", value)}
+            onAuctionEndsAtChange={(value) => updateDraftField("auctionEndsAt", value)}
+            onAuctionWinnerOnlyContentChange={(value) => updateDraftField("auctionWinnerOnlyContent", value)}
+            onAuctionWinnerOnlyContentPreviewChange={(value) => updateDraftField("auctionWinnerOnlyContentPreview", value)}
+            disabled={isEditMode}
+          />
+        ) : null}
+
         {draft.postType === "POLL" ? (
           <PollSettingsSection
             pollOptions={draft.pollOptions}
@@ -1199,7 +1219,8 @@ export function CreatePostForm({
         vipLevelOptions={viewVipLevelOptions}
         attachmentFeature={{
           siteUploadEnabled: attachmentFeature.uploadEnabled,
-          canConfigure: canConfigureAttachments,
+          canManage: canManageAttachments,
+          canAddNew: canAddAttachments,
           minUploadLevel: attachmentFeature.minUploadLevel,
           minUploadVipLevel: attachmentFeature.minUploadVipLevel,
           allowedExtensions: attachmentFeature.allowedExtensions,

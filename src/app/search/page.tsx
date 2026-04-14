@@ -131,7 +131,7 @@ export default async function SearchPage(props: PageProps<"/search">) {
                 </>
               ) : (
                 <>
-                  <ForumPostStream posts={resultItems} />
+                  <ForumPostStream posts={resultItems} compactFirstItem={false} />
                   <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
                     <PaginationLink
                       href={results!.hasPrevPage && results!.prevCursor ? buildSearchHref({ before: results!.prevCursor }) : null}

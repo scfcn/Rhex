@@ -12,9 +12,14 @@ export function AnnouncementPageContent({ items }: AnnouncementPageContentProps)
   return (
     <div className="space-y-6">
       <section className="rounded-[28px] border border-border bg-card p-6 shadow-xs shadow-black/5 dark:shadow-black/30">
-        <div className="flex items-center gap-2">
-          <Megaphone className="h-5 w-5 text-sky-500" />
-          <h1 className="text-2xl font-semibold">站点文档</h1>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-center gap-2">
+            <Megaphone className="h-5 w-5 text-sky-500" />
+            <h1 className="text-2xl font-semibold">站点文档</h1>
+          </div>
+          <Link href="/" className="inline-flex shrink-0 items-center justify-center rounded-full border border-border px-4 py-2 text-sm text-muted-foreground transition hover:bg-accent hover:text-foreground">
+            返回首页
+          </Link>
         </div>
 
       </section>
@@ -68,10 +73,6 @@ export function AnnouncementPageContent({ items }: AnnouncementPageContentProps)
           </section>
         ) : null}
       </section>
-
-      <div className="text-sm text-muted-foreground">
-        <Link href="/" className="transition hover:text-foreground">返回首页</Link>
-      </div>
     </div>
   )
 }

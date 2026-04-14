@@ -280,6 +280,7 @@ export function PostAttachmentList({ attachments, pointName }: { attachments: Po
         open={Boolean(revealedAttachment)}
         onClose={() => setRevealedAttachment(null)}
         size="md"
+        hideHeaderCloseButtonOnMobile
         title={revealedAttachment?.name ?? "网盘附件"}
         description="当前附件为第三方网盘链接，已在本地完成权限校验。请按下方信息前往下载。"
         footer={(

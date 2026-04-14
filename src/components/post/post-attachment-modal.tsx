@@ -55,7 +55,8 @@ interface PostAttachmentModalProps {
   vipLevelOptions: AccessThresholdOption[]
   attachmentFeature: {
     siteUploadEnabled: boolean
-    canConfigure: boolean
+    canManage: boolean
+    canAddNew: boolean
     minUploadLevel: number
     minUploadVipLevel: number
     allowedExtensions: string[]
@@ -84,11 +85,18 @@ export function PostAttachmentModal({
   onAttachmentChange,
 }: PostAttachmentModalProps) {
   const [expandedPermissionKeys, setExpandedPermissionKeys] = useState<Set<string>>(() => new Set())
-  const editingDisabled = !attachmentFeature.canConfigure
-  const canAddExternalAttachment = attachmentFeature.canConfigure && attachments.length < 20
+  const editingDisabled = !attachmentFeature.canManage
+  const canAddExternalAttachment = attachmentFeature.canAddNew && attachments.length < 20
   const canUploadAttachment = attachmentFeature.siteUploadEnabled && canAddExternalAttachment
-  const permissionHint = !attachmentFeature.canConfigure
-    ? `当前账号未达到附件门槛：至少 Lv.${attachmentFeature.minUploadLevel}、VIP${attachmentFeature.minUploadVipLevel}。`
+  const requirementParts = [
+    attachmentFeature.minUploadLevel > 0 ? `Lv.${attachmentFeature.minUploadLevel}` : null,
+    attachmentFeature.minUploadVipLevel > 0 ? `VIP${attachmentFeature.minUploadVipLevel}` : null,
+  ].filter(Boolean)
+  const requirementSummary = requirementParts.length > 0 ? `至少 ${requirementParts.join("、")}` : "当前站点规则"
+  const permissionHint = !attachmentFeature.canAddNew
+    ? attachments.length > 0
+      ? `当前账号未达到新增附件门槛：${requirementSummary}。你仍可调整或删除已存在的附件。`
+      : `当前账号未达到附件门槛：${requirementSummary}。`
     : !attachmentFeature.siteUploadEnabled
     ? "当前站内附件上传已关闭，但仍可添加网盘链接；已有附件也可以继续调整下载权限。"
     : `当前允许添加附件。支持格式：${attachmentFeature.allowedExtensions.join(", ")}，单文件不超过 ${attachmentFeature.maxFileSizeMb}MB。`

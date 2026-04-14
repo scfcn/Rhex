@@ -39,6 +39,35 @@ enum PostType {
   BOUNTY
   POLL
   LOTTERY
+  AUCTION
+}
+
+enum PostAuctionMode {
+  SEALED_BID
+  OPEN_ASCENDING
+}
+
+enum PostAuctionStatus {
+  DRAFT
+  ACTIVE
+  SETTLING
+  SETTLED
+  CANCELLED
+  FAILED
+}
+
+enum PostAuctionPricingRule {
+  FIRST_PRICE
+  SECOND_PRICE
+}
+
+enum PostAuctionEntryStatus {
+  ACTIVE
+  OUTBID
+  LOST
+  WON
+  CANCELLED
+  REFUNDED
 }
 
 enum LotteryTriggerMode {
@@ -327,6 +356,36 @@ enum AiReplyTaskSourceType {
   COMMENT
 }
 
+enum PaymentOrderStatus {
+  PENDING
+  WAIT_BUYER_PAY
+  PAID
+  CLOSED
+  FAILED
+  REFUNDING
+  REFUNDED
+}
+
+enum PaymentAttemptStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+enum PaymentRefundStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CLOSED
+}
+
+enum PaymentFulfillmentStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+}
+
 model User {
   id                               Int                            @id @default(autoincrement())
   username                         String                         @unique
@@ -394,6 +453,10 @@ model User {
   postGiftEventsSent               PostGiftEvent[]                @relation("PostGiftSender")
   postGiftEventsReceived           PostGiftEvent[]                @relation("PostGiftReceiver")
   postGiftStatsReceived            PostGiftStats[]                @relation("PostGiftStatsReceiver")
+  postAuctionsSelling              PostAuction[]                  @relation("PostAuctionSeller")
+  postAuctionsWon                  PostAuction[]                  @relation("PostAuctionWinner")
+  postAuctionEntries               PostAuctionEntry[]
+  postAuctionBidRecords            PostAuctionBidRecord[]
   redPacketsSent                   PostRedPacket[]
   redPacketClaims                  PostRedPacketClaim[]           @relation("PostRedPacketClaimUser")
   commentEffectFeedbacks           CommentEffectFeedback[]
@@ -413,7 +476,6 @@ model User {
   usedInviteCodes                  InviteCode[]                   @relation("InviteCodeConsumer")
   generatedRedeemCodes             RedeemCode[]                   @relation("RedeemCodeCreator")
   redeemedCodes                    RedeemCode[]                   @relation("RedeemCodeConsumer")
-  verificationCodes                VerificationCode[]
   verificationApplications         UserVerification[]             @relation("userVerificationApplicant")
   reviewedVerifications            UserVerification[]             @relation("userVerificationReviewer")
   reviewedComments                 Comment[]                      @relation("commentReviewer")
@@ -428,6 +490,7 @@ model User {
   reviewedBoardApplications        BoardApplication[]             @relation("boardApplicationReviewer")
   aiReplyTasksTriggered            AiReplyTask[]                  @relation("AiReplyTaskTriggerUser")
   aiReplyTasksAssigned             AiReplyTask[]                  @relation("AiReplyTaskAgentUser")
+  paymentOrders                    PaymentOrder[]
 
   @@index([role])
   @@index([status])
@@ -633,7 +696,7 @@ model Zone {
   replyPointDelta      Int                  @default(0)
   postIntervalSeconds  Int                  @default(120)
   replyIntervalSeconds Int                  @default(3)
-  allowedPostTypes     String?              @default("NORMAL,BOUNTY,POLL,LOTTERY")
+  allowedPostTypes     String?              @default("NORMAL,BOUNTY,POLL,LOTTERY,AUCTION")
   minViewPoints        Int                  @default(0)
   minViewLevel         Int                  @default(0)
   minPostPoints        Int                  @default(0)
@@ -850,6 +913,7 @@ model Post {
   tips                          PostTip[]
   giftEvents                    PostGiftEvent[]
   giftStats                     PostGiftStats[]
+  auction                       PostAuction?
   redPacket                     PostRedPacket?
   redPacketClaims               PostRedPacketClaim[]
   blockPurchases                PostBlockPurchase[]
@@ -971,8 +1035,8 @@ model Comment {
   lotteryParticipants   LotteryParticipant[]
   redPacketClaims       PostRedPacketClaim[]
   effectFeedback        CommentEffectFeedback?
-  aiReplyTasksAsSource  AiReplyTask[]            @relation("AiReplyTaskSourceComment")
-  aiReplyTaskGenerated  AiReplyTask?             @relation("AiReplyTaskGeneratedComment")
+  aiReplyTasksAsSource  AiReplyTask[]          @relation("AiReplyTaskSourceComment")
+  aiReplyTaskGenerated  AiReplyTask?           @relation("AiReplyTaskGeneratedComment")
 
   @@index([postId])
   @@index([userId])
@@ -1466,19 +1530,19 @@ model VipOrder {
 }
 
 model Upload {
-  id           String   @id @default(cuid())
-  userId       Int
-  bucketType   String
-  originalName String
-  fileName     String
-  fileExt      String
-  mimeType     String
-  fileSize     Int
-  fileHash     String?
-  storagePath  String
-  urlPath      String
-  createdAt    DateTime @default(now()) @db.Timestamptz(3)
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String           @id @default(cuid())
+  userId          Int
+  bucketType      String
+  originalName    String
+  fileName        String
+  fileExt         String
+  mimeType        String
+  fileSize        Int
+  fileHash        String?
+  storagePath     String
+  urlPath         String
+  createdAt       DateTime         @default(now()) @db.Timestamptz(3)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   postAttachments PostAttachment[]
 
   @@unique([userId, bucketType, fileHash])
@@ -1877,6 +1941,116 @@ model SiteSetting {
   updatedAt                     DateTime @updatedAt @db.Timestamptz(3)
 }
 
+model PaymentOrder {
+  id                      String                   @id @default(cuid())
+  merchantOrderNo         String                   @unique
+  bizScene                String
+  bizOrderId              String?
+  userId                  Int?
+  subject                 String
+  body                    String?
+  clientType              String
+  amountFen               Int
+  currency                String                   @default("CNY")
+  providerCode            String
+  channelCode             String
+  routeSnapshotJson       Json?
+  status                  PaymentOrderStatus       @default(PENDING)
+  providerTradeNo         String?                  @unique
+  providerBuyerId         String?
+  lastErrorCode           String?
+  lastErrorMessage        String?
+  paidAt                  DateTime?                @db.Timestamptz(3)
+  closedAt                DateTime?                @db.Timestamptz(3)
+  expiredAt               DateTime?                @db.Timestamptz(3)
+  fulfillmentStatus       PaymentFulfillmentStatus @default(PENDING)
+  fulfilledAt             DateTime?                @db.Timestamptz(3)
+  fulfillmentErrorMessage String?
+  metadataJson            Json?
+  rawSuccessPayloadJson   Json?
+  createdAt               DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime                 @updatedAt @db.Timestamptz(3)
+  user                    User?                    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  attempts                PaymentAttempt[]
+  notifications           PaymentNotification[]
+  refunds                 PaymentRefund[]
+
+  @@index([bizScene, bizOrderId, createdAt])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([fulfillmentStatus, createdAt])
+  @@index([providerCode, channelCode, createdAt])
+}
+
+model PaymentAttempt {
+  id                  String               @id @default(cuid())
+  orderId             String
+  attemptNo           Int
+  action              String               @default("checkout")
+  providerCode        String
+  channelCode         String
+  status              PaymentAttemptStatus @default(PENDING)
+  presentationType    String?
+  requestPayloadJson  Json?
+  responsePayloadJson Json?
+  providerTraceId     String?
+  redirectUrl         String?
+  formHtml            String?
+  qrCode              String?
+  providerTradeNo     String?
+  errorCode           String?
+  errorMessage        String?
+  createdAt           DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime             @updatedAt @db.Timestamptz(3)
+  order               PaymentOrder         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, attemptNo])
+  @@index([orderId, createdAt])
+  @@index([providerCode, channelCode, createdAt])
+}
+
+model PaymentNotification {
+  id              String        @id @default(cuid())
+  orderId         String?
+  providerCode    String
+  channelCode     String?
+  notifyType      String?
+  notifyId        String?
+  merchantOrderNo String?
+  providerTradeNo String?
+  tradeStatus     String?
+  verified        Boolean       @default(false)
+  handled         Boolean       @default(false)
+  payloadJson     Json
+  errorMessage    String?
+  receivedAt      DateTime      @default(now()) @db.Timestamptz(3)
+  handledAt       DateTime?     @db.Timestamptz(3)
+  order           PaymentOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([orderId, receivedAt])
+  @@index([providerCode, notifyId, receivedAt])
+  @@index([merchantOrderNo, receivedAt])
+}
+
+model PaymentRefund {
+  id                 String              @id @default(cuid())
+  orderId            String
+  refundNo           String              @unique
+  amountFen          Int
+  status             PaymentRefundStatus @default(PENDING)
+  reason             String?
+  providerRefundNo   String?
+  providerResultJson Json?
+  requestedAt        DateTime            @default(now()) @db.Timestamptz(3)
+  completedAt        DateTime?           @db.Timestamptz(3)
+  createdAt          DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime            @updatedAt @db.Timestamptz(3)
+  order              PaymentOrder        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, requestedAt])
+  @@index([status, requestedAt])
+}
+
 model AiReplyTask {
   id                 String                @id @default(cuid())
   sourceType         AiReplyTaskSourceType
@@ -1924,6 +2098,74 @@ model PostTip {
   @@index([senderId, createdAt])
   @@index([receiverId, createdAt])
   @@index([postId, senderId, createdAt])
+}
+
+model PostAuction {
+  id                       String                 @id @default(cuid())
+  postId                   String                 @unique
+  sellerId                 Int
+  mode                     PostAuctionMode
+  status                   PostAuctionStatus      @default(DRAFT)
+  pricingRule              PostAuctionPricingRule @default(FIRST_PRICE)
+  startPrice               Int
+  incrementStep            Int                    @default(1)
+  startsAt                 DateTime?              @db.Timestamptz(3)
+  endsAt                   DateTime               @db.Timestamptz(3)
+  activatedAt              DateTime?              @db.Timestamptz(3)
+  participantCount         Int                    @default(0)
+  bidCount                 Int                    @default(0)
+  leaderUserId             Int?
+  leaderBidAmount          Int?
+  winningBidAmount         Int?
+  finalPrice               Int?
+  winnerUserId             Int?
+  winnerOnlyContent        String?
+  winnerOnlyContentPreview String?
+  settledAt                DateTime?              @db.Timestamptz(3)
+  cancelledAt              DateTime?              @db.Timestamptz(3)
+  createdAt                DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt                DateTime               @updatedAt @db.Timestamptz(3)
+  post                     Post                   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  seller                   User                   @relation("PostAuctionSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+  winner                   User?                  @relation("PostAuctionWinner", fields: [winnerUserId], references: [id], onDelete: SetNull)
+  entries                  PostAuctionEntry[]
+  bidRecords               PostAuctionBidRecord[]
+
+  @@index([sellerId, createdAt])
+  @@index([status, endsAt])
+  @@index([winnerUserId, settledAt])
+}
+
+model PostAuctionEntry {
+  id               String                 @id @default(cuid())
+  auctionId        String
+  userId           Int
+  currentBidAmount Int
+  frozenAmount     Int
+  status           PostAuctionEntryStatus @default(ACTIVE)
+  firstBidAt       DateTime               @default(now()) @db.Timestamptz(3)
+  lastBidAt        DateTime               @default(now()) @db.Timestamptz(3)
+  refundedAt       DateTime?              @db.Timestamptz(3)
+  auction          PostAuction            @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([auctionId, userId])
+  @@index([auctionId, currentBidAmount])
+  @@index([userId, lastBidAt])
+}
+
+model PostAuctionBidRecord {
+  id        String      @id @default(cuid())
+  auctionId String
+  userId    Int
+  amount    Int
+  createdAt DateTime    @default(now()) @db.Timestamptz(3)
+  auction   PostAuction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([auctionId, createdAt])
+  @@index([auctionId, amount, createdAt])
+  @@index([userId, createdAt])
 }
 
 model GiftDefinition {
@@ -2089,30 +2331,6 @@ model RedeemCode {
   @@index([createdById])
   @@index([redeemedById])
   @@index([createdAt])
-}
-
-model VerificationCode {
-  id          String              @id @default(cuid())
-  channel     VerificationChannel
-  target      String
-  codeHash    String
-  purpose     String
-  attempts    Int                 @default(0)
-  maxAttempts Int                 @default(5)
-  expiresAt   DateTime
-  consumedAt  DateTime?           @db.Timestamptz(3)
-  sentByIp    String?
-  userAgent   String?
-  userId      Int?
-  createdAt   DateTime            @default(now()) @db.Timestamptz(3)
-  updatedAt   DateTime            @updatedAt @db.Timestamptz(3)
-  user        User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([channel, target, purpose])
-  @@index([channel, target, purpose, consumedAt])
-  @@index([channel, target, purpose, consumedAt, createdAt])
-  @@index([expiresAt])
-  @@index([userId])
 }
 
 model UserCheckInLog {

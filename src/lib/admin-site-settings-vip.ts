@@ -20,12 +20,83 @@ import {
 import { normalizeVipNameColors } from "@/lib/vip-name-colors"
 import { normalizeVipLevelIcons } from "@/lib/vip-level-icons"
 
+function isSupportedRedeemCodeHelpUrl(value: string) {
+  return value.startsWith("/") || /^https?:\/\//i.test(value)
+}
+
+function parseSiteSettingsAppState(raw: string | null | undefined) {
+  if (!raw) {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {}
+    }
+
+    const siteSettingsState = (parsed as Record<string, unknown>).__siteSettings
+    return siteSettingsState && typeof siteSettingsState === "object" && !Array.isArray(siteSettingsState)
+      ? parsed as Record<string, unknown>
+      : {}
+  } catch {
+    return {}
+  }
+}
+
+function resolveRedeemCodeHelpSettingsFromAppState(appStateJson?: string | null) {
+  const root = parseSiteSettingsAppState(appStateJson)
+  const siteSettingsState = root.__siteSettings
+  const normalizedState = siteSettingsState && typeof siteSettingsState === "object" && !Array.isArray(siteSettingsState)
+    ? siteSettingsState as Record<string, unknown>
+    : {}
+  const redeemCodeHelp = normalizedState.redeemCodeHelp
+  const normalizedHelp = redeemCodeHelp && typeof redeemCodeHelp === "object" && !Array.isArray(redeemCodeHelp)
+    ? redeemCodeHelp as Record<string, unknown>
+    : {}
+
+  return {
+    enabled: typeof normalizedHelp.enabled === "boolean" ? normalizedHelp.enabled : false,
+    title: typeof normalizedHelp.title === "string" ? normalizedHelp.title.trim() : "",
+    url: typeof normalizedHelp.url === "string" ? normalizedHelp.url.trim() : "",
+  }
+}
+
+function mergeRedeemCodeHelpSettingsIntoAppState(
+  appStateJson: string | null | undefined,
+  input: { enabled: boolean; title: string; url: string },
+) {
+  const root = parseSiteSettingsAppState(appStateJson)
+  const siteSettingsState = root.__siteSettings && typeof root.__siteSettings === "object" && !Array.isArray(root.__siteSettings)
+    ? root.__siteSettings as Record<string, unknown>
+    : {}
+
+  root.__siteSettings = {
+    ...siteSettingsState,
+    redeemCodeHelp: {
+      enabled: Boolean(input.enabled),
+      title: input.title.trim(),
+      url: input.url.trim(),
+    },
+  }
+
+  return JSON.stringify(root)
+}
+
 export async function updateVipSiteSettingsSection(existing: SiteSettingsRecord, body: JsonObject, section: string) {
   if (section !== "vip") {
     return null
   }
 
   const pointName = readOptionalStringField(body, "pointName")
+  const existingRedeemCodeHelpSettings = resolveRedeemCodeHelpSettingsFromAppState(existing.appStateJson)
+  const redeemCodeHelpEnabled = Boolean(body.redeemCodeHelpEnabled)
+  const redeemCodeHelpTitle = "redeemCodeHelpTitle" in body
+    ? readOptionalStringField(body, "redeemCodeHelpTitle")
+    : existingRedeemCodeHelpSettings.title
+  const redeemCodeHelpUrl = "redeemCodeHelpUrl" in body
+    ? readOptionalStringField(body, "redeemCodeHelpUrl")
+    : existingRedeemCodeHelpSettings.url
   const checkInEnabled = body.checkInEnabled === undefined ? existing.checkInEnabled : Boolean(body.checkInEnabled)
   const checkInReward = Math.max(0, readOptionalNumberField(body, "checkInReward") ?? existing.checkInReward ?? 0)
   const checkInVip1Reward = Math.max(0, readOptionalNumberField(body, "checkInVip1Reward") ?? checkInReward)
@@ -131,6 +202,24 @@ export async function updateVipSiteSettingsSection(existing: SiteSettingsRecord,
     apiError(400, "开启积分购买邀请码时，普通用户价格必须大于 0")
   }
 
+  if (redeemCodeHelpEnabled && !redeemCodeHelpTitle) {
+    apiError(400, "开启兑换码入口链接时，必须填写链接文本")
+  }
+
+  if (redeemCodeHelpEnabled && !redeemCodeHelpUrl) {
+    apiError(400, "开启兑换码入口链接时，必须填写链接地址")
+  }
+
+  if (redeemCodeHelpUrl && !isSupportedRedeemCodeHelpUrl(redeemCodeHelpUrl)) {
+    apiError(400, "兑换码入口链接仅支持以 /、http:// 或 https:// 开头")
+  }
+
+  const appStateWithRedeemCodeHelp = mergeRedeemCodeHelpSettingsIntoAppState(appStateWithVipNameColors, {
+    enabled: redeemCodeHelpEnabled,
+    title: redeemCodeHelpTitle,
+    url: redeemCodeHelpUrl,
+  })
+
   const settings = await updateSiteSettingsRecord(existing.id, {
     pointName: pointName || "积分",
     checkInEnabled,
@@ -139,7 +228,7 @@ export async function updateVipSiteSettingsSection(existing: SiteSettingsRecord,
     checkInVipMakeUpCardPrice,
     nicknameChangePointCost,
     inviteCodePrice,
-    appStateJson: appStateWithVipNameColors,
+    appStateJson: appStateWithRedeemCodeHelp,
     vipMonthlyPrice,
     vipQuarterlyPrice,
     vipYearlyPrice,

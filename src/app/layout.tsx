@@ -36,7 +36,69 @@ const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 const sidebarNavigationInitScript = getSidebarNavigationInitScript()
 const readingHistoryInitScript = getReadingHistoryInitScript()
 const themeInitScript = getThemeInitScript()
-const rootInitScript = `${themeInitScript}${sidebarNavigationInitScript}${readingHistoryInitScript}`
+const rootInitStyle = `
+  html[data-root-init="pending"] {
+    overflow: hidden;
+  }
+
+  html[data-root-init="pending"] body {
+    visibility: hidden;
+    overflow: hidden;
+  }
+
+  html[data-root-init="pending"]::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    background: #f8fafc;
+  }
+
+  html.dark[data-root-init="pending"]::before {
+    background: #10131a;
+  }
+
+  html[data-root-init="pending"]::after {
+    content: '';
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    z-index: 9999;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9999px;
+    border: 2px solid rgba(148, 163, 184, 0.32);
+    border-top-color: #3b82f6;
+    transform: translate(-50%, -50%);
+    animation: root-boot-spinner 0.72s linear infinite;
+  }
+
+  html.dark[data-root-init="pending"]::after {
+    border-color: rgba(71, 85, 105, 0.42);
+    border-top-color: #fb923c;
+  }
+
+  @keyframes root-boot-spinner {
+    to {
+      transform: translate(-50%, -50%) rotate(360deg);
+    }
+  }
+`
+const rootInitScript = `
+  (function () {
+    try {
+      ${themeInitScript}
+      ${sidebarNavigationInitScript}
+      ${readingHistoryInitScript}
+    } finally {
+      try {
+        document.documentElement.setAttribute("data-root-init", "ready");
+      } catch (_error) {
+        // Ignore root init cleanup failures.
+      }
+    }
+  })();
+`
 
 export async function generateMetadata(): Promise<Metadata> {
   const [settings, rssUrl, siteOrigin] = await Promise.all([getSiteSettings(), getRssFeedUrl(), resolveSiteOrigin()])
@@ -79,13 +141,17 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       lang="zh-CN"
       suppressHydrationWarning
       className={cn("font-sans", geist.variable)}
+      data-root-init="pending"
       data-sidebar-display-mode={sidebarDisplayMode}
     >
       <head>
+        <style>{rootInitStyle}</style>
         <Script id="site-root-init" strategy="beforeInteractive">
           {rootInitScript}
         </Script>
-
+        <noscript>
+          <style>{`html[data-root-init="pending"] { background: inherit; } html[data-root-init="pending"] body { visibility: visible !important; overflow: visible !important; } html[data-root-init="pending"]::before, html[data-root-init="pending"]::after { display: none !important; }`}</style>
+        </noscript>
       </head>
       <body style={vipNameColorStyle}>
         <ThemeProvider>

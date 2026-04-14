@@ -16,6 +16,7 @@ import {
 import { apiError } from "@/lib/api-route"
 import { verifyBuiltinCaptchaToken } from "@/lib/builtin-captcha"
 import { enforceSensitiveText } from "@/lib/content-safety"
+import { isEmailInWhitelist } from "@/lib/email"
 import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
 import { verifyPowCaptchaSolution } from "@/lib/pow-captcha"
 import { getRequestIp } from "@/lib/request-ip"
@@ -148,6 +149,10 @@ function verifyRequiredRegisterFields(context: RegisterContext) {
     if (!payload.emailCode) {
       apiError(400, "请填写邮箱验证码")
     }
+  }
+
+  if (settings.registerEmailWhitelistEnabled && payload.email && !isEmailInWhitelist(payload.email, settings.registerEmailWhitelistDomains)) {
+    apiError(400, "该邮箱后缀不在注册白名单内")
   }
 
   if (settings.registerPhoneEnabled && settings.registerPhoneVerification) {

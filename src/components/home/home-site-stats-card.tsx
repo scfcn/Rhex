@@ -15,7 +15,7 @@ export function HomeSiteStatsCard({ stats }: HomeSiteStatsCardProps) {
   ]
 
   return (
-    <section className="rounded-[24px] border border-border bg-card p-4 shadow-xs shadow-black/5 dark:shadow-black/30">
+    <section className="mobile-sidebar-section rounded-[24px] border border-border bg-card p-4 shadow-xs shadow-black/5 dark:shadow-black/30">
       <div className="mb-4 flex items-center gap-2">
         <BarChart3 className="h-5 w-5 text-slate-500 dark:text-slate-300" />
         <h3 className="font-semibold">社区统计</h3>

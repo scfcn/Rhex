@@ -169,7 +169,7 @@ npm run worker
 
 但新部署建议优先使用统一的 `npm run worker`。
 
-> 说明：Web/API 进程在有 Redis 时，也会在入队时按需拉起后台任务 runtime；不过生产环境仍建议单独跑 `worker`，这样任务消费和 RSS 抓取更稳定。
+> 说明：开发环境下，Web/API 进程会在入队时按需拉起后台任务 runtime。生产环境默认建议单独跑 `worker`，Web/API 只负责入队，不再自动消费；如需恢复旧行为，可设置 `BACKGROUND_JOB_WEB_RUNTIME=hybrid`。
 
 ## 快速开始
 
@@ -225,7 +225,7 @@ SEED_ADMIN_NICKNAME="秦始皇"
 ### 4. 初始化数据库
 
 ```bash
-npm run setup:dev
+npm run setup
 ```
 
 这个过程会：
@@ -234,6 +234,13 @@ npm run setup:dev
 - 使用 `prisma db push` 同步数据库结构
 - 检查当前数据库是否已完成初始化
 - 在需要时写入初始业务数据
+
+兼容说明：
+
+- `npm run setup:dev`
+- `npm run setup:prod`
+
+以上两个命令都会执行同一套 setup 流程；其中 `npm run setup:prod` 会额外显式设置 `NODE_ENV=production`。
 
 ### 5. 启动开发服务
 
@@ -270,19 +277,21 @@ npm run worker
 ### 1. 构建 Web 应用
 
 ```bash
-npm run build
+npm run start:prod
 ```
 
-### 2. 启动 Web 服务
+这个命令会显式以 `NODE_ENV=production` 执行构建和 `next start`。
+
+### 2. 启动统一 worker
 
 ```bash
-npm run start
+npm run worker:prod
 ```
 
-### 3. 启动统一 worker
+### 3. 如需先初始化数据库
 
 ```bash
-npm run worker
+npm run setup:prod
 ```
 
 ### 4. 确保持久化资源可用
@@ -315,13 +324,17 @@ npm run worker
 | `npm run build` | 构建生产包 |
 | `npm run start` | 启动生产 Web 服务 |
 | `npm run start:prod` | 构建并启动生产 Web 服务 |
-| `npm run setup:dev` | 开发环境初始化 |
-| `npm run setup:prod` | 生产环境初始化 |
+| `npm run setup` | 初始化数据库结构并按需写入基础数据 |
+| `npm run setup:dev` | 以默认环境执行 `npm run setup` |
+| `npm run setup:prod` | 以 `NODE_ENV=production` 执行 `npm run setup` |
 | `npm run setup:start` | 初始化并启动开发环境 |
 | `npm run setup:start:prod` | 初始化、构建并启动生产 Web 服务 |
 | `npm run worker` | 启动统一 worker，包含后台任务和 RSS 抓取 |
+| `npm run worker:prod` | 以 `NODE_ENV=production` 启动统一 worker |
 | `npm run jobs:worker` | 仅启动后台任务 worker（兼容保留） |
+| `npm run jobs:worker:prod` | 以 `NODE_ENV=production` 启动后台任务 worker |
 | `npm run rss:worker` | 仅启动 RSS worker（兼容保留） |
+| `npm run rss:worker:prod` | 以 `NODE_ENV=production` 启动 RSS worker |
 | `npm run prisma:generate` | 生成 Prisma Client |
 | `npm run prisma:push` | 同步数据库结构 |
 | `npm run prisma:seed` | 执行种子脚本 |

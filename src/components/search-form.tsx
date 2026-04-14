@@ -18,6 +18,9 @@ interface SearchFormProps {
   appLinks?: SiteHeaderAppLinkItem[]
   appIconName?: string
   search?: SiteSearchSettings
+  externalOptionsInline?: boolean
+  onNavigate?: () => void
+  onExternalSearchSelect?: () => void
 }
 
 function HeaderAppTriggerIcon({ name, className }: { name: string; className?: string }) {
@@ -36,6 +39,9 @@ export function SearchForm({
     enabled: true,
     externalEngines: [],
   },
+  externalOptionsInline = false,
+  onNavigate,
+  onExternalSearchSelect,
 }: SearchFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -102,6 +108,7 @@ export function SearchForm({
     if (!nextKeyword) {
       setExternalSearchMenuOpen(false)
       params.delete("q")
+      onNavigate?.()
       router.push(`/search${params.toString() ? `?${params.toString()}` : ""}`)
       return
     }
@@ -114,6 +121,7 @@ export function SearchForm({
 
     setExternalSearchMenuOpen(false)
     params.set("q", nextKeyword)
+    onNavigate?.()
     router.push(`/search${params.toString() ? `?${params.toString()}` : ""}`)
   }
 
@@ -198,14 +206,26 @@ export function SearchForm({
       {!searchEnabled && externalSearchMenuOpen ? (
         <div
           ref={externalSearchMenuRef}
-          className={compact
-            ? "absolute left-0 right-0 top-[calc(100%+8px)] z-20 rounded-2xl border border-border bg-background p-2 shadow-2xl"
-            : "absolute left-0 right-0 top-[calc(100%+12px)] z-20 rounded-[24px] border border-border bg-background p-3 shadow-soft"}
+          className={externalOptionsInline
+            ? (compact
+                ? "mt-2 rounded-2xl border border-border bg-background p-2 shadow-2xl"
+                : "mt-3 rounded-[24px] border border-border bg-background p-3 shadow-soft")
+            : (compact
+                ? "absolute left-0 right-0 top-[calc(100%+8px)] z-20 rounded-2xl border border-border bg-background p-2 shadow-2xl"
+                : "absolute left-0 right-0 top-[calc(100%+12px)] z-20 rounded-[24px] border border-border bg-background p-3 shadow-soft")}
         >
           <div className={compact ? "px-3 pb-2 pt-1 text-xs font-medium text-muted-foreground" : "px-2 pb-3 text-xs font-medium text-muted-foreground"}>
             站内搜索已关闭，请选择外部搜索引擎
           </div>
-          <ExternalSearchOptions keyword={keyword} engines={externalSearchEngines} onSelect={() => setExternalSearchMenuOpen(false)} variant={compact ? "menu" : "panel"} />
+          <ExternalSearchOptions
+            keyword={keyword}
+            engines={externalSearchEngines}
+            onSelect={() => {
+              setExternalSearchMenuOpen(false)
+              onExternalSearchSelect?.()
+            }}
+            variant={compact ? "menu" : "panel"}
+          />
         </div>
       ) : null}
     </form>

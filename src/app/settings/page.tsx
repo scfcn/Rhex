@@ -25,7 +25,7 @@ export default async function SettingsPage(props: PageProps<"/settings">) {
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader />
-      <main className="mx-auto max-w-[1240px] px-4 py-8 lg:px-6">
+      <main className="mx-auto max-w-[1240px] px-4 sm:py-8 lg:px-6">
         <SettingsShell profile={data.profile} pointName={data.settings.pointName} boardApplicationEnabled={data.settings.boardApplicationEnabled}>
           <SettingsPageContent data={data} />
         </SettingsShell>

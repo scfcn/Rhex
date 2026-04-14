@@ -29,8 +29,13 @@ export function findUsersByUsernames(usernames: string[], client?: DbClient) {
 }
 
 export function findUserIdByEmail(email: string, client?: DbClient) {
-  return resolveClient(client).user.findUnique({
-    where: { email },
+  return resolveClient(client).user.findFirst({
+    where: {
+      email: {
+        equals: email,
+        mode: "insensitive",
+      },
+    },
     select: { id: true },
   })
 }
@@ -59,7 +64,15 @@ export function findAuthenticatedUserSummaryById(userId: number, client?: DbClie
 export function findExternalAuthLoginCandidate(login: string, client?: DbClient) {
   return resolveClient(client).user.findFirst({
     where: {
-      OR: [{ username: login }, { email: login }],
+      OR: [
+        { username: login },
+        {
+          email: {
+            equals: login,
+            mode: "insensitive",
+          },
+        },
+      ],
     },
     select: {
       id: true,

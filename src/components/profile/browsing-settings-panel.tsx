@@ -114,7 +114,7 @@ function ChoiceRow<T extends string>({
   onChange: (value: T) => void
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 rounded-[20px] border border-border bg-secondary/20 px-4 py-3">
+    <div className="flex flex-col gap-3 rounded-[20px] border border-border bg-secondary/20 px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
       <div className="flex min-w-0 items-start gap-3">
         <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-background text-muted-foreground">
           <Icon className="h-4 w-4" />
@@ -125,14 +125,14 @@ function ChoiceRow<T extends string>({
         </div>
       </div>
 
-      <div className="flex shrink-0 flex-wrap justify-end gap-2">
+      <div className="flex w-full flex-wrap justify-start gap-2 pl-11 sm:w-auto sm:shrink-0 sm:justify-end sm:pl-0">
         {options.map((item) => (
           <button
             key={item.value}
             type="button"
             onClick={() => onChange(item.value)}
             className={cn(
-              "inline-flex h-8 items-center rounded-full px-3 text-xs font-medium transition-colors",
+              "inline-flex h-8 items-center justify-center rounded-full px-3 text-xs font-medium transition-colors",
               item.value === value
                 ? "bg-foreground text-background"
                 : "border border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground",

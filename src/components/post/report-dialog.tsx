@@ -92,6 +92,7 @@ export function ReportDialog({ targetType, targetId, targetLabel, buttonText = "
         size="md"
         title={title}
         description={`举报对象：${targetLabel}`}
+        hideHeaderCloseButtonOnMobile
         footer={(
           <div className="flex items-center gap-3">
             <Button type="button" disabled={isPending} onClick={submit}>

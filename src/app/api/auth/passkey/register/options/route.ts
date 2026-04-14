@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 
 import { apiError, apiSuccess, createRouteHandler, readJsonBody } from "@/lib/api-route"
 import { clearPasskeyCeremonyState, setPasskeyCeremonyState } from "@/lib/auth-flow-state"
+import { normalizeEmailAddress } from "@/lib/email"
 import { createPasskeyRegistrationOptions } from "@/lib/passkey-auth"
 import { getServerSiteSettings } from "@/lib/site-settings"
 
@@ -22,7 +23,7 @@ export const POST = createRouteHandler(async ({ request }) => {
 
   const body = await readJsonBody(request)
   const username = typeof body.username === "string" ? body.username.trim() : ""
-  const email = typeof body.email === "string" ? body.email.trim() : ""
+  const email = typeof body.email === "string" ? normalizeEmailAddress(body.email) : ""
 
   if (!isValidUsername(username)) {
     apiError(400, "用户名需为 3-20 位字母、数字或下划线")

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 
 import { apiSuccess, createRouteHandler, readJsonBody, readOptionalStringField } from "@/lib/api-route"
 import { createRegisterFlow } from "@/lib/auth-register-service"
+import { normalizeEmailAddress } from "@/lib/email"
 import { getRequestIp } from "@/lib/request-ip"
 import { revalidateHomeSidebarStatsCache } from "@/lib/home-sidebar-stats"
 import { logRouteWriteSuccess } from "@/lib/route-metadata"
@@ -18,7 +19,7 @@ export const POST = createRouteHandler(async ({ request }) => {
       nickname: readOptionalStringField(body, "nickname"),
       inviterUsername: readOptionalStringField(body, "inviterUsername"),
       inviteCode: readOptionalStringField(body, "inviteCode").toUpperCase(),
-      email: readOptionalStringField(body, "email"),
+      email: normalizeEmailAddress(readOptionalStringField(body, "email")),
       emailCode: readOptionalStringField(body, "emailCode"),
       phone: readOptionalStringField(body, "phone"),
       phoneCode: readOptionalStringField(body, "phoneCode"),

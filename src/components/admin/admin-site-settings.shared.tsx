@@ -96,6 +96,8 @@ export interface AdminBasicSettingsInitialSettings {
   registerEmailEnabled: boolean
   registerEmailRequired: boolean
   registerEmailVerification: boolean
+  registerEmailWhitelistEnabled: boolean
+  registerEmailWhitelistDomains: string[]
   registerPhoneEnabled: boolean
   registerPhoneRequired: boolean
   registerPhoneVerification: boolean
@@ -221,6 +223,8 @@ export interface AdminBasicSettingsDraft {
   registerEmailEnabled: boolean
   registerEmailRequired: boolean
   registerEmailVerification: boolean
+  registerEmailWhitelistEnabled: boolean
+  registerEmailWhitelistDomains: string
   registerPhoneEnabled: boolean
   registerPhoneRequired: boolean
   registerPhoneVerification: boolean
@@ -409,6 +413,10 @@ export function createAdminBasicSettingsDraft(initialSettings: AdminBasicSetting
     registerEmailEnabled: coerceBoolean(initialSettings.registerEmailEnabled, false),
     registerEmailRequired: coerceBoolean(initialSettings.registerEmailRequired, false),
     registerEmailVerification: coerceBoolean(initialSettings.registerEmailVerification, false),
+    registerEmailWhitelistEnabled: coerceBoolean(initialSettings.registerEmailWhitelistEnabled, false),
+    registerEmailWhitelistDomains: Array.isArray(initialSettings.registerEmailWhitelistDomains)
+      ? initialSettings.registerEmailWhitelistDomains.join("\n")
+      : "",
     registerPhoneEnabled: coerceBoolean(initialSettings.registerPhoneEnabled, false),
     registerPhoneRequired: coerceBoolean(initialSettings.registerPhoneRequired, false),
     registerPhoneVerification: coerceBoolean(initialSettings.registerPhoneVerification, false),
@@ -497,6 +505,8 @@ export function buildAdminBasicSettingsPayload(draft: AdminBasicSettingsDraft, m
       registerEmailEnabled: draft.registerEmailEnabled,
       registerEmailRequired: draft.registerEmailRequired,
       registerEmailVerification: draft.registerEmailVerification,
+      registerEmailWhitelistEnabled: draft.registerEmailWhitelistEnabled,
+      registerEmailWhitelistDomains: draft.registerEmailWhitelistDomains,
       registerPhoneEnabled: draft.registerPhoneEnabled,
       registerPhoneRequired: draft.registerPhoneRequired,
       registerPhoneVerification: draft.registerPhoneVerification,

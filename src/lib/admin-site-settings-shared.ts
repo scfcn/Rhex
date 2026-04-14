@@ -16,6 +16,10 @@ export function revalidateSiteSettingsCache() {
   revalidateTag(SITE_SETTINGS_CACHE_TAG, "max")
 }
 
+export function expireSiteSettingsCacheImmediately() {
+  revalidateTag(SITE_SETTINGS_CACHE_TAG, { expire: 0 })
+}
+
 export function finalizeSiteSettingsUpdate(result: SiteSettingsSectionUpdateResult) {
   revalidateSiteSettingsCache()
   return result

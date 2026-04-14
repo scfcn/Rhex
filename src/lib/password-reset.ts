@@ -4,15 +4,12 @@ import { VerificationChannel } from "@/db/types"
 
 import { findUserByEmail, updateUserPasswordById } from "@/db/password-reset-queries"
 import { apiError } from "@/lib/api-route"
+import { normalizeEmailAddress } from "@/lib/email"
 import { canSendEmail, sendResetPasswordVerificationEmail } from "@/lib/mailer"
 import { sendVerificationCode, verifyCode } from "@/lib/verification"
 
 
 const PASSWORD_RESET_PURPOSE = "password_reset"
-
-function normalizeEmail(email: string) {
-  return email.trim().toLowerCase()
-}
 
 function ensurePassword(value: string) {
   const password = value.trim()
@@ -34,7 +31,7 @@ export async function sendPasswordResetCode(input: {
   ip?: string | null
   userAgent?: string | null
 }) {
-  const email = normalizeEmail(input.email)
+  const email = normalizeEmailAddress(input.email)
 
   if (!email) {
     apiError(400, "请输入邮箱")
@@ -87,7 +84,7 @@ export async function resetPasswordByEmailCode(input: {
   code: string
   password: string
 }) {
-  const email = normalizeEmail(input.email)
+  const email = normalizeEmailAddress(input.email)
   const password = ensurePassword(input.password)
   const code = input.code.trim()
 

@@ -12,6 +12,9 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     currentUser: {
       id: currentUser.id,
       role: currentUser.role,
+      level: currentUser.level,
+      vipLevel: currentUser.vipLevel,
+      vipExpiresAt: currentUser.vipExpiresAt,
     },
   })
 

@@ -11,7 +11,12 @@ export function findRegistrationConflict(input: {
   const or: Prisma.UserWhereInput[] = [{ username: input.username }]
 
   if (input.email) {
-    or.push({ email: input.email })
+    or.push({
+      email: {
+        equals: input.email,
+        mode: "insensitive",
+      },
+    })
   }
 
   if (input.phone) {

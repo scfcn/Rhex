@@ -7,6 +7,7 @@ interface SelfServeAdsIntroPageProps {
 }
 
 export function SelfServeAdsIntroPage({ AppId }: SelfServeAdsIntroPageProps) {
+  void AppId
   return (
     <section className="space-y-6">
       <div className="rounded-[28px] border border-border bg-card p-6 shadow-xs shadow-black/5 dark:shadow-black/30">
@@ -23,7 +24,6 @@ export function SelfServeAdsIntroPage({ AppId }: SelfServeAdsIntroPageProps) {
         请从首页右侧广告位点击“购买”进入对应类型和槽位的购买页面。
       </div>
 
-      <div className="text-xs text-muted-foreground">应用标识：{AppId}</div>
     </section>
   )
 }

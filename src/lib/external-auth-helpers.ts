@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto"
 
 import { findUsersByUsernames } from "@/db/external-auth-user-queries"
 import { getExternalAuthProviderLabel } from "@/lib/auth-provider-config"
+import { normalizeOptionalEmailAddress } from "@/lib/email"
 import type { ExternalAuthIdentity, ExternalOAuthProfile, PendingExternalAuthState } from "@/lib/external-auth-types"
 
 function normalizeAsciiValue(value: string) {
@@ -23,8 +24,7 @@ export function isValidExternalUsername(value: string) {
 }
 
 export function trimNormalizedEmail(email?: string | null) {
-  const normalized = email?.trim()
-  return normalized ? normalized : null
+  return normalizeOptionalEmailAddress(email)
 }
 
 export function buildRandomPassword() {

@@ -1,44 +1,27 @@
 import { apiError, apiSuccess, createUserRouteHandler } from "@/lib/api-route"
-import { findPostUpdateContext } from "@/db/post-update-queries"
 import { findExistingUpload, createUploadRecord } from "@/db/upload-queries"
+import { resolvePostAttachmentUploadPermission } from "@/lib/post-attachments"
 import { logRouteWriteSuccess } from "@/lib/route-metadata"
 import { prepareBinaryUploadedFile, saveUploadedFile } from "@/lib/upload"
 import { getSiteSettings } from "@/lib/site-settings"
 import { normalizeUploadExtension } from "@/lib/upload-rules"
 import { createRequestWriteGuardOptions } from "@/lib/write-guard-policies"
 import { withRequestWriteGuard } from "@/lib/write-guard"
-import { isVipActive } from "@/lib/vip-status"
 
 export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   const settings = await getSiteSettings()
   const formData = await request.formData()
   const file = formData.get("file")
-  const postId = typeof formData.get("postId") === "string" ? String(formData.get("postId")).trim() : ""
-  const editTargetPost = postId ? await findPostUpdateContext(postId) : null
-  const editDeadline = editTargetPost
-    ? new Date(editTargetPost.createdAt).getTime() + Math.max(0, settings.postEditableMinutes) * 60 * 1000
-    : 0
-  const canUploadForPostEdit = Boolean(
-    editTargetPost
-    && (
-      currentUser.role === "ADMIN"
-      || (editTargetPost.authorId === currentUser.id && editDeadline > Date.now())
-    ),
-  )
+  const uploadPermission = resolvePostAttachmentUploadPermission({
+    settings,
+    user: currentUser,
+  })
 
-  if (!settings.attachmentUploadEnabled && currentUser.role !== "ADMIN" && !canUploadForPostEdit) {
+  if (!settings.attachmentUploadEnabled && !uploadPermission.canBypassPermission) {
     apiError(403, "当前站点未开启附件上传功能")
   }
 
-  const currentVipLevel = isVipActive(currentUser) ? Math.max(0, currentUser.vipLevel ?? 0) : 0
-  if (
-    currentUser.role !== "ADMIN"
-    && !canUploadForPostEdit
-    && (
-      currentUser.level < settings.attachmentMinUploadLevel
-      || currentVipLevel < settings.attachmentMinUploadVipLevel
-    )
-  ) {
+  if (!uploadPermission.canAddAttachments) {
     const requirementParts = [
       settings.attachmentMinUploadLevel > 0 ? `Lv.${settings.attachmentMinUploadLevel}` : null,
       settings.attachmentMinUploadVipLevel > 0 ? `VIP${settings.attachmentMinUploadVipLevel}` : null,

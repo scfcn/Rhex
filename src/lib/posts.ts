@@ -8,6 +8,7 @@ import type { AnonymousDisplayIdentity } from "@/lib/post-anonymous"
 import { getAnonymousMaskDisplayIdentity } from "@/lib/post-anonymous"
 
 import { getPublicPostContentText, parsePostContentDocument } from "@/lib/post-content"
+import type { PostAuctionSummary } from "@/lib/post-auctions"
 import type { PostRedPacketSummary } from "@/lib/post-red-packets"
 import type { PostTipSummary } from "@/lib/post-tips"
 import type { PostRewardPoolMode } from "@/lib/post-reward-pool-config"
@@ -28,7 +29,7 @@ interface PostDetailRelations {
   author: User
   acceptedComment: (Comment & { user: User }) | null
   pollOptions: Array<PollOption & { votes: PollVote[] }>
-  lotteryPrizes: Array<LotteryPrize & { winners: Array<LotteryWinner & { user: Pick<User, "username" | "nickname"> }> }>
+  lotteryPrizes: Array<LotteryPrize & { winners: Array<LotteryWinner & { user: Pick<User, "username" | "nickname" | "avatarPath"> }> }>
   lotteryConditions: LotteryCondition[]
   lotteryParticipants: LotteryParticipant[]
   appendices: PostAppendix[]
@@ -71,6 +72,7 @@ export interface SitePostItem {
   author: string
   authorId?: number
   authorUsername?: string
+  authorIsAiAgent?: boolean
   authorAvatarPath?: string | null
   authorStatus?: "ACTIVE" | "MUTED" | "BANNED" | "INACTIVE"
   authorIsVip?: boolean
@@ -118,6 +120,7 @@ export interface SitePostItem {
     content: string
     createdAt: string
   }>
+  hasAttachments?: boolean
   attachments?: Array<{
     id: string
     sourceType: PostAttachmentSourceType
@@ -153,6 +156,7 @@ export interface SitePostItem {
     acceptedAnswerAuthor?: string | null
     isResolved: boolean
   }
+  auction?: PostAuctionSummary
   poll?: {
     totalVotes: number
     hasVoted: boolean
@@ -210,7 +214,7 @@ function mapDatabasePost(post: Post & { board: Board; author: User }, anonymousM
 function mapPostDetail(
   post: Post & PostDetailRelations,
   currentUserId?: number,
-  options?: { isAdmin?: boolean; userReplyCount?: number; purchasedBlockIds?: Set<string>; purchasedBlockBuyerCounts?: Map<string, number>; tipSummary?: PostTipSummary; redPacketSummary?: PostRedPacketSummary; anonymousMaskIdentity?: AnonymousDisplayIdentity | null },
+  options?: { isAdmin?: boolean; userReplyCount?: number; purchasedBlockIds?: Set<string>; purchasedBlockBuyerCounts?: Map<string, number>; tipSummary?: PostTipSummary; redPacketSummary?: PostRedPacketSummary; auctionSummary?: PostAuctionSummary | null; anonymousMaskIdentity?: AnonymousDisplayIdentity | null },
 ): SitePostItem {
   const totalVotes = post.pollOptions.reduce((sum, option) => sum + option.voteCount, 0)
   const tipSummary = options?.tipSummary
@@ -285,6 +289,7 @@ function mapPostDetail(
           isResolved: Boolean(post.acceptedCommentId),
         }
       : undefined,
+    auction: post.type === "AUCTION" ? (options?.auctionSummary ?? undefined) : undefined,
     poll: post.type === "POLL"
       ? {
           totalVotes,
@@ -365,7 +370,7 @@ export async function getHomepagePosts(page = 1, pageSize = 20): Promise<SitePos
 export async function getPostDetailBySlug(
   slug: string,
   currentUserId?: number,
-  options?: { isAdmin?: boolean; userReplyCount?: number; purchasedBlockIds?: Set<string>; purchasedBlockBuyerCounts?: Map<string, number>; tipSummary?: PostTipSummary; redPacketSummary?: PostRedPacketSummary },
+  options?: { isAdmin?: boolean; userReplyCount?: number; purchasedBlockIds?: Set<string>; purchasedBlockBuyerCounts?: Map<string, number>; tipSummary?: PostTipSummary; redPacketSummary?: PostRedPacketSummary; auctionSummary?: PostAuctionSummary | null },
 ): Promise<SitePostItem | null> {
 
   try {

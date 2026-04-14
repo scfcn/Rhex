@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/select"
 import { Spinner } from "@/components/ui/spinner"
 import { toast } from "@/components/ui/toast"
+import { isEmailInWhitelist } from "@/lib/email"
 import type { SiteSettingsData } from "@/lib/site-settings"
 
 interface RegisterFormProps {
@@ -75,15 +76,42 @@ export function RegisterForm({ settings }: RegisterFormProps) {
   const useTurnstile = captchaMode === "TURNSTILE" && Boolean(settings.turnstileSiteKey)
   const useBuiltinCaptcha = captchaMode === "BUILTIN"
   const usePowCaptcha = captchaMode === "POW"
-  const inviteCodeHelpUrl = settings.registerInviteCodeHelpUrl.trim()
-  const inviteCodeHelpTitle = settings.registerInviteCodeHelpTitle.trim() || "如何获得邀请码？"
+  const inviteCodeHelpUrl = typeof settings.registerInviteCodeHelpUrl === "string"
+    ? settings.registerInviteCodeHelpUrl.trim()
+    : ""
+  const inviteCodeHelpTitle = typeof settings.registerInviteCodeHelpTitle === "string"
+    ? settings.registerInviteCodeHelpTitle.trim() || "如何获得邀请码？"
+    : "如何获得邀请码？"
   const showInviteCodeHelpLink = settings.registerInviteCodeEnabled && settings.registerInviteCodeHelpEnabled && inviteCodeHelpUrl.length > 0
   const inviteCodeHelpIsExternal = /^https?:\/\//i.test(inviteCodeHelpUrl)
+  const emailFieldDescription = useMemo(() => {
+    const messages: string[] = []
+
+    if (settings.registerEmailVerification) {
+      messages.push("需要验证码确认")
+    }
+
+    if (settings.registerEmailWhitelistEnabled && settings.registerEmailWhitelistDomains.length > 0) {
+      messages.push(`仅允许后缀：${settings.registerEmailWhitelistDomains.join("、")}`)
+    }
+
+    return messages.join("；")
+  }, [
+    settings.registerEmailVerification,
+    settings.registerEmailWhitelistDomains,
+    settings.registerEmailWhitelistEnabled,
+  ])
 
   const hiddenInviterBound = useMemo(() => !settings.registerInviterEnabled && !!inviterUsername, [settings.registerInviterEnabled, inviterUsername])
   const hiddenInviteCodeBound = useMemo(() => !settings.registerInviteCodeEnabled && !!inviteCode, [settings.registerInviteCodeEnabled, inviteCode])
   const hasAlternativeAuth = settings.authGithubEnabled || settings.authGoogleEnabled || settings.authPasskeyEnabled
   const hasSecurityStep = useTurnstile || useBuiltinCaptcha || usePowCaptcha
+
+  function emailPassesWhitelist(value: string) {
+    return !settings.registerEmailWhitelistEnabled
+      || !value
+      || isEmailInWhitelist(value, settings.registerEmailWhitelistDomains)
+  }
 
   async function sendCode(channel: VerificationChannel) {
     const target = channel === VerificationChannel.EMAIL ? email : phone
@@ -92,6 +120,12 @@ export function RegisterForm({ settings }: RegisterFormProps) {
 
     setSending(true)
     setFieldMessage("")
+
+    if (channel === VerificationChannel.EMAIL && target && !emailPassesWhitelist(target)) {
+      setFieldMessage("该邮箱后缀不在注册白名单内")
+      setSending(false)
+      return
+    }
 
     const response = await fetch("/api/auth/send-verification-code", {
       method: "POST",
@@ -131,6 +165,12 @@ export function RegisterForm({ settings }: RegisterFormProps) {
 
     if (settings.registerEmailEnabled && settings.registerEmailVerification && !emailCode) {
       toast.warning("请填写邮箱验证码", "注册校验")
+      setLoading(false)
+      return
+    }
+
+    if (settings.registerEmailEnabled && email && !emailPassesWhitelist(email)) {
+      toast.warning("该邮箱后缀不在注册白名单内", "注册校验")
       setLoading(false)
       return
     }
@@ -280,6 +320,7 @@ export function RegisterForm({ settings }: RegisterFormProps) {
               placeholder={settings.registerEmailRequired ? "请输入邮箱" : "邮箱（可选）"}
               required={settings.registerEmailRequired}
               verifyRequired={settings.registerEmailVerification}
+              description={emailFieldDescription || undefined}
               sending={emailSending}
               message={emailMessage}
               onSend={() => sendCode(VerificationChannel.EMAIL)}
@@ -431,6 +472,7 @@ function VerificationField({
   placeholder,
   required,
   verifyRequired,
+  description,
   sending,
   message,
   onSend,
@@ -447,6 +489,7 @@ function VerificationField({
   placeholder: string
   required: boolean
   verifyRequired: boolean
+  description?: string
   sending: boolean
   message: string
   onSend: () => Promise<void>
@@ -455,7 +498,7 @@ function VerificationField({
 }) {
   return (
     <div className="flex flex-col gap-3 rounded-[24px]">
-      <AuthField htmlFor={`${idPrefix}-value`} label={label} required={required} description={verifyRequired ? "需要验证码确认" : undefined}>
+      <AuthField htmlFor={`${idPrefix}-value`} label={label} required={required} description={description}>
         <InputGroup className="h-11 rounded-2xl bg-background/80">
           <InputGroupAddon>
             <Icon />

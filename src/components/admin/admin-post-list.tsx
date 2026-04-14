@@ -70,6 +70,7 @@ const typeFilters = [
   { value: "BOUNTY", label: "悬赏帖" },
   { value: "POLL", label: "投票帖" },
   { value: "LOTTERY", label: "抽奖帖" },
+  { value: "AUCTION", label: "拍卖帖" },
 ]
 
 const statusFilters = [

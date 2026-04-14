@@ -8,6 +8,14 @@ export interface LocalPostDraft {
   boardSlug: string
   postType: string
   bountyPoints: string
+  auctionMode: "SEALED_BID" | "OPEN_ASCENDING"
+  auctionPricingRule: "FIRST_PRICE" | "SECOND_PRICE"
+  auctionStartPrice: string
+  auctionIncrementStep: string
+  auctionStartsAt: string
+  auctionEndsAt: string
+  auctionWinnerOnlyContent: string
+  auctionWinnerOnlyContentPreview: string
   pollOptions: string[]
   pollExpiresAt: string
   commentsVisibleToAuthorOnly: boolean
@@ -68,6 +76,14 @@ export function createEmptyLocalPostDraft(boardSlug = ""): LocalPostDraft {
     boardSlug,
     postType: "NORMAL",
     bountyPoints: "100",
+    auctionMode: "SEALED_BID",
+    auctionPricingRule: "FIRST_PRICE",
+    auctionStartPrice: "100",
+    auctionIncrementStep: "10",
+    auctionStartsAt: "",
+    auctionEndsAt: "",
+    auctionWinnerOnlyContent: "",
+    auctionWinnerOnlyContentPreview: "",
     pollOptions: ["", ""],
     pollExpiresAt: "",
     commentsVisibleToAuthorOnly: false,

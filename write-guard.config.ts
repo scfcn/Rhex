@@ -147,6 +147,17 @@ const writeGuardConfig = {
       parts: ["userId", "recipientId", "body"],
     },
   },
+  "payments-checkout": {
+    description: "统一支付下单防重，避免连点导致重复创建第三方支付单。",
+    scope: "payments-checkout",
+    cooldownMs: 1_500,
+    cooldownMessage: "下单操作过于频繁，请稍后再试",
+    releaseOnError: true,
+    dedupe: {
+      windowMs: 10_000,
+      parts: ["userId", "scene", "bizOrderId", "amountFen", "clientType"],
+    },
+  },
   "posts-like": {
     description: "帖子点赞切换限流，减少高频抖动写入。",
     scope: "posts-like",
@@ -188,6 +199,17 @@ const writeGuardConfig = {
     dedupe: {
       windowMs: 10_000,
       parts: ["userId", "postId", "amount", "giftId"],
+    },
+  },
+  "posts-auction-bid": {
+    description: "拍卖出价防重，避免连点导致重复冻结或重复加价。",
+    scope: "posts-auction-bid",
+    cooldownMs: 1_500,
+    cooldownMessage: "出价操作过于频繁，请稍后再试",
+    releaseOnError: true,
+    dedupe: {
+      windowMs: 10_000,
+      parts: ["userId", "postId", "amount"],
     },
   },
   "redeem-codes-redeem": {

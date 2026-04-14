@@ -1,5 +1,6 @@
 import { parseNonNegativeSafeInteger } from "@/lib/shared/safe-integer"
 import { buildDefaultRegistrationEmailTemplateSettings, normalizeRegistrationEmailTemplateSettings, type RegistrationEmailTemplateSettings } from "@/lib/email-template-settings"
+import { parseEmailWhitelistDomains } from "@/lib/email"
 import { getDefaultTippingGiftItemsFromAmounts, normalizeTippingGiftItems, type SiteTippingGiftItem } from "@/lib/tipping-gifts"
 import { normalizeVipNameColors, type VipNameColors } from "@/lib/vip-name-colors"
 import { normalizeVipLevelIcons, type VipLevelIcons } from "@/lib/vip-level-icons"
@@ -178,6 +179,11 @@ export interface RegisterNicknameLengthSettings {
   maxLength: number
 }
 
+export interface RegisterEmailWhitelistSettings {
+  enabled: boolean
+  domains: string[]
+}
+
 export type PostSlugGenerationMode = "TITLE_TIMESTAMP" | "TIME36" | "PINYIN_TIME36" | "TITLE_TIME36"
 
 export interface PostSlugGenerationSettings {
@@ -255,6 +261,12 @@ export interface RegistrationRewardSettings {
 }
 
 export interface RegisterInviteCodeHelpSettings {
+  enabled: boolean
+  title: string
+  url: string
+}
+
+export interface RedeemCodeHelpSettings {
   enabled: boolean
   title: string
   url: string
@@ -786,6 +798,48 @@ export function mergeRegisterNicknameLengthSettings(
     registerNicknameLengths: {
       minLength,
       maxLength: Math.min(50, Math.max(minLength, normalizeNonNegativeInteger(input.maxLength, 20))),
+    },
+  }
+
+  return JSON.stringify(root)
+}
+
+export function resolveRegisterEmailWhitelistSettings(options: {
+  appStateJson?: string | null
+  enabledFallback?: boolean
+  domainsFallback?: string[]
+} = {}): RegisterEmailWhitelistSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const registerEmailWhitelist = isRecord(siteSettingsState.registerEmailWhitelist)
+    ? siteSettingsState.registerEmailWhitelist
+    : {}
+  const { domains } = parseEmailWhitelistDomains(
+    Array.isArray(registerEmailWhitelist.domains)
+      ? registerEmailWhitelist.domains
+      : options.domainsFallback ?? [],
+  )
+
+  return {
+    enabled: typeof registerEmailWhitelist.enabled === "boolean"
+      ? registerEmailWhitelist.enabled
+      : options.enabledFallback ?? false,
+    domains,
+  }
+}
+
+export function mergeRegisterEmailWhitelistSettings(
+  appStateJson: string | null | undefined,
+  input: RegisterEmailWhitelistSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+  const { domains } = parseEmailWhitelistDomains(input.domains)
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    registerEmailWhitelist: {
+      enabled: Boolean(input.enabled),
+      domains,
     },
   }
 
@@ -1774,6 +1828,49 @@ export function mergeRegisterInviteCodeHelpSettings(
   root[SITE_SETTINGS_STATE_KEY] = {
     ...siteSettingsState,
     registerInviteCodeHelp: {
+      enabled: Boolean(input.enabled),
+      title: input.title.trim(),
+      url: input.url.trim(),
+    },
+  }
+
+  return JSON.stringify(root)
+}
+
+export function resolveRedeemCodeHelpSettings(options: {
+  appStateJson?: string | null
+  enabledFallback?: boolean
+  titleFallback?: string
+  urlFallback?: string
+} = {}): RedeemCodeHelpSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const redeemCodeHelp = isRecord(siteSettingsState.redeemCodeHelp)
+    ? siteSettingsState.redeemCodeHelp
+    : {}
+
+  return {
+    enabled: typeof redeemCodeHelp.enabled === "boolean"
+      ? redeemCodeHelp.enabled
+      : options.enabledFallback ?? false,
+    title: typeof redeemCodeHelp.title === "string"
+      ? redeemCodeHelp.title.trim()
+      : options.titleFallback ?? "",
+    url: typeof redeemCodeHelp.url === "string"
+      ? redeemCodeHelp.url.trim()
+      : options.urlFallback ?? "",
+  }
+}
+
+export function mergeRedeemCodeHelpSettings(
+  appStateJson: string | null | undefined,
+  input: RedeemCodeHelpSettings,
+) {
+  const root = parseAppStateRoot(appStateJson)
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+
+  root[SITE_SETTINGS_STATE_KEY] = {
+    ...siteSettingsState,
+    redeemCodeHelp: {
       enabled: Boolean(input.enabled),
       title: input.title.trim(),
       url: input.url.trim(),

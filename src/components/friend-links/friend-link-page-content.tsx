@@ -18,11 +18,17 @@ export function FriendLinkPageContent({ links, announcement, applicationEnabled 
     <div className="space-y-4 sm:space-y-6">
       <section className="overflow-hidden rounded-[28px] border border-border bg-card shadow-xs shadow-black/5 dark:shadow-black/30">
         <div className="bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(251,191,36,0.12),transparent_30%)] px-4 py-5 sm:px-6 sm:py-6">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div className="flex items-start justify-between gap-3">
+            <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-sky-500/20 bg-sky-500/10 text-sky-600 dark:text-sky-300">
+              <Link2 className="h-5 w-5" />
+            </div>
+            <Link href="/" className="inline-flex shrink-0 items-center justify-center rounded-full border border-border bg-background/80 px-4 py-2 text-sm text-muted-foreground transition hover:bg-background hover:text-foreground">
+              返回首页
+            </Link>
+          </div>
+
+          <div className="mt-5 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div className="space-y-4">
-              <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-sky-500/20 bg-sky-500/10 text-sky-600 dark:text-sky-300">
-                <Link2 className="h-5 w-5" />
-              </div>
               <div className="space-y-2">
                 <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">友情链接</h1>
 
@@ -76,10 +82,6 @@ export function FriendLinkPageContent({ links, announcement, applicationEnabled 
             </div>
           )}
         </section>
-      </div>
-
-      <div className="text-sm text-muted-foreground">
-        <Link href="/" className="transition hover:text-foreground">返回首页</Link>
       </div>
     </div>
   )

@@ -716,6 +716,7 @@ export function ProfileEditForm({
       <Modal
         open={showNicknameModal}
         title="修改昵称"
+        hideHeaderCloseButtonOnMobile
         description="昵称全站唯一，提交后会立即生效。"
         onClose={() => {
           setPendingNickname(nickname)
@@ -747,6 +748,7 @@ export function ProfileEditForm({
       <Modal
         open={showIntroductionModal}
         title="修改个人介绍"
+        hideHeaderCloseButtonOnMobile
         description="个人介绍支持 Markdown，提交后会按当前身份即时结算。"
         onClose={() => {
           setPendingIntroduction(introduction)

@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useState } from "react"
 import { CornerDownRight, Flag } from "lucide-react"
 
+import { AiAgentIndicator } from "@/components/user/ai-agent-indicator"
 import { AnonymousUserIndicator } from "@/components/user/anonymous-user-indicator"
 import { CommentForm } from "@/components/comment/comment-form"
 import { CommentLikeButton } from "@/components/comment/comment-like-button"
@@ -189,6 +190,13 @@ export function CommentThreadReplyItem({
     isAdmin,
     adminRole,
   })
+  const replyRewardBadges = !replyUnavailableMessage && (reply.rewardClaim || reply.rewardEffectFeedback) ? (
+    <>
+      <CommentRewardBadge rewardClaim={reply.rewardClaim} pointName={pointName} />
+      {reply.rewardEffectFeedback ? <CommentRewardEffectBadge feedback={reply.rewardEffectFeedback} /> : null}
+      <CommentJackpotDepositBadge feedback={reply.rewardEffectFeedback} pointName={pointName} />
+    </>
+  ) : null
 
   return (
     <div
@@ -202,7 +210,7 @@ export function CommentThreadReplyItem({
       )}
     >
       {!isFlatLayout ? <span aria-hidden="true" className="absolute -left-[14px] top-4 h-2 w-2 rounded-full bg-muted-foreground/30 sm:-left-[18px]" /> : null}
-      <div className={cn(editingCommentId === reply.id ? "flex flex-col gap-2.5" : "flex items-start justify-between gap-2.5")}>
+      <div className="flex flex-col gap-2.5">
         <div className="flex min-w-0 flex-1 items-start gap-2.5">
           <Link href={`/users/${reply.authorUsername}`} className={cn("shrink-0", shouldDimRestrictedReplyAuthor && "grayscale")}>
             <UserAvatar name={reply.author} avatarPath={reply.authorAvatarPath} size="xs" isVip={reply.authorIsVip} vipLevel={reply.authorVipLevel} />
@@ -213,6 +221,7 @@ export function CommentThreadReplyItem({
                 <span className="inline-flex items-center gap-1">
                   <Link href={`/users/${reply.authorUsername}`} className={replyAuthorNameClassName}>{reply.author}</Link>
                   {reply.authorIsAnonymous ? <AnonymousUserIndicator /> : null}
+                  {reply.authorIsAiAgent ? <AiAgentIndicator /> : null}
                 </span>
               </VipNameTooltip>
               <CommentAuthorIdentityBadges isPostAuthor={reply.isPostAuthor} authorRole={reply.authorRole} />
@@ -271,22 +280,15 @@ export function CommentThreadReplyItem({
                   ) : (
                     <MarkdownContent content={reply.content} className="text-[13px] leading-6 text-foreground/90 dark:text-foreground/85 sm:text-sm sm:leading-7" markdownEmojiMap={markdownEmojiMap} />
                   )}
-                  {!replyUnavailableMessage && (reply.rewardClaim || reply.rewardEffectFeedback) ? (
-                    <div className="mt-2 flex items-center justify-start gap-2">
-                   
-                      <CommentRewardBadge rewardClaim={reply.rewardClaim} pointName={pointName} />
-                      {reply.rewardEffectFeedback ? <CommentRewardEffectBadge feedback={reply.rewardEffectFeedback} /> : null}
-                         <CommentJackpotDepositBadge feedback={reply.rewardEffectFeedback} pointName={pointName} />
-                    </div>
-                  ) : null}
                 </>
               )}
             </div>
           </div>
         </div>
 
-        <div className={cn("flex shrink-0 items-center gap-2 text-[11px] text-muted-foreground", editingCommentId === reply.id && "justify-end border-t border-border/50 pt-2")}>
-          <div className="flex items-center gap-1.5">
+        <div className={cn("flex w-full items-center gap-2 text-[11px] text-muted-foreground", replyRewardBadges ? "justify-between" : "justify-end", editingCommentId === reply.id && "border-t border-border/50 pt-2")}>
+          {replyRewardBadges ? <div className="flex min-w-0 flex-wrap items-center gap-2">{replyRewardBadges}</div> : null}
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
                      {!hideFloatingActionButtons && replyActions.length > 0 ? (
               <CommentAdminActionMenu
                 actions={replyActions}
@@ -390,6 +392,13 @@ export function CommentThreadCommentItem({
     canPinComment,
     pinningCommentId,
   })
+  const commentRewardBadges = !commentUnavailableMessage && (comment.rewardClaim || comment.rewardEffectFeedback) ? (
+    <>
+      <CommentRewardBadge rewardClaim={comment.rewardClaim} pointName={pointName} />
+      {comment.rewardEffectFeedback ? <CommentRewardEffectBadge feedback={comment.rewardEffectFeedback} /> : null}
+      <CommentJackpotDepositBadge feedback={comment.rewardEffectFeedback} pointName={pointName} />
+    </>
+  ) : null
 
   return (
     <div
@@ -399,7 +408,7 @@ export function CommentThreadCommentItem({
         isHighlighted && "rounded-[20px] bg-amber-50/70 ring-2 ring-amber-300/70 ring-offset-2 ring-offset-background dark:bg-amber-500/10 dark:ring-amber-400/40",
       )}
     >
-      <div className={cn("text-sm text-muted-foreground", editingCommentId === comment.id ? "flex flex-col gap-2.5" : "flex items-start justify-between gap-2.5")}>
+      <div className="flex flex-col gap-2.5 text-sm text-muted-foreground">
         <div className="flex min-w-0 flex-1 items-start gap-2.5">
           <Link href={`/users/${comment.authorUsername}`} className={cn("shrink-0", shouldDimRestrictedCommentAuthor && "grayscale")}>
             <UserAvatar name={comment.author} avatarPath={comment.authorAvatarPath} size="xs" isVip={comment.authorIsVip} vipLevel={comment.authorVipLevel} />
@@ -411,6 +420,7 @@ export function CommentThreadCommentItem({
                 <span className="inline-flex items-center gap-1">
                   <Link href={`/users/${comment.authorUsername}`} className={commentAuthorNameClassName}>{comment.author}</Link>
                   {comment.authorIsAnonymous ? <AnonymousUserIndicator /> : null}
+                  {comment.authorIsAiAgent ? <AiAgentIndicator /> : null}
                 </span>
               </VipNameTooltip>
               <CommentAuthorIdentityBadges isPostAuthor={comment.isPostAuthor} authorRole={comment.authorRole} />
@@ -448,21 +458,14 @@ export function CommentThreadCommentItem({
                 ) : (
                   <MarkdownContent content={comment.content} className="text-[13px] leading-6 text-foreground/90 dark:text-foreground/85 sm:text-sm sm:leading-7" markdownEmojiMap={markdownEmojiMap} />
                 )}
-                {!commentUnavailableMessage && (comment.rewardClaim || comment.rewardEffectFeedback) ? (
-                  <div className="mt-2 flex items-center justify-start gap-2">
-        
-                    <CommentRewardBadge rewardClaim={comment.rewardClaim} pointName={pointName} />
-                    {comment.rewardEffectFeedback ? <CommentRewardEffectBadge feedback={comment.rewardEffectFeedback} /> : null}
-                    <CommentJackpotDepositBadge feedback={comment.rewardEffectFeedback} pointName={pointName} />
-                  </div>
-                ) : null}
               </>
             )}
           </div>
         </div>
 
-        <div className={cn("flex shrink-0 items-center gap-2 text-[11px] text-muted-foreground sm:text-xs", editingCommentId === comment.id && "justify-end border-t border-border/60 pt-2")}>
-          <div className="flex items-center gap-1.5">
+        <div className={cn("flex w-full items-center gap-2 text-[11px] text-muted-foreground sm:text-xs", commentRewardBadges ? "justify-between" : "justify-end", editingCommentId === comment.id && "border-t border-border/60 pt-2")}>
+          {commentRewardBadges ? <div className="flex min-w-0 flex-wrap items-center gap-2">{commentRewardBadges}</div> : null}
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
                {!hideFloatingActionButtons && commentActions.length > 0 ? (
               <CommentAdminActionMenu
                 actions={commentActions}
@@ -506,18 +509,18 @@ export function CommentThreadCommentItem({
                 {submittingAnswerId === comment.id ? "提交中..." : "采纳"}
               </Button>
             ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                void copyCommentPermalink(comment.id, comment.floor, postPath)
+              }}
+              className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-semibold text-foreground/80 transition-colors hover:bg-accent hover:text-foreground"
+              title={`复制 #${comment.floor} 楼链接`}
+              aria-label={`复制 #${comment.floor} 楼链接`}
+            >
+              #{comment.floor}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              void copyCommentPermalink(comment.id, comment.floor, postPath)
-            }}
-            className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] font-semibold text-foreground/80 transition-colors hover:bg-accent hover:text-foreground"
-            title={`复制 #${comment.floor} 楼链接`}
-            aria-label={`复制 #${comment.floor} 楼链接`}
-          >
-            #{comment.floor}
-          </button>
         </div>
       </div>
 

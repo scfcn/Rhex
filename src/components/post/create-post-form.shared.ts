@@ -1,6 +1,12 @@
 import type { MarkdownEmojiItem } from "@/lib/markdown-emoji"
 import type { AccessThresholdOption } from "@/lib/access-threshold-options"
 import { createEmptyLocalPostDraft, type LocalPostDraft } from "@/lib/post-draft"
+import {
+  normalizePostAuctionMode,
+  normalizePostAuctionPricingRule,
+  type LocalPostAuctionMode,
+  type LocalPostAuctionPricingRule,
+} from "@/lib/post-auction-types"
 import { normalizeManualTags } from "@/lib/post-tags"
 import { DEFAULT_ALLOWED_POST_TYPES, DEFAULT_POST_TYPE, normalizePostType, type LocalPostType } from "@/lib/post-types"
 import type { PostLinkDisplayMode } from "@/lib/site-settings"
@@ -135,6 +141,7 @@ export const POST_TYPE_OPTIONS = [
   { value: "BOUNTY", label: "悬赏帖", hint: "设置积分悬赏" },
   { value: "POLL", label: "投票帖", hint: "发起投票" },
   { value: "LOTTERY", label: "抽奖帖", hint: "配置奖项与参与条件" },
+  { value: "AUCTION", label: "拍卖帖", hint: "出售赢家专属内容" },
 ] as const satisfies Array<{ value: LocalPostType; label: string; hint: string }>
 
 export interface CreatePostFormBoardItem {
@@ -160,6 +167,16 @@ export interface CreatePostFormInitialValues {
   boardSlug: string
   postType: LocalPostType
   bountyPoints?: number | null
+  auctionConfig?: {
+    mode?: LocalPostAuctionMode | null
+    pricingRule?: LocalPostAuctionPricingRule | null
+    startPrice?: number | null
+    incrementStep?: number | null
+    startsAt?: string | null
+    endsAt?: string | null
+    winnerOnlyContent?: string | null
+    winnerOnlyContentPreview?: string | null
+  }
   pollOptions?: string[]
   pollExpiresAt?: string | null
   commentsVisibleToAuthorOnly?: boolean
@@ -250,6 +267,8 @@ export type HiddenModalType = "login" | "reply" | "purchase" | "view-level" | nu
 
 export type LotteryPrizeDraft = LocalPostDraft["lotteryPrizes"][number]
 export type LotteryConditionDraft = LocalPostDraft["lotteryConditions"][number]
+export type AuctionModeDraft = LocalPostDraft["auctionMode"]
+export type AuctionPricingRuleDraft = LocalPostDraft["auctionPricingRule"]
 type InitialLotteryConfig = NonNullable<CreatePostFormInitialValues["lotteryConfig"]>
 
 export function normalizeLotteryConditionGroupKey(groupKey?: string | null) {
@@ -390,6 +409,14 @@ export function buildInitialPostDraft(
     boardSlug: initialValues.boardSlug,
     postType: normalizePostType(initialValues.postType, DEFAULT_POST_TYPE),
     bountyPoints: String(initialValues.bountyPoints ?? 100),
+    auctionMode: normalizePostAuctionMode(initialValues.auctionConfig?.mode),
+    auctionPricingRule: normalizePostAuctionPricingRule(initialValues.auctionConfig?.pricingRule),
+    auctionStartPrice: String(initialValues.auctionConfig?.startPrice ?? 100),
+    auctionIncrementStep: String(initialValues.auctionConfig?.incrementStep ?? 10),
+    auctionStartsAt: initialValues.auctionConfig?.startsAt ?? "",
+    auctionEndsAt: initialValues.auctionConfig?.endsAt ?? "",
+    auctionWinnerOnlyContent: initialValues.auctionConfig?.winnerOnlyContent ?? "",
+    auctionWinnerOnlyContentPreview: initialValues.auctionConfig?.winnerOnlyContentPreview ?? "",
     pollOptions: initialValues.pollOptions && initialValues.pollOptions.length > 0 ? initialValues.pollOptions : ["", ""],
     pollExpiresAt: initialValues.pollExpiresAt ?? "",
     commentsVisibleToAuthorOnly: Boolean(initialValues.commentsVisibleToAuthorOnly),
@@ -444,6 +471,8 @@ export function normalizeDraftData(draft: LocalPostDraft, pointName: string, fal
     boardSlug: draft.boardSlug || fallbackBoardSlug,
     isAnonymous: Boolean(draft.isAnonymous),
     postType: normalizePostType(draft.postType, DEFAULT_POST_TYPE),
+    auctionMode: normalizePostAuctionMode(draft.auctionMode),
+    auctionPricingRule: normalizePostAuctionPricingRule(draft.auctionPricingRule),
     pollOptions: Array.isArray(draft.pollOptions) && draft.pollOptions.length > 0 ? draft.pollOptions : emptyDraft.pollOptions,
     manualTags: normalizeManualTags(draft.manualTags),
     lotteryEndsAt: normalizedLotteryEndsAt,
@@ -493,6 +522,18 @@ export function buildSubmitRequest({
       groupKey: normalizeLotteryConditionGroupKey(item.groupKey),
     }))
     .filter((item) => item.type && item.value)
+  const auctionConfig = draft.postType === "AUCTION"
+    ? {
+        mode: normalizePostAuctionMode(draft.auctionMode),
+        pricingRule: normalizePostAuctionPricingRule(draft.auctionPricingRule),
+        startPrice: Number(draft.auctionStartPrice),
+        incrementStep: Number(draft.auctionIncrementStep),
+        startsAt: draft.auctionStartsAt || undefined,
+        endsAt: draft.auctionEndsAt || undefined,
+        winnerOnlyContent: draft.auctionWinnerOnlyContent,
+        winnerOnlyContentPreview: draft.auctionWinnerOnlyContentPreview,
+      }
+    : undefined
   const lotteryConfig = draft.postType === "LOTTERY"
     ? {
         startsAt: draft.lotteryStartsAt || undefined,
@@ -538,6 +579,7 @@ export function buildSubmitRequest({
     boardSlug: draft.boardSlug,
     postType: draft.postType,
     bountyPoints: draft.postType === "BOUNTY" ? Number(draft.bountyPoints) : undefined,
+    auctionConfig,
     pollOptions: draft.postType === "POLL" ? normalizedPollOptions : undefined,
     lotteryConfig,
     manualTags: draft.manualTags,

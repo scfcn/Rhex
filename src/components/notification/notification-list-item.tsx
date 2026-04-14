@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useTransition } from "react"
+import { useState } from "react"
 
 interface NotificationListItemProps {
   id: string
@@ -17,26 +17,35 @@ interface NotificationListItemProps {
 
 export function NotificationListItem({ id, href, isRead, typeLabel, title, content, senderName, createdAt }: NotificationListItemProps) {
   const router = useRouter()
-  const [isPending, startTransition] = useTransition()
+  const [isPending, setIsPending] = useState(false)
 
-  function handleClick(event: React.MouseEvent<HTMLAnchorElement>) {
-    if (isRead) {
+  async function handleClick(event: React.MouseEvent<HTMLAnchorElement>) {
+    if (isRead || isPending) {
       return
     }
 
     event.preventDefault()
 
-    startTransition(async () => {
-      await fetch("/api/notifications/read", {
+    setIsPending(true)
+
+    try {
+      const response = await fetch("/api/notifications/read", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ notificationId: id }),
       })
+
+      if (!response.ok) {
+        return
+      }
+
       router.push(href)
       router.refresh()
-    })
+    } finally {
+      setIsPending(false)
+    }
   }
 
   return (

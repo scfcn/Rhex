@@ -15,7 +15,7 @@ import { defaultSiteSettingsCreateInput } from "@/lib/site-settings-defaults"
 import { parseMarkdownEmojiMapJson } from "@/lib/markdown-emoji"
 import { normalizePostListLoadMode, type PostListLoadMode } from "@/lib/post-list-load-mode"
 import { normalizePostListDisplayMode, type PostListDisplayMode } from "@/lib/post-list-display"
-import { resolveAnonymousPostSettings, resolveAttachmentFeatureSettings, resolveAuthProviderSettings, resolveAvatarChangePointCostSettings, resolveBoardApplicationSettings, resolveBoardTreasurySettings, resolveCheckInMakeUpPriceSettings, resolveCheckInRewardSettings, resolveCheckInStreakSettings, resolveCommentAccessSettings, resolveFooterCopyrightSettings, resolveHomeFeedPostListLoadSettings, resolveHomeHotFeedSettings, resolveHomeSidebarAnnouncementSettings, resolveImageWatermarkSettings, resolveInteractionGateSettings, resolveIntroductionChangePointCostSettings, resolveInviteCodePurchasePriceSettings, resolveLeftSidebarDisplaySettings, resolveMarkdownImageUploadSettings, resolveNicknameChangePointCostSettings, resolvePostContentLengthSettings, resolvePostJackpotSettings, resolvePostPageSizeSettings, resolvePostRedPacketSettings, resolvePostSlugGenerationSettings, resolveRegisterInviteCodeHelpSettings, resolveRegisterNicknameLengthSettings, resolveRegistrationEmailTemplateSettings, resolveRegistrationRewardSettings, resolveSiteBrandingSettings, resolveUploadObjectStorageSettings, resolveVipLevelIconSettings, resolveVipNameColorSettings, type ImageWatermarkPosition, type InteractionGateSettings, type LeftSidebarDisplayMode, type PostSlugGenerationMode, type RegistrationEmailTemplateSettings } from "@/lib/site-settings-app-state"
+import { resolveAnonymousPostSettings, resolveAttachmentFeatureSettings, resolveAuthProviderSettings, resolveAvatarChangePointCostSettings, resolveBoardApplicationSettings, resolveBoardTreasurySettings, resolveCheckInMakeUpPriceSettings, resolveCheckInRewardSettings, resolveCheckInStreakSettings, resolveCommentAccessSettings, resolveFooterCopyrightSettings, resolveHomeFeedPostListLoadSettings, resolveHomeHotFeedSettings, resolveHomeSidebarAnnouncementSettings, resolveImageWatermarkSettings, resolveInteractionGateSettings, resolveIntroductionChangePointCostSettings, resolveInviteCodePurchasePriceSettings, resolveLeftSidebarDisplaySettings, resolveMarkdownImageUploadSettings, resolveNicknameChangePointCostSettings, resolvePostContentLengthSettings, resolvePostJackpotSettings, resolvePostPageSizeSettings, resolvePostRedPacketSettings, resolveRegisterEmailWhitelistSettings, resolvePostSlugGenerationSettings, resolveRegisterInviteCodeHelpSettings, resolveRegisterNicknameLengthSettings, resolveRegistrationEmailTemplateSettings, resolveRegistrationRewardSettings, resolveSiteBrandingSettings, resolveUploadObjectStorageSettings, resolveVipLevelIconSettings, resolveVipNameColorSettings, type ImageWatermarkPosition, type InteractionGateSettings, type LeftSidebarDisplayMode, type PostSlugGenerationMode, type RegistrationEmailTemplateSettings } from "@/lib/site-settings-app-state"
 import { resolveAuthPageShowcaseSettings } from "@/lib/site-settings-app-state"
 import { resolveAuthProviderSensitiveConfig, resolveCaptchaSensitiveConfig, resolveUploadStorageSensitiveConfig } from "@/lib/site-settings-sensitive-state"
 import { resolveSiteSearchSettings, type SiteSearchSettings } from "@/lib/site-search-settings"
@@ -46,6 +46,9 @@ export interface SiteSettingsData {
   siteIconPath?: string | null
   siteSeoKeywords: string[]
   pointName: string
+  redeemCodeHelpEnabled: boolean
+  redeemCodeHelpTitle: string
+  redeemCodeHelpUrl: string
   postLinkDisplayMode: PostLinkDisplayMode
   homeFeedPostListDisplayMode: PostListDisplayMode
   homeFeedPostListLoadMode: PostListLoadMode
@@ -161,6 +164,8 @@ export interface SiteSettingsData {
   registerEmailEnabled: boolean
   registerEmailRequired: boolean
   registerEmailVerification: boolean
+  registerEmailWhitelistEnabled: boolean
+  registerEmailWhitelistDomains: string[]
   registerPhoneEnabled: boolean
   registerPhoneRequired: boolean
   registerPhoneVerification: boolean
@@ -241,6 +246,72 @@ function getDefaultServerSiteSettings(): ServerSiteSettingsData {
     postOfflineVip2Price: 0,
     postOfflineVip3Price: 0,
   })
+}
+
+function normalizeLegacyServerSiteSettings(data: ServerSiteSettingsData): ServerSiteSettingsData {
+  const defaults = getDefaultServerSiteSettings()
+
+  return {
+    ...data,
+    registerInviteCodeHelpEnabled: typeof data.registerInviteCodeHelpEnabled === "boolean"
+      ? data.registerInviteCodeHelpEnabled
+      : defaults.registerInviteCodeHelpEnabled,
+    registerInviteCodeHelpTitle: typeof data.registerInviteCodeHelpTitle === "string"
+      ? data.registerInviteCodeHelpTitle
+      : defaults.registerInviteCodeHelpTitle,
+    registerInviteCodeHelpUrl: typeof data.registerInviteCodeHelpUrl === "string"
+      ? data.registerInviteCodeHelpUrl
+      : defaults.registerInviteCodeHelpUrl,
+    registerEmailWhitelistEnabled: typeof data.registerEmailWhitelistEnabled === "boolean"
+      ? data.registerEmailWhitelistEnabled
+      : defaults.registerEmailWhitelistEnabled,
+    registerEmailWhitelistDomains: Array.isArray(data.registerEmailWhitelistDomains)
+      ? data.registerEmailWhitelistDomains.filter((item): item is string => typeof item === "string")
+      : defaults.registerEmailWhitelistDomains,
+    redeemCodeHelpEnabled: typeof data.redeemCodeHelpEnabled === "boolean"
+      ? data.redeemCodeHelpEnabled
+      : defaults.redeemCodeHelpEnabled,
+    redeemCodeHelpTitle: typeof data.redeemCodeHelpTitle === "string"
+      ? data.redeemCodeHelpTitle
+      : defaults.redeemCodeHelpTitle,
+    redeemCodeHelpUrl: typeof data.redeemCodeHelpUrl === "string"
+      ? data.redeemCodeHelpUrl
+      : defaults.redeemCodeHelpUrl,
+  }
+}
+
+function parseSiteSettingsAppState(raw: string | null | undefined) {
+  if (!raw) {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {}
+    }
+
+    const siteSettingsState = (parsed as Record<string, unknown>).__siteSettings
+    return siteSettingsState && typeof siteSettingsState === "object" && !Array.isArray(siteSettingsState)
+      ? siteSettingsState as Record<string, unknown>
+      : {}
+  } catch {
+    return {}
+  }
+}
+
+function resolveRedeemCodeHelpSettingsFromAppState(appStateJson?: string | null) {
+  const appState = parseSiteSettingsAppState(appStateJson)
+  const redeemCodeHelp = appState.redeemCodeHelp
+  const normalized = redeemCodeHelp && typeof redeemCodeHelp === "object" && !Array.isArray(redeemCodeHelp)
+    ? redeemCodeHelp as Record<string, unknown>
+    : {}
+
+  return {
+    enabled: typeof normalized.enabled === "boolean" ? normalized.enabled : false,
+    title: typeof normalized.title === "string" ? normalized.title.trim() : "",
+    url: typeof normalized.url === "string" ? normalized.url.trim() : "",
+  }
 }
 
 async function readSiteSettingsFromDB(): Promise<ServerSiteSettingsData> {
@@ -476,6 +547,10 @@ function mapSiteSettings(record: {
   const registerInviteCodeHelpSettings = resolveRegisterInviteCodeHelpSettings({
     appStateJson: record.appStateJson,
   })
+  const registerEmailWhitelistSettings = resolveRegisterEmailWhitelistSettings({
+    appStateJson: record.appStateJson,
+  })
+  const redeemCodeHelpSettings = resolveRedeemCodeHelpSettingsFromAppState(record.appStateJson)
   const authPageShowcaseSettings = resolveAuthPageShowcaseSettings({
     appStateJson: record.appStateJson,
     enabledFallback: true,
@@ -532,6 +607,9 @@ function mapSiteSettings(record: {
     siteIconPath: siteBrandingSettings.iconPath || null,
     siteSeoKeywords: String(record.siteSeoKeywords || "").split(/[，,\n]+/).map((item) => item.trim()).filter(Boolean),
     pointName: record.pointName,
+    redeemCodeHelpEnabled: redeemCodeHelpSettings.enabled,
+    redeemCodeHelpTitle: redeemCodeHelpSettings.title,
+    redeemCodeHelpUrl: redeemCodeHelpSettings.url,
     postLinkDisplayMode: record.postLinkDisplayMode === "ID" ? "ID" : "SLUG",
     homeFeedPostListDisplayMode: normalizePostListDisplayMode(record.homeFeedPostListDisplayMode),
     homeFeedPostListLoadMode: homeFeedPostListLoadSettings.loadMode,
@@ -647,6 +725,8 @@ function mapSiteSettings(record: {
     registerEmailEnabled: record.registerEmailEnabled,
     registerEmailRequired: record.registerEmailRequired,
     registerEmailVerification: record.registerEmailVerification,
+    registerEmailWhitelistEnabled: registerEmailWhitelistSettings.enabled,
+    registerEmailWhitelistDomains: registerEmailWhitelistSettings.domains,
     registerPhoneEnabled: record.registerPhoneEnabled,
     registerPhoneRequired: record.registerPhoneRequired,
     registerPhoneVerification: record.registerPhoneVerification,
@@ -777,13 +857,13 @@ function isMissingIncrementalCacheInUnstableCacheError(error: unknown) {
 
 async function resolveServerSiteSettings(): Promise<ServerSiteSettingsData> {
   try {
-    return await getPersistentSiteSettings()
+    return normalizeLegacyServerSiteSettings(await getPersistentSiteSettings())
   } catch (error) {
     if (!isMissingIncrementalCacheInUnstableCacheError(error)) {
       throw error
     }
 
-    return readSiteSettingsFromDB()
+    return normalizeLegacyServerSiteSettings(await readSiteSettingsFromDB())
   }
 }
 

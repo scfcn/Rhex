@@ -1,4 +1,6 @@
+import { normalizePostAuctionMode, normalizePostAuctionPricingRule, type LocalPostAuctionMode, type LocalPostAuctionPricingRule } from "@/lib/post-auction-types"
 import { normalizePostType, type LocalPostType } from "@/lib/post-types"
+import { normalizeEmailAddress } from "@/lib/email"
 import { nicknameContainsWhitespace, normalizeNickname } from "@/lib/nickname"
 import { parseNonNegativeSafeInteger, parsePositiveSafeInteger } from "@/lib/shared/safe-integer"
 
@@ -97,7 +99,7 @@ export function validateAuthPayload(body: unknown, options: NicknameValidationOp
   const nickname = normalizeNickname(rawNickname)
   const inviterUsername = normalizeString(getField(body, "inviterUsername"))
   const inviteCode = normalizeString(getField(body, "inviteCode")).toUpperCase()
-  const email = normalizeString(getField(body, "email"))
+  const email = normalizeEmailAddress(normalizeString(getField(body, "email")))
   const emailCode = normalizeString(getField(body, "emailCode"))
   const phone = normalizeString(getField(body, "phone"))
   const phoneCode = normalizeString(getField(body, "phoneCode"))
@@ -182,6 +184,16 @@ export function validatePostPayload(body: unknown, options: PostPayloadValidatio
   boardSlug: string
   postType: LocalPostType
   bountyPoints: number | null
+  auctionConfig: {
+    mode: LocalPostAuctionMode
+    pricingRule: LocalPostAuctionPricingRule
+    startPrice: number
+    incrementStep: number
+    startsAt: string | null
+    endsAt: string
+    winnerOnlyContent: string
+    winnerOnlyContentPreview: string | null
+  } | null
   pollOptions: string[]
   commentsVisibleToAuthorOnly: boolean
   loginUnlockContent: string
@@ -202,6 +214,10 @@ export function validatePostPayload(body: unknown, options: PostPayloadValidatio
   const postType = normalizePostType(getField(body, "postType"))
 
   const rawBountyPoints = parsePositiveSafeInteger(getField(body, "bountyPoints") ?? 0) ?? 0
+  const rawAuctionConfig = getField(body, "auctionConfig")
+  const auctionConfig = rawAuctionConfig && typeof rawAuctionConfig === "object" && !Array.isArray(rawAuctionConfig)
+    ? (rawAuctionConfig as Record<string, unknown>)
+    : null
   const commentsVisibleToAuthorOnly = Boolean(getField(body, "commentsVisibleToAuthorOnly"))
   const loginUnlockContent = normalizeString(getField(body, "loginUnlockContent"))
   const replyUnlockContent = normalizeString(getField(body, "replyUnlockContent"))
@@ -219,6 +235,14 @@ export function validatePostPayload(body: unknown, options: PostPayloadValidatio
   const lotteryConfig = rawLotteryConfig && typeof rawLotteryConfig === "object" && !Array.isArray(rawLotteryConfig)
     ? (rawLotteryConfig as Record<string, unknown>)
     : null
+  const auctionWinnerOnlyContent = normalizeString(auctionConfig?.winnerOnlyContent)
+  const auctionWinnerOnlyContentPreview = normalizeString(auctionConfig?.winnerOnlyContentPreview)
+  const auctionEndsAt = normalizeString(auctionConfig?.endsAt)
+  const auctionStartsAt = normalizeString(auctionConfig?.startsAt)
+  const auctionMode = normalizePostAuctionMode(auctionConfig?.mode)
+  const auctionPricingRule = normalizePostAuctionPricingRule(auctionConfig?.pricingRule)
+  const rawAuctionStartPrice = parsePositiveSafeInteger(auctionConfig?.startPrice ?? 0) ?? 0
+  const rawAuctionIncrementStep = parsePositiveSafeInteger(auctionConfig?.incrementStep ?? 0) ?? 0
 
 
 
@@ -248,8 +272,12 @@ export function validatePostPayload(body: unknown, options: PostPayloadValidatio
     return { success: false, message: "封面地址不能超过 500 个字符" }
   }
 
-  if (loginUnlockContent.length > 20000 || replyUnlockContent.length > 20000 || purchaseUnlockContent.length > 20000) {
+  if (loginUnlockContent.length > 20000 || replyUnlockContent.length > 20000 || purchaseUnlockContent.length > 20000 || auctionWinnerOnlyContent.length > 20000) {
     return { success: false, message: "隐藏内容不能超过 20000 个字符" }
+  }
+
+  if (auctionWinnerOnlyContentPreview.length > 200) {
+    return { success: false, message: "赢家内容预告不能超过 200 个字符" }
   }
 
   if (replyUnlockContent && (!Number.isInteger(rawReplyThreshold) || rawReplyThreshold < 1 || rawReplyThreshold > 999)) {
@@ -292,6 +320,28 @@ export function validatePostPayload(body: unknown, options: PostPayloadValidatio
     }
   }
 
+  if (postType === "AUCTION") {
+    if (!auctionConfig) {
+      return { success: false, message: "拍卖帖缺少必要配置" }
+    }
+
+    if (!Number.isInteger(rawAuctionStartPrice) || rawAuctionStartPrice < 1 || rawAuctionStartPrice > 100000) {
+      return { success: false, message: "起拍价需为 1-100000 的整数" }
+    }
+
+    if (!Number.isInteger(rawAuctionIncrementStep) || rawAuctionIncrementStep < 1 || rawAuctionIncrementStep > 100000) {
+      return { success: false, message: "加价幅度需为 1-100000 的整数" }
+    }
+
+    if (!auctionEndsAt) {
+      return { success: false, message: "请设置拍卖结束时间" }
+    }
+
+    if (!auctionWinnerOnlyContent) {
+      return { success: false, message: "请填写赢家专属内容" }
+    }
+  }
+
   if (postType === "LOTTERY" && !lotteryConfig) {
     return { success: false, message: "抽奖帖缺少必要配置" }
   }
@@ -307,6 +357,18 @@ export function validatePostPayload(body: unknown, options: PostPayloadValidatio
       boardSlug,
       postType,
       bountyPoints: postType === "BOUNTY" ? rawBountyPoints : null,
+      auctionConfig: postType === "AUCTION"
+        ? {
+            mode: auctionMode,
+            pricingRule: auctionPricingRule,
+            startPrice: rawAuctionStartPrice,
+            incrementStep: rawAuctionIncrementStep,
+            startsAt: auctionStartsAt || null,
+            endsAt: auctionEndsAt,
+            winnerOnlyContent: auctionWinnerOnlyContent,
+            winnerOnlyContentPreview: auctionWinnerOnlyContentPreview || null,
+          }
+        : null,
       pollOptions: postType === "POLL" ? pollOptions : [],
       commentsVisibleToAuthorOnly,
       loginUnlockContent,
@@ -399,7 +461,7 @@ export function validateProfilePayload(body: unknown, options: NicknameValidatio
   const nickname = normalizeNickname(rawNickname)
   const bio = normalizeString(getField(body, "bio"))
   const introduction = normalizeString(getField(body, "introduction"))
-  const email = normalizeString(getField(body, "email"))
+  const email = normalizeEmailAddress(normalizeString(getField(body, "email")))
   const gender = normalizeString(getField(body, "gender"))
 
   if (!nickname) {

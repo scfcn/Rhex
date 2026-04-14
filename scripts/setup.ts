@@ -9,7 +9,6 @@ interface RequiredEnvSpec {
   example?: string
 }
 
-type SetupMode = "development" | "production"
 type SeedDecision = "run" | "skip"
 
 interface CommandResult {
@@ -40,7 +39,7 @@ const requiredEnvSpecs: RequiredEnvSpec[] = [
   },
   {
     key: "REDIS_URL",
-    description: "Redis 连接串，用于请求写保护和验证码消费锁",
+    description: "Redis 连接串，用于请求写保护、验证码存储与消费锁",
     example: "redis://127.0.0.1:6379",
   },
 ]
@@ -97,16 +96,6 @@ function runStep(command: string, args: string[], label: string) {
   if (result.status !== 0) {
     process.exit(result.status ?? 1)
   }
-}
-
-function resolveSetupMode(): SetupMode {
-  const rawMode = readEnvValue("SETUP_MODE").toLowerCase()
-
-  if (rawMode === "development" || rawMode === "production") {
-    return rawMode
-  }
-
-  return process.env.NODE_ENV === "production" ? "production" : "development"
 }
 
 function shouldForceSeed() {
@@ -233,9 +222,6 @@ function main() {
   loadDotenv({ path: resolve(process.cwd(), ".env") })
 
   validateEnv()
-
-  const mode = resolveSetupMode()
-  console.log(`Setup mode: ${mode}`)
   console.log("Schema strategy: prisma db push")
 
   runStep("npx", ["prisma", "generate"], "生成 Prisma Client")

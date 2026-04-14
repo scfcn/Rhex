@@ -18,6 +18,7 @@ import {
 import { revalidateHomeSidebarStatsCache } from "@/lib/home-sidebar-stats"
 import { ensureCanManageBoard, ensureCanManagePost, getAvailablePinScopes } from "@/lib/moderator-permissions"
 import { createSystemNotification } from "@/lib/notification-writes"
+import { activatePostAuctionForPost } from "@/lib/post-auctions"
 
 export const adminPostActionHandlers: Record<string, AdminActionDefinition> = {
   "post.feature": defineAdminAction({ targetType: "POST", revalidatePaths: ["/", "/admin"], buildDetail: () => "管理员切换推荐状态" }, async (context) => {
@@ -50,8 +51,11 @@ export const adminPostActionHandlers: Record<string, AdminActionDefinition> = {
     return { message: "帖子已下线" }
   }),
   "post.show": defineAdminAction({ targetType: "POST", revalidatePaths: ["/", "/admin"], buildDetail: () => "管理员上线帖子" }, async (context) => {
-    await ensureCanManagePost(context.actor, context.targetId)
+    const post = await ensureCanManagePost(context.actor, context.targetId)
     await updatePostStatus(context.targetId, PostStatus.NORMAL, null)
+    if (post.type === "AUCTION") {
+      await activatePostAuctionForPost(post.id)
+    }
     revalidateHomeSidebarStatsCache()
 
     await writeAdminActionLog(context, adminPostActionHandlers["post.show"].metadata)
@@ -81,6 +85,9 @@ export const adminPostActionHandlers: Record<string, AdminActionDefinition> = {
   "post.approve": defineAdminAction({ targetType: "POST", revalidatePaths: ["/", "/admin"], buildDetail: () => "管理员审核通过帖子" }, async (context) => {
     const post = await ensureCanManagePost(context.actor, context.targetId)
     await updatePostStatus(context.targetId, PostStatus.NORMAL, context.message || null, new Date())
+    if (post.type === "AUCTION") {
+      await activatePostAuctionForPost(post.id)
+    }
     revalidateHomeSidebarStatsCache()
 
     if (post.authorId !== context.adminUserId) {

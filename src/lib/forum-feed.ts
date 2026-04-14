@@ -40,6 +40,7 @@ export interface ForumFeedItem {
   tipCount: number
   tipTotalPoints: number
   hasRedPacket: boolean
+  hasAttachments: boolean
   rewardMode?: PostRewardPoolMode
   isPinned: boolean
 
@@ -99,6 +100,9 @@ type FeedPost = {
   }
   comments?: Array<{ content: string; userId?: number; useAnonymousIdentity?: boolean; user: { username: string; nickname: string | null } }>
   redPacket: { id: string } | null
+  _count?: {
+    attachments?: number
+  }
 }
 
 function mapFeedPost(post: FeedPostRecord | PinnedFeedPostRecord, anonymousMaskIdentity: Awaited<ReturnType<typeof getAnonymousMaskDisplayIdentity>> = null): ForumFeedItem {
@@ -146,6 +150,7 @@ function mapFeedPost(post: FeedPostRecord | PinnedFeedPostRecord, anonymousMaskI
     tipCount: feedPost.tipCount ?? 0,
     tipTotalPoints: feedPost.tipTotalPoints ?? 0,
     hasRedPacket: Boolean(feedPost.redPacket),
+    hasAttachments: (feedPost._count?.attachments ?? 0) > 0,
     rewardMode: rewardPoolConfig?.mode,
     isPinned: feedPost.isPinned,
 

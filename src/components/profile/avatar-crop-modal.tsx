@@ -148,6 +148,7 @@ export function AvatarCropModal({
       open={open}
       onClose={onClose}
       title="裁剪头像"
+      hideHeaderCloseButtonOnMobile
       description="先裁剪成正方形头像，再上传并保存。右侧会实时预览大、中、小三种尺寸。"
       size="xl"
       closeDisabled={saving}

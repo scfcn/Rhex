@@ -213,3 +213,42 @@ export function findLotteryAutoDrawStatus(postId: string) {
     },
   })
 }
+
+export function findLotteryParticipantPage(postId: string, skip: number, take: number) {
+  return prisma.lotteryParticipant.findMany({
+    where: {
+      postId,
+      isEligible: true,
+      user: {
+        status: "ACTIVE",
+      },
+    },
+    orderBy: {
+      joinedAt: "desc",
+    },
+    skip,
+    take,
+    include: {
+      user: {
+        select: {
+          id: true,
+          username: true,
+          nickname: true,
+          avatarPath: true,
+        },
+      },
+    },
+  })
+}
+
+export function countLotteryParticipants(postId: string) {
+  return prisma.lotteryParticipant.count({
+    where: {
+      postId,
+      isEligible: true,
+      user: {
+        status: "ACTIVE",
+      },
+    },
+  })
+}

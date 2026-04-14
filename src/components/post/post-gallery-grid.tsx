@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
 import Link from "next/link"
+import { useState } from "react"
 import { ImageIcon, ImageOff, MessageCircle, type LucideIcon } from "lucide-react"
 
 import { LevelIcon } from "@/components/level-icon"
 import { PostListLink } from "@/components/post/post-list-link"
 import { getPostPinTone, getPostTitleClassName, PostAccessBadges, PostRewardPoolIcon } from "@/components/post/post-list-shared"
+import { Skeleton } from "@/components/ui/skeleton"
 import { TimeTooltip } from "@/components/time-tooltip"
 import { Tooltip } from "@/components/ui/tooltip"
 import { UserStatusBadge } from "@/components/user/user-status-badge"
@@ -61,33 +62,43 @@ function GalleryCoverPlaceholder({ label, icon: Icon = ImageIcon }: { label: str
   )
 }
 
-function PostGalleryCover({ coverImage, title }: { coverImage?: string | null; title: string }) {
-  const normalizedCoverImage = coverImage?.trim() ?? ""
-  const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null)
-  const hasLoadError = Boolean(normalizedCoverImage) && failedImageSrc === normalizedCoverImage
-
-  if (!normalizedCoverImage) {
-    return <GalleryCoverPlaceholder label="无封面图" />
-  }
+function GalleryCoverImage({ src, title }: { src: string; title: string }) {
+  const [hasLoadError, setHasLoadError] = useState(false)
+  const [imageLoaded, setImageLoaded] = useState(false)
 
   if (hasLoadError) {
     return <GalleryCoverPlaceholder label="封面暂不可用" icon={ImageOff} />
   }
 
   return (
-    <div className="overflow-hidden bg-secondary/40">
+    <div className="relative min-h-[154px] overflow-hidden bg-secondary/40">
+      {!imageLoaded ? <Skeleton aria-hidden="true" className="absolute inset-0 rounded-none" /> : null}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={normalizedCoverImage}
+        src={src}
         alt={title}
         title={title}
-        className="block h-auto w-full"
+        className={cn("block h-auto w-full transition-opacity duration-300", imageLoaded ? "opacity-100" : "opacity-0")}
         loading="lazy"
         decoding="async"
-        onError={() => setFailedImageSrc(normalizedCoverImage)}
+        onLoad={() => setImageLoaded(true)}
+        onError={() => {
+          setHasLoadError(true)
+          setImageLoaded(true)
+        }}
       />
     </div>
   )
+}
+
+function PostGalleryCover({ coverImage, title }: { coverImage?: string | null; title: string }) {
+  const normalizedCoverImage = coverImage?.trim() ?? ""
+
+  if (!normalizedCoverImage) {
+    return <GalleryCoverPlaceholder label="无封面图" />
+  }
+
+  return <GalleryCoverImage key={normalizedCoverImage} src={normalizedCoverImage} title={title} />
 }
 
 export function PostGalleryGrid({ items, showBoard = true, postLinkDisplayMode = "SLUG" }: PostGalleryGridProps) {

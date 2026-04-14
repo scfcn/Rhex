@@ -79,6 +79,7 @@ export function findManagedPostContext(postId: string) {
       title: true,
       slug: true,
       authorId: true,
+      type: true,
       status: true,
       isPinned: true,
       pinScope: true,

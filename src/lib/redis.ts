@@ -20,11 +20,41 @@ function readRedisUrl() {
   return url
 }
 
-function createRedisClient() {
+function detectRedisProcessRole() {
+  const entrypoint = process.argv[1]?.replace(/\\/g, "/").toLowerCase() ?? ""
+
+  if (entrypoint.includes("background-jobs-worker")) {
+    return "jobs-worker"
+  }
+
+  if (entrypoint.includes("/worker.ts")) {
+    return "worker"
+  }
+
+  if (entrypoint.includes("rss-worker")) {
+    return "rss-worker"
+  }
+
+  if (entrypoint.includes("next")) {
+    return "web"
+  }
+
+  return process.env.NODE_ENV === "production" ? "app" : "dev"
+}
+
+function buildRedisConnectionName(role: string) {
+  const prefix = process.env.REDIS_CLIENT_NAME_PREFIX?.trim() || "rhex"
+  const processRole = detectRedisProcessRole()
+
+  return [prefix, processRole, String(process.pid), role].join(":")
+}
+
+function createRedisClient(role = "shared") {
   const client = new Redis(readRedisUrl(), {
     lazyConnect: true,
     maxRetriesPerRequest: 1,
     enableAutoPipelining: true,
+    connectionName: buildRedisConnectionName(role),
   })
 
   client.on("error", (error) => {
@@ -35,23 +65,17 @@ function createRedisClient() {
 }
 
 export function getRedis() {
-  const client = globalForRedis.redis ?? createRedisClient()
-
-  if (process.env.NODE_ENV !== "production") {
-    globalForRedis.redis = client
+  if (!globalForRedis.redis) {
+    globalForRedis.redis = createRedisClient("shared")
   }
 
-  return client
+  return globalForRedis.redis
 }
 
-export function createRedisConnection() {
-  const sharedClient = globalForRedis.redis
-
-  if (sharedClient) {
-    return sharedClient.duplicate()
-  }
-
-  return createRedisClient()
+export function createRedisConnection(role = "duplicate") {
+  return getRedis().duplicate({
+    connectionName: buildRedisConnectionName(role),
+  })
 }
 
 export async function connectRedisClient(client: Redis) {

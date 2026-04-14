@@ -574,7 +574,7 @@ export function PostTipPanel({
                   {isPending ? "打赏中..." : effectiveSelectedAmount > 0 ? `打赏 ${formatNumber(effectiveSelectedAmount)} ${pointName}` : "选择金额"}
                 </Button>
                 {points <= 0 ? (
-                  <Link href="/settings?tab=points" className="text-xs text-primary hover:opacity-80">
+                  <Link href="/topup" className="text-xs text-primary hover:opacity-80">
                     去充值 / 兑换
                   </Link>
                 ) : (

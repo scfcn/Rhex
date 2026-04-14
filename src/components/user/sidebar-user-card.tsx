@@ -250,7 +250,7 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "ç
 
   if (!currentUser) {
     return (
-      <div className="overflow-hidden rounded-[24px] border border-border bg-card shadow-xs shadow-black/5 dark:shadow-black/30">
+      <div className="mobile-sidebar-section overflow-hidden rounded-[24px] border border-border bg-card shadow-xs shadow-black/5 dark:shadow-black/30">
         <div className="sidebar-user-card-header p-4">
           <div className="flex items-center gap-3">
             {siteLogoPath ? (
@@ -412,7 +412,7 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "ç
 
   return (
     <>
-      <div className="overflow-hidden rounded-[24px] border border-border bg-card shadow-xs shadow-black/5 dark:shadow-black/30">
+      <div className="mobile-sidebar-section overflow-hidden rounded-[24px] border border-border bg-card shadow-xs shadow-black/5 dark:shadow-black/30">
         <div className="sidebar-user-card-header p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-start gap-3">

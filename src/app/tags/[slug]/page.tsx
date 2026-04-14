@@ -105,7 +105,7 @@ export default async function TagPage(props: PageProps<"/tags/[slug]">) {
                 </CardContent>
               </Card>
 
-              <ForumPostStream posts={posts} />
+              <ForumPostStream posts={posts} compactFirstItem={false} />
               {posts.length === 0 ? <div className="rounded-md border bg-background p-8 text-sm text-muted-foreground">当前标签下还没有内容。</div> : null}
             </div>
             </main>

@@ -104,6 +104,10 @@ export const defaultSiteSettingsCreateInput = {
         minLength: 1,
         maxLength: 20,
       },
+      registerEmailWhitelist: {
+        enabled: false,
+        domains: [],
+      },
       postSlugGeneration: {
         mode: "TITLE_TIMESTAMP",
       },

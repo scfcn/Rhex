@@ -3,15 +3,17 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { CheckCircle2, ChevronLeft, ChevronRight, Compass, Grid2x2, PenSquare, Search } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 
 import { LevelIcon } from "@/components/level-icon"
+import { SearchForm } from "@/components/search-form"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Modal } from "@/components/ui/modal"
 import { toast } from "@/components/ui/toast"
 import type { SiteBoardItem } from "@/lib/boards"
 import type { SiteHeaderAppLinkItem } from "@/lib/site-header-app-links"
+import type { SiteSearchSettings } from "@/lib/site-search-settings"
 import { cn } from "@/lib/utils"
 import type { SiteZoneItem } from "@/lib/zones"
 
@@ -20,6 +22,7 @@ interface MobileHeaderQuickActionsProps {
   checkInEnabled: boolean
   checkedInToday: boolean
   appLinks: SiteHeaderAppLinkItem[]
+  search?: SiteSearchSettings
   zones: SiteZoneItem[]
   boards: SiteBoardItem[]
 }
@@ -35,12 +38,17 @@ export function MobileHeaderQuickActions({
   checkInEnabled,
   checkedInToday: initialCheckedInToday,
   appLinks,
+  search = {
+    enabled: true,
+    externalEngines: [],
+  },
   zones,
   boards,
 }: MobileHeaderQuickActionsProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [navOpen, setNavOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [view, setView] = useState<MobileHeaderPanelView>("main")
   const [checkedInToday, setCheckedInToday] = useState(initialCheckedInToday)
   const [loading, setLoading] = useState(false)
@@ -82,15 +90,16 @@ export function MobileHeaderQuickActions({
   }, [initialCheckedInToday])
 
   useEffect(() => {
-    if (!open) {
+    if (!navOpen) {
       setView("main")
       setKeyword("")
       setSelectedZoneSlug(currentZone?.slug ?? zones[0]?.slug ?? "")
     }
-  }, [currentZone?.slug, open, zones])
+  }, [currentZone?.slug, navOpen, zones])
 
   useEffect(() => {
-    setOpen(false)
+    setNavOpen(false)
+    setSearchOpen(false)
   }, [pathname])
 
   const visibleAppLinks = useMemo(() => appLinks.filter((item) => item.href !== "/write"), [appLinks])
@@ -128,7 +137,7 @@ export function MobileHeaderQuickActions({
 
   async function handleCheckIn() {
     if (!isLoggedIn) {
-      setOpen(false)
+      setNavOpen(false)
       router.push("/login")
       return
     }
@@ -154,7 +163,7 @@ export function MobileHeaderQuickActions({
 
       setCheckedInToday(true)
       toast.success(result.message ?? "签到成功", "签到成功")
-      setOpen(false)
+      setNavOpen(false)
       router.refresh()
     } catch {
       toast.error("签到失败，请稍后再试", "签到失败")
@@ -165,13 +174,16 @@ export function MobileHeaderQuickActions({
 
   return (
     <>
-      <div className="sm:hidden">
+      <div className="flex items-center gap-1 sm:hidden">
         <Button
           type="button"
           variant="ghost"
           size="icon"
           className="relative size-8 rounded-md"
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            setSearchOpen(false)
+            setNavOpen(true)
+          }}
           aria-label="打开移动导航"
           title="打开移动导航"
         >
@@ -180,14 +192,30 @@ export function MobileHeaderQuickActions({
             <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-amber-500" />
           ) : null}
         </Button>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-8 rounded-md"
+          onClick={() => {
+            setNavOpen(false)
+            setSearchOpen(true)
+          }}
+          aria-label="打开搜索"
+          title="打开搜索"
+        >
+          <Search className="h-4 w-4" />
+        </Button>
       </div>
 
       <Modal
-        open={open}
-        onClose={() => setOpen(false)}
+        open={navOpen}
+        onClose={() => setNavOpen(false)}
         size="lg"
         title={view === "main" ? "导航" : "切换节点"}
         description={view === "main" ? "快捷访问发帖、签到、应用入口和节点导航。" : "按分区浏览节点，也可以直接搜索。"}
+        showHeaderCloseButton={false}
         footer={(
           view === "nodes" ? (
             <div className="flex justify-between gap-3">
@@ -195,13 +223,13 @@ export function MobileHeaderQuickActions({
                 <ChevronLeft className="h-4 w-4" />
                 返回
               </Button>
-              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+              <Button type="button" variant="ghost" onClick={() => setNavOpen(false)}>
                 关闭
               </Button>
             </div>
           ) : (
             <div className="flex justify-end">
-              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+              <Button type="button" variant="ghost" onClick={() => setNavOpen(false)}>
                 关闭
               </Button>
             </div>
@@ -233,7 +261,7 @@ export function MobileHeaderQuickActions({
                 <Link
                   href={isLoggedIn ? "/write" : "/login"}
                   className="rounded-[18px] border border-border bg-card px-4 py-3 transition-colors hover:bg-accent/40"
-                  onClick={() => setOpen(false)}
+                  onClick={() => setNavOpen(false)}
                 >
                   <div className="flex items-center gap-2 text-sm font-medium">
                     <PenSquare className="h-4 w-4 text-muted-foreground" />
@@ -276,7 +304,7 @@ export function MobileHeaderQuickActions({
                         target={isExternal ? "_blank" : undefined}
                         rel={isExternal ? "noreferrer noopener" : undefined}
                         className="rounded-[18px] border border-border bg-card px-4 py-3 transition-colors hover:bg-accent/40"
-                        onClick={() => setOpen(false)}
+                        onClick={() => setNavOpen(false)}
                       >
                         <div className="flex items-center gap-2 text-sm font-medium">
                           <LevelIcon icon={item.icon} className="h-4 w-4 text-base" emojiClassName="text-inherit" svgClassName="[&>svg]:block" title={item.name} />
@@ -336,7 +364,7 @@ export function MobileHeaderQuickActions({
                     key={board.id}
                     href={`/boards/${board.slug}`}
                     className={isActive ? "block rounded-[20px] border border-foreground/15 bg-accent px-4 py-3" : "block rounded-[20px] border border-border bg-card px-4 py-3 transition-colors hover:bg-accent/40"}
-                    onClick={() => setOpen(false)}
+                    onClick={() => setNavOpen(false)}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -355,7 +383,32 @@ export function MobileHeaderQuickActions({
           </div>
         )}
       </Modal>
+
+      <Modal
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        size="lg"
+        hideHeaderCloseButtonOnMobile
+        title={search.enabled ? "搜索" : "外部搜索"}
+        description={search.enabled ? "搜索帖子、节点与作者内容。" : "站内搜索已关闭，输入关键词后可继续使用外部搜索引擎查找本站内容。"}
+      >
+        <div className="space-y-4">
+          <Suspense fallback={<div className="h-12 rounded-2xl border border-border bg-muted/50" aria-hidden="true" />}>
+            <SearchForm
+              key={`mobile-search:${pathname}`}
+              search={search}
+              externalOptionsInline
+              onNavigate={() => setSearchOpen(false)}
+              onExternalSearchSelect={() => setSearchOpen(false)}
+            />
+          </Suspense>
+          <p className="text-sm text-muted-foreground">
+            {search.enabled
+              ? "输入关键词后会跳转到搜索结果页。"
+              : "输入关键词后，可继续使用外部搜索引擎搜索本站内容。"}
+          </p>
+        </div>
+      </Modal>
     </>
   )
 }
-

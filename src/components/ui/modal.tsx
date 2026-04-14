@@ -1,6 +1,7 @@
 "use client"
 
 import type { FormEvent, ReactNode } from "react"
+import { isValidElement } from "react"
 import { useId } from "react"
 
 import { Button } from "@/components/ui/button"
@@ -22,6 +23,8 @@ interface ModalProps {
   size?: "md" | "lg" | "xl"
   children: ReactNode
   footer?: ReactNode
+  showHeaderCloseButton?: boolean
+  hideHeaderCloseButtonOnMobile?: boolean
   closeDisabled?: boolean
   closeOnEscape?: boolean
   onClose: () => void
@@ -40,6 +43,56 @@ interface FormModalProps extends Omit<ModalProps, "children" | "footer"> {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
 }
 
+function getNodeText(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node)
+  }
+
+  if (Array.isArray(node)) {
+    return node.map(getNodeText).join("")
+  }
+
+  if (!isValidElement(node)) {
+    return ""
+  }
+
+  return getNodeText((node.props as { children?: ReactNode }).children)
+}
+
+function hasFooterCancelButton(node: ReactNode): boolean {
+  if (Array.isArray(node)) {
+    return node.some(hasFooterCancelButton)
+  }
+
+  if (!isValidElement(node)) {
+    return false
+  }
+
+  const props = node.props as {
+    children?: ReactNode
+    href?: unknown
+    onClick?: unknown
+    type?: unknown
+  }
+  const typeName = typeof node.type === "string"
+    ? node.type
+    : ((node.type as { displayName?: string; name?: string }).displayName ?? (node.type as { name?: string }).name ?? "")
+  const isActionLike = typeName === "button"
+    || typeName === "a"
+    || typeName.includes("Button")
+    || typeName.includes("DialogClose")
+    || typeof props.onClick === "function"
+    || typeof props.href === "string"
+    || props.type === "button"
+    || props.type === "submit"
+
+  if (isActionLike && (getNodeText(props.children).includes("取消") || getNodeText(props.children).includes("关闭"))) {
+    return true
+  }
+
+  return hasFooterCancelButton(props.children)
+}
+
 export function Modal({
   open,
   title,
@@ -47,10 +100,14 @@ export function Modal({
   size = "md",
   children,
   footer,
+  showHeaderCloseButton = true,
+  hideHeaderCloseButtonOnMobile = false,
   closeDisabled = false,
   closeOnEscape = true,
   onClose,
 }: ModalProps) {
+  const shouldHideHeaderCloseButtonOnMobile = hideHeaderCloseButtonOnMobile || hasFooterCancelButton(footer)
+
   return (
     <Dialog
       open={open}
@@ -86,13 +143,13 @@ export function Modal({
               </DialogDescription>
             ) : null}
           </div>
-          {!closeDisabled ? (
+          {!closeDisabled && showHeaderCloseButton ? (
             <DialogClose
               render={
                 <Button
                   type="button"
                   variant="ghost"
-                  className="h-8 w-full shrink-0 px-2 text-xs sm:w-auto"
+                  className={cn("h-8 w-full shrink-0 px-2 text-xs sm:w-auto", shouldHideHeaderCloseButtonOnMobile && "hidden sm:inline-flex")}
                   disabled={closeDisabled}
                 />
               }

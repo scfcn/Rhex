@@ -69,6 +69,8 @@ interface RawSettingsSearchParams {
   listBefore?: string | string[]
   pointsAfter?: string | string[]
   pointsBefore?: string | string[]
+  pointsChangeType?: string | string[]
+  pointsEventType?: string | string[]
 }
 
 export interface ResolvedSettingsRoute {
@@ -81,6 +83,8 @@ export interface ResolvedSettingsRoute {
   listBefore: string | null
   pointsAfter: string | null
   pointsBefore: string | null
+  pointsChangeType: string | null
+  pointsEventType: string | null
 }
 
 export interface SettingsPageData {
@@ -155,6 +159,8 @@ export function resolveSettingsRoute(searchParams?: RawSettingsSearchParams): Re
   const listBefore = readSearchParam(searchParams?.listBefore) ?? null
   const pointsAfter = readSearchParam(searchParams?.pointsAfter) ?? null
   const pointsBefore = readSearchParam(searchParams?.pointsBefore) ?? null
+  const pointsChangeType = readSearchParam(searchParams?.pointsChangeType) ?? null
+  const pointsEventType = readSearchParam(searchParams?.pointsEventType) ?? null
 
   return {
     currentTab,
@@ -166,6 +172,8 @@ export function resolveSettingsRoute(searchParams?: RawSettingsSearchParams): Re
     listBefore,
     pointsAfter,
     pointsBefore,
+    pointsChangeType,
+    pointsEventType,
   }
 }
 
@@ -235,7 +243,15 @@ async function loadSettingsTabData(
     currentTab === "board-applications" ? getBoardApplicationPageData(userId, currentUser) : Promise.resolve({ pendingCount: 0, items: [] }),
     currentTab === "board-applications" ? getZones() : Promise.resolve([]),
     currentTab === "verifications" ? getCurrentUserVerificationData() : Promise.resolve({ currentUserId: userId, types: [], approvedVerification: null }),
-    currentTab === "points" ? getUserPointLogs(userId, { pageSize: 10, after: route.pointsAfter, before: route.pointsBefore }) : Promise.resolve(null),
+    currentTab === "points"
+      ? getUserPointLogs(userId, {
+          pageSize: 10,
+          after: route.pointsAfter,
+          before: route.pointsBefore,
+          changeType: route.pointsChangeType,
+          eventType: route.pointsEventType,
+        })
+      : Promise.resolve(null),
     currentTab === "profile" && route.currentProfileTab === "accounts"
       ? getUserAccountBindingView(userId, {
           authGithubEnabled: settings.authGithubEnabled,

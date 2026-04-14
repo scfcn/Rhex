@@ -117,8 +117,8 @@ export function CollapsibleInfoCard({
               {summaryActions}
             </div>
           </div>
-          <div className="relative grid gap-3 p-4 pr-38 md:grid-cols-[auto_minmax(0,1fr)] md:items-center">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] text-foreground/90">
+          <div className="relative grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 p-4 pr-38">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[18px] text-foreground/90 sm:h-11 sm:w-11">
               <LevelIcon icon={icon} className="h-full w-full text-[2rem]" svgClassName="[&>svg]:block" />
             </div>
             <div className="min-w-0 space-y-1">
@@ -128,10 +128,8 @@ export function CollapsibleInfoCard({
                   <span className="truncate">{summary}</span>
                 </span>
               </div>
-              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <h1 className="text-lg font-semibold leading-tight text-foreground">{title}</h1>
-                <p className="min-w-0 text-sm leading-6 text-muted-foreground">{description}</p>
-              </div>
+              <h1 className="text-base font-semibold leading-tight text-foreground sm:text-lg">{title}</h1>
+              <p className="min-w-0 text-sm leading-6 text-muted-foreground">{description}</p>
             </div>
           </div>
         </div>

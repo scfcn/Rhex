@@ -14,6 +14,7 @@ export interface PostStreamDisplayItem {
   pinScope?: string | null
   pinLabel?: string | null
   hasRedPacket?: boolean
+  hasAttachments?: boolean
   rewardMode?: SitePostItem["rewardMode"]
   minViewLevel?: number
   minViewVipLevel?: number
@@ -89,6 +90,7 @@ export function mapSitePostsToDisplayItems(
       pinScope: post.pinScope,
       pinLabel: getVisiblePinLabel(post.pinScope, visiblePinScopes),
       hasRedPacket: post.hasRedPacket,
+      hasAttachments: post.hasAttachments,
       rewardMode: post.rewardMode,
       minViewLevel: post.minViewLevel,
       minViewVipLevel: post.minViewVipLevel,

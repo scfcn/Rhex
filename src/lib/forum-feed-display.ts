@@ -13,6 +13,7 @@ export interface FeedDisplayItem {
   pinScope?: string | null
   pinLabel?: string | null
   hasRedPacket: boolean
+  hasAttachments: boolean
   rewardMode?: PostRewardPoolMode
   minViewLevel?: number
   minViewVipLevel?: number
@@ -73,6 +74,7 @@ export function mapForumFeedItemsToDisplayItems(
       pinScope: item.pinScope,
       pinLabel: getFeedPinLabel(item.pinScope),
       hasRedPacket: item.hasRedPacket,
+      hasAttachments: item.hasAttachments,
       rewardMode: item.rewardMode,
       minViewLevel: item.minViewLevel ?? undefined,
       minViewVipLevel: item.minViewVipLevel ?? undefined,

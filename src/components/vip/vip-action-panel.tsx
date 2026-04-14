@@ -3,9 +3,11 @@
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 
+import { showConfirm } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/rbutton"
+import { toast } from "@/components/ui/toast"
 
-import { formatNumber } from "@/lib/formatters"
+import { formatDateTime, formatNumber } from "@/lib/formatters"
 import { isVipActive } from "@/lib/vip-status"
 
 interface VipActionPanelProps {
@@ -17,6 +19,16 @@ interface VipActionPanelProps {
   vipExpiresAt?: string | null
 }
 
+type VipPurchaseAction = "purchase.month" | "purchase.quarter" | "purchase.year"
+
+interface VipActionResult {
+  message?: string
+  data?: {
+    expiresAt?: string | null
+    mode?: "activate" | "renew"
+  }
+}
+
 export function VipActionPanel({ vipMonthlyPrice, vipQuarterlyPrice, vipYearlyPrice, pointName, userPoints = 0, vipExpiresAt = null }: VipActionPanelProps) {
 
   const vipActive = isVipActive({ vipExpiresAt })
@@ -26,19 +38,50 @@ export function VipActionPanel({ vipMonthlyPrice, vipQuarterlyPrice, vipYearlyPr
   const [message, setMessage] = useState("")
   const [loading, setLoading] = useState("")
 
-  async function runAction(action: string) {
+  async function runAction(action: VipPurchaseAction) {
+    const planMap: Record<VipPurchaseAction, { title: string; duration: string; price: number }> = {
+      "purchase.month": { title: "月卡 VIP1", duration: "30 天", price: vipMonthlyPrice },
+      "purchase.quarter": { title: "季卡 VIP2", duration: "90 天", price: vipQuarterlyPrice },
+      "purchase.year": { title: "年卡 VIP3", duration: "365 天", price: vipYearlyPrice },
+    }
+    const plan = planMap[action]
+
+    const confirmed = await showConfirm({
+      title: vipActive ? "确认续费 VIP" : "确认开通 VIP",
+      description: `确认${vipActive ? "续费" : "开通"} ${plan.title} 吗？\n生效时长：${plan.duration}\n需支付：${formatNumber(plan.price)} ${pointName}\n${vipActive ? "确认后会在当前到期时间基础上顺延。" : "确认后将立即生效。"}`,
+      confirmText: vipActive ? "确认续费" : "确认开通",
+    })
+
+    if (!confirmed) {
+      return
+    }
+
     setLoading(action)
     setMessage("")
-    const response = await fetch("/api/vip", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
-    })
-    const result = await response.json()
-    setLoading("")
-    setMessage(result.message ?? (response.ok ? "操作成功" : "操作失败"))
-    if (response.ok) {
-      router.refresh()
+
+    try {
+      const response = await fetch("/api/vip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      })
+      const result = await response.json() as VipActionResult
+
+      setMessage(result.message ?? (response.ok ? "操作成功" : "操作失败"))
+      if (response.ok) {
+        const successTitle = result.data?.mode === "renew" ? "续费成功" : "开通成功"
+        const expiresAt = result.data?.expiresAt
+        if (expiresAt) {
+          toast.success(`到期时间：${formatDateTime(expiresAt)}`, successTitle)
+        } else {
+          toast.success(result.message ?? "操作成功", successTitle)
+        }
+        router.refresh()
+      }
+    } catch {
+      setMessage("操作失败，请稍后重试")
+    } finally {
+      setLoading("")
     }
   }
 

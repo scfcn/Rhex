@@ -12,7 +12,11 @@ export function AuthShowcase({
   siteName,
 }: AuthShowcaseProps) {
   if (!siteName.includes(' ')) {
-  siteName = siteName + ' 社区';
+    let borefix = ' 社区';
+    if(siteName.includes('社区')){
+borefix =' BBS'
+    }
+  siteName = siteName + borefix;
 }
   return (
     <div className={cn("auth-showcase-layout", className)}>

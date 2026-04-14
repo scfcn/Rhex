@@ -91,7 +91,7 @@ export default async function VipPage() {
       <main className="mx-auto max-w-[1000px] px-4 py-8 lg:px-6">
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <Card className="overflow-hidden border-none bg-linear-to-r from-violet-700 via-fuchsia-700 to-purple-700 text-white shadow-soft">
-            <CardContent className="p-8">
+            <CardContent className="p-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15">
                   <Crown className="h-6 w-6" />
@@ -101,7 +101,7 @@ export default async function VipPage() {
                   <h1 className="mt-1 text-3xl font-semibold">超级VIP</h1>
                 </div>
               </div>
-              <p className="mt-5 max-w-2xl text-sm leading-7 text-white/80">VIP 体系用于控制部分节点、帖子和回复权限，同时也在前台通过紫色昵称与徽章进行身份展示。当前版本已支持后台定价配置，以及前台使用{settings.pointName}购买 / 续费 VIP。</p>
+              <p className="mt-5 max-w-2xl text-sm leading-7 text-white/80">VIP 体系用于控制部分节点、帖子和回复权限，同时也在前台通过紫色昵称与徽章进行身份展示。使用{settings.pointName}购买 / 续费 VIP。</p>
 
               {user ? (
                 <div className="mt-6 rounded-[24px] bg-white/10 p-5">
@@ -112,7 +112,7 @@ export default async function VipPage() {
 
                   </div>
                   <p className={`mt-3 text-xl font-semibold ${getVipNameClass(vipActive, vipUser?.vipLevel, { emphasize: true, interactive: false })}`}>{profileName}</p>
-                  <p className="mt-1 text-sm text-white/75">{vipActive ? `你当前已开通 VIP${currentLevel}，可进入受限内容区域。` : `你当前还不是 VIP，可直接在下方使用${settings.pointName}购买开通。`}</p>
+                  <p className="mt-1 text-sm text-white/75">{vipActive ? `你当前已开通 VIP${currentLevel}，是我们尊敬的会员。` : `你当前还不是 VIP，可直接在下方使用${settings.pointName}购买开通。`}</p>
 
 
                   <p className="mt-2 text-sm text-white/75">到期时间：{vipUser?.vipExpiresAt ? formatDateTime(vipUser.vipExpiresAt) : "长期有效 / 暂未设置"}</p>

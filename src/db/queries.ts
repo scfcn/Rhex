@@ -36,6 +36,11 @@ export const postListInclude = {
       id: true,
     },
   },
+  _count: {
+    select: {
+      attachments: true,
+    },
+  },
 } satisfies Prisma.PostInclude
 
 
@@ -71,6 +76,7 @@ const postDetailBaseInclude = {
             select: {
               username: true,
               nickname: true,
+              avatarPath: true,
             },
           },
         },

@@ -48,6 +48,11 @@ const searchPostListSelect = {
       id: true,
     },
   },
+  _count: {
+    select: {
+      attachments: true,
+    },
+  },
 } satisfies Prisma.PostSelect
 
 export function buildPostSearchWhere(keyword: string) {

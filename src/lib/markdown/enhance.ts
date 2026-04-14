@@ -134,7 +134,10 @@ function enhanceMarkdownLinks(container: HTMLElement) {
     icon.className = "md-link-icon text-[0.72em] opacity-70"
     icon.setAttribute("aria-hidden", "true")
     icon.textContent = isExternal ? "↗" : "⌁"
-    link.appendChild(icon)
+    if(isExternal){
+link.appendChild(icon)
+    }
+    
   }
 }
 

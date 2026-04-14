@@ -261,6 +261,10 @@ async function ensureSiteSettings() {
         authPageShowcase: {
           enabled: true,
         },
+        registerEmailWhitelist: {
+          enabled: false,
+          domains: [],
+        },
         leftSidebarDisplay: {
           mode: "DEFAULT",
         },

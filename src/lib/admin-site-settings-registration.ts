@@ -1,7 +1,9 @@
 import { updateSiteSettingsRecord } from "@/db/site-settings-write-queries"
 import { apiError, readOptionalNumberField, readOptionalStringField, type JsonObject } from "@/lib/api-route"
+import { parseEmailWhitelistDomains } from "@/lib/email"
 import { finalizeSiteSettingsUpdate, type SiteSettingsRecord } from "@/lib/admin-site-settings-shared"
 import {
+  mergeRegisterEmailWhitelistSettings,
   mergeAuthPageShowcaseSettings,
   mergeAuthProviderSettings,
   mergeRegisterInviteCodeHelpSettings,
@@ -9,6 +11,7 @@ import {
   mergeRegistrationEmailTemplateSettings,
   mergeRegistrationRewardSettings,
   resolveRegisterInviteCodeHelpSettings,
+  resolveRegisterEmailWhitelistSettings,
   resolveRegistrationEmailTemplateSettings,
   resolveRegisterNicknameLengthSettings,
   resolveRegistrationRewardSettings,
@@ -38,6 +41,9 @@ export async function updateRegistrationSiteSettingsSection(existing: SiteSettin
   const existingRegisterInviteCodeHelpSettings = resolveRegisterInviteCodeHelpSettings({
     appStateJson: existing.appStateJson,
   })
+  const existingRegisterEmailWhitelistSettings = resolveRegisterEmailWhitelistSettings({
+    appStateJson: existing.appStateJson,
+  })
   const registerInitialPoints = Math.max(0, readOptionalNumberField(body, "registerInitialPoints") ?? existingRegistrationRewardSettings.initialPoints)
   const existingRegisterNicknameLengthSettings = resolveRegisterNicknameLengthSettings({
     appStateJson: existing.appStateJson,
@@ -59,6 +65,14 @@ export async function updateRegistrationSiteSettingsSection(existing: SiteSettin
   const registerEmailEnabled = Boolean(body.registerEmailEnabled)
   const registerEmailRequired = registerEmailEnabled && Boolean(body.registerEmailRequired)
   const registerEmailVerification = registerEmailEnabled && Boolean(body.registerEmailVerification)
+  const registerEmailWhitelistEnabled = registerEmailEnabled && Boolean(body.registerEmailWhitelistEnabled)
+  const registerEmailWhitelistDomainsInput = "registerEmailWhitelistDomains" in body
+    ? readOptionalStringField(body, "registerEmailWhitelistDomains")
+    : existingRegisterEmailWhitelistSettings.domains.join("\n")
+  const {
+    domains: registerEmailWhitelistDomains,
+    invalidDomains: invalidRegisterEmailWhitelistDomains,
+  } = parseEmailWhitelistDomains(registerEmailWhitelistDomainsInput)
   const registerPhoneEnabled = Boolean(body.registerPhoneEnabled)
   const registerPhoneRequired = registerPhoneEnabled && Boolean(body.registerPhoneRequired)
   const registerPhoneVerification = registerPhoneEnabled && Boolean(body.registerPhoneVerification)
@@ -110,6 +124,14 @@ export async function updateRegistrationSiteSettingsSection(existing: SiteSettin
     apiError(400, "启用 Turnstile 验证码时，必须同时填写 Turnstile Site Key 和 Secret Key")
   }
 
+  if (invalidRegisterEmailWhitelistDomains.length > 0) {
+    apiError(400, `邮箱白名单后缀格式不正确：${invalidRegisterEmailWhitelistDomains.slice(0, 5).join("、")}`)
+  }
+
+  if (registerEmailWhitelistEnabled && registerEmailWhitelistDomains.length === 0) {
+    apiError(400, "开启邮箱白名单时，至少填写一个邮箱后缀")
+  }
+
   if (smtpEnabled && (!smtpHost || !smtpPort || !smtpUser || !smtpPass || !smtpFrom)) {
     apiError(400, "开启 SMTP 时请完整填写主机、端口、账号、密码和发件人地址")
   }
@@ -145,10 +167,14 @@ export async function updateRegistrationSiteSettingsSection(existing: SiteSettin
     minLength: registerNicknameMinLength,
     maxLength: registerNicknameMaxLength,
   })
-  const appStateJson = mergeRegisterInviteCodeHelpSettings(appStateWithRegisterNicknameLengths, {
+  const appStateWithRegisterInviteCodeHelp = mergeRegisterInviteCodeHelpSettings(appStateWithRegisterNicknameLengths, {
     enabled: registerInviteCodeHelpEnabled,
     title: registerInviteCodeHelpTitle,
     url: registerInviteCodeHelpUrl,
+  })
+  const appStateJson = mergeRegisterEmailWhitelistSettings(appStateWithRegisterInviteCodeHelp, {
+    enabled: registerEmailWhitelistEnabled,
+    domains: registerEmailWhitelistDomains,
   })
   const currentSensitiveStateJson = ("sensitiveStateJson" in existing ? existing.sensitiveStateJson : null) ?? null
   const sensitiveStateWithAuthProvider = mergeAuthProviderSensitiveConfig(currentSensitiveStateJson, {

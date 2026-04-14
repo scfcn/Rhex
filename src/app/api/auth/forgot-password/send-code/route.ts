@@ -1,5 +1,6 @@
 import { findUserByEmail } from "@/db/password-reset-queries"
 import { apiError, apiSuccess, createRouteHandler, readJsonBody, requireStringField } from "@/lib/api-route"
+import { normalizeEmailAddress } from "@/lib/email"
 import { canSendEmail } from "@/lib/mailer"
 import { getRequestIp } from "@/lib/request-ip"
 import { sendPasswordResetCode } from "@/lib/password-reset"
@@ -12,7 +13,7 @@ function isValidEmail(value: string) {
 
 export const POST = createRouteHandler(async ({ request }) => {
   const body = await readJsonBody(request)
-  const email = requireStringField(body, "email", "请输入邮箱").toLowerCase()
+  const email = normalizeEmailAddress(requireStringField(body, "email", "请输入邮箱"))
 
   if (!email) {
     apiError(400, "请输入邮箱")

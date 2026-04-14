@@ -77,6 +77,7 @@ export async function SiteHeader() {
                 checkInEnabled={settings.checkInEnabled}
                 checkedInToday={checkedInToday}
                 appLinks={settings.headerAppLinks}
+                search={settings.search}
                 zones={zones}
                 boards={boards}
               />

@@ -1,21 +1,34 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useTransition } from "react"
+import { useState } from "react"
 
 import { Button } from "@/components/ui/rbutton"
 
 export function NotificationsToolbar({ unreadCount }: { unreadCount: number }) {
   const router = useRouter()
-  const [isPending, startTransition] = useTransition()
+  const [isPending, setIsPending] = useState(false)
 
   async function handleReadAll() {
-    startTransition(async () => {
-      await fetch("/api/notifications/read-all", {
+    if (isPending || unreadCount === 0) {
+      return
+    }
+
+    setIsPending(true)
+
+    try {
+      const response = await fetch("/api/notifications/read-all", {
         method: "POST",
       })
+
+      if (!response.ok) {
+        return
+      }
+
       router.refresh()
-    })
+    } finally {
+      setIsPending(false)
+    }
   }
 
   return (

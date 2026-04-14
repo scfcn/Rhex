@@ -75,6 +75,13 @@ interface AttachmentViewerInput extends VipStateSource {
   role?: string | null
 }
 
+export interface PostAttachmentUploadPermissionState {
+  canBypassPermission: boolean
+  canAddAttachments: boolean
+  currentLevel: number
+  currentVipLevel: number
+}
+
 function normalizeNonNegativeInteger(value: unknown, fallback = 0) {
   const parsed = Number(value)
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback
@@ -94,6 +101,26 @@ function normalizeAttachmentExtension(value?: string | null) {
 
 function getCurrentVipLevel(user: VipStateSource | null | undefined) {
   return isVipActive(user) ? Math.max(0, user?.vipLevel ?? 0) : 0
+}
+
+export function resolvePostAttachmentUploadPermission(params: {
+  settings: Pick<SiteSettingsData, "attachmentMinUploadLevel" | "attachmentMinUploadVipLevel">
+  user: AttachmentViewerInput | null | undefined
+}): PostAttachmentUploadPermissionState {
+  const currentLevel = Math.max(0, params.user?.level ?? 0)
+  const currentVipLevel = getCurrentVipLevel(params.user)
+  const canBypassPermission = params.user?.role === "ADMIN"
+  const canAddAttachments = canBypassPermission || (
+    currentLevel >= params.settings.attachmentMinUploadLevel
+    && currentVipLevel >= params.settings.attachmentMinUploadVipLevel
+  )
+
+  return {
+    canBypassPermission,
+    canAddAttachments,
+    currentLevel,
+    currentVipLevel,
+  }
 }
 
 function deriveExternalAttachmentName(externalUrl: string, fallbackIndex: number) {
@@ -278,6 +305,7 @@ export async function normalizePostAttachmentInputs(
     settings: SiteSettingsData
     user: AttachmentViewerInput & { id: number }
     uploadOwnerUserIds?: number[]
+    allowedExistingAttachmentIds?: string[]
     tx?: Prisma.TransactionClient
     skipFeatureEnabledCheck?: boolean
     skipUploadPermissionCheck?: boolean
@@ -296,8 +324,10 @@ export async function normalizePostAttachmentInputs(
   }
 
   const settings = resolveAttachmentSettings(options.settings)
-  const currentVipLevel = getCurrentVipLevel(options.user)
-  const canBypassPermission = options.user.role === "ADMIN"
+  const uploadPermission = resolvePostAttachmentUploadPermission({
+    settings,
+    user: options.user,
+  })
   const attachmentDrafts = rawAttachments.map((item) => (item && typeof item === "object" && !Array.isArray(item) ? item as PostAttachmentDraftPayload : null))
 
   if (attachmentDrafts.some((item) => item === null)) {
@@ -305,22 +335,39 @@ export async function normalizePostAttachmentInputs(
   }
 
   const normalizedAttachmentDrafts = attachmentDrafts as PostAttachmentDraftPayload[]
-  const hasUploadAttachment = normalizedAttachmentDrafts.some((item) => normalizeAttachmentSourceType(item?.sourceType) === "UPLOAD")
+  const existingAttachmentIds = new Set(
+    (options.allowedExistingAttachmentIds ?? [])
+      .map((item) => String(item ?? "").trim())
+      .filter(Boolean),
+  )
+  const hasNewAttachment = normalizedAttachmentDrafts.some((item) => {
+    const existingId = String(item?.id ?? "").trim()
+    return !existingId || !existingAttachmentIds.has(existingId)
+  })
+  const hasNewUploadAttachment = normalizedAttachmentDrafts.some((item) => {
+    if (normalizeAttachmentSourceType(item?.sourceType) !== "UPLOAD") {
+      return false
+    }
 
-  if (!options.skipFeatureEnabledCheck && !settings.attachmentUploadEnabled && hasUploadAttachment && !canBypassPermission) {
+    const existingId = String(item?.id ?? "").trim()
+    return !existingId || !existingAttachmentIds.has(existingId)
+  })
+
+  if (
+    !options.skipFeatureEnabledCheck
+    && !settings.attachmentUploadEnabled
+    && hasNewUploadAttachment
+    && !uploadPermission.canBypassPermission
+  ) {
     apiError(403, "当前站点未开启附件上传功能")
   }
 
   if (
     !options.skipUploadPermissionCheck
-    && !canBypassPermission
-    && rawAttachments.length > 0
-    && (
-      (options.user.level ?? 0) < settings.attachmentMinUploadLevel
-      || currentVipLevel < settings.attachmentMinUploadVipLevel
-    )
+    && !uploadPermission.canAddAttachments
+    && hasNewAttachment
   ) {
-    apiError(403, buildAttachmentPermissionDeniedMessage(settings, options.user.level ?? 0, currentVipLevel))
+    apiError(403, buildAttachmentPermissionDeniedMessage(settings, uploadPermission.currentLevel, uploadPermission.currentVipLevel))
   }
 
   const uploadIds = Array.from(new Set(

@@ -73,6 +73,9 @@ export interface BackgroundJobPayloadMap {
     userId: number
     commentId: string
   }
+  "post-auction.settle": {
+    auctionId: string
+  }
   "ai-reply.process": {
     taskId: string
   }
@@ -421,6 +424,20 @@ let backgroundJobTransport: BackgroundJobTransport = new InMemoryBackgroundJobTr
 let backgroundJobHandlersReadyPromise: Promise<void> | null = null
 let backgroundJobRuntimeReadyPromise: Promise<void> | null = null
 
+function shouldStartBackgroundJobWorkerInProcess() {
+  const mode = process.env.BACKGROUND_JOB_WEB_RUNTIME?.trim().toLowerCase()
+
+  if (mode === "1" || mode === "true" || mode === "on" || mode === "enabled" || mode === "hybrid") {
+    return true
+  }
+
+  if (mode === "0" || mode === "false" || mode === "off" || mode === "disabled" || mode === "worker-only") {
+    return false
+  }
+
+  return process.env.NODE_ENV !== "production"
+}
+
 export function registerBackgroundJobHandler<Name extends BackgroundJobName>(
   name: Name,
   handler: BackgroundJobHandler<Name>,
@@ -453,7 +470,10 @@ export async function ensureBackgroundJobRuntimeReady() {
   backgroundJobRuntimeReadyPromise ??= import("@/lib/redis-background-jobs")
     .then(async ({ ensureRedisBackgroundJobWorkerRunning, getRedisBackgroundJobTransport }) => {
       setBackgroundJobTransport(await getRedisBackgroundJobTransport())
-      await ensureRedisBackgroundJobWorkerRunning()
+
+      if (shouldStartBackgroundJobWorkerInProcess()) {
+        await ensureRedisBackgroundJobWorkerRunning()
+      }
     })
     .catch((error) => {
       backgroundJobRuntimeReadyPromise = null

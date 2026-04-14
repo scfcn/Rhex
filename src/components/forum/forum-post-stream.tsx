@@ -11,6 +11,7 @@ interface ForumPostStreamProps {
   showBoard?: boolean
   visiblePinScopes?: Array<"GLOBAL" | "ZONE" | "BOARD">
   showPinnedDivider?: boolean
+  compactFirstItem?: boolean
 }
 
 export async function ForumPostStream({
@@ -19,6 +20,7 @@ export async function ForumPostStream({
   showBoard = true,
   visiblePinScopes = ["GLOBAL", "ZONE", "BOARD"],
   showPinnedDivider = false,
+  compactFirstItem = true,
 }: ForumPostStreamProps) {
   const settings = await getSiteSettings()
   const displayItems = mapSitePostsToDisplayItems(posts, settings, visiblePinScopes)
@@ -29,6 +31,7 @@ export async function ForumPostStream({
       listDisplayMode={listDisplayMode}
       showBoard={showBoard}
       showPinnedDivider={showPinnedDivider}
+      compactFirstItem={compactFirstItem}
       postLinkDisplayMode={settings.postLinkDisplayMode}
     />
   )

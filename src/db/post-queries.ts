@@ -91,6 +91,7 @@ export async function findEditablePostBySlug(slug: string) {
         },
       },
       redPacket: true,
+      auction: true,
       tags: {
         include: {
           tag: {

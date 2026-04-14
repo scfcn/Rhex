@@ -36,6 +36,7 @@ import { AdminTippingGiftListEditor } from "@/components/admin/admin-tipping-gif
 import { adminPost } from "@/lib/admin-client"
 import { getAdminSettingsHref } from "@/lib/admin-settings-navigation"
 import type { AdminSettingsSectionKey } from "@/lib/admin-navigation"
+import { renderEmailTemplate } from "@/lib/email-template-settings"
 import { calculatePostHeatScore, resolvePostHeatStyle } from "@/lib/post-heat"
 import { POST_LIST_LOAD_MODE_INFINITE, POST_LIST_LOAD_MODE_PAGINATION } from "@/lib/post-list-load-mode"
 import { POST_LIST_DISPLAY_MODE_DEFAULT, POST_LIST_DISPLAY_MODE_GALLERY } from "@/lib/post-list-display"
@@ -146,6 +147,7 @@ function EmailTemplateSection({
   onSubjectChange,
   onTextChange,
   onHtmlChange,
+  previewVariables,
 }: {
   title: string
   description: string
@@ -155,7 +157,12 @@ function EmailTemplateSection({
   onSubjectChange: (value: string) => void
   onTextChange: (value: string) => void
   onHtmlChange: (value: string) => void
+  previewVariables: Record<string, string>
 }) {
+  const renderedSubject = renderEmailTemplate(subject, previewVariables)
+  const renderedText = renderEmailTemplate(text, previewVariables)
+  const renderedHtml = renderEmailTemplate(html, previewVariables)
+
   return (
     <div className="space-y-4 rounded-[20px] border border-border bg-background p-4">
       <div>
@@ -166,15 +173,46 @@ function EmailTemplateSection({
         <TextField label="邮件主题" value={subject} onChange={onSubjectChange} placeholder="输入邮件主题模板" />
         <div className="rounded-[18px] border border-dashed border-border bg-card/60 px-4 py-3 text-xs leading-6 text-muted-foreground">
           可用变量：<code>{"{{siteName}}"}</code>、<code>{"{{code}}"}</code>、<code>{"{{username}}"}</code>。其中注册验证码邮件不会传入 <code>{"{{username}}"}</code>，留空会自动替换为空字符串。
+          <div className="mt-3 grid gap-1">
+            <p>当前预览变量：</p>
+            <p><code>{"{{siteName}}"}</code> = {previewVariables.siteName || "(空)"}</p>
+            <p><code>{"{{code}}"}</code> = {previewVariables.code || "(空)"}</p>
+            <p><code>{"{{username}}"}</code> = {previewVariables.username || "(空)"}</p>
+          </div>
         </div>
       </div>
       <div className="space-y-2">
         <p className="text-sm font-medium">纯文本模板</p>
         <textarea value={text} onChange={(event) => onTextChange(event.target.value)} className="min-h-[120px] w-full rounded-[20px] border border-border bg-card px-4 py-3 text-sm outline-hidden" placeholder="输入纯文本邮件内容模板" />
       </div>
-      <div className="space-y-2">
-        <p className="text-sm font-medium">HTML 模板</p>
-        <textarea value={html} onChange={(event) => onHtmlChange(event.target.value)} className="min-h-[200px] w-full rounded-[20px] border border-border bg-card px-4 py-3 font-mono text-xs leading-6 outline-hidden" placeholder="输入 HTML 邮件内容模板" />
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <div className="space-y-2">
+          <p className="text-sm font-medium">HTML 模板</p>
+          <textarea value={html} onChange={(event) => onHtmlChange(event.target.value)} className="min-h-[200px] w-full rounded-[20px] border border-border bg-card px-4 py-3 font-mono text-xs leading-6 outline-hidden" placeholder="输入 HTML 邮件内容模板" />
+        </div>
+        <div className="space-y-3 rounded-[20px] border border-border bg-card/60 p-4">
+          <div>
+            <p className="text-sm font-medium">模板预览</p>
+            <p className="mt-1 text-xs leading-6 text-muted-foreground">使用当前示例变量渲染主题、纯文本和 HTML，用于检查变量替换和版式效果。</p>
+          </div>
+          <div className="rounded-[16px] border border-border bg-background px-4 py-3">
+            <p className="text-xs text-muted-foreground">渲染后的主题</p>
+            <p className="mt-1 break-all text-sm font-medium">{renderedSubject || "（空）"}</p>
+          </div>
+          <div className="rounded-[16px] border border-border bg-background px-4 py-3">
+            <p className="text-xs text-muted-foreground">渲染后的纯文本</p>
+            <pre className="mt-2 whitespace-pre-wrap break-words text-xs leading-6 text-foreground">{renderedText || "（空）"}</pre>
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">HTML 预览</p>
+            <iframe
+              title={`${title} HTML 预览`}
+              srcDoc={renderedHtml || "<div style='font-family:Arial,sans-serif;color:#666;padding:16px'>（空）</div>"}
+              sandbox=""
+              className="h-80 w-full rounded-[16px] border border-border bg-white"
+            />
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -196,6 +234,7 @@ export function AdminBasicSettingsForm({
   const [smtpTestRecipient, setSmtpTestRecipient] = useState(() => extractEmailAddress(initialSettings.smtpFrom ?? "") || (initialSettings.smtpUser ?? ""))
   const [isSendingSmtpTest, setIsSendingSmtpTest] = useState(false)
   const { isPending, runMutation } = useAdminMutation()
+  const { isPending: isClearingCache, runMutation: runCacheMutation } = useAdminMutation()
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -304,6 +343,8 @@ export function AdminBasicSettingsForm({
     registerEmailEnabled,
     registerEmailRequired,
     registerEmailVerification,
+    registerEmailWhitelistEnabled,
+    registerEmailWhitelistDomains,
     registerPhoneEnabled,
     registerPhoneRequired,
     registerPhoneVerification,
@@ -360,6 +401,16 @@ export function AdminBasicSettingsForm({
   const resolvedPasskeyRpId = passkeyRpId || siteHost
   const resolvedPasskeyRpName = passkeyRpName || draft.siteName || "你的站点名称"
   const resolvedPasskeyOrigin = passkeyOrigin || siteOrigin
+  const registerVerificationPreviewVariables = useMemo(() => ({
+    siteName: siteName.trim() || "示例站点",
+    code: "246810",
+    username: "",
+  }), [siteName])
+  const resetPasswordPreviewVariables = useMemo(() => ({
+    siteName: siteName.trim() || "示例站点",
+    code: "864209",
+    username: "demo_user",
+  }), [siteName])
 
   const previewScore = useMemo(() => calculatePostHeatScore(previewInput, previewSettings), [previewInput, previewSettings])
   const previewHeat = useMemo(() => resolvePostHeatStyle(previewInput, previewSettings), [previewInput, previewSettings])
@@ -829,6 +880,15 @@ export function AdminBasicSettingsForm({
                 <AdminBooleanSelectField label="显示邮箱输入框" checked={registerEmailEnabled} onChange={(value) => updateDraftField("registerEmailEnabled", value)} />
                 <AdminBooleanSelectField label="邮箱必填" checked={registerEmailRequired} onChange={(value) => updateDraftField("registerEmailRequired", value)} />
                 <AdminBooleanSelectField label="邮箱需要验证" checked={registerEmailVerification} onChange={(value) => updateDraftField("registerEmailVerification", value)} />
+                <AdminBooleanSelectField label="启用邮箱后缀白名单" checked={registerEmailWhitelistEnabled} onChange={(value) => updateDraftField("registerEmailWhitelistEnabled", value)} />
+                {registerEmailWhitelistEnabled ? (
+                  <SettingsTextareaField
+                    label="允许的邮箱后缀"
+                    value={registerEmailWhitelistDomains}
+                    onChange={(value) => updateDraftField("registerEmailWhitelistDomains", value)}
+                    placeholder={"支持换行、空格或逗号分隔，如\nqq.com\ngmail.com\nexample.org"}
+                  />
+                ) : null}
               </FieldGroup>
               <FieldGroup title="手机">
                 <AdminBooleanSelectField label="显示手机输入框" checked={registerPhoneEnabled} onChange={(value) => updateDraftField("registerPhoneEnabled", value)} />
@@ -866,6 +926,7 @@ export function AdminBasicSettingsForm({
             onSubjectChange={(value) => updateDraftField("registerVerificationEmailSubject", value)}
             onTextChange={(value) => updateDraftField("registerVerificationEmailText", value)}
             onHtmlChange={(value) => updateDraftField("registerVerificationEmailHtml", value)}
+            previewVariables={registerVerificationPreviewVariables}
           />
 
           <EmailTemplateSection
@@ -877,6 +938,7 @@ export function AdminBasicSettingsForm({
             onSubjectChange={(value) => updateDraftField("resetPasswordEmailSubject", value)}
             onTextChange={(value) => updateDraftField("resetPasswordEmailText", value)}
             onHtmlChange={(value) => updateDraftField("resetPasswordEmailHtml", value)}
+            previewVariables={resetPasswordPreviewVariables}
           />
         </div>
       ) : null}
@@ -1250,8 +1312,27 @@ Passkey Origin = ${resolvedPasskeyOrigin}`}</code></pre>
         </>
       ) : null}
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={isPending}>{isPending ? "保存中..." : submitText}</Button>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={isClearingCache}
+          onClick={() => {
+            runCacheMutation({
+              mutation: () => adminPost("/api/admin/site-settings/cache", undefined, {
+                defaultSuccessMessage: "站点设置缓存已清除",
+                defaultErrorMessage: "清除缓存失败",
+              }),
+              successTitle: "缓存已清除",
+              errorTitle: "清除失败",
+              refreshRouter: true,
+            })
+          }}
+        >
+          {isClearingCache ? "清理中..." : "清除站点设置缓存"}
+        </Button>
+        <span className="text-xs leading-6 text-muted-foreground">用于强制刷新站点设置的缓存；</span>
       </div>
     </form>
   )

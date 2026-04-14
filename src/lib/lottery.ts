@@ -1,12 +1,15 @@
 import { type Comment, type Favorite, type Like, LotteryStatus, LotteryTriggerMode, type Post, type Prisma, type User } from "@/db/types"
 import crypto from "node:crypto"
 
+import { prisma } from "@/db/client"
 import {
+  countLotteryParticipants,
   executeLotteryDrawTransaction,
   findLotteryAutoDrawStatus,
   findLotteryDrawContext,
   findLotteryEnrollmentContext,
   findLotteryInteractionState,
+  findLotteryParticipantPage,
   upsertLotteryParticipantEligibility,
 } from "@/db/lottery-queries"
 import { apiError } from "@/lib/api-route"
@@ -87,10 +90,28 @@ export interface LotteryViewModel {
       userId: number
       username: string
       nickname: string | null
+      avatarPath: string | null
       drawnAt: string
     }>
   }>
   conditionGroups: LotteryConditionGroupSummary[]
+}
+
+export interface LotteryParticipantListItem {
+  id: string
+  userId: number
+  username: string
+  nickname: string | null
+  avatarPath: string | null
+  joinedAt: string
+}
+
+export interface LotteryParticipantListResult {
+  items: LotteryParticipantListItem[]
+  total: number
+  page: number
+  pageSize: number
+  pageCount: number
 }
 
 interface LotteryPostRelations extends Post {
@@ -106,6 +127,7 @@ interface LotteryPostRelations extends Post {
       user: {
         username: string
         nickname: string | null
+        avatarPath: string | null
       }
     }>
   }>
@@ -694,6 +716,7 @@ export function mapLotteryView(post: LotteryPostRelations, currentUserId?: numbe
           userId: winner.userId,
           username: winner.user.username,
           nickname: winner.user.nickname,
+          avatarPath: winner.user.avatarPath ?? null,
           drawnAt: winner.drawnAt.toISOString(),
         })),
       })),
@@ -717,5 +740,48 @@ export function mapLotteryView(post: LotteryPostRelations, currentUserId?: numbe
 
 
     })),
+  }
+}
+
+export async function getLotteryParticipantList(
+  postId: string,
+  options?: {
+    page?: number
+    pageSize?: number
+  },
+): Promise<LotteryParticipantListResult | null> {
+  const post = await prisma.post.findUnique({
+    where: { id: postId },
+    select: {
+      id: true,
+      type: true,
+      status: true,
+    },
+  })
+
+  if (!post || post.type !== "LOTTERY" || post.status !== "NORMAL") {
+    return null
+  }
+
+  const pageSize = Math.min(20, Math.max(1, Math.trunc(options?.pageSize ?? 10)))
+  const page = Math.max(1, Math.trunc(options?.page ?? 1))
+  const total = await countLotteryParticipants(postId)
+  const pageCount = Math.max(1, Math.ceil(total / pageSize))
+  const safePage = Math.min(page, pageCount)
+  const rows = await findLotteryParticipantPage(postId, (safePage - 1) * pageSize, pageSize)
+
+  return {
+    items: rows.map((row) => ({
+      id: row.id,
+      userId: row.userId,
+      username: row.user.username,
+      nickname: row.user.nickname,
+      avatarPath: row.user.avatarPath ?? null,
+      joinedAt: row.joinedAt.toISOString(),
+    })),
+    total,
+    page: safePage,
+    pageSize,
+    pageCount,
   }
 }

@@ -54,7 +54,7 @@ class MessageEventBus {
 
     try {
       const runtime = getRedisMessageEventBusRuntime()
-      await runtime.ensureReady()
+      await runtime.ensurePublisherReady()
       await runtime.publish(event)
     } catch (error) {
       logError({
@@ -86,58 +86,71 @@ class MessageEventBus {
 
 class RedisMessageEventBusRuntime {
   private readonly runtimeId = randomUUID()
-  private readonly publisher = createRedisConnection()
-  private readonly subscriber = createRedisConnection()
-  private readyPromise: Promise<void> | null = null
+  private readonly publisher = createRedisConnection("message-bus:publisher")
+  private readonly subscriber = createRedisConnection("message-bus:subscriber")
+  private publisherReadyPromise: Promise<void> | null = null
+  private subscriberReadyPromise: Promise<void> | null = null
+  private subscriberStarted = false
 
   constructor(private readonly bus: MessageEventBus) {}
 
-  async ensureReady() {
-    this.readyPromise ??= this.start()
+  async ensurePublisherReady() {
+    this.publisherReadyPromise ??= connectRedisClient(this.publisher)
+      .then(() => undefined)
       .catch((error) => {
-        this.readyPromise = null
+        this.publisherReadyPromise = null
         throw error
       })
 
-    return this.readyPromise
+    return this.publisherReadyPromise
+  }
+
+  async ensureSubscriberReady() {
+    this.subscriberReadyPromise ??= this.startSubscriber()
+      .catch((error) => {
+        this.subscriberReadyPromise = null
+        throw error
+      })
+
+    return this.subscriberReadyPromise
   }
 
   async publish(event: MessageStreamEvent) {
+    await this.ensurePublisherReady()
     await this.publisher.publish(getMessageEventChannel(), JSON.stringify({
       event,
       origin: this.runtimeId,
     }))
   }
 
-  private async start() {
-    this.subscriber.on("message", (channel, rawMessage) => {
-      if (channel !== getMessageEventChannel()) {
-        return
-      }
-
-      try {
-        const payload = JSON.parse(rawMessage) as {
-          event?: MessageStreamEvent
-        }
-
-        if (!payload?.event) {
+  private async startSubscriber() {
+    if (!this.subscriberStarted) {
+      this.subscriberStarted = true
+      this.subscriber.on("message", (channel, rawMessage) => {
+        if (channel !== getMessageEventChannel()) {
           return
         }
 
-        this.bus.publishLocal(payload.event)
-      } catch (error) {
-        logError({
-          scope: "message-event-bus",
-          action: "consume",
-        }, error)
-      }
-    })
+        try {
+          const payload = JSON.parse(rawMessage) as {
+            event?: MessageStreamEvent
+          }
 
-    await Promise.all([
-      connectRedisClient(this.publisher),
-      connectRedisClient(this.subscriber),
-    ])
+          if (!payload?.event) {
+            return
+          }
 
+          this.bus.publishLocal(payload.event)
+        } catch (error) {
+          logError({
+            scope: "message-event-bus",
+            action: "consume",
+          }, error)
+        }
+      })
+    }
+
+    await connectRedisClient(this.subscriber)
     await this.subscriber.subscribe(getMessageEventChannel())
   }
 }
@@ -163,7 +176,7 @@ export async function ensureMessageEventBusRuntimeReady() {
     return
   }
 
-  await getRedisMessageEventBusRuntime().ensureReady()
+  await getRedisMessageEventBusRuntime().ensureSubscriberReady()
 }
 
 export function buildMessageEventPayload(event: MessageStreamEvent) {

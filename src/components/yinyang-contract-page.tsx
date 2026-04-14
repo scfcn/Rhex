@@ -490,21 +490,45 @@ function LeaderboardList({ items, getMetric }: { items: YinYangLeaderboardUser[]
         return (
           <div
             key={`leaderboard-${item.userId}-${index}`}
-            className={`flex items-center justify-between gap-3 rounded-[18px] px-4 py-3 ${isTopThree ? "border border-amber-200/70 bg-linear-to-r from-amber-50 via-background to-amber-50 shadow-[0_10px_30px_rgba(245,158,11,0.08)]" : "bg-muted"}`}
+            className={`flex items-center justify-between gap-3 rounded-[18px] px-4 py-3 ${
+              isTopThree
+                ? "border border-amber-200/70 bg-linear-to-r from-amber-50 via-background to-amber-50 shadow-[0_10px_30px_rgba(245,158,11,0.08)] dark:border-amber-400/28 dark:from-amber-500/16 dark:via-slate-950 dark:to-orange-400/12 dark:shadow-[0_18px_44px_rgba(245,158,11,0.16)]"
+                : "border border-border/70 bg-muted/90 dark:bg-muted/75"
+            }`}
           >
             <div className="flex items-center gap-3">
-              <div className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold ${isTopThree ? "bg-amber-100 text-amber-700" : "bg-background text-muted-foreground"}`}>
+              <div
+                className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold ${
+                  isTopThree
+                    ? "bg-amber-100 text-amber-700 dark:bg-amber-400/18 dark:text-amber-50 dark:ring-1 dark:ring-amber-300/30"
+                    : "bg-background text-muted-foreground dark:bg-background/80 dark:text-foreground/70"
+                }`}
+              >
                 {medal ?? `#${index + 1}`}
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">{item.userName}</span>
-                  {item.badge ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">{item.badge}</span> : null}
+                  <span className={`font-medium ${isTopThree ? "dark:text-amber-50" : ""}`}>{item.userName}</span>
+                  {item.badge ? (
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                        isTopThree
+                          ? "bg-amber-100 text-amber-700 dark:bg-amber-400/18 dark:text-amber-50 dark:ring-1 dark:ring-amber-300/25"
+                          : "bg-background text-muted-foreground dark:bg-background/80 dark:text-foreground/70"
+                      }`}
+                    >
+                      {item.badge}
+                    </span>
+                  ) : null}
                 </div>
-                <div className="mt-1 text-xs text-muted-foreground">{getMetric(item)}</div>
+                <div className={`mt-1 text-xs ${isTopThree ? "text-amber-800/80 dark:text-amber-100/80" : "text-muted-foreground"}`}>
+                  {getMetric(item)}
+                </div>
               </div>
             </div>
-            {isTopThree ? <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-amber-600">Top {index + 1}</div> : null}
+            {isTopThree ? (
+              <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-amber-600 dark:text-amber-200">Top {index + 1}</div>
+            ) : null}
           </div>
         )
       })}

@@ -33,6 +33,7 @@ export function GlobalNavigationProgress() {
   const search = searchParams.toString()
   const [visible, setVisible] = useState(false)
   const [progress, setProgress] = useState(0)
+  const hasHydratedRef = useRef(false)
   const navigatingRef = useRef(false)
   const progressTimerRef = useRef<number | null>(null)
   const finishTimerRef = useRef<number | null>(null)
@@ -108,6 +109,11 @@ export function GlobalNavigationProgress() {
   }, [])
 
   useEffect(() => {
+    if (!hasHydratedRef.current) {
+      hasHydratedRef.current = true
+      return
+    }
+
     if (!navigatingRef.current) {
       return
     }

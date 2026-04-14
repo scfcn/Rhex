@@ -19,6 +19,7 @@ import {
 import { findUserByNicknameInsensitive } from "@/db/user-queries"
 import { apiError } from "@/lib/api-route"
 import { getExternalAuthProviderLabel } from "@/lib/auth-provider-config"
+import { isEmailInWhitelist } from "@/lib/email"
 import { createSystemNotification } from "@/lib/notification-writes"
 import { revalidateHomeSidebarStatsCache } from "@/lib/home-sidebar-stats"
 import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
@@ -81,7 +82,7 @@ async function createUserFromIdentity(input: {
   username: string
   inviteCode?: string
   request: Request
-  siteSettings: Pick<SiteSettingsData, "inviteRewardInvitee" | "inviteRewardInviter" | "pointName" | "registerInitialPoints" | "registrationEnabled" | "registrationRequireInviteCode">
+  siteSettings: Pick<SiteSettingsData, "inviteRewardInvitee" | "inviteRewardInviter" | "pointName" | "registerEmailWhitelistDomains" | "registerEmailWhitelistEnabled" | "registerInitialPoints" | "registrationEnabled" | "registrationRequireInviteCode">
 }) {
   if (!input.siteSettings.registrationEnabled) {
     apiError(403, "当前站点已关闭注册")
@@ -111,6 +112,10 @@ async function createUserFromIdentity(input: {
 
     if (emailOwner) {
       apiError(409, "邮箱已被使用，请绑定已有账户")
+    }
+
+    if (input.siteSettings.registerEmailWhitelistEnabled && !isEmailInWhitelist(email, input.siteSettings.registerEmailWhitelistDomains)) {
+      apiError(400, "该邮箱后缀不在注册白名单内")
     }
   }
 
@@ -345,7 +350,7 @@ export async function disconnectPasskeyCredentialFromUser(userId: number, creden
   }
 }
 
-export async function resolveExternalAuth(identity: ExternalAuthIdentity, siteSettings: Pick<SiteSettingsData, "inviteRewardInvitee" | "inviteRewardInviter" | "pointName" | "registerInitialPoints" | "registrationEnabled" | "registrationRequireInviteCode">, request: Request): Promise<ExternalAuthResolutionResult> {
+export async function resolveExternalAuth(identity: ExternalAuthIdentity, siteSettings: Pick<SiteSettingsData, "inviteRewardInvitee" | "inviteRewardInviter" | "pointName" | "registerEmailWhitelistDomains" | "registerEmailWhitelistEnabled" | "registerInitialPoints" | "registrationEnabled" | "registrationRequireInviteCode">, request: Request): Promise<ExternalAuthResolutionResult> {
   if (identity.method === "oauth" && identity.provider && identity.providerAccountId) {
     const existingAccount = await findExternalAuthAccount(identity.provider, identity.providerAccountId)
 
@@ -379,6 +384,10 @@ export async function resolveExternalAuth(identity: ExternalAuthIdentity, siteSe
         kind: "pending",
         state: await buildPendingExternalAuthState(identity, { emailConflictUserId: emailOwner.id }),
       }
+    }
+
+    if (siteSettings.registerEmailWhitelistEnabled && !isEmailInWhitelist(email, siteSettings.registerEmailWhitelistDomains)) {
+      apiError(400, "该邮箱后缀不在注册白名单内")
     }
   }
 
@@ -419,7 +428,7 @@ export async function completePendingExternalAuthUsername(input: {
   state: PendingExternalAuthState
   username: string
   inviteCode?: string
-  siteSettings: Pick<SiteSettingsData, "inviteRewardInvitee" | "inviteRewardInviter" | "pointName" | "registerInitialPoints" | "registrationEnabled" | "registrationRequireInviteCode">
+  siteSettings: Pick<SiteSettingsData, "inviteRewardInvitee" | "inviteRewardInviter" | "pointName" | "registerEmailWhitelistDomains" | "registerEmailWhitelistEnabled" | "registerInitialPoints" | "registrationEnabled" | "registrationRequireInviteCode">
   request: Request
 }) {
   if (input.state.kind !== "username_required") {

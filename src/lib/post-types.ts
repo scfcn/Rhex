@@ -1,6 +1,6 @@
 import type { PostStatus } from "@/db/types"
 
-export const POST_TYPES = ["NORMAL", "BOUNTY", "POLL", "LOTTERY"] as const
+export const POST_TYPES = ["NORMAL", "BOUNTY", "POLL", "LOTTERY", "AUCTION"] as const
 
 export type LocalPostType = (typeof POST_TYPES)[number]
 
@@ -47,6 +47,8 @@ export function getPostTypeLabel(type: LocalPostType | string) {
       return "投票帖"
     case "LOTTERY":
       return "抽奖帖"
+    case "AUCTION":
+      return "拍卖帖"
     case "NORMAL":
     default:
       return "普通帖"

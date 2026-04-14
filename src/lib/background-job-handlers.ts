@@ -17,6 +17,7 @@ export async function registerDefaultBackgroundJobHandlers() {
     import("@/lib/interaction-side-effects"),
     import("@/lib/level-system"),
     import("@/lib/notification-writes"),
+    import("@/lib/post-auctions"),
   ])
 
   globalForBackgroundJobHandlers.__bbsBackgroundJobHandlersRegistered = true

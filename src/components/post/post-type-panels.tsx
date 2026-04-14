@@ -2,10 +2,15 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { CheckCircle2, Clock3, Gift, Sparkles, Trophy } from "lucide-react"
+import { Clock3, Gift, Sparkles, Trophy } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
+import { UserAvatar } from "@/components/user/user-avatar"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/rbutton"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Modal } from "@/components/ui/modal"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatDateTime, formatNumber, formatRelativeTime } from "@/lib/formatters"
 import { addPostBountyResolvedListener } from "@/lib/post-discussion-events"
 import { cn } from "@/lib/utils"
@@ -61,6 +66,7 @@ interface LotteryPanelProps {
         userId: number
         username: string
         nickname: string | null
+        avatarPath: string | null
         drawnAt: string
       }>
     }>
@@ -75,13 +81,6 @@ interface LotteryPanelProps {
     }>
   }
 }
-
-const lotterySurfaceCardClassName =
-  "rounded-[20px] bg-white p-3.5 sm:rounded-[22px] sm:p-4 dark:bg-slate-900"
-
-const lotteryInnerItemClassName =
-  "rounded-[18px] bg-slate-100 px-3 py-2.5 dark:bg-slate-800/80"
-
 
 export function BountyPanel({ postId, points, pointName = "积分", isResolved, acceptedAnswerAuthor }: BountyPanelProps) {
   const [resolved, setResolved] = useState(isResolved)
@@ -119,6 +118,21 @@ export function LotteryPanel({ postId, isOwnerOrAdmin, lottery }: LotteryPanelPr
   const router = useRouter()
   const [message, setMessage] = useState("")
   const [loading, setLoading] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  const [detailModal, setDetailModal] = useState<"prizes" | "conditions" | "announcement" | null>(null)
+  const [participantModalOpen, setParticipantModalOpen] = useState(false)
+  const [participantLoading, setParticipantLoading] = useState(false)
+  const [participantPage, setParticipantPage] = useState(1)
+  const [participantPageCount, setParticipantPageCount] = useState(1)
+  const [participantTotal, setParticipantTotal] = useState(lottery.participantCount)
+  const [participantItems, setParticipantItems] = useState<Array<{
+    id: string
+    userId: number
+    username: string
+    nickname: string | null
+    avatarPath: string | null
+    joinedAt: string
+  }>>([])
   const [now, setNow] = useState(() => {
     const renderedAtTime = new Date(lottery.renderedAt).getTime()
     return Number.isFinite(renderedAtTime) ? renderedAtTime : Date.now()
@@ -135,9 +149,27 @@ export function LotteryPanel({ postId, isOwnerOrAdmin, lottery }: LotteryPanelPr
   const goalProgress = lottery.participantGoal && lottery.participantGoal > 0
     ? Math.min(100, Math.round((lottery.participantCount / lottery.participantGoal) * 100))
     : null
-  const winnerCount = lottery.prizes.reduce((sum, prize) => sum + prize.winnerCount, 0)
   const relativeStartsAt = lottery.startsAt ? formatRelativeTime(lottery.startsAt, "zh-CN", now) : null
-  const relativeEndsAt = lottery.endsAt ? formatRelativeTime(lottery.endsAt, "zh-CN", now) : null
+  const countdown = useLotteryCountdown({
+    mounted,
+    now,
+    startsAt: lottery.startsAt,
+    endsAt: lottery.endsAt,
+    isDrawn,
+    hasNotStarted,
+    isLocked,
+    triggerMode: lottery.triggerMode,
+  })
+  const summaryChips = [
+    `参与 ${formatNumber(lottery.participantCount)} 人`,
+    `中奖名额 ${formatNumber(totalPrizeQuantity)} 份`,
+    lottery.currentProbability !== null ? `理论 ${lottery.currentProbability}%` : null,
+    lottery.triggerMode === "AUTO_PARTICIPANT_COUNT" && lottery.participantGoal ? `目标 ${formatNumber(lottery.participantGoal)} 人` : null,
+  ].filter(Boolean) as string[]
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     if (isDrawn) {
@@ -196,10 +228,10 @@ export function LotteryPanel({ postId, isOwnerOrAdmin, lottery }: LotteryPanelPr
             badgeClassName: "bg-rose-600 text-white dark:bg-rose-400 dark:text-rose-950",
             iconWrapClassName: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300",
             emphasisClassName: "text-rose-700 dark:text-rose-200",
-          }
-        : {
-            label: isLocked ? "名单锁定中" : "火热进行中",
-            title: isLocked ? "抽奖名单已锁定，正在等待开奖" : "抽奖正在进行，快确认自己是否已入池",
+        }
+      : {
+          label: isLocked ? "名单锁定中" : "火热进行中",
+          title: isLocked ? "抽奖名单已锁定，正在等待开奖" : "抽奖正在进行，快确认自己是否已入池",
             description: isLocked
               ? `锁池时间：${formatDateTime(lottery.lockedAt ?? "")}`
               : lottery.triggerMode === "AUTO_PARTICIPANT_COUNT"
@@ -216,6 +248,46 @@ export function LotteryPanel({ postId, isOwnerOrAdmin, lottery }: LotteryPanelPr
 
   const StatusIcon = statusConfig.icon
   const showParticipationMeta = !isDrawn
+  const participationBadgeText = lottery.joined
+    ? "你已入池"
+    : lottery.ineligibleReason
+      ? "未入池"
+      : "待入池"
+  const currentStageText = isDrawn
+    ? "已开奖"
+    : hasNotStarted
+      ? "距开始"
+      : isLocked
+        ? "等待开奖"
+        : lottery.endsAt
+          ? "距结束"
+          : lottery.triggerMode === "AUTO_PARTICIPANT_COUNT"
+            ? "人数开奖"
+            : "进行中"
+
+  async function loadParticipantPage(page: number) {
+    setParticipantLoading(true)
+
+    try {
+      const response = await fetch(`/api/posts/lottery/participants?postId=${encodeURIComponent(postId)}&page=${page}&pageSize=10`, {
+        method: "GET",
+      })
+      const result = await response.json()
+      if (!response.ok || result?.code !== 0) {
+        setMessage(result?.message ?? "加载参与记录失败")
+        return
+      }
+
+      setParticipantItems(result.data.items ?? [])
+      setParticipantPage(result.data.page ?? 1)
+      setParticipantPageCount(result.data.pageCount ?? 1)
+      setParticipantTotal(result.data.total ?? 0)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "加载参与记录失败")
+    } finally {
+      setParticipantLoading(false)
+    }
+  }
 
   async function drawNow() {
     setLoading(true)
@@ -239,180 +311,254 @@ export function LotteryPanel({ postId, isOwnerOrAdmin, lottery }: LotteryPanelPr
   }
 
   return (
-    <div className="overflow-hidden rounded-[24px] bg-slate-50 p-3.5 sm:rounded-[28px] sm:p-6 dark:bg-slate-950">
-      <div className="flex flex-col gap-3.5 sm:gap-4">
-        <div className="flex min-w-0 items-start gap-3 sm:gap-4">
-          <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl sm:h-14 sm:w-14", statusConfig.iconWrapClassName)}>
-            <StatusIcon className="h-5 w-5 sm:h-7 sm:w-7" />
-          </div>
-          <div className="min-w-0 flex-1 space-y-2">
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-              <span className={cn("rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-[0.12em] sm:px-3 sm:text-[11px]", statusConfig.badgeClassName)}>
-                {statusConfig.label}
-              </span>
-              <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[10px] font-medium text-slate-600 sm:px-3 sm:text-[11px] dark:bg-slate-800 dark:text-slate-300">
-                抽奖帖
-              </span>
-              <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[10px] font-medium text-slate-600 sm:ml-auto sm:px-3 sm:text-xs dark:bg-slate-800 dark:text-slate-300">
-                {statusConfig.chip}
-              </span>
-            </div>
-            <div>
-              <p className="text-base font-semibold leading-6 text-slate-950 sm:text-xl sm:leading-7 dark:text-slate-50">{statusConfig.title}</p>
-              <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">{statusConfig.description}</p>
-            </div>
-            <p className={cn("text-sm font-medium leading-6", statusConfig.emphasisClassName)}>{nextActionText}</p>
-          </div>
-        </div>
+    <>
+      <Card className="overflow-hidden rounded-[24px]">
+        <CardHeader className="sr-only">
+          <CardTitle>抽奖面板</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="border-b bg-[radial-gradient(circle_at_1px_1px,rgba(148,163,184,0.35)_1px,transparent_0)] [background-size:16px_16px] px-4 py-5 sm:px-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2 text-foreground">
+                  <StatusIcon className="h-4 w-4" />
+                  <p className="text-lg font-semibold leading-none">{statusConfig.title}</p>
+                  <Badge variant={isDrawn ? "outline" : hasNotStarted ? "outline" : "secondary"} className="rounded-full bg-background/80">
+                    {statusConfig.label}
+                  </Badge>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <div className="flex items-center gap-2 text-foreground">
+                    <Clock3 className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-[1.9rem] font-semibold tracking-tight">{countdown}</span>
+                    <span className="text-sm text-muted-foreground">{currentStageText}</span>
+                  </div>
+                  <Badge variant="outline" className="rounded-full bg-background/80">
+                    {participationBadgeText}
+                  </Badge>
+                </div>
+              </div>
 
-        {isOwnerOrAdmin && !isDrawn && !isAutoParticipantDraw ? (
-          <div className="flex w-full sm:justify-end">
-            <Button type="button" variant={isLocked ? "default" : "outline"} onClick={drawNow} disabled={loading} className="h-10 w-full sm:w-auto">
-              {loading ? "开奖中..." : isLocked ? "立即公布结果" : "立即开奖"}
+              {isOwnerOrAdmin && !isDrawn && !isAutoParticipantDraw ? (
+                <Button type="button" variant={isLocked ? "default" : "outline"} className="h-12 rounded-[16px] px-5 text-base" onClick={drawNow} disabled={loading}>
+                  <Trophy data-icon="inline-start" />
+                  {loading ? "开奖中..." : isLocked ? "立即开奖" : "手动开奖"}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="px-4 py-4 sm:px-5">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 rounded-full px-3 text-xs"
+                onClick={() => {
+                  setParticipantModalOpen(true)
+                  void loadParticipantPage(1)
+                }}
+              >
+                参与 {formatNumber(lottery.participantCount)} 人
+              </Button>
+              {summaryChips.slice(1).map((item) => (
+                <Badge key={item} variant="outline" className="h-8 rounded-full px-3 text-xs">
+                  {item}
+                </Badge>
+              ))}
+            </div>
+
+            {!showParticipationMeta ? null : lottery.ineligibleReason ? (
+              <div className="mt-4 rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
+                当前还未满足入池条件：{lottery.ineligibleReason}
+              </div>
+            ) : lottery.joined ? (
+              <div className="mt-4 rounded-[20px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
+                你已进入抽奖池，保持当前资格即可参与开奖。
+              </div>
+            ) : null}
+
+            {!isDrawn && goalProgress !== null ? (
+              <div className="mt-4 rounded-[20px] border border-border bg-card/70 px-4 py-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">自动开奖进度</p>
+                    <p className="mt-1 text-xs text-muted-foreground">还差 {Math.max((lottery.participantGoal ?? 0) - lottery.participantCount, 0)} 人达到开奖门槛</p>
+                  </div>
+                  <Badge variant="secondary" className="rounded-full">{goalProgress}%</Badge>
+                </div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary">
+                  <div className="h-full rounded-full bg-foreground transition-all" style={{ width: `${Math.max(goalProgress, lottery.participantCount > 0 ? 6 : 0)}%` }} />
+                </div>
+              </div>
+            ) : null}
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" className="rounded-full px-3" onClick={() => setDetailModal("prizes")}>
+                奖项 {lottery.prizes.length}
+              </Button>
+              <Button type="button" variant="outline" size="sm" className="rounded-full px-3" onClick={() => setDetailModal("conditions")}>
+                条件 {lottery.conditionGroups.reduce((sum, group) => sum + group.conditions.length, 0)}
+              </Button>
+              {lottery.announcement ? (
+                <Button type="button" variant="outline" size="sm" className="rounded-full px-3" onClick={() => setDetailModal("announcement")}>
+                  开奖公告
+                </Button>
+              ) : null}
+            </div>
+
+            <p className={cn("mt-4 text-sm font-medium leading-6", statusConfig.emphasisClassName)}>{nextActionText}</p>
+            {message ? <p className="mt-2 text-sm text-muted-foreground">{message}</p> : null}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Modal
+        open={participantModalOpen}
+        onClose={() => setParticipantModalOpen(false)}
+        title="抽奖参与用户"
+        description={`按最新参与时间排序，共 ${formatNumber(participantTotal)} 人。`}
+        size="lg"
+        footer={(
+          <div className="flex w-full items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={participantLoading || participantPage <= 1}
+                onClick={() => void loadParticipantPage(participantPage - 1)}
+              >
+                上一页
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                第 {participantPage} / {participantPageCount} 页
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={participantLoading || participantPage >= participantPageCount}
+                onClick={() => void loadParticipantPage(participantPage + 1)}
+              >
+                下一页
+              </Button>
+            </div>
+            <Button type="button" variant="outline" onClick={() => setParticipantModalOpen(false)}>
+              关闭
             </Button>
           </div>
-        ) : null}
-      </div>
+        )}
+      >
+        <div className="rounded-[18px] border border-border bg-card/60 p-2">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>参与时间</TableHead>
+                <TableHead>用户</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {participantItems.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell>{formatDateTime(item.joinedAt)}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <UserAvatar name={item.nickname ?? item.username} avatarPath={item.avatarPath} size="xs" />
+                      <span>{item.nickname ?? item.username}</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </Modal>
 
-      <div className="mt-4 grid grid-cols-2 gap-2.5 sm:mt-5 sm:gap-3 lg:grid-cols-4">
-        <div className={lotterySurfaceCardClassName}>
-          <p className="text-xs text-slate-500 dark:text-slate-400">{isDrawn ? "有效参与人数" : "参与人数"}</p>
-          <p className="mt-1.5 text-xl font-semibold text-slate-950 sm:mt-2 sm:text-2xl dark:text-slate-100">{lottery.participantCount}</p>
-          <p className="mt-1 text-[11px] leading-5 text-slate-500 sm:text-xs dark:text-slate-300">
-            {isDrawn
-              ? "本次开奖纳入抽奖池并参与最终抽取的人数"
-              : lottery.joined
-                ? "你已成功入池"
-                : lottery.ineligibleReason
-                  ? "你当前尚未入池"
-                  : "互动后将自动校验资格"}
-          </p>
-        </div>
-        <div className={lotterySurfaceCardClassName}>
-          <p className="text-xs text-slate-500 dark:text-slate-400">{isDrawn ? "开奖结果" : "奖品名额"}</p>
-          <p className="mt-1.5 text-xl font-semibold text-slate-950 sm:mt-2 sm:text-2xl dark:text-slate-100">{isDrawn ? winnerCount : totalPrizeQuantity}</p>
-          <p className="mt-1 text-[11px] leading-5 text-slate-500 sm:text-xs dark:text-slate-300">
-            {isDrawn
-              ? `共 ${lottery.prizes.length} 个奖项，实际开出 ${winnerCount} 名`
-              : `共 ${lottery.prizes.length} 个奖项，已开出 ${winnerCount} 名`}
-          </p>
-        </div>
-        <div className={lotterySurfaceCardClassName}>
-          <p className="text-xs text-slate-500 dark:text-slate-400">{isDrawn ? "开奖时间" : "理论中奖率"}</p>
-          {isDrawn ? (
-            <>
-              <p className="mt-1.5 text-sm font-semibold leading-5 text-slate-950 sm:mt-2 sm:text-base dark:text-slate-100">{lottery.drawnAt ? formatDateTime(lottery.drawnAt) : "--"}</p>
-              <p className="mt-1 text-[11px] leading-5 text-slate-500 sm:text-xs dark:text-slate-300">结果以本次开奖记录和公告为准</p>
-            </>
-          ) : (
-            <>
-              <p className="mt-1.5 text-xl font-semibold text-slate-950 sm:mt-2 sm:text-2xl dark:text-slate-100">{lottery.currentProbability !== null ? `${lottery.currentProbability}%` : "--"}</p>
-              <p className="mt-1 text-[11px] leading-5 text-slate-500 sm:text-xs dark:text-slate-300">基于当前有效参与人数动态计算</p>
-            </>
-          )}
-        </div>
-        <div className={lotterySurfaceCardClassName}>
-          <p className="text-xs text-slate-500 dark:text-slate-400">开奖方式</p>
-          <p className="mt-1.5 text-sm font-semibold leading-5 text-slate-950 sm:mt-2 sm:text-base dark:text-slate-100">{lottery.triggerMode === "AUTO_PARTICIPANT_COUNT" ? "人数达标自动开奖" : "楼主手动开奖"}</p>
-          <p className="mt-1 text-[11px] leading-5 text-slate-500 sm:text-xs dark:text-slate-300">
-            {lottery.triggerMode === "AUTO_PARTICIPANT_COUNT"
-              ? `目标人数 ${lottery.participantGoal ?? 0} 人`
-              : lottery.endsAt
-                ? `结束于 ${relativeEndsAt ?? "-"}`
-                : "未设置固定结束时间"}
-          </p>
-        </div>
-      </div>
-
-      {!isDrawn && goalProgress !== null ? (
-        <div className={cn("mt-4", lotterySurfaceCardClassName)}>
-          <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-            <div>
-              <p className="font-medium text-slate-950 dark:text-slate-100">自动开奖进度</p>
-              <p className="mt-1 text-[11px] leading-5 text-slate-500 sm:text-xs dark:text-slate-300">还差 {Math.max((lottery.participantGoal ?? 0) - lottery.participantCount, 0)} 人达到开奖门槛</p>
-            </div>
-            <span className="w-fit rounded-full bg-slate-200 px-3 py-1 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">{goalProgress}%</span>
+      <Modal
+        open={detailModal === "prizes"}
+        onClose={() => setDetailModal(null)}
+        title="奖项详情"
+        description={`共 ${lottery.prizes.length} 个奖项，合计 ${totalPrizeQuantity} 个中奖名额。`}
+        size="lg"
+        footer={(
+          <div className="flex w-full justify-end">
+            <Button type="button" variant="outline" onClick={() => setDetailModal(null)}>
+              关闭
+            </Button>
           </div>
-          <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-            <div className="h-full rounded-full bg-violet-500 transition-all dark:bg-violet-400" style={{ width: `${Math.max(goalProgress, lottery.participantCount > 0 ? 6 : 0)}%` }} />
-          </div>
-        </div>
-      ) : null}
-
-      {!showParticipationMeta ? null : lottery.ineligibleReason ? (
-        <div className="mt-4 rounded-[20px] bg-amber-50 px-3.5 py-3 text-sm text-amber-900 sm:rounded-[22px] sm:px-4 dark:bg-slate-900 dark:text-amber-200">
-          <div className="flex items-start gap-2">
-            <Clock3 className="mt-0.5 h-4 w-4 shrink-0" />
-            <div>
-              <p className="font-medium">当前还未满足入池条件</p>
-              <p className="mt-1 text-amber-800/90 dark:text-amber-100/90">{lottery.ineligibleReason}</p>
-            </div>
-          </div>
-        </div>
-      ) : lottery.joined ? (
-        <div className="mt-4 rounded-[20px] bg-emerald-50 px-3.5 py-3 text-sm text-emerald-900 sm:rounded-[22px] sm:px-4 dark:bg-slate-900 dark:text-emerald-200">
-          <div className="flex items-start gap-2">
-            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-            <div>
-              <p className="font-medium">你已进入抽奖池</p>
-              <p className="mt-1 text-emerald-800/90 dark:text-emerald-100/90">保持当前资格即可参与开奖，无需额外操作。</p>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="mt-4 grid gap-2.5 sm:mt-5 sm:gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {lottery.prizes.map((prize) => (
-          <div key={prize.id} className={lotterySurfaceCardClassName}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">{prize.title}</p>
-                <p className="mt-1 text-[11px] leading-5 text-slate-500 sm:text-xs dark:text-slate-300">共 {prize.quantity} 名 · 已开奖 {prize.winnerCount} 名</p>
+        )}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          {lottery.prizes.map((prize) => (
+            <div key={prize.id} className="rounded-[20px] border border-border bg-card/70 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground">{prize.title}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">共 {prize.quantity} 名 · 已开奖 {prize.winnerCount} 名</p>
+                </div>
+                <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-xl", isDrawn ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/14 dark:text-emerald-300" : "bg-violet-100 text-violet-700 dark:bg-violet-500/14 dark:text-violet-300")}>
+                  <Gift />
+                </span>
               </div>
-              <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-xl sm:h-9 sm:w-9", isDrawn ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/14 dark:text-emerald-300" : "bg-violet-100 text-violet-700 dark:bg-violet-500/14 dark:text-violet-300")}>
-                <Gift className="h-4 w-4" />
-              </span>
-            </div>
-            <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-200">{prize.description}</p>
-            {prize.winners.length > 0 ? (
-              <div className="mt-3 rounded-[16px] bg-emerald-50 p-3 sm:rounded-[18px] dark:bg-slate-800">
-                <p className="text-xs font-medium text-emerald-800 dark:text-emerald-200">中奖用户</p>
-                <p className="mt-2 text-xs leading-6 text-emerald-700 dark:text-emerald-300">
-                  {prize.winners.map((winner, index) => (
-                    <span key={`${winner.userId}-${winner.username}`}>
-                      {index > 0 ? "、" : ""}
-                      <Link href={`/users/${winner.username}`} className="font-medium underline-offset-2 hover:underline">
-                        {winner.nickname ?? winner.username}
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">{prize.description}</p>
+              {prize.winners.length > 0 ? (
+                <div className="mt-3 rounded-[16px] border border-border bg-background px-3 py-3">
+                  <div className="flex flex-wrap gap-2">
+                    {prize.winners.map((winner) => (
+                      <Link
+                        key={`${winner.userId}-${winner.username}`}
+                        href={`/users/${winner.username}`}
+                        className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-2.5 py-1.5 text-xs text-foreground transition-colors hover:bg-accent/50"
+                      >
+                        <UserAvatar
+                          name={winner.nickname ?? winner.username}
+                          avatarPath={winner.avatarPath}
+                          size="xs"
+                        />
+                        <span className="max-w-24 truncate">{winner.nickname ?? winner.username}</span>
                       </Link>
-                    </span>
-                  ))}
-                </p>
-              </div>
-            ) : (
-              <p className="mt-3 text-xs text-slate-500 dark:text-slate-300">{isDrawn ? "该奖项暂无中奖者。" : "开奖后将在这里展示中奖名单。"}</p>
-            )}
-          </div>
-        ))}
-      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-3 text-xs text-muted-foreground">{isDrawn ? "该奖项暂无中奖者。" : "开奖后将在这里展示中奖名单。"}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      </Modal>
 
-      {!showParticipationMeta ? null : (
-        <div className="mt-4 space-y-2.5 sm:mt-5 sm:space-y-3">
+      <Modal
+        open={detailModal === "conditions"}
+        onClose={() => setDetailModal(null)}
+        title="参与条件"
+        description="满足任一参与方案即可入池，方案内条件需全部满足。"
+        size="lg"
+        footer={(
+          <div className="flex w-full justify-end">
+            <Button type="button" variant="outline" onClick={() => setDetailModal(null)}>
+              关闭
+            </Button>
+          </div>
+        )}
+      >
+        <div className="space-y-3">
           {lottery.conditionGroups.map((group) => (
-            <div key={group.key} className={lotterySurfaceCardClassName}>
+            <div key={group.key} className="rounded-[20px] border border-border bg-card/70 p-4">
               <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                <p className="text-sm font-medium text-slate-950 dark:text-slate-100">{group.label}</p>
+                <Sparkles className="h-4 w-4 text-muted-foreground" />
+                <p className="text-sm font-medium text-foreground">{group.label}</p>
               </div>
-              <ul className="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-200">
+              <ul className="mt-3 flex flex-col gap-2">
                 {group.conditions.map((condition) => (
-                  <li key={condition.id} className={cn(lotteryInnerItemClassName, "flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3")}>
-                    <span className="min-w-0 flex-1 leading-6">{condition.description ?? "未命名条件"}</span>
+                  <li key={condition.id} className="flex flex-col gap-2 rounded-[16px] border border-border bg-background px-3 py-3 sm:flex-row sm:items-start sm:justify-between">
+                    <span className="min-w-0 flex-1 text-sm leading-6 text-foreground">{condition.description ?? "未命名条件"}</span>
                     {condition.matched === true ? (
-                      <span className="w-fit rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">已满足</span>
+                      <Badge variant="secondary" className="rounded-full">已满足</Badge>
                     ) : condition.matched === false ? (
-                      <span className="w-fit rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-medium text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">未满足</span>
+                      <Badge variant="outline" className="rounded-full">未满足</Badge>
                     ) : (
-                      <span className="w-fit rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-200">待校验</span>
+                      <Badge variant="outline" className="rounded-full">待校验</Badge>
                     )}
                   </li>
                 ))}
@@ -420,20 +566,67 @@ export function LotteryPanel({ postId, isOwnerOrAdmin, lottery }: LotteryPanelPr
             </div>
           ))}
         </div>
-      )}
+      </Modal>
 
-      {lottery.announcement ? (
-        <div className="mt-4 rounded-[22px] bg-white p-3.5 sm:mt-5 sm:rounded-[24px] sm:p-4 dark:bg-slate-900">
-          <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
-            <Trophy className="h-4 w-4" />
-            <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">开奖公告</p>
+      <Modal
+        open={detailModal === "announcement"}
+        onClose={() => setDetailModal(null)}
+        title="开奖公告"
+        description="开奖结果与领奖说明会在这里展示。"
+        size="lg"
+        footer={(
+          <div className="flex w-full justify-end">
+            <Button type="button" variant="outline" onClick={() => setDetailModal(null)}>
+              关闭
+            </Button>
           </div>
-          <pre className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700 sm:leading-7 dark:text-slate-100">{lottery.announcement}</pre>
-        </div>
-      ) : null}
-      {message ? <p className="mt-3 text-sm text-slate-500 dark:text-slate-300">{message}</p> : null}
-    </div>
+        )}
+      >
+        <pre className="rounded-[20px] border border-border bg-card/70 px-4 py-4 text-sm leading-7 whitespace-pre-wrap text-foreground">
+          {lottery.announcement ?? "当前还没有开奖公告。"}
+        </pre>
+      </Modal>
+    </>
   )
+}
+
+function useLotteryCountdown(input: {
+  mounted: boolean
+  now: number
+  startsAt: string | null
+  endsAt: string | null
+  isDrawn: boolean
+  hasNotStarted: boolean
+  isLocked: boolean
+  triggerMode: string
+}) {
+  if (!input.mounted) {
+    return input.isDrawn ? "已开奖" : input.hasNotStarted ? "未开始" : "进行中"
+  }
+
+  if (input.isDrawn) {
+    return "已开奖"
+  }
+
+  if (input.hasNotStarted && input.startsAt) {
+    return formatDurationText(Math.max(0, new Date(input.startsAt).getTime() - input.now))
+  }
+
+  if (!input.isLocked && input.endsAt) {
+    return formatDurationText(Math.max(0, new Date(input.endsAt).getTime() - input.now))
+  }
+
+  return input.triggerMode === "AUTO_PARTICIPANT_COUNT" ? "人数达标开奖" : "等待开奖"
+}
+
+function formatDurationText(remainingMs: number) {
+  const totalSeconds = Math.floor(remainingMs / 1000)
+  const days = Math.floor(totalSeconds / 86400)
+  const hours = Math.floor((totalSeconds % 86400) / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
+  return `${String(days).padStart(2, "0")}天${String(hours).padStart(2, "0")}小时${String(minutes).padStart(2, "0")}分${String(seconds).padStart(2, "0")}秒`
 }
 
 export function PollPanel({ postId, totalVotes, hasVoted, expiresAt, options }: PollPanelProps) {

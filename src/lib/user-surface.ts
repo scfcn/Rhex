@@ -126,7 +126,10 @@ export function revalidateUserSurfaceCache(userId?: number | null) {
   const tag = userId ? getUserSurfaceCacheTag(userId) : USER_SURFACE_CACHE_TAG
 
   try {
-    revalidateTag(tag, "max")
+    // User-surface data powers read-your-own-writes UI like header unread badges.
+    // Expire immediately so the next request blocks for fresh data instead of
+    // serving stale counts and updating later in the background.
+    revalidateTag(tag, { expire: 0 })
   } catch (error) {
     // Background workers do not run inside a Next.js request/store context, so
     // tag invalidation is unavailable there. The cache still self-heals via TTL.

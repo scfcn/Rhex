@@ -83,6 +83,10 @@ interface ListPostSource {
   acceptedCommentId?: string | null
 
   redPacket?: { id: string } | null
+  _count?: {
+    attachments?: number
+  }
+  attachments?: Array<unknown>
   commentCount: number
   likeCount: number
   favoriteCount: number
@@ -153,6 +157,7 @@ export function mapListPost(post: ListPostSource, anonymousMaskIdentity: Anonymo
     isPinned: post.isPinned,
     pinScope: post.pinScope ?? (post.isPinned ? "BOARD" : "NONE"),
     hasRedPacket: Boolean(post.redPacket),
+    hasAttachments: (post._count?.attachments ?? post.attachments?.length ?? 0) > 0,
     rewardMode: rewardPoolConfig?.mode,
     minViewLevel: post.minViewLevel ?? 0,
     minViewVipLevel: post.minViewVipLevel ?? 0,

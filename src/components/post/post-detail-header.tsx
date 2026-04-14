@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { ChevronDown, ChevronRight, Eye } from "lucide-react"
 
+import { AiAgentIndicator } from "@/components/user/ai-agent-indicator"
 import { AnonymousUserIndicator } from "@/components/user/anonymous-user-indicator"
 import { FollowToggleButton } from "@/components/follow-toggle-button"
 import { LevelIcon } from "@/components/level-icon"
@@ -23,6 +24,7 @@ interface PostDetailHeaderProps {
     author: string
     authorUsername?: string
     isAnonymous?: boolean
+    authorIsAiAgent?: boolean
     authorAvatarPath?: string | null
     authorStatus?: "ACTIVE" | "MUTED" | "BANNED" | "INACTIVE"
     authorIsVip?: boolean
@@ -176,6 +178,7 @@ export function PostDetailHeader({ post, isFollowingPost, isRestrictedAuthor, zo
                   {post.author}
                 </Link>
                 {post.isAnonymous ? <AnonymousUserIndicator /> : null}
+                {post.authorIsAiAgent ? <AiAgentIndicator /> : null}
               </span>
             </VipNameTooltip>
             <UserDisplayedBadges badges={post.authorDisplayedBadges} compact appearance="plain" spacing="tight" />

@@ -46,10 +46,10 @@ export function PostSidebarPanels({
   siteIconPath,
 }: PostSidebarPanelsProps) {
   return (
-    <div className="min-w-0 w-full max-w-full space-y-4">
+    <div className="post-sidebar-panels mobile-sidebar-stack flex min-w-0 w-full max-w-full flex-col gap-4">
       <SidebarUserCard user={currentUser} siteName={siteName} siteDescription={siteDescription} siteLogoPath={siteLogoPath} siteIconPath={siteIconPath} />
 
-      <div className="rounded-[24px] border border-border bg-card p-4 shadow-xs shadow-black/5 dark:shadow-black/30">
+      <div className="mobile-sidebar-section rounded-[24px] border border-border bg-card p-4 shadow-xs shadow-black/5 dark:shadow-black/30">
         <div className="mb-4 border-b border-border/80 pb-4">
           <h3 className="mb-3 font-semibold">相关主题</h3>
           <div className="space-y-3">

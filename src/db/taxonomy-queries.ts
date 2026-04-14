@@ -193,6 +193,11 @@ export function findGlobalPinnedPosts(options?: { pageSize?: number; homeVisible
           id: true,
         },
       },
+      _count: {
+        select: {
+          attachments: true,
+        },
+      },
     },
     orderBy: getZonePinnedOrderBy(),
     take: normalizedPageSize,
@@ -218,6 +223,11 @@ export function findZonePinnedPosts(boardIds: string[], pageSize?: number) {
           id: true,
         },
       },
+      _count: {
+        select: {
+          attachments: true,
+        },
+      },
     },
     orderBy: getZonePinnedOrderBy(),
     take: normalizedPageSize,
@@ -241,6 +251,11 @@ export function findZoneNormalPosts(boardIds: string[], excludedPostIds: string[
       redPacket: {
         select: {
           id: true,
+        },
+      },
+      _count: {
+        select: {
+          attachments: true,
         },
       },
     },
@@ -282,6 +297,11 @@ export function findBoardPinnedPosts(boardId: string, zoneBoardIds: string[], pa
           id: true,
         },
       },
+      _count: {
+        select: {
+          attachments: true,
+        },
+      },
     },
     orderBy: getZonePinnedOrderBy(),
     take: normalizedPageSize,
@@ -303,6 +323,11 @@ export function findBoardNormalPosts(boardId: string, excludedPostIds: string[],
       redPacket: {
         select: {
           id: true,
+        },
+      },
+      _count: {
+        select: {
+          attachments: true,
         },
       },
     },

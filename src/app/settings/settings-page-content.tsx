@@ -15,13 +15,15 @@ import { ProfileAccountBindingSettings } from "@/components/profile/profile-acco
 import { ProfileEditForm } from "@/components/profile/profile-edit-form"
 import { ProfileNotificationSettings } from "@/components/profile/profile-notification-settings"
 import { ReadingHistoryPanel } from "@/components/post/reading-history-panel"
-import { RedeemCodeCard } from "@/components/redeem-code-card"
 import { SettingsTabs } from "@/components/settings/settings-tabs"
+import { UserAvatar } from "@/components/user/user-avatar"
 import { UserRecentRepliesList } from "@/components/user/user-recent-replies-list"
 import { UserBlockToggleButton } from "@/components/user/user-block-toggle-button"
 import { VerificationCenter } from "@/components/verification-center"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/rbutton"
 import { formatDateTime, formatNumber } from "@/lib/formatters"
+import { getPointLogEventLabel, POINT_LOG_EVENT_TYPES } from "@/lib/point-log-events"
 import type { SettingsPageData } from "@/app/settings/settings-page-loader"
 import { followTabs, postManagementTabs, profileTabs } from "@/app/settings/settings-page-loader"
 
@@ -109,7 +111,11 @@ export function SettingsPageContent({ data }: { data: SettingsPageData }) {
       ) : null}
 
       {route.currentTab === "points" ? (
-        <PointsPanel pointLogs={data.pointLogs} currentPoints={data.profile.points} pointName={settings.pointName} />
+        <PointsPanel
+          pointLogs={data.pointLogs}
+          currentPoints={data.profile.points}
+          pointName={settings.pointName}
+        />
       ) : null}
 
       {route.currentTab === "follows" ? (
@@ -145,6 +151,7 @@ function InvitePanel({
   inviteCodePrice: number
   inviteCodePriceDescription: string
 }) {
+
   return (
     <Card>
       <CardHeader>
@@ -168,10 +175,9 @@ function InvitePanel({
         <div className="space-y-3 rounded-[24px] border border-border px-4 py-4 text-sm">
           <div>
             <p className="font-medium">我的邀请链接</p>
-            <p className="mt-2 break-all text-muted-foreground">{invitePath}</p>
+            <div className="mt-2 break-all text-muted-foreground"><InviteLinkCopyButton path={invitePath} /></div>
             <p className="mt-2 text-xs leading-6 text-muted-foreground">把这个链接发给好友，对方注册时会自动带上你的邀请信息。</p>
           </div>
-          <InviteLinkCopyButton path={invitePath} />
         </div>
         <InviteCodePurchaseCard enabled={inviteCodePurchaseEnabled} price={inviteCodePrice} priceDescription={inviteCodePriceDescription} pointName={pointName} />
       </CardContent>
@@ -610,108 +616,26 @@ function FollowBoardsPanel({ followedBoards }: { followedBoards: SettingsPageDat
 }
 
 function FollowUsersPanel({ followedUsers }: { followedUsers: SettingsPageData["followedUsers"] }) {
-  if (!followedUsers) {
-    return (
-      <Card>
-        <CardContent className="p-6 text-sm text-muted-foreground">暂时无法加载关注用户，请稍后刷新重试。</CardContent>
-      </Card>
-    )
-  }
-
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <CardTitle>关注用户</CardTitle>
-          <span className="text-sm text-muted-foreground">共 {followedUsers.total} 位用户</span>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {followedUsers.items.length === 0 ? <p className="text-sm text-muted-foreground">你还没有关注任何用户。</p> : null}
-
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {followedUsers.items.map((user) => (
-            <Link key={user.id} href={`/users/${user.username}`} className="rounded-[18px] border border-border bg-card px-4 py-4 transition-colors hover:bg-accent/40">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-foreground">{user.displayName}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">@{user.username}</p>
-                </div>
-                <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-              </div>
-              <p className="mt-3 line-clamp-2 text-xs leading-5 text-muted-foreground">{user.bio}</p>
-              <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-                <span>Lv.{user.level}</span>
-                <span>帖子 {user.postCount}</span>
-                <span>粉丝 {user.followerCount}</span>
-              </div>
-            </Link>
-          ))}
-        </div>
-
-        {followedUsers.total > 0 ? (
-          <CursorPaginationBar
-            hasPrevPage={followedUsers.hasPrevPage}
-            hasNextPage={followedUsers.hasNextPage}
-            prevHref={buildCursorHref("/settings?tab=follows&followTab=users", "listBefore", followedUsers.prevCursor)}
-            nextHref={buildCursorHref("/settings?tab=follows&followTab=users", "listAfter", followedUsers.nextCursor)}
-          />
-        ) : null}
-      </CardContent>
-    </Card>
+    <SocialUserListPanel
+      users={followedUsers}
+      title="关注用户"
+      emptyText="你还没有关注任何用户。"
+      errorText="暂时无法加载关注用户，请稍后刷新重试。"
+      paginationBase="/settings?tab=follows&followTab=users"
+    />
   )
 }
 
 function FollowersPanel({ followers }: { followers: SettingsPageData["followers"] }) {
-  if (!followers) {
-    return (
-      <Card>
-        <CardContent className="p-6 text-sm text-muted-foreground">暂时无法加载粉丝列表，请稍后刷新重试。</CardContent>
-      </Card>
-    )
-  }
-
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <CardTitle>我的粉丝</CardTitle>
-          <span className="text-sm text-muted-foreground">共 {followers.total} 位用户</span>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {followers.items.length === 0 ? <p className="text-sm text-muted-foreground">当前还没有粉丝。</p> : null}
-
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {followers.items.map((user) => (
-            <Link key={user.id} href={`/users/${user.username}`} className="rounded-[18px] border border-border bg-card px-4 py-4 transition-colors hover:bg-accent/40">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-foreground">{user.displayName}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">@{user.username}</p>
-                </div>
-                <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-              </div>
-              <p className="mt-3 line-clamp-2 text-xs leading-5 text-muted-foreground">{user.bio}</p>
-              <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-                <span>Lv.{user.level}</span>
-                <span>帖子 {user.postCount}</span>
-                <span>粉丝 {user.followerCount}</span>
-              </div>
-            </Link>
-          ))}
-        </div>
-
-        {followers.total > 0 ? (
-          <CursorPaginationBar
-            hasPrevPage={followers.hasPrevPage}
-            hasNextPage={followers.hasNextPage}
-            prevHref={buildCursorHref("/settings?tab=follows&followTab=followers", "listBefore", followers.prevCursor)}
-            nextHref={buildCursorHref("/settings?tab=follows&followTab=followers", "listAfter", followers.nextCursor)}
-          />
-        ) : null}
-      </CardContent>
-    </Card>
+    <SocialUserListPanel
+      users={followers}
+      title="我的粉丝"
+      emptyText="当前还没有粉丝。"
+      errorText="暂时无法加载粉丝列表，请稍后刷新重试。"
+      paginationBase="/settings?tab=follows&followTab=followers"
+    />
   )
 }
 
@@ -785,10 +709,63 @@ function FollowPostsPanel({
 }
 
 function BlockedUsersPanel({ blockedUsers }: { blockedUsers: SettingsPageData["blockedUsers"] }) {
-  if (!blockedUsers) {
+  return (
+    <SocialUserListPanel
+      users={blockedUsers}
+      title="拉黑用户"
+      emptyText="当前还没有拉黑任何用户。"
+      errorText="暂时无法加载拉黑列表，请稍后刷新重试。"
+      paginationBase="/settings?tab=follows&followTab=blocks"
+      renderAction={(user) => (
+        <UserBlockToggleButton
+          targetUserId={user.id}
+          initialBlocked
+          activeLabel="取消拉黑"
+          inactiveLabel="拉黑用户"
+          showLabel
+          reloadOnChange
+          className="h-7 shrink-0 rounded-full px-2.5 text-xs"
+        />
+      )}
+    />
+  )
+}
+
+type SocialUserListItem = {
+  id: number
+  username: string
+  displayName: string
+  avatarPath?: string | null
+}
+
+type SocialUserListResult = {
+  total: number
+  items: SocialUserListItem[]
+  hasPrevPage: boolean
+  hasNextPage: boolean
+  prevCursor: string | null
+  nextCursor: string | null
+}
+
+function SocialUserListPanel({
+  users,
+  title,
+  emptyText,
+  errorText,
+  paginationBase,
+  renderAction,
+}: {
+  users: SocialUserListResult | null
+  title: string
+  emptyText: string
+  errorText: string
+  paginationBase: string
+  renderAction?: (user: SocialUserListItem) => ReactNode
+}) {
+  if (!users) {
     return (
       <Card>
-        <CardContent className="p-6 text-sm text-muted-foreground">暂时无法加载拉黑列表，请稍后刷新重试。</CardContent>
+        <CardContent className="p-6 text-sm text-muted-foreground">{errorText}</CardContent>
       </Card>
     )
   }
@@ -797,51 +774,48 @@ function BlockedUsersPanel({ blockedUsers }: { blockedUsers: SettingsPageData["b
     <Card>
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <CardTitle>拉黑用户</CardTitle>
-          <span className="text-sm text-muted-foreground">共 {blockedUsers.total} 位用户</span>
+          <CardTitle>{title}</CardTitle>
+          <span className="text-sm text-muted-foreground">共 {users.total} 位用户</span>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {blockedUsers.items.length === 0 ? <p className="text-sm text-muted-foreground">当前还没有拉黑任何用户。</p> : null}
+        {users.items.length === 0 ? <p className="text-sm text-muted-foreground">{emptyText}</p> : null}
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {blockedUsers.items.map((user) => (
-            <div key={user.id} className="rounded-[18px] border border-border bg-card px-4 py-4">
-              <div className="flex items-start justify-between gap-3">
-                <Link href={`/users/${user.username}`} className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-foreground">{user.displayName}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">@{user.username}</p>
-                </Link>
-                <UserBlockToggleButton
-                  targetUserId={user.id}
-                  initialBlocked
-                  activeLabel="取消拉黑"
-                  inactiveLabel="拉黑用户"
-                  showLabel
-                  reloadOnChange
-                  className="h-8 rounded-xl px-3 text-xs"
-                />
-              </div>
-              <p className="mt-3 line-clamp-2 text-xs leading-5 text-muted-foreground">{user.bio}</p>
-              <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-                <span>Lv.{user.level}</span>
-                <span>帖子 {user.postCount}</span>
-                <span>粉丝 {user.followerCount}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+        {users.items.length > 0 ? (
+          <div className="flex flex-wrap gap-3">
+            {users.items.map((user) => (
+              <SocialUserRow key={user.id} user={user} action={renderAction?.(user)} />
+            ))}
+          </div>
+        ) : null}
 
-        {blockedUsers.total > 0 ? (
+        {users.total > 0 ? (
           <CursorPaginationBar
-            hasPrevPage={blockedUsers.hasPrevPage}
-            hasNextPage={blockedUsers.hasNextPage}
-            prevHref={buildCursorHref("/settings?tab=follows&followTab=blocks", "listBefore", blockedUsers.prevCursor)}
-            nextHref={buildCursorHref("/settings?tab=follows&followTab=blocks", "listAfter", blockedUsers.nextCursor)}
+            hasPrevPage={users.hasPrevPage}
+            hasNextPage={users.hasNextPage}
+            prevHref={buildCursorHref(paginationBase, "listBefore", users.prevCursor)}
+            nextHref={buildCursorHref(paginationBase, "listAfter", users.nextCursor)}
           />
         ) : null}
       </CardContent>
     </Card>
+  )
+}
+
+function SocialUserRow({ user, action }: { user: SocialUserListItem; action?: ReactNode }) {
+  const profileLabel = user.displayName === user.username ? user.displayName : `${user.displayName} (@${user.username})`
+
+  return (
+    <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-border/70 bg-background px-2 py-2 transition-colors hover:bg-accent/30">
+      <Link href={`/users/${user.username}`} className="group flex min-w-0 items-center gap-2" title={profileLabel}>
+        <UserAvatar name={user.displayName || user.username} avatarPath={user.avatarPath} size="xs" />
+        <div className="flex min-w-0 items-center gap-1.5">
+          <p className="truncate text-sm font-semibold text-foreground transition-colors group-hover:text-primary">@{user.username}</p>
+          {user.displayName !== user.username ? <p className="truncate text-xs text-muted-foreground">{user.displayName}</p> : null}
+        </div>
+      </Link>
+      {action}
+    </div>
   )
 }
 
@@ -908,7 +882,7 @@ function PostListPanel({
       </CardHeader>
       <CardContent className="space-y-4">
         {posts.items.length === 0 ? <p className="text-sm text-muted-foreground">{emptyText}</p> : null}
-        {posts.items.length > 0 ? <ForumPostStream posts={posts.items} showBoard listDisplayMode={listDisplayMode} /> : null}
+        {posts.items.length > 0 ? <ForumPostStream compactFirstItem={false} posts={posts.items} showBoard listDisplayMode={listDisplayMode} /> : null}
 
         {posts.total > 0 ? (
           <CursorPaginationBar
@@ -923,7 +897,15 @@ function PostListPanel({
   )
 }
 
-function PointsPanel({ pointLogs, currentPoints, pointName }: { pointLogs: SettingsPageData["pointLogs"]; currentPoints: number; pointName: string }) {
+function PointsPanel({
+  pointLogs,
+  currentPoints,
+  pointName,
+}: {
+  pointLogs: SettingsPageData["pointLogs"]
+  currentPoints: number
+  pointName: string
+}) {
   if (!pointLogs) {
     return (
       <Card>
@@ -934,16 +916,52 @@ function PointsPanel({ pointLogs, currentPoints, pointName }: { pointLogs: Setti
 
   return (
     <div className="space-y-4">
-            <RedeemCodeCard pointName={pointName} currentPoints={currentPoints} />
-
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle>{pointName}明细</CardTitle>
-            <span className="text-sm text-muted-foreground">当前余额：{formatNumber(currentPoints)}</span>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm text-muted-foreground">当前余额：{formatNumber(currentPoints)}</span>
+              <Link href="/topup" className="text-sm font-medium text-primary underline-offset-4 hover:underline">
+                去充值 / 兑换
+              </Link>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <form action="/settings" className="grid gap-3 rounded-[20px] border border-border bg-secondary/25 p-4 md:grid-cols-[180px_220px_auto_auto] md:items-end">
+            <input type="hidden" name="tab" value="points" />
+            <label className="space-y-2">
+              <span className="text-sm font-medium">收支类型</span>
+              <select
+                name="pointsChangeType"
+                defaultValue={pointLogs.filters.changeType}
+                className="h-10 w-full rounded-[16px] border border-border bg-background px-3 text-sm outline-hidden"
+              >
+                <option value="ALL">全部</option>
+                <option value="INCREASE">收入</option>
+                <option value="DECREASE">支出</option>
+              </select>
+            </label>
+            <label className="space-y-2">
+              <span className="text-sm font-medium">变动场景</span>
+              <select
+                name="pointsEventType"
+                defaultValue={pointLogs.filters.eventType}
+                className="h-10 w-full rounded-[16px] border border-border bg-background px-3 text-sm outline-hidden"
+              >
+                <option value="ALL">全部</option>
+                {Object.values(POINT_LOG_EVENT_TYPES).map((eventType) => (
+                  <option key={eventType} value={eventType}>{getPointLogEventLabel(eventType)}</option>
+                ))}
+              </select>
+            </label>
+            <Button type="submit" className="h-10 rounded-full px-4">筛选</Button>
+            <Link href="/settings?tab=points" className="inline-flex h-10 items-center justify-center rounded-full border border-border px-4 text-sm transition-colors hover:bg-accent hover:text-foreground">
+              重置
+            </Link>
+          </form>
+
           {pointLogs.items.length === 0 ? <p className="text-sm text-muted-foreground">当前还没有任何积分变动记录。</p> : null}
           {pointLogs.items.map((log) => {
             const positive = log.changeType === ChangeType.INCREASE
@@ -1008,14 +1026,14 @@ function PointsPanel({ pointLogs, currentPoints, pointName }: { pointLogs: Setti
           {pointLogs.total > 0 ? (
             <div className="flex items-center justify-end gap-2 pt-2">
               <Link
-                href={pointLogs.hasPrevPage && pointLogs.prevCursor ? `/settings?tab=points&pointsBefore=${encodeURIComponent(pointLogs.prevCursor)}` : "#"}
+                href={pointLogs.hasPrevPage && pointLogs.prevCursor ? `/settings?tab=points&pointsBefore=${encodeURIComponent(pointLogs.prevCursor)}${pointLogs.filters.changeType !== "ALL" ? `&pointsChangeType=${encodeURIComponent(pointLogs.filters.changeType)}` : ""}${pointLogs.filters.eventType !== "ALL" ? `&pointsEventType=${encodeURIComponent(pointLogs.filters.eventType)}` : ""}` : "#"}
                 aria-disabled={!pointLogs.hasPrevPage}
                 className={pointLogs.hasPrevPage ? "rounded-full border border-border px-4 py-2 text-sm transition-colors hover:bg-accent/40" : "pointer-events-none rounded-full border border-border px-4 py-2 text-sm text-muted-foreground opacity-50"}
               >
                 上一页
               </Link>
               <Link
-                href={pointLogs.hasNextPage && pointLogs.nextCursor ? `/settings?tab=points&pointsAfter=${encodeURIComponent(pointLogs.nextCursor)}` : "#"}
+                href={pointLogs.hasNextPage && pointLogs.nextCursor ? `/settings?tab=points&pointsAfter=${encodeURIComponent(pointLogs.nextCursor)}${pointLogs.filters.changeType !== "ALL" ? `&pointsChangeType=${encodeURIComponent(pointLogs.filters.changeType)}` : ""}${pointLogs.filters.eventType !== "ALL" ? `&pointsEventType=${encodeURIComponent(pointLogs.filters.eventType)}` : ""}` : "#"}
                 aria-disabled={!pointLogs.hasNextPage}
                 className={pointLogs.hasNextPage ? "rounded-full border border-border px-4 py-2 text-sm transition-colors hover:bg-accent/40" : "pointer-events-none rounded-full border border-border px-4 py-2 text-sm text-muted-foreground opacity-50"}
               >

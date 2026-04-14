@@ -21,6 +21,9 @@ import { normalizeVipNameColors, VIP_NAME_COLOR_FALLBACKS, VIP_NAME_COLOR_PRESET
 interface AdminVipSettingsFormProps {
   initialSettings: {
     pointName: string
+    redeemCodeHelpEnabled: boolean
+    redeemCodeHelpTitle: string
+    redeemCodeHelpUrl: string
     checkInEnabled: boolean
     checkInReward: number
     checkInVip1Reward: number
@@ -102,6 +105,9 @@ export function AdminVipSettingsForm({
   const router = useRouter()
   const [activeTab, setActiveTab] = useState(() => resolveVipTab(initialSubTab))
   const [pointName, setPointName] = useState(initialSettings.pointName)
+  const [redeemCodeHelpEnabled, setRedeemCodeHelpEnabled] = useState(initialSettings.redeemCodeHelpEnabled)
+  const [redeemCodeHelpTitle, setRedeemCodeHelpTitle] = useState(initialSettings.redeemCodeHelpTitle)
+  const [redeemCodeHelpUrl, setRedeemCodeHelpUrl] = useState(initialSettings.redeemCodeHelpUrl)
   const [checkInEnabled, setCheckInEnabled] = useState(initialSettings.checkInEnabled)
   const [checkInReward, setCheckInReward] = useState(String(initialSettings.checkInReward))
   const [checkInVip1Reward, setCheckInVip1Reward] = useState(String(initialSettings.checkInVip1Reward))
@@ -178,6 +184,9 @@ export function AdminVipSettingsForm({
             startTransition(async () => {
               const result = await saveAdminSiteSettings({
                 pointName,
+                redeemCodeHelpEnabled,
+                redeemCodeHelpTitle,
+                redeemCodeHelpUrl,
                 checkInEnabled,
                 checkInReward: Number(checkInReward),
                 checkInVip1Reward: Number(checkInVip1Reward),
@@ -236,6 +245,13 @@ export function AdminVipSettingsForm({
               <SettingsInputField label="积分名称" value={pointName} onChange={setPointName} placeholder="如 积分 / 金币 / 钻石" />
               <AdminBooleanSelectField label="签到开关" checked={checkInEnabled} onChange={setCheckInEnabled} />
               <AdminBooleanSelectField label="补签计入连续签到" checked={checkInMakeUpCountsTowardStreak} onChange={setCheckInMakeUpCountsTowardStreak} />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <AdminBooleanSelectField label="兑换码入口链接开关" checked={redeemCodeHelpEnabled} onChange={setRedeemCodeHelpEnabled} />
+              <SettingsInputField label="链接文本" value={redeemCodeHelpTitle} onChange={setRedeemCodeHelpTitle} placeholder="如 获取兑换码" />
+              <div className="md:col-span-2 xl:col-span-2">
+                <SettingsInputField label="链接地址" value={redeemCodeHelpUrl} onChange={setRedeemCodeHelpUrl} placeholder="如 /faq/redeem-code 或 https://example.com/redeem-help" />
+              </div>
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <SettingsInputField label="普通用户改昵称积分" value={nicknameChangePointCost} onChange={setNicknameChangePointCost} placeholder="0 表示免费" />

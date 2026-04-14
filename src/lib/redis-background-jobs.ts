@@ -19,7 +19,8 @@ const DEFAULT_BLOCK_TIMEOUT_MS = 5_000
 const DEFAULT_PENDING_IDLE_MS = 15 * 60 * 1_000
 const DEFAULT_PENDING_CLAIM_BATCH_SIZE = 20
 const DEFAULT_PENDING_SWEEP_INTERVAL_MS = 15_000
-const DEFAULT_LANE_RESTART_DELAY_MS = 1_000
+const DEFAULT_LANE_RESTART_BASE_DELAY_MS = 1_000
+const DEFAULT_LANE_RESTART_MAX_DELAY_MS = 30_000
 const DEFAULT_DELAYED_PROMOTION_BATCH_SIZE = 50
 const DEFAULT_DEAD_LETTER_MAX_LENGTH = 1_000
 
@@ -86,6 +87,40 @@ function getBackgroundJobDelayedPromotionBatchSize() {
 
 function getBackgroundJobDeadLetterMaxLength() {
   return parsePositiveInteger(process.env.BACKGROUND_JOB_DEAD_LETTER_MAX_LENGTH, DEFAULT_DEAD_LETTER_MAX_LENGTH, 10, 100_000)
+}
+
+function getBackgroundJobLaneRestartBaseDelayMs() {
+  return parsePositiveInteger(
+    process.env.BACKGROUND_JOB_LANE_RESTART_BASE_DELAY_MS,
+    DEFAULT_LANE_RESTART_BASE_DELAY_MS,
+    250,
+    60_000,
+  )
+}
+
+function getBackgroundJobLaneRestartMaxDelayMs() {
+  const baseDelayMs = getBackgroundJobLaneRestartBaseDelayMs()
+  return parsePositiveInteger(
+    process.env.BACKGROUND_JOB_LANE_RESTART_MAX_DELAY_MS,
+    DEFAULT_LANE_RESTART_MAX_DELAY_MS,
+    baseDelayMs,
+    10 * 60 * 1_000,
+  )
+}
+
+function computeBackgroundJobLaneRestartDelayMs(consecutiveFailureCount: number) {
+  const baseDelayMs = getBackgroundJobLaneRestartBaseDelayMs()
+  const maxDelayMs = getBackgroundJobLaneRestartMaxDelayMs()
+  const exponent = Math.max(0, Math.trunc(consecutiveFailureCount) - 1)
+  const cappedBaseDelayMs = Math.min(maxDelayMs, baseDelayMs * 2 ** exponent)
+  const minJitterDelayMs = Math.max(baseDelayMs, Math.floor(cappedBaseDelayMs / 2))
+
+  if (cappedBaseDelayMs <= minJitterDelayMs) {
+    return cappedBaseDelayMs
+  }
+
+  const jitterRangeMs = cappedBaseDelayMs - minJitterDelayMs
+  return minJitterDelayMs + Math.floor(Math.random() * (jitterRangeMs + 1))
 }
 
 function normalizeStreamEntries(value: unknown): RedisStreamEntry[] {
@@ -173,7 +208,7 @@ function parseBackgroundJobEnvelope(entry: RedisStreamEntry): BackgroundJobEnvel
 }
 
 class RedisBackgroundJobTransport implements BackgroundJobTransport {
-  private readonly redis = createRedisConnection()
+  private readonly redis = createRedisConnection("background-job:transport")
   private groupReadyPromise: Promise<void> | null = null
 
   async enqueue<Name extends BackgroundJobEnvelope["name"]>(job: BackgroundJobEnvelope<Name>) {
@@ -305,9 +340,10 @@ class RedisBackgroundJobRuntime {
     const consumerName = `${this.workerId}:${laneIndex}`
     let nextPendingSweepAt = 0
     let nextDelayedPromotionAt = 0
+    let consecutiveFailureCount = 0
 
     while (true) {
-      const redis = createRedisConnection()
+      const redis = createRedisConnection(`background-job:lane:${laneIndex}`)
 
       try {
         await connectRedisClient(redis)
@@ -325,6 +361,7 @@ class RedisBackgroundJobRuntime {
           }
 
           const entries = await this.readNewEntries(redis, consumerName)
+          consecutiveFailureCount = 0
 
           if (entries.length === 0) {
             continue
@@ -341,13 +378,27 @@ class RedisBackgroundJobRuntime {
           metadata: {
             workerId: this.workerId,
             consumerName,
+            consecutiveFailureCount: consecutiveFailureCount + 1,
           },
         }, error)
       } finally {
         redis.disconnect()
       }
 
-      await sleep(DEFAULT_LANE_RESTART_DELAY_MS)
+      consecutiveFailureCount += 1
+      const restartDelayMs = computeBackgroundJobLaneRestartDelayMs(consecutiveFailureCount)
+      logInfo({
+        scope: "background-job",
+        action: "worker-lane-restart",
+        metadata: {
+          workerId: this.workerId,
+          consumerName,
+          laneIndex,
+          consecutiveFailureCount,
+          restartDelayMs,
+        },
+      })
+      await sleep(restartDelayMs)
     }
   }
 

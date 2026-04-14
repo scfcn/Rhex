@@ -1,4 +1,5 @@
 import { findPostUpdateContext, runPostUpdateTransaction } from "@/db/post-update-queries"
+import { findPostAttachmentsByPostId } from "@/db/post-attachment-queries"
 
 import { apiError } from "@/lib/api-route"
 import { extractSummaryFromContent } from "@/lib/content"
@@ -18,6 +19,9 @@ export async function updatePostFlow(input: {
   currentUser: {
     id: number
     role?: string | null
+    level?: number | null
+    vipLevel?: number | null
+    vipExpiresAt?: Date | string | null
   }
 }) {
   const settings = await getSiteSettings()
@@ -68,15 +72,18 @@ export async function updatePostFlow(input: {
   const canEditNormally = isAdmin || (editDeadline > Date.now())
 
   if (canEditNormally && !appendedContent) {
+    const existingAttachments = await findPostAttachmentsByPostId(post.id)
     const normalizedAttachments = await normalizePostAttachmentInputs(rawBody?.attachments, {
       settings,
       user: {
         id: input.currentUser.id,
         role: input.currentUser.role,
+        level: input.currentUser.level,
+        vipLevel: input.currentUser.vipLevel,
+        vipExpiresAt: input.currentUser.vipExpiresAt,
       },
       uploadOwnerUserIds: isAdmin ? [input.currentUser.id, post.authorId] : [post.authorId],
-      skipFeatureEnabledCheck: true,
-      skipUploadPermissionCheck: true,
+      allowedExistingAttachmentIds: existingAttachments.map((attachment) => attachment.id),
     })
     const titleSafety = await enforceSensitiveText({ scene: "post.title", text: title })
     const contentSafety = await enforceSensitiveText({ scene: "post.content", text: content })

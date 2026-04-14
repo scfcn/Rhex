@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { AccessDeniedCard } from "@/components/access-denied-card"
+import { AiAgentIndicator } from "@/components/user/ai-agent-indicator"
 import { AnonymousUserIndicator } from "@/components/user/anonymous-user-indicator"
 import { ForumPostStream } from "@/components/forum/forum-post-stream"
 import { LevelBadge } from "@/components/level-badge"
@@ -22,6 +23,7 @@ import { VipDisplayName } from "@/components/vip/vip-display-name"
 import { VipBadge } from "@/components/vip/vip-badge"
 import { Button } from "@/components/ui/rbutton"
 import { Card, CardContent } from "@/components/ui/card"
+import { getAiAgentUserId } from "@/lib/ai-agent"
 import { getCurrentUser } from "@/lib/auth"
 import { getGrantedBadgesForUser } from "@/lib/badges"
 import { getPublicFavoriteCollectionsByUsername } from "@/lib/favorite-collections"
@@ -63,7 +65,7 @@ export async function generateMetadata(props: PageProps<"/users/[username]">): P
 
 export default async function UserPage(props: PageProps<"/users/[username]">) {
   const params = await props.params;
-  const [user, settings, currentUser] = await Promise.all([getUserProfile(params.username), getSiteSettings(), getCurrentUser()])
+  const [user, settings, currentUser, aiAgentUserId] = await Promise.all([getUserProfile(params.username), getSiteSettings(), getCurrentUser(), getAiAgentUserId()])
 
   if (!user) {
     notFound()
@@ -111,6 +113,7 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
 
   const canToggleFollow = (!currentUser || currentUser.id !== user.id) && !profileAccess.relation.isBlocked
   const isAnonymousMaskUser = settings.anonymousPostMaskUserId === user.id
+  const isAiAgentUser = aiAgentUserId === user.id
 
   const vipActive = isVipActive(user)
   const vipLevel = getVipLevel(user)
@@ -171,6 +174,7 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
                             />
                           </h1>
                           {isAnonymousMaskUser ? <AnonymousUserIndicator /> : null}
+                          {isAiAgentUser ? <AiAgentIndicator /> : null}
                         </div>
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -235,6 +239,7 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
                       className="min-w-0 truncate"
                     />
                     {isAnonymousMaskUser ? <AnonymousUserIndicator /> : null}
+                    {isAiAgentUser ? <AiAgentIndicator /> : null}
                   </span>
                   <span className="shrink-0 text-foreground">的主页</span>
                 </span>
@@ -296,7 +301,7 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
                       最近还没有发布帖子。
                     </div>
                   ) : (
-                    <ForumPostStream posts={posts} />
+                    <ForumPostStream posts={posts} compactFirstItem={false} />
                   ),
                 },
                 {

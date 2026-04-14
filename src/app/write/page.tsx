@@ -182,6 +182,18 @@ export default async function WritePage(props: PageProps<"/write">) {
                     boardSlug: editingPost.board.slug,
                     postType: editingPost.type,
                     bountyPoints: editingPost.bountyPoints,
+                    auctionConfig: editingPost.auction
+                      ? {
+                          mode: editingPost.auction.mode,
+                          pricingRule: editingPost.auction.pricingRule,
+                          startPrice: editingPost.auction.startPrice,
+                          incrementStep: editingPost.auction.incrementStep,
+                          startsAt: editingPost.auction.startsAt?.toISOString() ?? null,
+                          endsAt: editingPost.auction.endsAt.toISOString(),
+                          winnerOnlyContent: editingPost.auction.winnerOnlyContent,
+                          winnerOnlyContentPreview: editingPost.auction.winnerOnlyContentPreview,
+                        }
+                      : undefined,
                     pollOptions: editingPost.pollOptions.map((item) => item.content),
                     tags: editingPost.tags.map((item) => item.tag.name),
                     attachments: editingPost.attachments.map((attachment) => ({

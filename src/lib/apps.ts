@@ -44,6 +44,24 @@ export const HOST_APPS = [
     adminHref: "/admin/apps/rss-harvest",
     category: "采集",
   },
+  {
+    id: "worker",
+    slug: "worker",
+    name: "Worker 中心",
+    description: "后台任务 worker 诊断页，查看队列状态、竞拍结算进度、死信告警和在线 worker 连接。",
+    href: "/admin/apps/worker",
+    adminHref: "/admin/apps/worker",
+    category: "系统",
+  },
+  {
+    id: "payment-gateway",
+    slug: "payment-gateway",
+    name: "支付网关",
+    description: "统一管理支付渠道、路由规则、敏感密钥和异步通知，首期内置支付宝网页/H5/扫码通道。",
+    href: "/admin/apps/payment-gateway",
+    adminHref: "/admin/apps/payment-gateway",
+    category: "交易",
+  },
 ] as const
 
 

@@ -196,7 +196,10 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
   if (nextEmail) {
     const existingEmailUser = await prisma.user.findFirst({
       where: {
-        email: nextEmail,
+        email: {
+          equals: nextEmail,
+          mode: "insensitive",
+        },
         id: {
           not: currentUser.id,
         },

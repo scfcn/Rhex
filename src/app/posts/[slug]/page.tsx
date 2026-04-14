@@ -12,6 +12,7 @@ import { ForumPageShell } from "@/components/forum/forum-page-shell"
 import { MarkdownContent } from "@/components/markdown-content"
 import { PostAppendixTimeline } from "@/components/post/post-appendix-timeline"
 import { PostAttachmentList } from "@/components/post/post-attachment-list"
+import { PostAuctionPanel, PostAuctionWinnerContent } from "@/components/post/post-auction-panel"
 import { PostBodyCopyMenu } from "@/components/post/post-body-copy-menu"
 import { PostDetailHeader } from "@/components/post/post-detail-header"
 
@@ -26,6 +27,7 @@ import { BountyPanel, LotteryPanel, PollPanel } from "@/components/post/post-typ
 
 import { SiteHeader } from "@/components/site-header"
 
+import { getAiAgentUserId } from "@/lib/ai-agent"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getCurrentUser } from "@/lib/auth"
 import { PinScope } from "@/db/types"
@@ -43,6 +45,7 @@ import { canUseAnonymousIdentityForPostReply, getAnonymousMaskDisplayIdentity } 
 import { isImageOnlyMarkdown } from "@/lib/markdown/render"
 import { getPostTipSummary } from "@/lib/post-tips"
 import { getPostOfflineActionMeta } from "@/lib/post-offline"
+import { getPostAuctionSummary } from "@/lib/post-auctions"
 import { getPurchasedPostAttachmentIds, resolveAttachmentViewerState } from "@/lib/post-attachments"
 
 import { getPurchasedPostBlockBuyerCounts, getPurchasedPostBlockIds } from "@/lib/post-unlock"
@@ -105,9 +108,10 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
   const currentPage = Math.max(1, Number(readSearchParam(searchParams?.page) ?? "1") || 1)
 
 
-  const [currentUser, settings] = await Promise.all([
+  const [currentUser, settings, aiAgentUserId] = await Promise.all([
   getCurrentUser(),
   getSiteSettings(),
+  getAiAgentUserId(),
 ])
 
   const sidebarUserPromise = resolveSidebarUser(currentUser, settings)
@@ -136,7 +140,9 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
   const adminActor = await adminActorPromise
   const canManageThisPost = Boolean(adminActor && boardAccessContext && canManageBoard(adminActor, boardAccessContext.board.id, boardAccessContext.board.zoneId))
   const isSiteAdmin = isSiteAdminActor(adminActor)
-  const isOwnerOrManager = Boolean(currentUser?.id === basePost.authorId || canManageThisPost)
+  const isPostOwner = currentUser?.id === basePost.authorId
+  const isOwnerOrManager = Boolean(isPostOwner || canManageThisPost)
+  const isOwnerOrSiteAdmin = Boolean(isPostOwner || isSiteAdmin)
   const canViewPendingPost = basePost.status === "PENDING" && isOwnerOrManager
   const canViewOfflinePost = basePost.status === "OFFLINE" && isOwnerOrManager
 
@@ -174,6 +180,9 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
   const purchasedBlockBuyerCountsPromise = canViewRestrictedPost ? getPurchasedPostBlockBuyerCounts(basePost.id) : Promise.resolve(new Map<string, number>())
   const tipSummaryPromise = canViewRestrictedPost ? getPostTipSummary(basePost.id, currentUser?.id) : Promise.resolve(undefined)
   const redPacketSummaryPromise = canViewRestrictedPost ? getPostRedPacketSummary(basePost.id, currentUser?.id) : Promise.resolve(undefined)
+  const postAuctionSummaryPromise = basePost.type === "AUCTION" && (canViewRestrictedPost || isOwnerOrManager)
+    ? getPostAuctionSummary(basePost.id, currentUser?.id, { isAdmin: isSiteAdmin })
+    : Promise.resolve(undefined)
   const postOfflineMetaPromise = currentUser?.id === basePost.authorId ? getPostOfflineActionMeta(basePost.id) : Promise.resolve(null)
   const anonymousMaskIdentityPromise = basePost.isAnonymous ? getAnonymousMaskDisplayIdentity() : Promise.resolve(null)
   const commentResultPromise = canViewComments
@@ -194,7 +203,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
       viewMode: currentCommentView,
     })
 
-  const [userReplyCount, purchasedBlockIds, purchasedAttachmentIds, purchasedBlockBuyerCounts, tipSummary, redPacketSummary, postOfflineMeta, commentResult, sidebarData, boards, zones] = await Promise.all([
+  const [userReplyCount, purchasedBlockIds, purchasedAttachmentIds, purchasedBlockBuyerCounts, tipSummary, redPacketSummary, postAuctionSummary, postOfflineMeta, commentResult, sidebarData, boards, zones] = await Promise.all([
 
 
     userReplyCountPromise,
@@ -203,6 +212,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
     purchasedBlockBuyerCountsPromise,
     tipSummaryPromise,
     redPacketSummaryPromise,
+    postAuctionSummaryPromise,
     postOfflineMetaPromise,
     commentResultPromise,
     getPostSidebarData(basePost.id, basePost.authorUsername ?? basePost.author, settings.postSidebarRelatedTopicsCount, currentUser?.id),
@@ -215,8 +225,9 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
     void incrementPostViewCount(basePost.id)
   }
 
+  const postWithAuction = postAuctionSummary ? { ...basePost, auction: postAuctionSummary } : basePost
   const displayPost = canViewRestrictedPost
-    ? { ...basePost, redPacket: redPacketSummary ?? basePost.redPacket, tipping: tipSummary ? {
+    ? { ...postWithAuction, redPacket: redPacketSummary ?? postWithAuction.redPacket, tipping: tipSummary ? {
       enabled: tipSummary.enabled,
       pointName: tipSummary.pointName,
       currentUserPoints: tipSummary.currentUserPoints,
@@ -231,8 +242,8 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
       totalCount: tipSummary.tipCount,
       totalPoints: tipSummary.tipTotalPoints,
       topSupporters: tipSummary.topSupporters,
-    } : basePost.tipping,
-      contentBlocks: (basePost.contentBlocks ?? []).map((block) => {
+    } : postWithAuction.tipping,
+      contentBlocks: (postWithAuction.contentBlocks ?? []).map((block) => {
 
         const replyUnlocked = isOwnerOrManager || userReplyCount >= (block.replyThreshold ?? 1)
 
@@ -248,9 +259,13 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
           purchaseCount: block.type === "PURCHASE_UNLOCK" ? (purchasedBlockBuyerCounts.get(block.id) ?? 0) : block.purchaseCount,
         }
       }) }
-    : basePost
-  const isRestrictedAuthor = displayPost.authorStatus === "BANNED" || displayPost.authorStatus === "MUTED"
-  const currentZone = displayPost.boardSlug ? zones.find((zone) => zone.boardSlugs.includes(displayPost.boardSlug!)) ?? null : null
+    : postWithAuction
+  const displayPostWithAiIndicator = {
+    ...displayPost,
+    authorIsAiAgent: !displayPost.isAnonymous && displayPost.authorId === aiAgentUserId,
+  }
+  const isRestrictedAuthor = displayPostWithAiIndicator.authorStatus === "BANNED" || displayPostWithAiIndicator.authorStatus === "MUTED"
+  const currentZone = displayPostWithAiIndicator.boardSlug ? zones.find((zone) => zone.boardSlugs.includes(displayPostWithAiIndicator.boardSlug!)) ?? null : null
   const currentZoneBoards = currentZone
     ? boards
         .filter((board) => currentZone.boardSlugs.includes(board.slug))
@@ -326,7 +341,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
       viewer: currentUser,
       userReplyCount,
       hasPurchasedAccess: purchasedAttachmentIds.has(attachment.id),
-      isOwnerOrAdmin: isOwnerOrManager,
+      isOwnerOrAdmin: isOwnerOrSiteAdmin,
     })
 
     return {
@@ -390,26 +405,26 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                   <PostBodyCopyMenu
                     post={{ id: displayPost.id, slug: displayPost.slug }}
                     postLinkDisplayMode={settings.postLinkDisplayMode}
-                    canReport={Boolean(currentUser && currentUser.id !== displayPost.authorId)}
-                    reportTargetId={displayPost.id}
-                    reportLabel={displayPost.title}
+                    canReport={Boolean(currentUser && currentUser.id !== displayPostWithAiIndicator.authorId)}
+                    reportTargetId={displayPostWithAiIndicator.id}
+                    reportLabel={displayPostWithAiIndicator.title}
                   >
                     <Card className={hasRewardPoolHighlight || hasAppendices ? "rounded-b-none" : undefined}>
                       <CardContent>
-                      {displayPost.status === "NORMAL" && canViewRestrictedPost ? (
+                      {displayPostWithAiIndicator.status === "NORMAL" && canViewRestrictedPost ? (
                         <PostReadingHistoryRecorder
-                          postId={displayPost.id}
-                          postSlug={displayPost.slug}
+                          postId={displayPostWithAiIndicator.id}
+                          postSlug={displayPostWithAiIndicator.slug}
                           postPath={canonicalPath}
-                          title={displayPost.title}
-                          boardName={displayPost.board}
-                          boardSlug={displayPost.boardSlug}
-                          postCreatedAt={displayPost.createdAt}
+                          title={displayPostWithAiIndicator.title}
+                          boardName={displayPostWithAiIndicator.board}
+                          boardSlug={displayPostWithAiIndicator.boardSlug}
+                          postCreatedAt={displayPostWithAiIndicator.createdAt}
                         />
                       ) : null}
 
                       <PostDetailHeader
-                        post={displayPost}
+                        post={displayPostWithAiIndicator}
                         isFollowingPost={isFollowingPost}
                         isRestrictedAuthor={isRestrictedAuthor}
                         zone={currentZone ? { slug: currentZone.slug, name: currentZone.name } : null}
@@ -428,6 +443,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                           />
                         ) : null}
                         {displayPost.lottery ? <LotteryPanel postId={displayPost.id} lottery={displayPost.lottery} isOwnerOrAdmin={isOwnerOrManager} /> : null}
+                        {displayPost.auction ? <PostAuctionPanel postId={displayPost.id} auction={displayPost.auction} pointName={settings.pointName} currentUserId={currentUser?.id} /> : null}
 
 
                       </div>
@@ -460,6 +476,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
 
                        {displayPost.poll ? <PollPanel postId={displayPost.id} totalVotes={displayPost.poll.totalVotes} hasVoted={displayPost.poll.hasVoted} expiresAt={displayPost.poll.expiresAt} options={displayPost.poll.options} /> : null}
                         {displayAttachments.length > 0 ? <PostAttachmentList attachments={displayAttachments} pointName={settings.pointName} /> : null}
+                        {displayPost.auction ? <PostAuctionWinnerContent auction={displayPost.auction} pointName={settings.pointName} /> : null}
 
                         </div>
 

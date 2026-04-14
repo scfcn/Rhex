@@ -1,9 +1,10 @@
 import { apiError, apiSuccess, createRouteHandler, readJsonBody, requireStringField } from "@/lib/api-route"
+import { normalizeEmailAddress } from "@/lib/email"
 import { resetPasswordByEmailCode } from "@/lib/password-reset"
 
 export const POST = createRouteHandler(async ({ request }) => {
   const body = await readJsonBody(request)
-  const email = requireStringField(body, "email", "请完整填写邮箱、验证码和新密码").toLowerCase()
+  const email = normalizeEmailAddress(requireStringField(body, "email", "请完整填写邮箱、验证码和新密码"))
   const code = requireStringField(body, "code", "请完整填写邮箱、验证码和新密码")
   const password = requireStringField(body, "password", "请完整填写邮箱、验证码和新密码")
   const confirmPassword = requireStringField(body, "confirmPassword", "请完整填写邮箱、验证码和新密码")

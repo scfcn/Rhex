@@ -1,8 +1,13 @@
 import { prisma } from "@/db/client"
 
 export function findUserByEmail(email: string) {
-  return prisma.user.findUnique({
-    where: { email },
+  return prisma.user.findFirst({
+    where: {
+      email: {
+        equals: email,
+        mode: "insensitive",
+      },
+    },
     select: {
       id: true,
       username: true,

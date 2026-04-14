@@ -9,7 +9,7 @@ interface HomeAnnouncementPanelProps {
 
 export function HomeAnnouncementPanel({ announcements }: HomeAnnouncementPanelProps) {
   return (
-    <section className="rounded-[24px] border border-border bg-card p-4 shadow-xs shadow-black/5 dark:shadow-black/30">
+    <section className="mobile-sidebar-section rounded-[24px] border border-border bg-card p-4 shadow-xs shadow-black/5 dark:shadow-black/30">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Megaphone className="h-5 w-5 text-sky-500" />

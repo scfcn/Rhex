@@ -3,17 +3,26 @@ import type { Prisma } from "@/db/types"
 import { prisma } from "@/db/client"
 import type { TimestampCursorPayload } from "@/lib/cursor-pagination"
 
-export function countUserPointLogs(userId: number) {
+export function countUserPointLogs(userId: number, where?: Prisma.PointLogWhereInput) {
   return prisma.pointLog.count({
-    where: { userId },
+    where: {
+      userId,
+      ...(where ?? {}),
+    },
   })
 }
 
-function buildPointLogCursorWhere(userId: number, cursor: TimestampCursorPayload, direction: "after" | "before"): Prisma.PointLogWhereInput {
+function buildPointLogCursorWhere(
+  userId: number,
+  cursor: TimestampCursorPayload,
+  direction: "after" | "before",
+  where?: Prisma.PointLogWhereInput,
+): Prisma.PointLogWhereInput {
   const createdAt = new Date(cursor.createdAt)
 
   return {
     userId,
+    ...(where ?? {}),
     OR: direction === "after"
       ? [
           { createdAt: { lt: createdAt } },
@@ -31,12 +40,18 @@ export async function findUserPointLogsCursor(params: {
   take: number
   after?: TimestampCursorPayload | null
   before?: TimestampCursorPayload | null
+  where?: Prisma.PointLogWhereInput
 }) {
   const normalizedTake = Math.min(Math.max(1, params.take), 50)
   const pagingDirection = params.before ? "before" : "after"
   const cursor = params.before ?? params.after
   const rows = await prisma.pointLog.findMany({
-    where: cursor ? buildPointLogCursorWhere(params.userId, cursor, pagingDirection) : { userId: params.userId },
+    where: cursor
+      ? buildPointLogCursorWhere(params.userId, cursor, pagingDirection, params.where)
+      : {
+          userId: params.userId,
+          ...(params.where ?? {}),
+        },
     orderBy: pagingDirection === "before"
       ? [{ createdAt: "asc" }, { id: "asc" }]
       : [{ createdAt: "desc" }, { id: "desc" }],

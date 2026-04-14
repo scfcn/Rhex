@@ -106,6 +106,7 @@ function CustomThemeModalContent({
       open={open}
       onClose={onClose}
       title="自定义主题"
+      hideHeaderCloseButtonOnMobile
       description="只保存在当前浏览器本地。保存后会自动切换到自定义主题，你仍然可以随时切回官方预设。"
       size="lg"
       footer={(

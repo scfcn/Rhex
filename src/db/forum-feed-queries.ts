@@ -24,6 +24,11 @@ const feedPostInclude = {
       id: true,
     },
   },
+  _count: {
+    select: {
+      attachments: true,
+    },
+  },
   comments: {
     where: { status: "NORMAL" },
     orderBy: { createdAt: "desc" },

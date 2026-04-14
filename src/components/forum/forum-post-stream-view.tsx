@@ -10,6 +10,7 @@ interface ForumPostStreamViewProps {
   listDisplayMode?: PostListDisplayMode
   showBoard?: boolean
   showPinnedDivider?: boolean
+  compactFirstItem?: boolean
   postLinkDisplayMode?: "SLUG" | "ID"
 }
 
@@ -18,6 +19,7 @@ export function ForumPostStreamView({
   listDisplayMode,
   showBoard = true,
   showPinnedDivider = false,
+  compactFirstItem = true,
   postLinkDisplayMode = "SLUG",
 }: ForumPostStreamViewProps) {
   const resolvedListDisplayMode = normalizePostListDisplayMode(listDisplayMode)
@@ -29,14 +31,14 @@ export function ForumPostStreamView({
     <div className="overflow-hidden rounded-md bg-background">
       <div className="lg:pl-4">
         {pinnedPosts.map((post, index) => (
-          <div key={post.id}>
-            <ForumPostListItem
-              item={post}
-              showBoard={showBoard}
-              compactFirstItem={index === 0}
-              postLinkDisplayMode={postLinkDisplayMode}
-            />
-          </div>
+          <ForumPostListItem
+            key={post.id}
+            item={post}
+            showBoard={showBoard}
+            compactFirstItem={compactFirstItem && index === 0}
+            hideDivider={shouldShowPinnedDivider && index === pinnedPosts.length - 1}
+            postLinkDisplayMode={postLinkDisplayMode}
+          />
         ))}
         {shouldShowPinnedDivider ? (
           <div className="mb-2 mt-4 flex items-center gap-3 px-3 text-xs text-muted-foreground">
@@ -51,7 +53,7 @@ export function ForumPostStreamView({
             key={post.id}
             item={post}
             showBoard={showBoard}
-            compactFirstItem={pinnedPosts.length === 0 && index === 0}
+            compactFirstItem={compactFirstItem && pinnedPosts.length === 0 && index === 0}
             postLinkDisplayMode={postLinkDisplayMode}
           />
         ))}

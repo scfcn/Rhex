@@ -1,5 +1,6 @@
 import { findCommentEffectFeedbackByCommentIds } from "@/db/comment-effect-feedback-queries"
 import { countRootCommentsByPostId, countUserRepliesByPostId, countVisibleCommentsByPostId, findAllFlatCommentIdsByPostId, findAllRootCommentIdsByPostId, findAllVisibleCommentIdsByPostId, findCommentRewardClaimsByCommentIds, findCommentsByIds, findFlatCommentsByPostId, findRepliesByParentIds, findRootCommentsByPostId } from "@/db/comment-queries"
+import { getAiAgentUserId } from "@/lib/ai-agent"
 import { formatRelativeTime } from "@/lib/formatters"
 import type { AnonymousDisplayIdentity } from "@/lib/post-anonymous"
 import type { PostRewardPoolEffectFeedback } from "@/lib/post-reward-effect-feedback"
@@ -29,6 +30,7 @@ export interface SiteCommentReplyItem {
   reviewNote?: string | null
   author: string
   authorIsAnonymous?: boolean
+  authorIsAiAgent?: boolean
   authorId: number
   authorUsername: string
   authorAvatarPath?: string | null
@@ -79,6 +81,7 @@ export interface SiteCommentItem {
   reviewNote?: string | null
   author: string
   authorIsAnonymous?: boolean
+  authorIsAiAgent?: boolean
   authorId: number
   authorUsername: string
   authorAvatarPath?: string | null
@@ -253,6 +256,8 @@ export async function getCommentsByPostId(
   const pageSize = Math.min(50, Math.max(1, options.pageSize ?? 10))
   const viewMode = options.viewMode ?? "tree"
   try {
+    const aiAgentUserId = await getAiAgentUserId()
+
     const shouldMaskComment = (authorId: number) => {
       if (!viewer?.commentsVisibleToAuthorOnly) {
         return false
@@ -330,6 +335,7 @@ export async function getCommentsByPostId(
         postId,
         author: displayAsAnonymous ? anonymousCommentIdentity.author : (comment.user.nickname ?? comment.user.username),
         authorIsAnonymous: displayAsAnonymous,
+        authorIsAiAgent: !displayAsAnonymous && comment.userId === aiAgentUserId,
         authorId: comment.userId,
         authorUsername: displayAsAnonymous ? anonymousCommentIdentity.authorUsername : comment.user.username,
         authorAvatarPath: displayAsAnonymous ? anonymousCommentIdentity.authorAvatarPath : comment.user.avatarPath,
@@ -372,6 +378,7 @@ export async function getCommentsByPostId(
         postId,
         author: displayAsAnonymous ? anonymousCommentIdentity.author : getUserDisplayName(comment.user),
         authorIsAnonymous: displayAsAnonymous,
+        authorIsAiAgent: !displayAsAnonymous && comment.userId === aiAgentUserId,
         authorId: comment.userId,
         authorUsername: displayAsAnonymous ? anonymousCommentIdentity.authorUsername : comment.user.username,
         authorAvatarPath: displayAsAnonymous ? anonymousCommentIdentity.authorAvatarPath : comment.user.avatarPath,
