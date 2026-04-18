@@ -1,4 +1,5 @@
-import { countUserPublicPostsByUsername, findUserAccountSettingsById, findUserPostsByUsername, findUserProfileByUsername, findUserRepliesByUsername } from "@/db/user-queries"
+import { resolvePagination } from "@/db/helpers"
+import { countUserPublicPostsByUsername, countVisibleUserRepliesByUsername, findUserAccountSettingsById, findUserPostsByUsername, findUserProfileByUsername, findUserRepliesByUsername } from "@/db/user-queries"
 import { getCurrentSessionActor } from "@/lib/auth"
 import { getLevelBadgeData } from "@/lib/level-badge"
 import { getAnonymousMaskDisplayIdentity } from "@/lib/post-anonymous"
@@ -13,6 +14,9 @@ export type PublicUserRole = "USER" | "MODERATOR" | "ADMIN"
 
 export { getUserDisplayName }
 export type { UserDisplayNameSource } from "@/lib/user-display"
+
+const USER_PROFILE_POSTS_PAGE_SIZE = 10
+const USER_PROFILE_REPLIES_PAGE_SIZE = 6
 
 export interface SiteUserProfile {
   id: number
@@ -123,39 +127,109 @@ export async function getCurrentUserProfile(): Promise<SiteUserProfile | null> {
   return getUserProfile(actor.username)
 }
 
-export async function getUserPosts(username: string) {
+export async function getUserPostsPage(username: string, input: { page?: unknown } = {}) {
   try {
+    const total = await countUserPublicPostsByUsername(username)
+    const pagination = resolvePagination(
+      { page: input.page, pageSize: USER_PROFILE_POSTS_PAGE_SIZE },
+      total,
+      [USER_PROFILE_POSTS_PAGE_SIZE],
+      USER_PROFILE_POSTS_PAGE_SIZE,
+    )
     const [posts, anonymousMaskIdentity] = await Promise.all([
-      findUserPostsByUsername(username),
+      findUserPostsByUsername(username, {
+        skip: pagination.skip,
+        take: pagination.pageSize,
+      }),
       getAnonymousMaskDisplayIdentity(),
     ])
 
-    return posts.map((post) => mapListPost(post, anonymousMaskIdentity))
+    return {
+      items: posts.map((post) => mapListPost(post, anonymousMaskIdentity)),
+      pagination: {
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+        total: pagination.total,
+        totalPages: pagination.totalPages,
+        hasPrevPage: pagination.hasPrevPage,
+        hasNextPage: pagination.hasNextPage,
+      },
+    }
   } catch (error) {
     console.error(error)
-    return []
+    return {
+      items: [],
+      pagination: {
+        page: 1,
+        pageSize: USER_PROFILE_POSTS_PAGE_SIZE,
+        total: 0,
+        totalPages: 1,
+        hasPrevPage: false,
+        hasNextPage: false,
+      },
+    }
   }
 }
 
-export async function getUserRecentReplies(username: string, limit = 20) {
-  try {
-    const replies = await findUserRepliesByUsername(username, limit)
+export async function getUserPosts(username: string) {
+  const page = await getUserPostsPage(username, { page: 1 })
+  return page.items
+}
 
-    return replies.map((reply) => ({
-      id: reply.id,
-      content: reply.content,
-      createdAt: reply.createdAt.toISOString(),
-      postId: reply.post.id,
-      postTitle: reply.post.title,
-      postSlug: reply.post.slug,
-      boardName: reply.post.board.name,
-      likeCount: reply.likeCount,
-      replyToUsername: reply.replyToUser?.username ?? null,
-    }))
+export async function getUserRecentRepliesPage(username: string, input: { page?: unknown } = {}) {
+  try {
+    const total = await countVisibleUserRepliesByUsername(username)
+    const pagination = resolvePagination(
+      { page: input.page, pageSize: USER_PROFILE_REPLIES_PAGE_SIZE },
+      total,
+      [USER_PROFILE_REPLIES_PAGE_SIZE],
+      USER_PROFILE_REPLIES_PAGE_SIZE,
+    )
+    const replies = await findUserRepliesByUsername(username, {
+      skip: pagination.skip,
+      take: pagination.pageSize,
+    })
+
+    return {
+      items: replies.map((reply) => ({
+        id: reply.id,
+        content: reply.content,
+        createdAt: reply.createdAt.toISOString(),
+        postId: reply.post.id,
+        postTitle: reply.post.title,
+        postSlug: reply.post.slug,
+        boardName: reply.post.board.name,
+        likeCount: reply.likeCount,
+        replyToUsername: reply.replyToUser?.username ?? null,
+      })),
+      pagination: {
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+        total: pagination.total,
+        totalPages: pagination.totalPages,
+        hasPrevPage: pagination.hasPrevPage,
+        hasNextPage: pagination.hasNextPage,
+      },
+    }
   } catch (error) {
     console.error(error)
-    return []
+    return {
+      items: [],
+      pagination: {
+        page: 1,
+        pageSize: USER_PROFILE_REPLIES_PAGE_SIZE,
+        total: 0,
+        totalPages: 1,
+        hasPrevPage: false,
+        hasNextPage: false,
+      },
+    }
   }
+}
+
+export async function getUserRecentReplies(username: string, limit = USER_PROFILE_REPLIES_PAGE_SIZE) {
+  const page = await getUserRecentRepliesPage(username, { page: 1 })
+  return page.items.slice(0, limit)
 }
 
 export async function getUserAccountSettings(userId: number) {

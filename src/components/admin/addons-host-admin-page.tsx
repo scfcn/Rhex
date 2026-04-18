@@ -7,10 +7,15 @@ import { AddonManagementActionButtons } from "@/components/admin/addon-managemen
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Modal } from "@/components/ui/modal"
 import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { toast } from "@/components/ui/toast"
-import type { AddonAdminItem, AddonsAdminData } from "@/addons-host/admin-types"
+import type {
+  AddonAdminItem,
+  AddonInstallPreviewData,
+  AddonsAdminData,
+} from "@/addons-host/admin-types"
 
 interface AddonsHostAdminPageProps {
   initialData: AddonsAdminData
@@ -82,13 +87,68 @@ function getAddonIssueText(addon: AddonAdminItem) {
   return "无"
 }
 
+function getPermissionDescription(permission: string) {
+  const descriptions: Record<string, string> = {
+    "config:read": "读取插件配置",
+    "config:write": "修改插件配置",
+    "secret:read": "读取插件敏感信息",
+    "secret:write": "修改插件敏感信息",
+    "database:sql": "执行数据库原生 SQL",
+    "database:orm": "复用宿主 Prisma ORM 访问现有模型",
+    "data:read": "读取插件数据仓库",
+    "data:write": "写入插件数据仓库",
+    "data:delete": "删除插件数据仓库内容",
+    "data:migrate": "执行插件数据迁移",
+    "background-job:register": "注册后台任务",
+    "background-job:enqueue": "添加后台任务",
+    "background-job:delete": "删除后台任务",
+    "slot:register": "注册页面插槽扩展",
+    "surface:register": "接管宿主 surface 渲染",
+    "page:public": "注册前台页面",
+    "page:admin": "注册后台页面",
+    "api:public": "注册前台 API",
+    "api:admin": "注册后台 API",
+    "provider:register": "注册 provider 能力",
+    "hook:register": "注册生命周期 hook",
+    "post:create": "以指定账号创建帖子",
+    "post:query": "读取宿主帖子数据",
+    "post:like": "以指定账号确保帖子已点赞",
+    "comment:create": "以指定账号创建评论",
+    "comment:query": "读取宿主评论数据",
+    "comment:like": "以指定账号确保评论已点赞",
+    "message:send": "以指定账号发送站内私信",
+    "notification:create": "创建系统通知",
+    "follow:user": "以指定账号确保已关注用户",
+    "points:adjust": "调整用户积分余额",
+    "post:tip": "以指定账号执行帖子打赏",
+    "network:external": "访问外部网络资源",
+    "auth:integrate": "接入认证能力",
+    "captcha:integrate": "接入验证码能力",
+    "payment:integrate": "接入支付能力",
+  }
+
+  return descriptions[permission] ?? "插件声明的自定义或未归档权限"
+}
+
+function PreviewMeta({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-border bg-muted/30 px-4 py-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-2 text-sm font-medium">{value}</p>
+    </div>
+  )
+}
+
 export function AddonsHostAdminPage({ initialData }: AddonsHostAdminPageProps) {
   const [data, setData] = useState(initialData)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [replaceExisting, setReplaceExisting] = useState(false)
   const [enableAfterInstall, setEnableAfterInstall] = useState(true)
+  const [installPreview, setInstallPreview] = useState<AddonInstallPreviewData | null>(null)
+  const [installPreviewOpen, setInstallPreviewOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [pendingOverviewAction, setPendingOverviewAction] = useState<"sync" | "clear-cache" | null>(null)
+  const [pendingInstallPhase, setPendingInstallPhase] = useState<"inspect" | "install" | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   function runOverviewAction(action: "sync" | "clear-cache") {
@@ -117,6 +177,59 @@ export function AddonsHostAdminPage({ initialData }: AddonsHostAdminPageProps) {
     })
   }
 
+  function resetInstallSelection() {
+    setSelectedFile(null)
+    setReplaceExisting(false)
+    setEnableAfterInstall(true)
+    setInstallPreview(null)
+    setInstallPreviewOpen(false)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
+  function inspectAddonBeforeInstall() {
+    if (!selectedFile) {
+      toast.warning("请先选择一个 zip 插件包", "缺少文件")
+      return
+    }
+
+    startTransition(() => {
+      void (async () => {
+        try {
+          const formData = new FormData()
+          formData.set("file", selectedFile)
+          formData.set("intent", "inspect")
+          formData.set("replaceExisting", String(replaceExisting))
+          formData.set("enableAfterInstall", String(enableAfterInstall))
+          setPendingInstallPhase("inspect")
+
+          const response = await fetch("/api/admin/addons/install", {
+            method: "POST",
+            body: formData,
+          })
+
+          const result = await response.json() as {
+            code?: number
+            message?: string
+            data?: AddonInstallPreviewData
+          }
+
+          if (!response.ok || result.code !== 0 || !result.data) {
+            throw new Error(result.message ?? "插件预检失败")
+          }
+
+          setInstallPreview(result.data)
+          setInstallPreviewOpen(true)
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : "插件预检失败", "预检失败")
+        } finally {
+          setPendingInstallPhase(null)
+        }
+      })()
+    })
+  }
+
   function installAddon() {
     if (!selectedFile) {
       toast.warning("请先选择一个 zip 插件包", "缺少文件")
@@ -130,6 +243,7 @@ export function AddonsHostAdminPage({ initialData }: AddonsHostAdminPageProps) {
           formData.set("file", selectedFile)
           formData.set("replaceExisting", String(replaceExisting))
           formData.set("enableAfterInstall", String(enableAfterInstall))
+          setPendingInstallPhase("install")
 
           const response = await fetch("/api/admin/addons/install", {
             method: "POST",
@@ -147,15 +261,13 @@ export function AddonsHostAdminPage({ initialData }: AddonsHostAdminPageProps) {
           }
 
           setData(result.data)
-          setSelectedFile(null)
-          setReplaceExisting(false)
-          setEnableAfterInstall(true)
-          if (fileInputRef.current) {
-            fileInputRef.current.value = ""
-          }
-          toast.success(result.message ?? "插件已安装", "安装成功")
+          resetInstallSelection()
+          const successTitle = result.message?.includes("升级") ? "升级成功" : "安装成功"
+          toast.success(result.message ?? "插件已安装", successTitle)
         } catch (error) {
           toast.error(error instanceof Error ? error.message : "插件安装失败", "安装失败")
+        } finally {
+          setPendingInstallPhase(null)
         }
       })()
     })
@@ -177,7 +289,11 @@ export function AddonsHostAdminPage({ initialData }: AddonsHostAdminPageProps) {
                   type="file"
                   accept=".zip,application/zip"
                   className="block w-full rounded-xl border border-border bg-background px-4 py-3 text-sm"
-                  onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
+                  onChange={(event) => {
+                    setSelectedFile(event.target.files?.[0] ?? null)
+                    setInstallPreview(null)
+                    setInstallPreviewOpen(false)
+                  }}
                 />
                 <p className="text-xs text-muted-foreground">
                   支持 zip 根目录直接包含 `addon.json`，也支持单层插件目录包裹。
@@ -187,8 +303,8 @@ export function AddonsHostAdminPage({ initialData }: AddonsHostAdminPageProps) {
               <div className="space-y-4 rounded-2xl border border-border bg-muted/30 p-4">
                 <label className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm font-medium">覆盖已有插件</p>
-                    <p className="text-xs text-muted-foreground">如果插件目录已存在，则将旧目录移动到 `.trash` 后再安装新包。</p>
+                    <p className="text-sm font-medium">覆盖安装 / 升级</p>
+                    <p className="text-xs text-muted-foreground">如果插件目录已存在，会先在 staging 校验并执行升级 hook，成功后再把旧目录移动到 `.trash`。</p>
                   </div>
                   <Switch checked={replaceExisting} onCheckedChange={setReplaceExisting} />
                 </label>
@@ -204,8 +320,8 @@ export function AddonsHostAdminPage({ initialData }: AddonsHostAdminPageProps) {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Button onClick={installAddon} disabled={isPending || !selectedFile}>
-                {isPending ? "安装中..." : "上传并安装"}
+              <Button onClick={inspectAddonBeforeInstall} disabled={isPending || !selectedFile}>
+                {pendingInstallPhase === "inspect" ? "检查中..." : "上传并安装"}
               </Button>
               {selectedFile ? (
                 <span className="inline-flex items-center rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">
@@ -319,6 +435,93 @@ export function AddonsHostAdminPage({ initialData }: AddonsHostAdminPageProps) {
           </Table>
         </CardContent>
       </Card>
+
+      <Modal
+        open={installPreviewOpen}
+        onClose={() => {
+          setInstallPreviewOpen(false)
+        }}
+        closeDisabled={pendingInstallPhase === "install"}
+        title="安装权限确认"
+        description={installPreview
+          ? `即将${installPreview.installAction === "upgrade" ? "升级" : "安装"}插件“${installPreview.name}”。请先确认它声明的权限。`
+          : "请确认插件权限后再继续安装。"}
+        footer={(
+          <>
+            <Button
+              variant="outline"
+              onClick={() => setInstallPreviewOpen(false)}
+              disabled={pendingInstallPhase === "install"}
+            >
+              取消
+            </Button>
+            <Button
+              onClick={installAddon}
+              disabled={!installPreview || pendingInstallPhase === "install"}
+            >
+              {pendingInstallPhase === "install" ? "安装中..." : "确认并继续"}
+            </Button>
+          </>
+        )}
+      >
+        {installPreview ? (
+          <div className="space-y-5">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <PreviewMeta label="插件标识" value={installPreview.addonId} />
+              <PreviewMeta label="版本" value={installPreview.version} />
+              <PreviewMeta label="动作" value={installPreview.installAction === "upgrade" ? "升级" : "安装"} />
+              <PreviewMeta label="安装后状态" value={installPreview.enableAfterInstall ? "立即启用" : "仅安装"} />
+              {installPreview.existingVersion ? (
+                <PreviewMeta label="当前已装版本" value={installPreview.existingVersion} />
+              ) : null}
+            </div>
+
+            {installPreview.description ? (
+              <div className="rounded-2xl border border-border bg-muted/30 px-4 py-3">
+                <p className="text-xs text-muted-foreground">插件说明</p>
+                <p className="mt-2 text-sm leading-6">{installPreview.description}</p>
+              </div>
+            ) : null}
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium">声明权限</p>
+                <Badge variant="outline">
+                  {installPreview.permissions.length > 0 ? `${installPreview.permissions.length} 项` : "未声明"}
+                </Badge>
+              </div>
+
+              {installPreview.permissions.length > 0 ? (
+                <div className="space-y-2">
+                  {installPreview.permissions.map((permission) => (
+                    <div
+                      key={permission.key}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-background px-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-mono text-sm">{permission.key}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {getPermissionDescription(permission.key)}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={permission.risk === "sensitive" ? "destructive" : "outline"}
+                        className="shrink-0"
+                      >
+                        {permission.risk === "sensitive" ? "高风险" : "常规"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
+                  该插件未在 `addon.json` 中声明任何权限。
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   )
 }

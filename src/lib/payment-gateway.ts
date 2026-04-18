@@ -27,6 +27,7 @@ import {
   listPaymentGatewayChannelDefinitions,
   listPaymentGatewayProviderAdminEntries,
 } from "@/lib/payment-gateway-registry"
+import { toPrismaJsonValue } from "@/lib/shared/prisma-json"
 import { executeAddonActionHook } from "@/addons-host/runtime/hooks"
 import { POINT_LOG_EVENT_TYPES } from "@/lib/point-log-events"
 import { applyPointDelta } from "@/lib/point-center"
@@ -227,11 +228,7 @@ function createMerchantOrderNo() {
 }
 
 function toJsonValue(value: unknown): Prisma.InputJsonValue | undefined {
-  if (typeof value === "undefined") {
-    return undefined
-  }
-
-  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue
+  return toPrismaJsonValue(value)
 }
 
 function mapTradeStatusToOrderStatus(currentStatus: PaymentOrderStatus, tradeStatus: string) {

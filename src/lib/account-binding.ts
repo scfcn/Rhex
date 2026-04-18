@@ -1,7 +1,6 @@
-import { getExternalAuthProviderLabel } from "@/lib/auth-provider-config"
+import { getExternalAuthProviderLabel, isExternalAuthProviderEnabled } from "@/lib/auth-provider-config"
 import { listAddonExternalAuthEntries } from "@/lib/addon-external-auth-providers"
 import { listExternalAuthAccountsByUserId, listPasskeyCredentialsByUserId } from "@/lib/external-auth-store"
-import type { ExternalAuthProvider } from "@/lib/external-auth-types"
 import type { SiteSettingsData } from "@/lib/site-settings"
 
 interface ExternalAuthMetadata {
@@ -28,13 +27,6 @@ function parseExternalAuthMetadata(metadataJson?: string | null): ExternalAuthMe
   }
 }
 
-function getEnabledBuiltinProviderFlag(
-  settings: Pick<SiteSettingsData, "authGithubEnabled" | "authGoogleEnabled">,
-  provider: ExternalAuthProvider,
-) {
-  return provider === "github" ? settings.authGithubEnabled : settings.authGoogleEnabled
-}
-
 export async function getUserAccountBindingView(
   userId: number,
   settings: Pick<SiteSettingsData, "authGithubEnabled" | "authGoogleEnabled" | "authPasskeyEnabled">,
@@ -45,49 +37,44 @@ export async function getUserAccountBindingView(
   ])
   const addonEntries = await listAddonExternalAuthEntries()
 
-  const builtinProviders = (["github", "google"] as const).map((provider) => {
-    const account = accounts.find((item) => item.provider === provider) ?? null
-    const metadata = parseExternalAuthMetadata(account?.metadataJson)
+  const builtinProviders = (["github", "google"] as const)
+    .filter((provider) => isExternalAuthProviderEnabled(settings, provider))
+    .map((provider) => {
+      const account = accounts.find((item) => item.provider === provider) ?? null
+      const metadata = parseExternalAuthMetadata(account?.metadataJson)
 
-    return {
-      provider,
-      label: getExternalAuthProviderLabel(provider),
-      enabled: getEnabledBuiltinProviderFlag(settings, provider),
-      accountId: account?.id ?? null,
-      connected: Boolean(account),
-      connectMode: "url" as const,
-      loginUrl: null,
-      registerUrl: null,
-      connectUrl: `/api/auth/oauth/${provider}/start?mode=connect`,
-      providerUsername: account?.providerUsername ?? null,
-      providerEmail: account?.providerEmail ?? null,
-      providerLabel: metadata.providerLabel ?? null,
-      displayName: metadata.displayName ?? null,
-      avatarUrl: metadata.avatarUrl ?? null,
-      connectedAt: account?.createdAt.toISOString() ?? null,
-    }
-  })
+      return {
+        provider,
+        label: getExternalAuthProviderLabel(provider),
+        accountId: account?.id ?? null,
+        connected: Boolean(account),
+        connectMode: "url" as const,
+        loginUrl: null,
+        registerUrl: null,
+        connectUrl: `/api/auth/oauth/${provider}/start?mode=connect`,
+        providerUsername: account?.providerUsername ?? null,
+        providerEmail: account?.providerEmail ?? null,
+        providerLabel: metadata.providerLabel ?? null,
+        displayName: metadata.displayName ?? null,
+        avatarUrl: metadata.avatarUrl ?? null,
+        connectedAt: account?.createdAt.toISOString() ?? null,
+      }
+    })
 
   const addonEntryMap = new Map(addonEntries.map((entry) => [entry.provider, entry]))
-  const addonProviders = Array.from(new Set([
-    ...addonEntries.map((entry) => entry.provider),
-    ...accounts
-      .filter((item) => item.provider !== "github" && item.provider !== "google")
-      .map((item) => item.provider),
-  ]))
+  const addonProviders = Array.from(new Set(addonEntries.map((entry) => entry.provider)))
     .map((provider) => {
       const account = accounts.find((item) => item.provider === provider) ?? null
       const entry = addonEntryMap.get(provider) ?? null
       const metadata = parseExternalAuthMetadata(account?.metadataJson)
 
-      if (!account && !entry) {
+      if (!entry) {
         return null
       }
 
       return {
         provider,
         label: entry?.label || metadata.providerLabel?.trim() || getExternalAuthProviderLabel(provider),
-        enabled: true,
         accountId: account?.id ?? null,
         connected: Boolean(account),
         connectMode: entry?.connectUrl ? "url" as const : "connected-only" as const,
@@ -105,7 +92,6 @@ export async function getUserAccountBindingView(
     .filter((item): item is {
       provider: string
       label: string
-      enabled: true
       accountId: string | null
       connected: boolean
       connectMode: "url" | "connected-only"

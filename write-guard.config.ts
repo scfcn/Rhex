@@ -158,6 +158,16 @@ const writeGuardConfig = {
       parts: ["userId", "recipientId", "body"],
     },
   },
+  "messages-upload": {
+    description: "私信图片/文件上传按内容哈希去重，避免重复写盘和重复入库。",
+    scope: "messages-upload",
+    cooldownMs: 0,
+    releaseOnError: true,
+    dedupe: {
+      windowMs: 10_000,
+      parts: ["userId", "kind", "fileHash"],
+    },
+  },
   "payments-checkout": {
     description: "统一支付下单防重，避免连点导致重复创建第三方支付单。",
     scope: "payments-checkout",

@@ -10,7 +10,10 @@ import { enqueueBackgroundJob } from "@/lib/background-jobs"
 import { createSystemNotification } from "@/lib/notification-writes"
 import { prepareScopedPointDelta, applyPointDelta } from "@/lib/point-center"
 import { POINT_LOG_EVENT_TYPES } from "@/lib/point-log-events"
+import { sleep } from "@/lib/shared/async"
+import { parseBoundedInteger } from "@/lib/shared/number-parsers"
 
+export const POST_AUCTION_RECOVERY_BACKGROUND_JOB_NAME = "post-auction.recovery"
 export const POST_AUCTION_SETTLE_BACKGROUND_JOB_NAME = "post-auction.settle"
 const POST_AUCTION_TRANSACTION_MAX_RETRIES = 3
 const POST_AUCTION_TRANSACTION_RETRY_BASE_DELAY_MS = 25
@@ -54,69 +57,19 @@ function isRetryablePostAuctionTransactionError(error: unknown) {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034"
 }
 
-function sleep(ms: number) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms)
-  })
-}
-
-export function sleepWithAbort(ms: number, signal?: AbortSignal) {
-  if (!signal) {
-    return sleep(ms)
-  }
-
-  const activeSignal = signal
-
-  if (activeSignal.aborted) {
-    return Promise.resolve()
-  }
-
-  return new Promise<void>((resolve) => {
-    const timeoutId = setTimeout(() => {
-      activeSignal.removeEventListener("abort", handleAbort)
-      resolve()
-    }, ms)
-
-    function handleAbort() {
-      clearTimeout(timeoutId)
-      activeSignal.removeEventListener("abort", handleAbort)
-      resolve()
-    }
-
-    activeSignal.addEventListener("abort", handleAbort, { once: true })
-  })
-}
-
-function parsePositiveInteger(
-  value: string | undefined,
-  fallback: number,
-  min: number,
-  max: number,
-) {
-  const parsed = Number.parseInt(String(value ?? ""), 10)
-
-  if (!Number.isFinite(parsed)) {
-    return fallback
-  }
-
-  return Math.min(max, Math.max(min, parsed))
-}
-
 export function resolvePostAuctionSettlementRecoveryIntervalMs() {
-  return parsePositiveInteger(
+  return parseBoundedInteger(
     process.env.POST_AUCTION_SETTLEMENT_RECOVERY_INTERVAL_MS,
     DEFAULT_POST_AUCTION_SETTLEMENT_RECOVERY_INTERVAL_MS,
-    5_000,
-    60 * 60 * 1_000,
+    { min: 5_000, max: 60 * 60 * 1_000 },
   )
 }
 
 export function resolvePostAuctionSettlementRecoveryBatchSize() {
-  return parsePositiveInteger(
+  return parseBoundedInteger(
     process.env.POST_AUCTION_SETTLEMENT_RECOVERY_BATCH_SIZE,
     DEFAULT_POST_AUCTION_SETTLEMENT_RECOVERY_BATCH_SIZE,
-    1,
-    MAX_POST_AUCTION_SETTLEMENT_RECOVERY_BATCH_SIZE,
+    { min: 1, max: MAX_POST_AUCTION_SETTLEMENT_RECOVERY_BATCH_SIZE },
   )
 }
 

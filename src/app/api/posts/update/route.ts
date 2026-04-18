@@ -1,5 +1,5 @@
 import { apiSuccess, createUserRouteHandler, readJsonBody } from "@/lib/api-route"
-import { enqueueAiReplyForPostMention } from "@/lib/ai-reply"
+import { triggerAiMention } from "@/lib/ai/mention-trigger"
 import { logRouteWriteSuccess } from "@/lib/route-metadata"
 import { updatePostFlow } from "@/lib/post-update-service"
 
@@ -31,7 +31,8 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     },
   })
 
-  void enqueueAiReplyForPostMention({
+  void triggerAiMention({
+    kind: "post",
     postId: result.post.id,
     triggerUserId: currentUser.id,
     mentionedUserIds: result.mentionUserIds,

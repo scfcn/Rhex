@@ -1,5 +1,6 @@
 import { apiError, apiSuccess, createAdminRouteHandler } from "@/lib/api-route"
-import { installAddonFromZip } from "@/addons-host/installer"
+import type { AddonInstallPreviewData, AddonsAdminData } from "@/addons-host/admin-types"
+import { inspectAddonZip, installAddonFromZip } from "@/addons-host/installer"
 import { getAddonsAdminData } from "@/addons-host/management"
 
 export const dynamic = "force-dynamic"
@@ -20,9 +21,12 @@ function parseBooleanField(value: FormDataEntryValue | null, fallback: boolean) 
   return fallback
 }
 
-export const POST = createAdminRouteHandler(async ({ request }) => {
+export const POST = createAdminRouteHandler<AddonsAdminData | AddonInstallPreviewData>(async ({ request }) => {
   const formData = await request.formData()
   const file = formData.get("file")
+  const intent = typeof formData.get("intent") === "string"
+    ? String(formData.get("intent")).trim().toLowerCase()
+    : "install"
 
   if (!(file instanceof File)) {
     apiError(400, "请上传插件 zip 文件")
@@ -32,17 +36,29 @@ export const POST = createAdminRouteHandler(async ({ request }) => {
     apiError(400, "只支持上传 .zip 插件包")
   }
 
+  const zipBuffer = Buffer.from(await file.arrayBuffer())
+  const replaceExisting = parseBooleanField(formData.get("replaceExisting"), false)
+  const enableAfterInstall = parseBooleanField(formData.get("enableAfterInstall"), true)
+
+  if (intent === "inspect") {
+    return apiSuccess(await inspectAddonZip({
+      zipBuffer,
+      replaceExisting,
+      enableAfterInstall,
+    }))
+  }
+
   const installed = await installAddonFromZip({
-    zipBuffer: Buffer.from(await file.arrayBuffer()),
+    zipBuffer,
     originalName: file.name,
-    replaceExisting: parseBooleanField(formData.get("replaceExisting"), false),
-    enableAfterInstall: parseBooleanField(formData.get("enableAfterInstall"), true),
+    replaceExisting,
+    enableAfterInstall,
   })
 
   return apiSuccess(
     await getAddonsAdminData(),
-    installed.replacedExisting
-      ? `已覆盖安装插件 ${installed.name}`
+    installed.action === "upgraded"
+      ? `已升级插件 ${installed.name}`
       : `已安装插件 ${installed.name}`,
   )
 }, {

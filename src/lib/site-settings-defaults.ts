@@ -180,6 +180,10 @@ export const defaultSiteSettingsCreateInput = {
         allowedExtensions: ["zip", "rar", "7z", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt"],
         maxFileSizeMb: 20,
       },
+      messageMedia: {
+        imageUploadEnabled: false,
+        fileUploadEnabled: false,
+      },
     },
   }),
   sensitiveStateJson: "{}",

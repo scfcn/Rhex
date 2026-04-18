@@ -1,7 +1,7 @@
 import { updateSiteSettingsRecord } from "@/db/site-settings-write-queries"
 import { apiError, readOptionalStringField, type JsonObject } from "@/lib/api-route"
 import { finalizeSiteSettingsUpdate, type SiteSettingsRecord } from "@/lib/admin-site-settings-shared"
-import { mergeAttachmentFeatureSettings, mergeImageWatermarkSettings, mergeMarkdownImageUploadSettings, mergeUploadObjectStorageSettings, resolveAttachmentFeatureSettings, resolveImageWatermarkSettings, resolveMarkdownImageUploadSettings, resolveUploadObjectStorageSettings, type ImageWatermarkPosition } from "@/lib/site-settings-app-state"
+import { mergeAttachmentFeatureSettings, mergeImageWatermarkSettings, mergeMarkdownImageUploadSettings, mergeMessageMediaSettings, mergeUploadObjectStorageSettings, resolveAttachmentFeatureSettings, resolveImageWatermarkSettings, resolveMarkdownImageUploadSettings, resolveMessageMediaSettings, resolveUploadObjectStorageSettings, type ImageWatermarkPosition } from "@/lib/site-settings-app-state"
 import { normalizeNonNegativeInteger, normalizePositiveInteger } from "@/lib/shared/normalizers"
 import { mergeUploadStorageSensitiveConfig, resolveUploadStorageSensitiveConfig } from "@/lib/site-settings-sensitive-state"
 import { normalizeUploadLocalPath } from "@/lib/upload-path"
@@ -56,6 +56,11 @@ export async function updateUploadSiteSettingsSection(existing: SiteSettingsReco
     allowedExtensionsFallback: ["zip", "rar", "7z", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt"],
     maxFileSizeMbFallback: 20,
   })
+  const existingMessageMediaSettings = resolveMessageMediaSettings({
+    appStateJson: existing.appStateJson,
+    imageUploadEnabledFallback: false,
+    fileUploadEnabledFallback: false,
+  })
   const existingUploadObjectStorageSettings = resolveUploadObjectStorageSettings({
     appStateJson: existing.appStateJson,
     forcePathStyleFallback: true,
@@ -90,6 +95,12 @@ export async function updateUploadSiteSettingsSection(existing: SiteSettingsReco
   const attachmentMinUploadVipLevel = normalizeNonNegativeInteger(body.attachmentMinUploadVipLevel, existingAttachmentFeatureSettings.minUploadVipLevel)
   const attachmentAllowedExtensions = Array.from(new Set(readOptionalStringField(body, "attachmentAllowedExtensions").split(/[，,\s]+/).map((item) => item.trim().toLowerCase().replace(/^\./, "")).filter(Boolean)))
   const attachmentMaxFileSizeMb = normalizePositiveInteger(body.attachmentMaxFileSizeMb, existingAttachmentFeatureSettings.maxFileSizeMb)
+  const messageImageUploadEnabled = body.messageImageUploadEnabled === undefined
+    ? existingMessageMediaSettings.imageUploadEnabled
+    : Boolean(body.messageImageUploadEnabled)
+  const messageFileUploadEnabled = body.messageFileUploadEnabled === undefined
+    ? existingMessageMediaSettings.fileUploadEnabled
+    : Boolean(body.messageFileUploadEnabled)
   const uploadS3ForcePathStyle = body.uploadS3ForcePathStyle === undefined
     ? existingUploadObjectStorageSettings.forcePathStyle
     : Boolean(body.uploadS3ForcePathStyle)
@@ -134,7 +145,11 @@ export async function updateUploadSiteSettingsSection(existing: SiteSettingsReco
     allowedExtensions: attachmentAllowedExtensions,
     maxFileSizeMb: attachmentMaxFileSizeMb,
   })
-  const appStateJson = mergeUploadObjectStorageSettings(appStateWithAttachmentFeature, {
+  const appStateWithMessageMedia = mergeMessageMediaSettings(appStateWithAttachmentFeature, {
+    imageUploadEnabled: messageImageUploadEnabled,
+    fileUploadEnabled: messageFileUploadEnabled,
+  })
+  const appStateJson = mergeUploadObjectStorageSettings(appStateWithMessageMedia, {
     forcePathStyle: uploadS3ForcePathStyle,
   })
   const currentSensitiveStateJson = ("sensitiveStateJson" in existing ? existing.sensitiveStateJson : null) ?? null

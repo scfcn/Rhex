@@ -565,6 +565,63 @@ export async function cleanupAddonDataCollection(
   }
 }
 
+export async function clearAddonDataCollection(
+  addonId: string,
+  collectionName?: string,
+) {
+  if (!collectionName) {
+    const meta = await readAddonDataMeta(addonId)
+    const collectionNames = Object.keys(meta.collections)
+    let clearedRecords = 0
+
+    for (const name of collectionNames) {
+      const collection = await readCollectionFile(addonId, name)
+      clearedRecords += Object.keys(collection.records).length
+    }
+
+    await deleteAddonDataStore(addonId)
+
+    return {
+      clearedCollections: collectionNames.length,
+      clearedRecords,
+    }
+  }
+
+  const normalizedCollectionName = normalizeCollectionName(collectionName)
+
+  return runAddonDataMutation(async () => {
+    const [meta, collection] = await Promise.all([
+      readAddonDataMeta(addonId),
+      readCollectionFile(addonId, normalizedCollectionName),
+    ])
+
+    const definition = meta.collections[normalizedCollectionName]
+      ? normalizeCollectionDefinition(meta.collections[normalizedCollectionName]!)
+      : normalizeCollectionDefinition(collection.definition)
+    const clearedRecords = Object.keys(collection.records).length
+
+    await Promise.all([
+      writeAddonDataMeta(addonId, {
+        ...meta,
+        collections: {
+          ...meta.collections,
+          [normalizedCollectionName]: definition,
+        },
+      }),
+      writeCollectionFile(addonId, normalizedCollectionName, {
+        definition,
+        records: {},
+        indexes: rebuildCollectionIndexes(definition, {}),
+      }),
+    ])
+
+    return {
+      clearedCollections: 1,
+      clearedRecords,
+    }
+  })
+}
+
 export async function getAddonDataSchemaVersion(addonId: string) {
   const meta = await readAddonDataMeta(addonId)
   return meta.schemaVersion

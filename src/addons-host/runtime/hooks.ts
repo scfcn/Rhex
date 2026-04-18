@@ -2,13 +2,26 @@ import "server-only"
 
 import { buildAddonExecutionContext, loadAddonsRegistry } from "@/addons-host/runtime/loader"
 import { runWithAddonExecutionScope } from "@/addons-host/runtime/execution-scope"
-import { createAddonLifecycleLog } from "@/db/addon-registry-queries"
+import { runHookPipeline } from "@/addons-host/runtime/internal/hook-pipeline"
 import type {
   AddonActionHookName,
   AddonAsyncWaterfallHookName,
   AddonWaterfallHookName,
   LoadedAddonRuntime,
 } from "@/addons-host/types"
+
+/**
+ * hooks.ts — addons Hook 三类执行入口（action / waterfall / asyncWaterfall）。
+ *
+ * 重构（Phase C）：for-try-catch-log-continue 的重复骨架已下沉至 internal/hook-pipeline.ts
+ * 的泛型 runHookPipeline<T>；本文件只负责：
+ *   1. 从 registry 拉取当前 hook 的候选 registrations
+ *   2. 把候选包装成带 buildAddonExecutionContext + runWithAddonExecutionScope 的 run 闭包
+ *   3. 在 pipeline.onSuccess 里做调用方专属的"结果收集 / 串值"语义
+ *
+ * 对外签名（executeAddonActionHook / executeAddonWaterfallHook / executeAddonAsyncWaterfallHook）
+ * 与返回结构（ExecutedAddonActionHookResult / ExecutedAddonWaterfallHookResult）保持不变。
+ */
 
 interface AddonHookExecutionInput {
   request?: Request
@@ -46,29 +59,6 @@ export interface ExecutedAddonWaterfallHookResult<TValue> {
   hook: AddonWaterfallHookName | AddonAsyncWaterfallHookName
   order: number
   value: TValue
-}
-
-async function logHookFailure(input: {
-  addon: LoadedAddonRuntime
-  kind: "action" | "waterfall" | "asyncWaterfall"
-  hook: string
-  key: string
-  error: unknown
-}) {
-  await createAddonLifecycleLog({
-    addonId: input.addon.manifest.id,
-    action: `HOOK_${input.kind.toUpperCase()}`,
-    status: "FAILED",
-    message:
-      input.error instanceof Error
-        ? input.error.message
-        : `addon hook "${input.hook}" failed`,
-    metadataJson: {
-      kind: input.kind,
-      hook: input.hook,
-      key: input.key,
-    },
-  })
 }
 
 async function buildActionHookCandidates(
@@ -116,6 +106,9 @@ async function buildWaterfallHookCandidates<TValue>(
   const candidates: WaterfallHookCandidate<TValue>[] = []
   const registry = await loadAddonsRegistry()
 
+  // 注意：这里刻意按 kind 分支，而非合并 source — 原因是
+  // AddonWaterfallHookContext 是以 hook 名字面量为键的泛型；若保持 hook 类型为两者联合，
+  // TypeScript 会把 context 的 hook 字段两侧 literal 做交集并收敛为 never，触发 TS2345。
   if (kind === "waterfall") {
     for (const candidate of registry.waterfallHookCandidatesByHook.get(hook) ?? []) {
       const { addon, registration } = candidate
@@ -183,38 +176,23 @@ export async function executeAddonActionHook<TPayload = unknown>(
   const candidates = await buildActionHookCandidates(hook, input)
   const results: ExecutedAddonActionHookResult[] = []
 
-  for (const candidate of candidates) {
-    try {
-      await candidate.handle(payload)
-    } catch (error) {
-      await logHookFailure({
-        addon: candidate.addon,
-        kind: "action",
+  await runHookPipeline<ActionHookCandidate>({
+    candidates,
+    kind: "action",
+    hook,
+    throwOnError: input?.throwOnError,
+    getAddon: (c) => c.addon,
+    getKey: (c) => c.key,
+    run: (c) => c.handle(payload),
+    onSuccess: (c) => {
+      results.push({
+        addon: c.addon,
+        key: c.key,
         hook,
-        key: candidate.key,
-        error,
+        order: c.order,
       })
-
-      if (input?.throwOnError) {
-        throw error
-      }
-
-      console.error(
-        `[addons-host:hook:action:${hook}] handler failed`,
-        candidate.addon.manifest.id,
-        candidate.key,
-        error,
-      )
-      continue
-    }
-
-    results.push({
-      addon: candidate.addon,
-      key: candidate.key,
-      hook,
-      order: candidate.order,
-    })
-  }
+    },
+  })
 
   return results
 }
@@ -228,42 +206,29 @@ export async function executeAddonWaterfallHook<TValue>(
   const results: ExecutedAddonWaterfallHookResult<TValue>[] = []
   let currentValue = initialValue
 
-  for (const candidate of candidates) {
-    try {
-      const nextValue = await candidate.transform(currentValue)
+  await runHookPipeline<WaterfallHookCandidate<TValue>>({
+    candidates,
+    kind: "waterfall",
+    hook,
+    throwOnError: input?.throwOnError,
+    getAddon: (c) => c.addon,
+    getKey: (c) => c.key,
+    run: async (c) => {
+      const nextValue = await c.transform(currentValue)
       if (typeof nextValue !== "undefined") {
         currentValue = nextValue
       }
-    } catch (error) {
-      await logHookFailure({
-        addon: candidate.addon,
-        kind: "waterfall",
+    },
+    onSuccess: (c) => {
+      results.push({
+        addon: c.addon,
+        key: c.key,
         hook,
-        key: candidate.key,
-        error,
+        order: c.order,
+        value: currentValue,
       })
-
-      if (input?.throwOnError) {
-        throw error
-      }
-
-      console.error(
-        `[addons-host:hook:waterfall:${hook}] transform failed`,
-        candidate.addon.manifest.id,
-        candidate.key,
-        error,
-      )
-      continue
-    }
-
-    results.push({
-      addon: candidate.addon,
-      key: candidate.key,
-      hook,
-      order: candidate.order,
-      value: currentValue,
-    })
-  }
+    },
+  })
 
   return {
     value: currentValue,
@@ -280,42 +245,29 @@ export async function executeAddonAsyncWaterfallHook<TValue>(
   const results: ExecutedAddonWaterfallHookResult<TValue>[] = []
   let currentValue = initialValue
 
-  for (const candidate of candidates) {
-    try {
-      const nextValue = await candidate.transform(currentValue)
+  await runHookPipeline<WaterfallHookCandidate<TValue>>({
+    candidates,
+    kind: "asyncWaterfall",
+    hook,
+    throwOnError: input?.throwOnError,
+    getAddon: (c) => c.addon,
+    getKey: (c) => c.key,
+    run: async (c) => {
+      const nextValue = await c.transform(currentValue)
       if (typeof nextValue !== "undefined") {
         currentValue = nextValue
       }
-    } catch (error) {
-      await logHookFailure({
-        addon: candidate.addon,
-        kind: "asyncWaterfall",
+    },
+    onSuccess: (c) => {
+      results.push({
+        addon: c.addon,
+        key: c.key,
         hook,
-        key: candidate.key,
-        error,
+        order: c.order,
+        value: currentValue,
       })
-
-      if (input?.throwOnError) {
-        throw error
-      }
-
-      console.error(
-        `[addons-host:hook:asyncWaterfall:${hook}] transform failed`,
-        candidate.addon.manifest.id,
-        candidate.key,
-        error,
-      )
-      continue
-    }
-
-    results.push({
-      addon: candidate.addon,
-      key: candidate.key,
-      hook,
-      order: candidate.order,
-      value: currentValue,
-    })
-  }
+    },
+  })
 
   return {
     value: currentValue,

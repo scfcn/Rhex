@@ -67,3 +67,20 @@ export interface AddonAdminDetailData {
   item: AddonAdminItem
   logs: AddonLifecycleLogItem[]
 }
+
+export interface AddonInstallPermissionItem {
+  key: string
+  risk: "normal" | "sensitive"
+}
+
+export interface AddonInstallPreviewData {
+  addonId: string
+  name: string
+  version: string
+  description: string | null
+  permissions: AddonInstallPermissionItem[]
+  installAction: "install" | "upgrade"
+  existingVersion: string | null
+  replaceExisting: boolean
+  enableAfterInstall: boolean
+}

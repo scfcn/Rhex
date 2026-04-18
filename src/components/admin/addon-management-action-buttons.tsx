@@ -74,7 +74,7 @@ export function AddonManagementActionButtons({
           if (action === "remove") {
             const confirmed = await confirm({
               title: "物理卸载插件",
-              description: `确认物理卸载插件“${addon.name}”吗？插件目录会移动到 addons/.trash 中，前台和后台入口都会消失，注册状态和配置也会清除。`,
+              description: `确认物理卸载插件“${addon.name}”吗？如果插件定义了 uninstall hook，会先执行卸载逻辑；成功后目录才会移动到 addons/.trash，注册状态和配置也会清除。`,
               confirmText: "物理卸载",
               cancelText: "取消",
               variant: "danger",

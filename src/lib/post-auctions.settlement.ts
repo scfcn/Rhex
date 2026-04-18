@@ -4,15 +4,21 @@ import {
   PostAuctionStatus,
 } from "@/db/types"
 import { apiError } from "@/lib/api-route"
-import { registerBackgroundJobHandler } from "@/lib/background-jobs"
+import {
+  enqueueBackgroundJob,
+  registerBackgroundJobHandler,
+  type BackgroundJobEnvelope,
+} from "@/lib/background-jobs"
 import { getSiteSettings } from "@/lib/site-settings"
 import { logError, logInfo } from "@/lib/logger"
+import { acquireRedisLease } from "@/lib/redis-lease"
 import {
   buildPostAuctionPendingSettlementWhere,
   enqueuePostAuctionSettlementContinuation,
   getUserDisplayName,
   notifyPostAuctionFailed,
   notifyPostAuctionSettled,
+  POST_AUCTION_RECOVERY_BACKGROUND_JOB_NAME,
   POST_AUCTION_SETTLE_BACKGROUND_JOB_NAME,
   refundAuctionPoints,
   resolvePostAuctionFinalPrice,
@@ -21,8 +27,72 @@ import {
   resolvePostAuctionSettlementRecoveryIntervalMs,
   resolveSellerIncome,
   runSerializablePostAuctionTransaction,
-  sleepWithAbort,
 } from "@/lib/post-auctions.core"
+import { createRedisKey, hasRedisUrl } from "@/lib/redis"
+
+const POST_AUCTION_RECOVERY_LEASE_KEY = createRedisKey("post-auction", "recovery-lease")
+const POST_AUCTION_RECOVERY_LEASE_BUFFER_MS = 5_000
+
+type GlobalPostAuctionRecoveryState = {
+  __bbsPostAuctionRecoveryLeaseExpiresAt?: number
+}
+
+const globalForPostAuctionRecovery = globalThis as typeof globalThis & GlobalPostAuctionRecoveryState
+
+async function tryAcquirePostAuctionRecoveryLease(ttlMs: number) {
+  const effectiveTtlMs = Math.max(1_000, ttlMs)
+
+  if (hasRedisUrl()) {
+    const lease = await acquireRedisLease({
+      key: POST_AUCTION_RECOVERY_LEASE_KEY,
+      ttlMs: effectiveTtlMs,
+    })
+    return Boolean(lease)
+  }
+
+  const now = Date.now()
+  const expiresAt = globalForPostAuctionRecovery.__bbsPostAuctionRecoveryLeaseExpiresAt ?? 0
+  if (expiresAt > now) {
+    return false
+  }
+
+  globalForPostAuctionRecovery.__bbsPostAuctionRecoveryLeaseExpiresAt = now + effectiveTtlMs
+  return true
+}
+
+export async function ensurePostAuctionRecoveryJobScheduled(options?: {
+  delayMs?: number
+  reason?: string
+}) {
+  const delayMs = Math.max(0, options?.delayMs ?? 0)
+  const intervalMs = resolvePostAuctionSettlementRecoveryIntervalMs()
+  const leaseTtlMs = Math.max(
+    delayMs + POST_AUCTION_RECOVERY_LEASE_BUFFER_MS,
+    intervalMs + POST_AUCTION_RECOVERY_LEASE_BUFFER_MS,
+  )
+  const acquired = await tryAcquirePostAuctionRecoveryLease(leaseTtlMs)
+
+  if (!acquired) {
+    return {
+      scheduled: false,
+    }
+  }
+
+  await enqueueBackgroundJob(
+    POST_AUCTION_RECOVERY_BACKGROUND_JOB_NAME,
+    {
+      reason: options?.reason ?? "bootstrap",
+    },
+    {
+      delayMs,
+      maxAttempts: 1,
+    },
+  )
+
+  return {
+    scheduled: true,
+  }
+}
 
 async function initializePostAuctionSettlement(
   auctionId: string,
@@ -596,32 +666,42 @@ export async function runPostAuctionSettlementRecoveryCycle(options?: {
   }
 }
 
-export async function startPostAuctionSettlementRecoveryLoop(options?: {
-  signal?: AbortSignal
-}) {
+async function runPostAuctionRecoveryJob(
+  job: BackgroundJobEnvelope<typeof POST_AUCTION_RECOVERY_BACKGROUND_JOB_NAME>,
+) {
   const intervalMs = resolvePostAuctionSettlementRecoveryIntervalMs()
 
-  while (!options?.signal?.aborted) {
-    try {
-      const cycle = await runPostAuctionSettlementRecoveryCycle(options)
+  try {
+    const cycle = await runPostAuctionSettlementRecoveryCycle()
 
-      if (cycle.scannedCount > 0) {
-        logInfo({
-          scope: "post-auction",
-          action: "recovery-loop",
-          metadata: cycle,
-        })
-      }
-    } catch (error) {
-      logError({
-        scope: "post-auction",
-        action: "recovery-loop",
-      }, error)
-    }
-
-    await sleepWithAbort(intervalMs, options?.signal)
+    logInfo({
+      scope: "post-auction",
+      action: "recovery-loop",
+      metadata: {
+        ...cycle,
+        jobId: job.id,
+      },
+    })
+  } catch (error) {
+    logError({
+      scope: "post-auction",
+      action: "recovery-loop",
+      targetId: job.id,
+    }, error)
+  } finally {
+    await ensurePostAuctionRecoveryJobScheduled({
+      delayMs: intervalMs,
+      reason: "recovery-cycle-complete",
+    })
   }
 }
+
+registerBackgroundJobHandler(
+  POST_AUCTION_RECOVERY_BACKGROUND_JOB_NAME,
+  async (_payload, job) => {
+    await runPostAuctionRecoveryJob(job)
+  },
+)
 
 registerBackgroundJobHandler(
   POST_AUCTION_SETTLE_BACKGROUND_JOB_NAME,

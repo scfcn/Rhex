@@ -1,13 +1,13 @@
 "use client"
 
 import Link from "next/link"
-import type { KeyboardEvent } from "react"
+import type { ChangeEvent, ClipboardEvent, KeyboardEvent } from "react"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, ChevronUp, MessageSquareMore, Send, SmilePlus } from "lucide-react"
+import { ChevronLeft, ChevronUp, ImageIcon, MessageSquareMore, Paperclip, Send, SmilePlus } from "lucide-react"
 
 import { EmojiPicker } from "@/components/emoji-picker"
-import { MarkdownContent } from "@/components/markdown-content"
+import { MessageBubbleContent } from "@/components/message/message-bubble-content"
 import { useMarkdownEmojiMap } from "@/components/site-settings-provider"
 import { Button } from "@/components/ui/rbutton"
 import { UserAvatar } from "@/components/user/user-avatar"
@@ -18,6 +18,8 @@ interface MessageThreadPanelProps {
   conversation: MessageConversationDetail | null
   currentUserId: number
   usingDemoData: boolean
+  messageImageUploadEnabled: boolean
+  messageFileUploadEnabled: boolean
   onMessageSent: (message: MessageBubbleItem) => void
   onLoadHistory: () => void
   loadingHistory: boolean
@@ -25,7 +27,7 @@ interface MessageThreadPanelProps {
   onBack?: () => void
 }
 
-export function MessageThreadPanel({ conversation, currentUserId, usingDemoData, onMessageSent, onLoadHistory, loadingHistory, historyError, onBack }: MessageThreadPanelProps) {
+export function MessageThreadPanel({ conversation, currentUserId, usingDemoData, messageImageUploadEnabled, messageFileUploadEnabled, onMessageSent, onLoadHistory, loadingHistory, historyError, onBack }: MessageThreadPanelProps) {
   const recipient = useMemo(() => resolveRecipient(conversation, currentUserId), [conversation, currentUserId])
 
   const recipientProfileHref = recipient ? `/users/${recipient.username}` : null
@@ -51,6 +53,8 @@ export function MessageThreadPanel({ conversation, currentUserId, usingDemoData,
       recipientProfileHref={recipientProfileHref}
       usingDemoData={usingDemoData}
       currentUserId={currentUserId}
+      messageImageUploadEnabled={messageImageUploadEnabled}
+      messageFileUploadEnabled={messageFileUploadEnabled}
       onMessageSent={onMessageSent}
       onLoadHistory={onLoadHistory}
       loadingHistory={loadingHistory}
@@ -66,6 +70,8 @@ function MessageThreadPanelContent({
   recipientProfileHref,
   currentUserId,
   usingDemoData,
+  messageImageUploadEnabled,
+  messageFileUploadEnabled,
   onMessageSent,
   onLoadHistory,
   loadingHistory,
@@ -77,6 +83,8 @@ function MessageThreadPanelContent({
   recipientProfileHref: string | null
   currentUserId: number
   usingDemoData: boolean
+  messageImageUploadEnabled: boolean
+  messageFileUploadEnabled: boolean
   onMessageSent: (message: MessageBubbleItem) => void
   onLoadHistory: () => void
   loadingHistory: boolean
@@ -86,11 +94,15 @@ function MessageThreadPanelContent({
   const router = useRouter()
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const threadRef = useRef<HTMLDivElement | null>(null)
+  const imageInputRef = useRef<HTMLInputElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const shouldStickToBottomRef = useRef(true)
   const markdownEmojiMap = useMarkdownEmojiMap()
   const [draft, setDraft] = useState("")
   const [error, setError] = useState("")
   const [showEmojiPanel, setShowEmojiPanel] = useState(false)
+  const [assetUploadPending, setAssetUploadPending] = useState(false)
+  const [assetUploadLabel, setAssetUploadLabel] = useState("")
   const [isPending, startTransition] = useTransition()
   const emojiPickerItems = useMemo(
     () => markdownEmojiMap.map((emoji) => ({
@@ -138,6 +150,156 @@ function MessageThreadPanelContent({
     })
   }
 
+  async function uploadMessageAsset(file: File) {
+    const formData = new FormData()
+    formData.append("file", file)
+
+    const response = await fetch("/api/messages/upload", {
+      method: "POST",
+      body: formData,
+    })
+    const payload = await response.json().catch(() => null)
+
+    if (!response.ok || payload?.code !== 0 || !payload?.data?.token) {
+      throw new Error(payload?.message ?? "上传失败")
+    }
+
+    return payload.data.token as string
+  }
+
+  async function sendMessageBody(content: string, options?: {
+    clearDraft?: boolean
+  }) {
+    const response = await fetch("/api/messages/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ recipientId: recipient.id, body: content }),
+    })
+
+    const payload = await response.json().catch(() => null)
+
+    if (!response.ok || payload?.code !== 0) {
+      setError(payload?.message ?? "发送失败")
+      return false
+    }
+
+    const result = payload?.data as MessageSendResult | undefined
+
+    if (result) {
+      onMessageSent({
+        id: result.id,
+        body: result.content,
+        createdAt: result.createdAt,
+        occurredAt: result.occurredAt,
+        senderId: currentUserId,
+        senderName: "我",
+        senderAvatarPath: null,
+        isMine: true,
+      })
+
+      if (result.conversationId !== conversation.id) {
+        router.replace(`/messages?conversation=${result.conversationId}`, { scroll: false })
+      }
+    }
+
+    if (options?.clearDraft) {
+      setDraft("")
+    }
+    setShowEmojiPanel(false)
+    return true
+  }
+
+  function normalizePastedImageFile(file: File, index: number) {
+    if (file.name?.trim()) {
+      return file
+    }
+
+    const extension = file.type === "image/jpeg"
+      ? "jpg"
+      : file.type === "image/gif"
+        ? "gif"
+        : file.type === "image/webp"
+          ? "webp"
+          : file.type === "image/avif"
+            ? "avif"
+            : file.type === "image/svg+xml"
+              ? "svg"
+              : "png"
+
+    return new File([file], `pasted-image-${Date.now()}-${index}.${extension}`, {
+      type: file.type || "image/png",
+      lastModified: Date.now(),
+    })
+  }
+
+  async function handleAssetUpload(files: File[], label: string, normalizeImageFiles = false) {
+    if (files.length === 0) {
+      return
+    }
+
+    if (usingDemoData) {
+      setError("当前会话尚未完成数据库接入")
+      return
+    }
+
+    setError("")
+    setAssetUploadPending(true)
+    setAssetUploadLabel(label)
+
+    try {
+      const tokens: string[] = []
+      for (const [index, file] of files.entries()) {
+        const resolvedFile = normalizeImageFiles ? normalizePastedImageFile(file, index) : file
+        tokens.push(await uploadMessageAsset(resolvedFile))
+      }
+
+      setAssetUploadLabel("正在发送消息...")
+      shouldStickToBottomRef.current = true
+      await sendMessageBody(tokens.join("\n"))
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "上传失败")
+    } finally {
+      setAssetUploadPending(false)
+      setAssetUploadLabel("")
+      textareaRef.current?.focus()
+    }
+  }
+
+  async function handleImageInputChange(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? [])
+    event.target.value = ""
+    await handleAssetUpload(files, "正在上传图片...")
+  }
+
+  async function handleFileInputChange(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? [])
+    event.target.value = ""
+    await handleAssetUpload(files, "正在上传文件...")
+  }
+
+  function handlePaste(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const imageFiles = Array.from(event.clipboardData.items)
+      .filter((item) => item.kind === "file")
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => Boolean(file))
+      .filter((file) => file.type.startsWith("image/"))
+
+    if (imageFiles.length === 0) {
+      return
+    }
+
+    event.preventDefault()
+
+    if (!messageImageUploadEnabled) {
+      setError("当前站点未开启私信图片发送")
+      return
+    }
+
+    void handleAssetUpload(imageFiles, "正在上传粘贴图片...", true)
+  }
+
   async function handleSend() {
     const content = draft.trim()
     if (!content) {
@@ -154,42 +316,9 @@ function MessageThreadPanelContent({
     shouldStickToBottomRef.current = true
 
     startTransition(async () => {
-      const response = await fetch("/api/messages/send", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ recipientId: recipient.id, body: content }),
+      await sendMessageBody(content, {
+        clearDraft: true,
       })
-
-      const payload = await response.json().catch(() => null)
-
-      if (!response.ok || payload?.code !== 0) {
-        setError(payload?.message ?? "发送失败")
-        return
-      }
-
-      const result = payload?.data as MessageSendResult | undefined
-
-      if (result) {
-        onMessageSent({
-          id: result.id,
-          body: result.content,
-          createdAt: result.createdAt,
-          occurredAt: result.occurredAt,
-          senderId: currentUserId,
-          senderName: "我",
-          senderAvatarPath: null,
-          isMine: true,
-        })
-
-        if (result.conversationId !== conversation.id) {
-          router.replace(`/messages?conversation=${result.conversationId}`, { scroll: false })
-        }
-      }
-
-      setDraft("")
-      setShowEmojiPanel(false)
     })
   }
 
@@ -213,7 +342,7 @@ function MessageThreadPanelContent({
 
     event.preventDefault()
 
-    if (!isPending) {
+    if (!isPending && !assetUploadPending) {
       void handleSend()
     }
   }
@@ -286,14 +415,7 @@ function MessageThreadPanelContent({
                     : "rounded-bl-md border border-border bg-card text-foreground dark:bg-secondary/70 dark:text-foreground",
                 )}
               >
-                <MarkdownContent
-                  content={message.body}
-                  markdownEmojiMap={markdownEmojiMap}
-                  className={cn(
-                    "[&_p]:!my-0 [&_p]:leading-6 [&_ul]:my-1.5 [&_ol]:my-1.5 [&_li]:my-0 prose-headings:my-0 prose-blockquote:my-2 prose-pre:my-2 prose-p:text-inherit prose-headings:text-inherit prose-strong:text-inherit prose-code:text-inherit prose-blockquote:text-inherit prose-li:text-inherit prose-a:text-inherit",
-                    message.isMine && "text-inherit **:text-inherit [&_.md-list]:text-inherit [&_.md-task-list_.task-list-item_label]:text-inherit [&_.md-task-list_.task-list-item:has(input[type='checkbox']:checked)]:text-inherit [&_.md-callout-title]:text-inherit",
-                  )}
-                />
+                <MessageBubbleContent content={message.body} markdownEmojiMap={markdownEmojiMap} isMine={message.isMine} />
               </div>
               <p className={cn("mt-2 text-xs text-muted-foreground", message.isMine ? "text-right" : "text-left")}>{message.createdAt}</p>
             </div>
@@ -305,25 +427,31 @@ function MessageThreadPanelContent({
       <div className="border-t border-border px-4 py-3 sm:px-5 sm:py-3.5 max-sm:pb-[calc(env(safe-area-inset-bottom)+12px)]">
         {usingDemoData ? <p className="mb-3 rounded-[18px] bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">当前会话尚未完成数据库接入。</p> : null}
         {error ? <p className="mb-3 rounded-[18px] bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-200">{error}</p> : null}
+        {assetUploadPending ? <p className="mb-3 rounded-[18px] bg-secondary px-4 py-3 text-sm text-muted-foreground">{assetUploadLabel}</p> : null}
         <div className="rounded-[24px] border border-border bg-background px-4 py-3 max-sm:rounded-[20px]">
           <textarea
             ref={textareaRef}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={handleDraftKeyDown}
+            onPaste={handlePaste}
             rows={3}
-            placeholder="输入消息，回车发送，Shift + Enter 换行"
+            placeholder={messageImageUploadEnabled ? "输入消息，回车发送，Shift + Enter 换行，支持粘贴图片" : "输入消息，回车发送，Shift + Enter 换行"}
             className="w-full resize-none border-none bg-transparent text-sm leading-7 outline-hidden placeholder:text-muted-foreground"
           />
+          <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageInputChange} />
+          <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileInputChange} />
           <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
             <div className="relative flex items-center gap-2 text-xs text-muted-foreground">
               <button
                 type="button"
-                className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-xs transition-colors hover:bg-accent"
+                aria-label="表情"
+                title="表情"
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-border px-3 py-1.5 text-xs transition-colors hover:bg-accent max-sm:size-9 max-sm:px-0"
                 onClick={() => setShowEmojiPanel((current) => !current)}
               >
                 <SmilePlus className="h-4 w-4" />
-                <span>表情</span>
+                <span className="hidden sm:inline">表情</span>
               </button>
               {showEmojiPanel ? (
                 <div className="absolute bottom-[calc(100%+12px)] left-0 z-20 w-[260px] max-h-[320px] overflow-y-auto rounded-2xl border border-border bg-background p-3 shadow-2xl">
@@ -335,10 +463,36 @@ function MessageThreadPanelContent({
                   />
                 </div>
               ) : null}
+              {messageImageUploadEnabled ? (
+                <button
+                  type="button"
+                  aria-label="图片"
+                  title="图片"
+                  className="inline-flex items-center justify-center gap-2 rounded-full border border-border px-3 py-1.5 text-xs transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60 max-sm:size-9 max-sm:px-0"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={assetUploadPending || isPending}
+                >
+                  <ImageIcon className="h-4 w-4" />
+                  <span className="hidden sm:inline">图片</span>
+                </button>
+              ) : null}
+              {messageFileUploadEnabled ? (
+                <button
+                  type="button"
+                  aria-label="文件"
+                  title="文件"
+                  className="inline-flex items-center justify-center gap-2 rounded-full border border-border px-3 py-1.5 text-xs transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60 max-sm:size-9 max-sm:px-0"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={assetUploadPending || isPending}
+                >
+                  <Paperclip className="h-4 w-4" />
+                  <span className="hidden sm:inline">文件</span>
+                </button>
+              ) : null}
             </div>
-            <Button type="button" className="h-10 rounded-full px-5" onClick={handleSend} disabled={isPending}>
+            <Button type="button" className="h-10 rounded-full px-5" onClick={handleSend} disabled={isPending || assetUploadPending}>
               <Send className="mr-2 h-4 w-4" />
-              {isPending ? "发送中..." : "发送消息"}
+              {isPending ? "发送中..." : assetUploadPending ? "上传中..." : "发送消息"}
             </Button>
           </div>
         </div>

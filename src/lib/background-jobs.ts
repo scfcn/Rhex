@@ -1,6 +1,35 @@
+import {
+  getInMemoryBackgroundJobConcurrency,
+  getInMemoryBackgroundJobDeadLetterMaxLength,
+  readBackgroundJobWebRuntimeMode,
+} from "@/lib/background-job-config"
+import {
+  BackgroundJobPermanentError,
+  createBackgroundJobDeadLetterRecord,
+  createBackgroundJobLogMetadata,
+  createBackgroundJobRetryEnvelope,
+  isBackgroundJobRetryableError,
+  normalizeBackgroundJobEnvelope,
+  normalizeBackgroundJobThrownError,
+} from "@/lib/background-job-envelope"
+import {
+  dedupeBackgroundJobsById,
+  matchesBackgroundJob,
+} from "@/lib/background-job-helpers"
 import type { NotificationType, RelatedType } from "@/db/types"
 import { logError, logInfo } from "@/lib/logger"
-import { hasRedisUrl } from "@/lib/redis"
+
+export {
+  BackgroundJobPermanentError,
+  createBackgroundJobDeadLetterRecord,
+  createBackgroundJobLogMetadata,
+  createBackgroundJobRetryEnvelope,
+  normalizeBackgroundJobEnvelope,
+  parseBackgroundJobEnvelopeString,
+  resolveBackgroundJobMaxAttempts,
+  resolveBackgroundJobRetryDelayMs,
+  serializeBackgroundJobError,
+} from "@/lib/background-job-envelope"
 
 export interface BackgroundJobPayloadMap {
   "notification.create": {
@@ -73,11 +102,22 @@ export interface BackgroundJobPayloadMap {
     userId: number
     commentId: string
   }
+  "post-auction.recovery": {
+    reason?: string
+  }
   "post-auction.settle": {
     auctionId: string
   }
   "ai-reply.process": {
     taskId: string
+  }
+  "rss-harvest.process-queue-item": {
+    queueId: string
+  }
+  "addon.background-job.run": {
+    addonId: string
+    jobKey: string
+    payload: unknown
   }
   "security.login-ip-change-email-alert": {
     userId: number
@@ -106,18 +146,58 @@ export interface BackgroundJobPayloadMap {
 export type BackgroundJobName = keyof BackgroundJobPayloadMap
 
 export interface BackgroundJobEnvelope<Name extends BackgroundJobName = BackgroundJobName> {
+  id: string
   name: Name
   payload: BackgroundJobPayloadMap[Name]
   enqueuedAt: string
   attempt: number
   maxAttempts: number
   availableAt?: string
+  idempotencyKey?: string
 }
 
-type BackgroundJobHandler<Name extends BackgroundJobName> = (payload: BackgroundJobPayloadMap[Name]) => Promise<void>
+type BackgroundJobHandler<Name extends BackgroundJobName> = (
+  payload: BackgroundJobPayloadMap[Name],
+  job: BackgroundJobEnvelope<Name>,
+) => Promise<void>
+
+export type BackgroundJobDeleteLocation =
+  | "memory-queue"
+  | "stream"
+  | "delayed"
+  | "dead-letter"
+
+export interface BackgroundJobEnqueueResult<Name extends BackgroundJobName = BackgroundJobName> {
+  job: BackgroundJobEnvelope<Name>
+}
+
+export interface BackgroundJobDeleteOptions {
+  match?: (job: BackgroundJobEnvelope) => boolean
+}
+
+export interface BackgroundJobFindOptions {
+  match?: (job: BackgroundJobEnvelope) => boolean
+}
+
+export interface BackgroundJobDeleteResult {
+  id: string
+  removed: boolean
+  removedFrom: BackgroundJobDeleteLocation[]
+}
 
 export interface BackgroundJobTransport {
-  enqueue<Name extends BackgroundJobName>(job: BackgroundJobEnvelope<Name>): Promise<void>
+  enqueue<Name extends BackgroundJobName>(job: BackgroundJobEnvelope<Name>): Promise<BackgroundJobEnqueueResult<Name>>
+  findById?: (
+    jobId: string,
+    options?: BackgroundJobFindOptions,
+  ) => Promise<BackgroundJobEnvelope | null>
+  list?: (
+    options?: BackgroundJobFindOptions,
+  ) => Promise<BackgroundJobEnvelope[]>
+  deleteById?: (
+    jobId: string,
+    options?: BackgroundJobDeleteOptions,
+  ) => Promise<BackgroundJobDeleteResult>
 }
 
 export interface EnqueueBackgroundJobOptions {
@@ -151,166 +231,17 @@ type GlobalBackgroundJobState = {
 
 const globalForBackgroundJobs = globalThis as typeof globalThis & GlobalBackgroundJobState
 
-const DEFAULT_BACKGROUND_JOB_MAX_ATTEMPTS = 3
-const DEFAULT_BACKGROUND_JOB_RETRY_BASE_MS = 5_000
-const DEFAULT_BACKGROUND_JOB_RETRY_MAX_MS = 5 * 60 * 1_000
-const DEFAULT_IN_MEMORY_BACKGROUND_JOB_DEAD_LETTER_MAX_LENGTH = 200
-
-export class BackgroundJobPermanentError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = "BackgroundJobPermanentError"
-  }
-}
-
-const backgroundJobHandlers = new Map<BackgroundJobName, (payload: unknown) => Promise<void>>()
-const DEFAULT_IN_MEMORY_BACKGROUND_JOB_CONCURRENCY = 10
-const MAX_IN_MEMORY_BACKGROUND_JOB_CONCURRENCY = 32
-
-function parsePositiveInteger(value: string | undefined, fallback: number, min: number, max: number) {
-  const parsed = Number.parseInt(String(value ?? ""), 10)
-
-  if (!Number.isFinite(parsed)) {
-    return fallback
-  }
-
-  return Math.min(max, Math.max(min, parsed))
-}
+const backgroundJobHandlers = new Map<BackgroundJobName, (payload: unknown, job: BackgroundJobEnvelope) => Promise<void>>()
 
 function getInMemoryBackgroundJobDeadLetterStore() {
   globalForBackgroundJobs.__bbsInMemoryBackgroundJobDeadLetters ??= []
   return globalForBackgroundJobs.__bbsInMemoryBackgroundJobDeadLetters
 }
 
-function getInMemoryBackgroundJobDeadLetterMaxLength() {
-  return parsePositiveInteger(
-    process.env.BACKGROUND_JOB_IN_MEMORY_DEAD_LETTER_MAX_LENGTH,
-    DEFAULT_IN_MEMORY_BACKGROUND_JOB_DEAD_LETTER_MAX_LENGTH,
-    10,
-    10_000,
-  )
-}
-
 function rememberInMemoryBackgroundJobDeadLetter(record: BackgroundJobDeadLetterRecord) {
   const store = getInMemoryBackgroundJobDeadLetterStore()
   store.unshift(record)
   store.splice(getInMemoryBackgroundJobDeadLetterMaxLength())
-}
-
-function normalizePositiveInteger(value: number | undefined, fallback: number) {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return fallback
-  }
-
-  return Math.max(1, Math.trunc(value))
-}
-
-export function serializeBackgroundJobError(error: unknown) {
-  return error instanceof Error
-    ? {
-        name: error.name,
-        message: error.message,
-      }
-    : {
-        name: "Error",
-        message: String(error),
-      }
-}
-
-export function parseBackgroundJobEnvelopeString(value: string) {
-  try {
-    const parsed = JSON.parse(value) as Partial<BackgroundJobEnvelope>
-
-    if (!parsed || typeof parsed !== "object" || typeof parsed.name !== "string" || typeof parsed.enqueuedAt !== "string" || !("payload" in parsed)) {
-      return null
-    }
-
-    return normalizeBackgroundJobEnvelope({
-      name: parsed.name,
-      payload: parsed.payload as BackgroundJobEnvelope["payload"],
-      enqueuedAt: parsed.enqueuedAt,
-      attempt: parsed.attempt,
-      maxAttempts: parsed.maxAttempts,
-      availableAt: typeof parsed.availableAt === "string" ? parsed.availableAt : undefined,
-    })
-  } catch {
-    return null
-  }
-}
-
-export function resolveBackgroundJobMaxAttempts(value?: number) {
-  return normalizePositiveInteger(value, parsePositiveInteger(
-    process.env.BACKGROUND_JOB_MAX_ATTEMPTS,
-    DEFAULT_BACKGROUND_JOB_MAX_ATTEMPTS,
-    1,
-    20,
-  ))
-}
-
-export function resolveBackgroundJobRetryDelayMs(attempt: number) {
-  const baseDelayMs = parsePositiveInteger(
-    process.env.BACKGROUND_JOB_RETRY_BASE_MS,
-    DEFAULT_BACKGROUND_JOB_RETRY_BASE_MS,
-    250,
-    60 * 60 * 1_000,
-  )
-  const maxDelayMs = parsePositiveInteger(
-    process.env.BACKGROUND_JOB_RETRY_MAX_MS,
-    DEFAULT_BACKGROUND_JOB_RETRY_MAX_MS,
-    1_000,
-    24 * 60 * 60 * 1_000,
-  )
-  const retryDelayMs = baseDelayMs * Math.max(1, 2 ** Math.max(0, attempt - 1))
-
-  return Math.min(maxDelayMs, retryDelayMs)
-}
-
-export function normalizeBackgroundJobEnvelope<Name extends BackgroundJobName>(
-  job: Omit<BackgroundJobEnvelope<Name>, "attempt" | "maxAttempts">
-    & Partial<Pick<BackgroundJobEnvelope<Name>, "attempt" | "maxAttempts">>,
-): BackgroundJobEnvelope<Name> {
-  return {
-    ...job,
-    attempt: normalizePositiveInteger(job.attempt, 1),
-    maxAttempts: resolveBackgroundJobMaxAttempts(job.maxAttempts),
-  }
-}
-
-export function createBackgroundJobLogMetadata(job: BackgroundJobEnvelope, extra?: Record<string, unknown>) {
-  return {
-    jobName: job.name,
-    enqueuedAt: job.enqueuedAt,
-    attempt: job.attempt,
-    maxAttempts: job.maxAttempts,
-    availableAt: job.availableAt ?? null,
-    payload: job.payload,
-    ...(extra ?? {}),
-  }
-}
-
-export function createBackgroundJobRetryEnvelope<Name extends BackgroundJobName>(job: BackgroundJobEnvelope<Name>) {
-  if (job.attempt >= job.maxAttempts) {
-    return null
-  }
-
-  return {
-    ...job,
-    attempt: job.attempt + 1,
-    availableAt: new Date(Date.now() + resolveBackgroundJobRetryDelayMs(job.attempt)).toISOString(),
-  } satisfies BackgroundJobEnvelope<Name>
-}
-
-export function createBackgroundJobDeadLetterRecord(
-  job: BackgroundJobEnvelope,
-  error: unknown,
-  retryable: boolean,
-): BackgroundJobDeadLetterRecord {
-  return {
-    job,
-    failedAt: new Date().toISOString(),
-    retryable,
-    error: serializeBackgroundJobError(error),
-  }
 }
 
 export function getInMemoryBackgroundJobDeadLetters() {
@@ -329,35 +260,113 @@ export async function runRegisteredBackgroundJob(job: BackgroundJobEnvelope): Pr
   }
 
   try {
-    await handler(job.payload)
+    await handler(job.payload, job)
     return { ok: true }
   } catch (error) {
+    const normalizedError = normalizeBackgroundJobThrownError(error)
+
     return {
       ok: false,
-      error,
-      retryable: !(error instanceof BackgroundJobPermanentError),
+      error: normalizedError,
+      retryable: isBackgroundJobRetryableError(error),
     }
   }
 }
 
+export interface BackgroundJobOutcomeHooks {
+  /** Extra fields merged into every log entry's metadata (e.g. transport, workerId). */
+  baseMetadata: Record<string, unknown>
+  /** Optional log targetId (e.g. Redis stream entry id). */
+  targetId?: string
+  /** Enqueue a retry envelope when the job failed with a retryable error. */
+  enqueueRetry: (retryJob: BackgroundJobEnvelope) => Promise<unknown> | unknown
+  /** Persist the dead-letter record when the job can no longer be retried. */
+  persistDeadLetter: (record: BackgroundJobDeadLetterRecord) => Promise<void> | void
+}
+
+/**
+ * Run a job through `runRegisteredBackgroundJob` and emit the standard
+ * start/success/retry/dead-letter log sequence, delegating the transport-
+ * specific enqueue/persist side effects through {@link BackgroundJobOutcomeHooks}.
+ *
+ * Consolidates the duplicated outcome handling previously replicated in the
+ * in-memory pump and the Redis stream worker. See R3 in `REDIS_AUDIT_REPORT.md`.
+ */
+export async function executeBackgroundJobWithOutcome(
+  job: BackgroundJobEnvelope,
+  hooks: BackgroundJobOutcomeHooks,
+): Promise<BackgroundJobRunResult> {
+  const { baseMetadata, targetId, enqueueRetry, persistDeadLetter } = hooks
+  const targetIdFields = targetId === undefined ? {} : { targetId }
+
+  logInfo({
+    scope: "background-job",
+    action: "start",
+    ...targetIdFields,
+    metadata: createBackgroundJobLogMetadata(job, baseMetadata),
+  })
+
+  const startedAtMs = Date.now()
+  const result = await runRegisteredBackgroundJob(job)
+  const durationMs = Date.now() - startedAtMs
+
+  if (result.ok) {
+    logInfo({
+      scope: "background-job",
+      action: "success",
+      ...targetIdFields,
+      metadata: createBackgroundJobLogMetadata(job, { ...baseMetadata, durationMs }),
+    })
+    return result
+  }
+
+  const errorMetadata = createBackgroundJobLogMetadata(job, { ...baseMetadata, durationMs })
+  const retryJob = result.retryable ? createBackgroundJobRetryEnvelope(job) : null
+
+  if (retryJob) {
+    logError({
+      scope: "background-job",
+      action: "run",
+      ...targetIdFields,
+      metadata: errorMetadata,
+    }, result.error)
+    await enqueueRetry(retryJob)
+    logInfo({
+      scope: "background-job",
+      action: "retry",
+      ...targetIdFields,
+      metadata: createBackgroundJobLogMetadata(job, {
+        ...baseMetadata,
+        durationMs,
+        nextAttempt: retryJob.attempt,
+        availableAt: retryJob.availableAt ?? null,
+      }),
+    })
+    return result
+  }
+
+  await persistDeadLetter(createBackgroundJobDeadLetterRecord(job, result.error, result.retryable))
+  logError({
+    scope: "background-job",
+    action: "dead-letter",
+    ...targetIdFields,
+    metadata: errorMetadata,
+  }, result.error)
+  return result
+}
+
 export function resolveBackgroundJobConcurrency() {
-  const rawValue = process.env.BACKGROUND_JOB_CONCURRENCY?.trim()
-
-  if (!rawValue) {
-    return DEFAULT_IN_MEMORY_BACKGROUND_JOB_CONCURRENCY
-  }
-
-  const parsed = Number.parseInt(rawValue, 10)
-  if (!Number.isFinite(parsed) || parsed < 1) {
-    return DEFAULT_IN_MEMORY_BACKGROUND_JOB_CONCURRENCY
-  }
-
-  return Math.min(MAX_IN_MEMORY_BACKGROUND_JOB_CONCURRENCY, parsed)
+  return getInMemoryBackgroundJobConcurrency()
 }
 
 class InMemoryBackgroundJobTransport implements BackgroundJobTransport {
   private readonly concurrency: number
   private readonly queue: BackgroundJobEnvelope[] = []
+  private readonly delayedQueue = new Map<string, {
+    job: BackgroundJobEnvelope
+    timer: ReturnType<typeof setTimeout>
+  }>()
+  private readonly idempotencyIndex = new Map<string, string>()
   private activeCount = 0
   private pumpScheduled = false
 
@@ -371,18 +380,110 @@ class InMemoryBackgroundJobTransport implements BackgroundJobTransport {
 
     if (availableAt > Date.now()) {
       const delayMs = Math.max(0, availableAt - Date.now())
-      setTimeout(() => {
+      const timer = setTimeout(() => {
+        this.delayedQueue.delete(normalizedJob.id)
         this.queue.push(normalizedJob)
         this.schedulePump()
       }, delayMs)
+      this.delayedQueue.set(normalizedJob.id, {
+        job: normalizedJob,
+        timer,
+      })
 
-      return Promise.resolve()
+      return Promise.resolve({
+        job: normalizedJob,
+      })
     }
 
     this.queue.push(normalizedJob)
     this.schedulePump()
 
-    return Promise.resolve()
+    return Promise.resolve({
+      job: normalizedJob,
+    })
+  }
+
+  async deleteById(
+    jobId: string,
+    options?: BackgroundJobDeleteOptions,
+  ): Promise<BackgroundJobDeleteResult> {
+    const removedFrom: BackgroundJobDeleteLocation[] = []
+    const delayedEntry = this.delayedQueue.get(jobId)
+
+    if (delayedEntry && matchesBackgroundJob(delayedEntry.job, options)) {
+      clearTimeout(delayedEntry.timer)
+      this.delayedQueue.delete(jobId)
+      removedFrom.push("delayed")
+    }
+
+    const retainedQueue: BackgroundJobEnvelope[] = []
+    for (const job of this.queue) {
+      if (job.id === jobId && matchesBackgroundJob(job, options)) {
+        if (!removedFrom.includes("memory-queue")) {
+          removedFrom.push("memory-queue")
+        }
+        continue
+      }
+
+      retainedQueue.push(job)
+    }
+    this.queue.splice(0, this.queue.length, ...retainedQueue)
+
+    const deadLetters = getInMemoryBackgroundJobDeadLetterStore()
+    for (let index = deadLetters.length - 1; index >= 0; index -= 1) {
+      const record = deadLetters[index]
+      if (record.job.id !== jobId || !matchesBackgroundJob(record.job, options)) {
+        continue
+      }
+
+      deadLetters.splice(index, 1)
+      if (!removedFrom.includes("dead-letter")) {
+        removedFrom.push("dead-letter")
+      }
+      break
+    }
+
+    return {
+      id: jobId,
+      removed: removedFrom.length > 0,
+      removedFrom,
+    }
+  }
+
+  async findById(
+    jobId: string,
+    options?: BackgroundJobFindOptions,
+  ): Promise<BackgroundJobEnvelope | null> {
+    const delayedEntry = this.delayedQueue.get(jobId)
+    if (delayedEntry && matchesBackgroundJob(delayedEntry.job, options)) {
+      return delayedEntry.job
+    }
+
+    for (const job of this.queue) {
+      if (job.id === jobId && matchesBackgroundJob(job, options)) {
+        return job
+      }
+    }
+
+    for (const record of getInMemoryBackgroundJobDeadLetterStore()) {
+      if (record.job.id === jobId && matchesBackgroundJob(record.job, options)) {
+        return record.job
+      }
+    }
+
+    return null
+  }
+
+  async list(
+    options?: BackgroundJobFindOptions,
+  ): Promise<BackgroundJobEnvelope[]> {
+    const jobs = [
+      ...this.queue,
+      ...[...this.delayedQueue.values()].map((entry) => entry.job),
+      ...getInMemoryBackgroundJobDeadLetterStore().map((record) => record.job),
+    ].filter((job) => matchesBackgroundJob(job, options))
+
+    return dedupeBackgroundJobsById(jobs)
   }
 
   private schedulePump() {
@@ -412,72 +513,35 @@ class InMemoryBackgroundJobTransport implements BackgroundJobTransport {
         return
       }
 
+      if (nextJob.idempotencyKey) {
+        const existing = this.idempotencyIndex.get(nextJob.idempotencyKey)
+        if (existing && existing !== nextJob.id) {
+          logInfo({
+            scope: "background-job",
+            action: "idempotent-skip",
+            metadata: createBackgroundJobLogMetadata(nextJob, {
+              transport: "in-memory",
+              existingJobId: existing,
+            }),
+          })
+          continue
+        }
+        this.idempotencyIndex.set(nextJob.idempotencyKey, nextJob.id)
+      }
+
       this.activeCount += 1
 
-      logInfo({
-        scope: "background-job",
-        action: "start",
-        metadata: createBackgroundJobLogMetadata(nextJob, {
-          transport: "in-memory",
-        }),
+      void executeBackgroundJobWithOutcome(nextJob, {
+        baseMetadata: { transport: "in-memory" },
+        enqueueRetry: (retryJob) => this.enqueue(retryJob),
+        persistDeadLetter: rememberInMemoryBackgroundJobDeadLetter,
       })
-
-      const startedAtMs = Date.now()
-
-      void runRegisteredBackgroundJob(nextJob)
-        .then(async (result) => {
-          const durationMs = Date.now() - startedAtMs
-
-          if (result.ok) {
-            logInfo({
-              scope: "background-job",
-              action: "success",
-              metadata: createBackgroundJobLogMetadata(nextJob, {
-                transport: "in-memory",
-                durationMs,
-              }),
-            })
-            return
-          }
-
-          const errorMetadata = createBackgroundJobLogMetadata(nextJob, {
-            transport: "in-memory",
-            durationMs,
-          })
-          const retryJob = result.retryable ? createBackgroundJobRetryEnvelope(nextJob) : null
-
-          if (retryJob) {
-            logError({
-              scope: "background-job",
-              action: "run",
-              metadata: errorMetadata,
-            }, result.error)
-            await this.enqueue(retryJob)
-            logInfo({
-              scope: "background-job",
-              action: "retry",
-              metadata: createBackgroundJobLogMetadata(nextJob, {
-                transport: "in-memory",
-                durationMs,
-                nextAttempt: retryJob.attempt,
-                availableAt: retryJob.availableAt ?? null,
-              }),
-            })
-            return
-          }
-
-          rememberInMemoryBackgroundJobDeadLetter(createBackgroundJobDeadLetterRecord(nextJob, result.error, result.retryable))
-          logError({
-            scope: "background-job",
-            action: "dead-letter",
-            metadata: errorMetadata,
-          }, result.error)
-        })
         .catch((error) => {
           logError({
             scope: "background-job",
             action: "transport-run",
             metadata: {
+              jobId: nextJob.id,
               jobName: nextJob.name,
               enqueuedAt: nextJob.enqueuedAt,
             },
@@ -501,10 +565,6 @@ let backgroundJobRuntimeReadyPromise: Promise<void> | null = null
 function detectBackgroundJobProcessRole() {
   const entrypoint = process.argv[1]?.replace(/\\/g, "/").toLowerCase() ?? ""
 
-  if (entrypoint.includes("background-jobs-worker")) {
-    return "jobs-worker"
-  }
-
   if (entrypoint.includes("/worker.ts")) {
     return "worker"
   }
@@ -522,11 +582,11 @@ function shouldStartBackgroundJobWorkerInProcess() {
   // Dedicated worker entrypoints must always consume jobs, regardless of the
   // web runtime mode. `BACKGROUND_JOB_WEB_RUNTIME=worker-only` only disables
   // job consumption inside the web process.
-  if (processRole === "jobs-worker" || processRole === "worker") {
+  if (processRole === "worker") {
     return true
   }
 
-  const mode = process.env.BACKGROUND_JOB_WEB_RUNTIME?.trim().toLowerCase()
+  const mode = readBackgroundJobWebRuntimeMode()
 
   if (mode === "1" || mode === "true" || mode === "on" || mode === "enabled" || mode === "hybrid") {
     return true
@@ -543,7 +603,7 @@ export function registerBackgroundJobHandler<Name extends BackgroundJobName>(
   name: Name,
   handler: BackgroundJobHandler<Name>,
 ) {
-  backgroundJobHandlers.set(name, handler as (payload: unknown) => Promise<void>)
+  backgroundJobHandlers.set(name, handler as (payload: unknown, job: BackgroundJobEnvelope) => Promise<void>)
 }
 
 export function setBackgroundJobTransport(transport: BackgroundJobTransport) {
@@ -564,10 +624,6 @@ export async function ensureBackgroundJobHandlersRegistered() {
 export async function ensureBackgroundJobRuntimeReady() {
   await ensureBackgroundJobHandlersRegistered()
 
-  if (!hasRedisUrl()) {
-    return
-  }
-
   backgroundJobRuntimeReadyPromise ??= import("@/lib/redis-background-jobs")
     .then(async ({ ensureRedisBackgroundJobWorkerRunning, getRedisBackgroundJobTransport }) => {
       setBackgroundJobTransport(await getRedisBackgroundJobTransport())
@@ -582,6 +638,48 @@ export async function ensureBackgroundJobRuntimeReady() {
     })
 
   return backgroundJobRuntimeReadyPromise
+}
+
+export async function deleteBackgroundJobById(
+  jobId: string,
+  options?: BackgroundJobDeleteOptions,
+) {
+  await ensureBackgroundJobRuntimeReady()
+
+  if (typeof backgroundJobTransport.deleteById !== "function") {
+    return {
+      id: jobId,
+      removed: false,
+      removedFrom: [],
+    } satisfies BackgroundJobDeleteResult
+  }
+
+  return backgroundJobTransport.deleteById(jobId, options)
+}
+
+export async function findBackgroundJobById(
+  jobId: string,
+  options?: BackgroundJobFindOptions,
+) {
+  await ensureBackgroundJobRuntimeReady()
+
+  if (typeof backgroundJobTransport.findById !== "function") {
+    return null
+  }
+
+  return backgroundJobTransport.findById(jobId, options)
+}
+
+export async function listBackgroundJobs(
+  options?: BackgroundJobFindOptions,
+) {
+  await ensureBackgroundJobRuntimeReady()
+
+  if (typeof backgroundJobTransport.list !== "function") {
+    return []
+  }
+
+  return backgroundJobTransport.list(options)
 }
 
 export function enqueueBackgroundJob<Name extends BackgroundJobName>(

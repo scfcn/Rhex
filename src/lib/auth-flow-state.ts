@@ -4,7 +4,7 @@ import type { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 
 import type { OAuthFlowState, PasskeyCeremonyState, PendingExternalAuthState } from "@/lib/external-auth-types"
-import { createRedisKey, getRedis, hasRedisUrl } from "@/lib/redis"
+import { createRedisKey, getRedis } from "@/lib/redis"
 
 const PENDING_AUTH_COOKIE_NAME = "bbs_pending_auth"
 const PASSKEY_REGISTER_COOKIE_NAME = "bbs_passkey_register"
@@ -102,10 +102,6 @@ function getRedisAuthFlowKey(cookieName: string, nonce: string) {
 }
 
 async function setCookie<T extends object>(response: NextResponse, cookieName: string, value: T, ttlSeconds: number) {
-  if (!hasRedisUrl()) {
-    response.cookies.set(cookieName, createSignedValue(value, ttlSeconds), getCookieOptions(ttlSeconds))
-    return
-  }
 
   const nonce = randomUUID()
   const expiresAt = Date.now() + ttlSeconds * 1000
@@ -127,9 +123,6 @@ async function readCookieValue<T extends object>(cookieName: string) {
   const cookieStore = await cookies()
   const rawValue = cookieStore.get(cookieName)?.value
 
-  if (!hasRedisUrl()) {
-    return parseSignedValue<T>(rawValue)
-  }
 
   const pointer = parseSignedValue<SignedAuthFlowPointer>(rawValue)
 

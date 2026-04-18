@@ -59,7 +59,14 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
       return apiSuccess({ urlPath: existing.urlPath }, "上传成功")
     }
 
-    const saved = await saveUploadedFile(file, preparedFile, folder)
+    const saved = await saveUploadedFile(file, preparedFile, folder, {
+      request,
+      actor: {
+        id: currentUser.id,
+        username: currentUser.username,
+        kind: "user",
+      },
+    })
 
     await createUploadRecord({
       userId: currentUser.id,

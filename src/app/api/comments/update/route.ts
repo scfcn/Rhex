@@ -1,5 +1,5 @@
 import { apiSuccess, createUserRouteHandler, readJsonBody } from "@/lib/api-route"
-import { enqueueAiReplyForCommentMention } from "@/lib/ai-reply"
+import { triggerAiMention } from "@/lib/ai/mention-trigger"
 import { updateCommentFlow } from "@/lib/comment-update-service"
 import { logRequestSucceeded } from "@/lib/request-log"
 
@@ -25,9 +25,10 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     contentAdjusted: result.contentAdjusted,
   })
 
-  void enqueueAiReplyForCommentMention({
+  void triggerAiMention({
+    kind: "comment",
     postId: result.updated.postId,
-    sourceCommentId: result.updated.id,
+    commentId: result.updated.id,
     triggerUserId: currentUser.id,
     mentionedUserIds: result.mentionUserIds,
   })

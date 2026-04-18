@@ -46,7 +46,15 @@ export const POST = createAdminRouteHandler(async ({ request, adminUser }) => {
     return apiSuccess({ urlPath: existing.urlPath }, "上传成功")
   }
 
-  const saved = await saveUploadedFile(file, preparedFile, "icon")
+  const saved = await saveUploadedFile(file, preparedFile, "icon", {
+    request,
+    actor: {
+      id: adminUser.id,
+      username: adminUser.username,
+      role: adminUser.role,
+      kind: "admin",
+    },
+  })
 
   await createUploadRecord({
     userId: adminUser.id,

@@ -1,4 +1,0 @@
-CREATE TYPE "PostRedPacketClaimOrderMode" AS ENUM ('FIRST_COME_FIRST_SERVED', 'RANDOM');
-
-ALTER TABLE "PostRedPacket"
-  ADD COLUMN "claimOrderMode" "PostRedPacketClaimOrderMode" NOT NULL DEFAULT 'FIRST_COME_FIRST_SERVED';

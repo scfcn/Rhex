@@ -160,7 +160,8 @@ export function InviteCodePurchaseCard({ enabled, price, priceDescription, point
         onClose={() => setHistoryOpen(false)}
         size="lg"
         title="我购买的邀请码"
-        description="分页查看你已购买的邀请码及当前使用情况。"
+        hideHeaderCloseButtonOnMobile
+        description="查看你已购买的邀请码及当前使用情况。"
       >
         <div className="space-y-4">
           {historyData ? (

@@ -3,6 +3,7 @@ import { normalizePostType, type LocalPostType } from "@/lib/post-types"
 import { normalizeEmailAddress } from "@/lib/email"
 import { nicknameContainsWhitespace, normalizeNickname } from "@/lib/nickname"
 import { parseNonNegativeSafeInteger, parsePositiveSafeInteger } from "@/lib/shared/safe-integer"
+import { isHttpUrl } from "@/lib/shared/url"
 
 
 export interface ValidationResult<T> {
@@ -47,15 +48,6 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
-function isValidHttpUrl(value: string) {
-  try {
-    const url = new URL(value)
-    return url.protocol === "http:" || url.protocol === "https:"
-  } catch {
-    return false
-  }
-}
-
 function isValidPhone(value: string) {
   return /^1\d{10}$/.test(value)
 }
@@ -65,7 +57,7 @@ function validateNotificationWebhookUrl(notificationWebhookUrl: string) {
     return "Webhook URL 长度不能超过 1000 个字符"
   }
 
-  if (notificationWebhookUrl && !isValidHttpUrl(notificationWebhookUrl)) {
+  if (notificationWebhookUrl && !isHttpUrl(notificationWebhookUrl)) {
     return "Webhook URL 仅支持 http 或 https 地址"
   }
 

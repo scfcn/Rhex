@@ -294,30 +294,10 @@ enum YinYangOption {
   B
 }
 
-enum RssSourceStatus {
-  ACTIVE
-  PAUSED
-}
-
-enum RssQueueStatus {
-  PENDING
-  PROCESSING
-  SUCCEEDED
-  FAILED
-  CANCELLED
-}
-
 enum RssTriggerType {
   MANUAL
   SCHEDULED
   RETRY
-}
-
-enum RssRunStatus {
-  RUNNING
-  SUCCEEDED
-  FAILED
-  CANCELLED
 }
 
 enum RssLogLevel {
@@ -354,6 +334,13 @@ enum AiReplyTaskStatus {
 enum AiReplyTaskSourceType {
   POST
   COMMENT
+}
+
+enum AiModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUPERSEDED
 }
 
 enum PaymentOrderStatus {
@@ -498,6 +485,7 @@ model User {
   aiReplyTasksTriggered            AiReplyTask[]                  @relation("AiReplyTaskTriggerUser")
   aiReplyTasksAssigned             AiReplyTask[]                  @relation("AiReplyTaskAgentUser")
   paymentOrders                    PaymentOrder[]
+  aiModerationSuggestionsReviewed  AiModerationSuggestion[]
 
   @@index([role])
   @@index([status])
@@ -725,46 +713,47 @@ model Zone {
 }
 
 model Board {
-  id                   String                @id @default(cuid())
-  zoneId               String?
-  name                 String                @unique
-  slug                 String                @unique
-  description          String?
-  iconPath             String?
-  coverPath            String?
-  configJson           Json?
-  sortOrder            Int                   @default(0)
-  status               BoardStatus           @default(ACTIVE)
-  allowPost            Boolean               @default(true)
-  showInHomeFeed       Boolean?
-  requirePostReview    Boolean?
-  requireCommentReview Boolean?
-  postPointDelta       Int?
-  replyPointDelta      Int?
-  postIntervalSeconds  Int?
-  replyIntervalSeconds Int?
-  allowedPostTypes     String?
-  minViewPoints        Int?
-  minViewLevel         Int?
-  minPostPoints        Int?
-  minPostLevel         Int?
-  minReplyPoints       Int?
-  minReplyLevel        Int?
-  minViewVipLevel      Int?
-  minPostVipLevel      Int?
-  minReplyVipLevel     Int?
-  postListDisplayMode  String?
-  postListLoadMode     String?
-  postCount            Int                   @default(0)
-  treasuryPoints       Int                   @default(0)
-  followerCount        Int                   @default(0)
-  createdAt            DateTime              @default(now()) @db.Timestamptz(3)
-  updatedAt            DateTime              @updatedAt @db.Timestamptz(3)
-  zone                 Zone?                 @relation(fields: [zoneId], references: [id])
-  posts                Post[]
-  followers            BoardFollow[]
-  moderatorScopes      ModeratorBoardScope[]
-  boardApplications    BoardApplication[]
+  id                              String                   @id @default(cuid())
+  zoneId                          String?
+  name                            String                   @unique
+  slug                            String                   @unique
+  description                     String?
+  iconPath                        String?
+  coverPath                       String?
+  configJson                      Json?
+  sortOrder                       Int                      @default(0)
+  status                          BoardStatus              @default(ACTIVE)
+  allowPost                       Boolean                  @default(true)
+  showInHomeFeed                  Boolean?
+  requirePostReview               Boolean?
+  requireCommentReview            Boolean?
+  postPointDelta                  Int?
+  replyPointDelta                 Int?
+  postIntervalSeconds             Int?
+  replyIntervalSeconds            Int?
+  allowedPostTypes                String?
+  minViewPoints                   Int?
+  minViewLevel                    Int?
+  minPostPoints                   Int?
+  minPostLevel                    Int?
+  minReplyPoints                  Int?
+  minReplyLevel                   Int?
+  minViewVipLevel                 Int?
+  minPostVipLevel                 Int?
+  minReplyVipLevel                Int?
+  postListDisplayMode             String?
+  postListLoadMode                String?
+  postCount                       Int                      @default(0)
+  treasuryPoints                  Int                      @default(0)
+  followerCount                   Int                      @default(0)
+  createdAt                       DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt                       DateTime                 @updatedAt @db.Timestamptz(3)
+  zone                            Zone?                    @relation(fields: [zoneId], references: [id])
+  posts                           Post[]
+  followers                       BoardFollow[]
+  moderatorScopes                 ModeratorBoardScope[]
+  boardApplications               BoardApplication[]
+  aiModerationSuggestionsAsTarget AiModerationSuggestion[]
 
   @@index([zoneId])
   @@index([status])
@@ -929,6 +918,7 @@ model Post {
   commentEffectFeedbacks        CommentEffectFeedback[]
   followers                     PostFollow[]
   aiReplyTasks                  AiReplyTask[]
+  aiModerationSuggestions       AiModerationSuggestion[]
 
   @@index([boardId])
   @@index([authorId])
@@ -1705,125 +1695,38 @@ model AdminLog {
 }
 
 model RssSetting {
-  id                     String    @id @default(cuid())
-  workerEnabled          Boolean   @default(true)
-  schedulerIntervalSec   Int       @default(30)
-  maxConcurrentJobs      Int       @default(2)
-  maxRetryCount          Int       @default(3)
-  retryBackoffSec        Int       @default(300)
-  fetchTimeoutMs         Int       @default(15000)
-  maxResponseBytes       Int       @default(1048576)
-  maxRedirects           Int       @default(3)
-  failurePauseThreshold  Int       @default(5)
-  homeDisplayEnabled     Boolean   @default(false)
-  homePageSize           Int       @default(20)
-  userAgent              String    @default("bbs-rss-worker/1.0")
-  workerHeartbeatAt      DateTime? @db.Timestamptz(3)
-  workerLastCycleAt      DateTime? @db.Timestamptz(3)
-  workerLastWorkerId     String?
-  workerLastSummaryJson  Json?
-  workerLastErrorAt      DateTime? @db.Timestamptz(3)
-  workerLastErrorMessage String?
-  createdAt              DateTime  @default(now()) @db.Timestamptz(3)
-  updatedAt              DateTime  @updatedAt @db.Timestamptz(3)
+  id                    String   @id @default(cuid())
+  maxConcurrentJobs     Int      @default(2)
+  maxRetryCount         Int      @default(3)
+  retryBackoffSec       Int      @default(300)
+  fetchTimeoutMs        Int      @default(15000)
+  maxResponseBytes      Int      @default(1048576)
+  maxRedirects          Int      @default(3)
+  failurePauseThreshold Int      @default(5)
+  homeDisplayEnabled    Boolean  @default(false)
+  homePageSize          Int      @default(20)
+  userAgent             String   @default("bbs-rss-worker/1.0")
+  createdAt             DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime @updatedAt @db.Timestamptz(3)
 
   @@map("rss_setting")
 }
 
 model RssSource {
-  id                String          @id @default(cuid())
-  siteName          String
-  feedUrl           String          @unique
-  logoPath          String?
-  intervalMinutes   Int
-  requiresReview    Boolean         @default(true)
-  status            RssSourceStatus @default(PAUSED)
-  requestTimeoutMs  Int?
-  maxRetryCount     Int?
-  nextRunAt         DateTime?       @db.Timestamptz(3)
-  lastRunAt         DateTime?       @db.Timestamptz(3)
-  lastSuccessAt     DateTime?       @db.Timestamptz(3)
-  lastErrorAt       DateTime?       @db.Timestamptz(3)
-  lastErrorMessage  String?
-  failureCount      Int             @default(0)
-  lastRunDurationMs Int?
-  createdAt         DateTime        @default(now()) @db.Timestamptz(3)
-  updatedAt         DateTime        @updatedAt @db.Timestamptz(3)
-  queueItems        RssQueue[]
-  runs              RssRun[]
-  entries           RssEntry[]
+  id               String     @id @default(cuid())
+  siteName         String
+  feedUrl          String     @unique
+  logoPath         String?
+  intervalMinutes  Int
+  requiresReview   Boolean    @default(true)
+  requestTimeoutMs Int?
+  maxRetryCount    Int?
+  createdAt        DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime   @updatedAt @db.Timestamptz(3)
+  entries          RssEntry[]
 
-  @@index([status, nextRunAt])
   @@index([createdAt])
   @@map("rss_source")
-}
-
-model RssQueue {
-  id             String         @id @default(cuid())
-  sourceId       String
-  triggerType    RssTriggerType
-  status         RssQueueStatus @default(PENDING)
-  priority       Int            @default(0)
-  scheduledAt    DateTime       @default(now()) @db.Timestamptz(3)
-  leaseExpiresAt DateTime?      @db.Timestamptz(3)
-  startedAt      DateTime?      @db.Timestamptz(3)
-  finishedAt     DateTime?      @db.Timestamptz(3)
-  attemptCount   Int            @default(0)
-  maxAttempts    Int            @default(3)
-  workerId       String?
-  errorMessage   String?
-  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime       @updatedAt @db.Timestamptz(3)
-  source         RssSource      @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  runs           RssRun[]
-
-  @@index([sourceId, status, scheduledAt])
-  @@index([status, scheduledAt, priority])
-  @@index([leaseExpiresAt])
-  @@map("rss_queue")
-}
-
-model RssRun {
-  id             String         @id @default(cuid())
-  sourceId       String
-  queueId        String?
-  triggerType    RssTriggerType
-  status         RssRunStatus   @default(RUNNING)
-  startedAt      DateTime       @default(now()) @db.Timestamptz(3)
-  finishedAt     DateTime?      @db.Timestamptz(3)
-  durationMs     Int?
-  httpStatus     Int?
-  contentType    String?
-  responseBytes  Int?
-  fetchedCount   Int            @default(0)
-  insertedCount  Int            @default(0)
-  duplicateCount Int            @default(0)
-  errorMessage   String?
-  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime       @updatedAt @db.Timestamptz(3)
-  source         RssSource      @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  queue          RssQueue?      @relation(fields: [queueId], references: [id], onDelete: SetNull)
-  logs           RssLog[]
-
-  @@index([sourceId, startedAt])
-  @@index([status, startedAt])
-  @@index([queueId])
-  @@map("rss_run")
-}
-
-model RssLog {
-  id         String      @id @default(cuid())
-  runId      String
-  level      RssLogLevel @default(INFO)
-  stage      String
-  message    String
-  detailJson Json?
-  createdAt  DateTime    @default(now()) @db.Timestamptz(3)
-  run        RssRun      @relation(fields: [runId], references: [id], onDelete: Cascade)
-
-  @@index([runId, createdAt])
-  @@index([level, createdAt])
-  @@map("rss_log")
 }
 
 model RssEntry {
@@ -1857,23 +1760,23 @@ model RssEntry {
 }
 
 model AddonRegistry {
-  id               String             @id @default(cuid())
-  addonId          String             @unique
+  id               String              @id @default(cuid())
+  addonId          String              @unique
   name             String
   version          String
   description      String?
   sourceDir        String?
-  state            AddonRegistryState @default(ENABLED)
-  enabled          Boolean            @default(true)
+  state            AddonRegistryState  @default(ENABLED)
+  enabled          Boolean             @default(true)
   manifestJson     Json?
   permissionsJson  Json?
-  installedAt      DateTime?          @db.Timestamptz(3)
-  disabledAt       DateTime?          @db.Timestamptz(3)
-  uninstalledAt    DateTime?          @db.Timestamptz(3)
-  lastErrorAt      DateTime?          @db.Timestamptz(3)
+  installedAt      DateTime?           @db.Timestamptz(3)
+  disabledAt       DateTime?           @db.Timestamptz(3)
+  uninstalledAt    DateTime?           @db.Timestamptz(3)
+  lastErrorAt      DateTime?           @db.Timestamptz(3)
   lastErrorMessage String?
-  createdAt        DateTime           @default(now()) @db.Timestamptz(3)
-  updatedAt        DateTime           @updatedAt @db.Timestamptz(3)
+  createdAt        DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime            @updatedAt @db.Timestamptz(3)
   logs             AddonLifecycleLog[]
 
   @@index([state, updatedAt])
@@ -1881,14 +1784,14 @@ model AddonRegistry {
 }
 
 model AddonLifecycleLog {
-  id          String        @id @default(cuid())
-  addonId     String
-  action      String
-  status      String
-  message     String?
+  id           String        @id @default(cuid())
+  addonId      String
+  action       String
+  status       String
+  message      String?
   metadataJson Json?
-  createdAt   DateTime      @default(now()) @db.Timestamptz(3)
-  addon       AddonRegistry @relation(fields: [addonId], references: [addonId], onDelete: Cascade)
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+  addon        AddonRegistry @relation(fields: [addonId], references: [addonId], onDelete: Cascade)
 
   @@index([addonId, createdAt])
   @@index([action, createdAt])
@@ -2419,4 +2322,54 @@ model UserLoginLog {
   @@index([userId])
   @@index([userId, createdAt])
   @@index([createdAt])
+}
+
+// ===== AI capabilities (plan_ai_reply_enhance Step 6) =====
+
+model AiUsageDaily {
+  id        String   @id @default(cuid())
+  appKey    String
+  day       DateTime @db.Date
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([appKey, day])
+  @@index([day])
+}
+
+model AiSummaryCache {
+  id          String   @id @default(cuid())
+  sourceKind  String
+  sourceId    String
+  contentHash String
+  summary     String
+  modelKey    String
+  hitCount    Int      @default(0)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  lastHitAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([sourceKind, sourceId, contentHash, modelKey])
+  @@index([sourceKind, sourceId])
+  @@index([createdAt])
+}
+
+model AiModerationSuggestion {
+  id               String             @id @default(cuid())
+  postId           String
+  suggestedBoardId String?
+  suggestedTagIds  String[]
+  reasoning        String?
+  modelKey         String
+  status           AiModerationStatus @default(PENDING)
+  reviewerId       Int?
+  decidedAt        DateTime?          @db.Timestamptz(3)
+  createdAt        DateTime           @default(now()) @db.Timestamptz(3)
+
+  post           Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  suggestedBoard Board? @relation(fields: [suggestedBoardId], references: [id], onDelete: SetNull)
+  reviewer       User?  @relation(fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@index([postId])
+  @@index([status, createdAt])
+  @@index([reviewerId])
 }

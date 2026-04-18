@@ -1,1 +1,0 @@
-ALTER TYPE "PointEffectTargetType" ADD VALUE IF NOT EXISTS 'FUNCTION';

@@ -46,8 +46,8 @@ export function findRssEntryById(id: string) {
 export function listRssEntrySourceOptions() {
   return prisma.rssSource.findMany({
     orderBy: [
-      { status: "asc" },
       { siteName: "asc" },
+      { id: "asc" },
     ],
     select: {
       id: true,

@@ -1,71 +1,14 @@
 import { apiSuccess, createUserRouteHandler, readJsonBody } from "@/lib/api-route"
-import { enqueueAiReplyForPostMention } from "@/lib/ai-reply"
-import { enqueueNewPostFollowNotifications } from "@/lib/follow-notifications"
-import { revalidateHomeSidebarStatsCache } from "@/lib/home-sidebar-stats"
-import { enqueueEvaluateUserLevelProgress } from "@/lib/level-system"
-import { createPostFlow } from "@/lib/post-create-service"
-import { logRouteWriteSuccess } from "@/lib/route-metadata"
-import { expireTaxonomyCacheImmediately } from "@/lib/taxonomy-cache"
-import { revalidateUserSurfaceCache } from "@/lib/user-surface"
-import { executeAddonActionHook } from "@/addons-host/runtime/hooks"
+import { executePostCreation } from "@/lib/post-create-execution"
 
-export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
+export const POST = createUserRouteHandler(async ({ request }) => {
   const body = await readJsonBody(request)
-  const requestUrl = new URL(request.url)
-
-  await executeAddonActionHook("post.create.before", {
-    authorId: currentUser.id,
-    authorUsername: currentUser.username,
-    body,
-  }, {
+  const result = await executePostCreation(body, {
     request,
-    pathname: requestUrl.pathname,
-    searchParams: requestUrl.searchParams,
-    throwOnError: true,
-  })
-  const result = await createPostFlow(body, { request })
-
-  logRouteWriteSuccess({
-    scope: "posts-create",
-    action: "create-post",
-  }, {
-    userId: result.author.id,
-    targetId: result.post.id,
-    extra: {
-      slug: result.post.slug,
-      status: result.post.status,
-      reviewRequired: result.shouldPending,
-      contentAdjusted: result.contentAdjusted,
+    log: {
+      scope: "posts-create",
+      action: "create-post",
     },
-  })
-
-  revalidateUserSurfaceCache(result.author.id)
-  if (!result.shouldPending) {
-    revalidateHomeSidebarStatsCache()
-    expireTaxonomyCacheImmediately()
-  }
-
-  void enqueueEvaluateUserLevelProgress(result.author.id, { notifyOnUpgrade: true })
-
-  if (!result.shouldPending) {
-    void enqueueNewPostFollowNotifications(result.post.id)
-    void enqueueAiReplyForPostMention({
-      postId: result.post.id,
-      triggerUserId: result.author.id,
-      mentionedUserIds: result.mentionUserIds,
-    })
-  }
-
-  await executeAddonActionHook("post.create.after", {
-    postId: result.post.id,
-    boardId: result.post.boardId,
-    authorId: result.author.id,
-    postType: result.post.type,
-    status: result.post.status,
-  }, {
-    request,
-    pathname: requestUrl.pathname,
-    searchParams: requestUrl.searchParams,
   })
 
   return apiSuccess({

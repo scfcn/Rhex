@@ -1,5 +1,5 @@
 import { executeAddonWaterfallHook } from "@/addons-host/runtime/hooks"
-import { getCurrentUserRecord } from "@/db/current-user"
+import { getCurrentUserRecord, type CurrentUserRecord } from "@/db/current-user"
 import {
   countAnonymousPostsByAuthorInRange,
   findAnonymousMaskUserById,
@@ -40,6 +40,14 @@ import { validatePostPayload } from "@/lib/validators"
 
 const MAX_POST_SLUG_RETRY_COUNT = 8
 
+export type PostCreateStatusMode = "AUTO" | "PUBLISHED" | "PENDING"
+
+interface CreatePostFlowOptions {
+  request: Request
+  author?: CurrentUserRecord | null
+  statusMode?: PostCreateStatusMode
+}
+
 function isPostSlugUniqueConstraintError(error: unknown) {
   if (!error || typeof error !== "object" || !("code" in error) || (error as { code?: string }).code !== "P2002") {
     return false
@@ -54,9 +62,7 @@ function isPostSlugUniqueConstraintError(error: unknown) {
     : true
 }
 
-export async function createPostFlow(body: unknown, options: {
-  request: Request
-}) {
+export async function createPostFlow(body: unknown, options: CreatePostFlowOptions) {
   const settings = await getSiteSettings()
   const validated = validatePostPayload(body, {
     titleMinLength: settings.postTitleMinLength,
@@ -171,7 +177,7 @@ export async function createPostFlow(body: unknown, options: {
 
   const [boardContext, author] = await Promise.all([
     getBoardAccessContextBySlug(boardSlug),
-    getCurrentUserRecord(),
+    options.author ? Promise.resolve(options.author) : getCurrentUserRecord(),
   ])
 
   if (!boardContext || !author) {
@@ -265,7 +271,12 @@ export async function createPostFlow(body: unknown, options: {
     user: author,
   })
 
-  const shouldPending = Boolean(boardContext.settings.requirePostReview)
+  const statusMode = options.statusMode ?? "AUTO"
+  const shouldPending = statusMode === "PENDING"
+    ? true
+    : statusMode === "PUBLISHED"
+      ? false
+      : Boolean(boardContext.settings.requirePostReview)
   const contentAdjusted = Boolean(
     titleSafety.wasReplaced
     || contentSafety.wasReplaced

@@ -11,6 +11,7 @@ import type {
   AttachmentFeatureSettings,
   ImageWatermarkPosition,
   ImageWatermarkSettings,
+  MessageMediaSettings,
   MarkdownImageUploadSettings,
   UploadObjectStorageSettings,
 } from "@/lib/site-settings-app-state.types"
@@ -254,6 +255,43 @@ export function mergeAttachmentFeatureSettings(
           ? allowedExtensions
           : ["zip", "rar", "7z", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt"],
       maxFileSizeMb: Math.max(1, normalizeNonNegativeInteger(input.maxFileSizeMb, 20)),
+    },
+  })
+}
+
+export function resolveMessageMediaSettings(options: {
+  appStateJson?: string | null
+  imageUploadEnabledFallback?: boolean
+  fileUploadEnabledFallback?: boolean
+} = {}): MessageMediaSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const messageMedia = isRecord(siteSettingsState.messageMedia)
+    ? siteSettingsState.messageMedia
+    : {}
+
+  return {
+    imageUploadEnabled:
+      typeof messageMedia.imageUploadEnabled === "boolean"
+        ? messageMedia.imageUploadEnabled
+        : options.imageUploadEnabledFallback ?? false,
+    fileUploadEnabled:
+      typeof messageMedia.fileUploadEnabled === "boolean"
+        ? messageMedia.fileUploadEnabled
+        : options.fileUploadEnabledFallback ?? false,
+  }
+}
+
+export function mergeMessageMediaSettings(
+  appStateJson: string | null | undefined,
+  input: MessageMediaSettings,
+) {
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+
+  return writeSiteSettingsState(appStateJson, {
+    ...siteSettingsState,
+    messageMedia: {
+      imageUploadEnabled: Boolean(input.imageUploadEnabled),
+      fileUploadEnabled: Boolean(input.fileUploadEnabled),
     },
   })
 }

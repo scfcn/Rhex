@@ -55,6 +55,9 @@ export function normalizeAddonManifest(input: unknown): AddonManifest {
           adminApis: Array.isArray((record.provides as Record<string, unknown>).adminApis)
             ? ((record.provides as Record<string, unknown>).adminApis as unknown[]).filter((item): item is string => typeof item === "string" && item.trim().length > 0)
             : undefined,
+          backgroundJobs: Array.isArray((record.provides as Record<string, unknown>).backgroundJobs)
+            ? ((record.provides as Record<string, unknown>).backgroundJobs as unknown[]).filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+            : undefined,
           providers: Array.isArray((record.provides as Record<string, unknown>).providers)
             ? ((record.provides as Record<string, unknown>).providers as unknown[]).filter((item): item is string => typeof item === "string" && item.trim().length > 0)
             : undefined,

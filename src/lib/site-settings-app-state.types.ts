@@ -139,6 +139,11 @@ export interface AttachmentFeatureSettings {
   maxFileSizeMb: number
 }
 
+export interface MessageMediaSettings {
+  imageUploadEnabled: boolean
+  fileUploadEnabled: boolean
+}
+
 export interface HomeSidebarAnnouncementSettings {
   enabled: boolean
 }

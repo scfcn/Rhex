@@ -12,6 +12,10 @@ import { logError, logInfo } from "@/lib/logger"
 import { createNotifications } from "@/lib/notification-writes"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getAiReplyConfig, getServerAiReplyConfig, isAiReplyConfigRunnable, type AiReplyConfigData } from "@/lib/ai-reply-config"
+import { resolveAiProvider, type AiProviderConfig } from "@/lib/ai/provider"
+import { runAiTask } from "@/lib/ai/service"
+import { AiProviderError } from "@/lib/ai/provider/types"
+import { AiRateLimitError } from "@/lib/ai/rate-limit"
 
 const AI_REPLY_BACKGROUND_JOB_NAME = "ai-reply.process"
 const AI_REPLY_MAX_CONTEXT_CHARS = 4_000
@@ -185,90 +189,6 @@ function getAiReplyProcessingStaleMs() {
   return DEFAULT_AI_REPLY_PROCESSING_STALE_MS
 }
 
-function extractCompletionText(payload: unknown) {
-  if (!payload || typeof payload !== "object") {
-    return ""
-  }
-
-  const choices = Array.isArray((payload as { choices?: unknown }).choices)
-    ? (payload as { choices: unknown[] }).choices
-    : []
-  const firstChoice = choices[0]
-
-  if (!firstChoice || typeof firstChoice !== "object") {
-    return ""
-  }
-
-  const delta = "delta" in firstChoice && firstChoice.delta && typeof firstChoice.delta === "object"
-    ? firstChoice.delta as { content?: unknown }
-    : null
-  const deltaContent = delta?.content
-
-  if (typeof deltaContent === "string") {
-    return deltaContent
-  }
-
-  const message = "message" in firstChoice && firstChoice.message && typeof firstChoice.message === "object"
-    ? firstChoice.message as { content?: unknown }
-    : null
-  const content = message?.content
-
-  if (typeof content === "string") {
-    return content.trim()
-  }
-
-  if (Array.isArray(content)) {
-    return content
-      .map((item) => {
-        if (typeof item === "string") {
-          return item
-        }
-
-        if (item && typeof item === "object" && "text" in item && typeof item.text === "string") {
-          return item.text
-        }
-
-        return ""
-      })
-      .join("")
-      .trim()
-  }
-
-  return ""
-}
-
-function extractCompletionTextFromSse(rawText: string) {
-  if (!rawText.includes("data:")) {
-    return ""
-  }
-
-  const parts: string[] = []
-
-  for (const rawLine of rawText.split(/\r?\n/)) {
-    const line = rawLine.trim()
-    if (!line.startsWith("data:")) {
-      continue
-    }
-
-    const data = line.slice(5).trim()
-    if (!data || data === "[DONE]") {
-      continue
-    }
-
-    try {
-      const parsed = JSON.parse(data) as unknown
-      const text = extractCompletionText(parsed)
-      if (text) {
-        parts.push(text)
-      }
-    } catch {
-      continue
-    }
-  }
-
-  return parts.join("").trim()
-}
-
 function normalizeAiReplyOutput(value: string) {
   const trimmed = value.trim()
   if (!trimmed) {
@@ -342,9 +262,6 @@ async function callAiReplyModel(params: {
     nickname: string | null
   }
 }) {
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), params.config.timeoutMs)
-
   const systemPrompt = [
     params.config.systemPrompt.trim(),
     `你当前扮演的论坛账号是 @${params.agentUser.username}${params.agentUser.nickname ? `（${params.agentUser.nickname}）` : ""}。`,
@@ -353,60 +270,45 @@ async function callAiReplyModel(params: {
       : params.config.commentReplyPrompt.trim(),
   ].filter(Boolean).join("\n\n")
 
+  const providerConfig: AiProviderConfig = {
+    kind: "openai-compatible",
+    baseUrl: params.config.baseUrl,
+    apiKey: params.config.apiKey ?? "",
+  }
+  const provider = resolveAiProvider(providerConfig)
+
   try {
-    const response = await fetch(`${params.config.baseUrl.replace(/\/+$/, "")}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${params.config.apiKey}`,
-      },
-      body: JSON.stringify({
+    const result = await runAiTask({
+      kind: "reply",
+      appKey: "app.ai-reply",
+      provider,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: params.prompt },
+      ],
+      options: {
         model: params.config.model,
-        stream: false,
         temperature: params.config.temperature,
-        max_tokens: params.config.maxOutputTokens,
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt,
-          },
-          {
-            role: "user",
-            content: params.prompt,
-          },
-        ],
-      }),
-      signal: controller.signal,
+        maxTokens: params.config.maxOutputTokens,
+        timeoutMs: params.config.timeoutMs,
+      },
     })
 
-    const rawText = await response.text()
-    let parsed: unknown = null
-
-    try {
-      parsed = rawText ? JSON.parse(rawText) : null
-    } catch {
-      parsed = null
-    }
-
-    if (!response.ok) {
-      const message = parsed && typeof parsed === "object" && "error" in parsed
-        ? JSON.stringify(parsed)
-        : rawText
-
-      throw new Error(`AI provider responded with ${response.status}: ${truncateText(message, 600)}`)
-    }
-
-    const content = normalizeAiReplyOutput(
-      extractCompletionText(parsed) || extractCompletionTextFromSse(rawText),
-    )
+    const content = normalizeAiReplyOutput(result.text)
     if (!content) {
-      const contentType = response.headers.get("content-type") ?? ""
-      throw new Error(`AI provider returned empty content${contentType ? ` (${contentType})` : ""}`)
+      throw new Error("AI provider returned empty content")
     }
-
     return content
-  } finally {
-    clearTimeout(timeout)
+  } catch (err) {
+    if (err instanceof AiProviderError) {
+      // openai-compatible 在 HTTP 非 2xx 时抛出 "AI provider responded with <status>: <snippet>"，
+      // 保留该文案让调用方（任务表 errorMessage）与旧实现输出尽量一致。
+      if (/AI provider responded with \d+/.test(err.message)) {
+        throw new Error(err.message)
+      }
+      throw new Error(`AI provider error (${err.kind}): ${err.message}`)
+    }
+    throw err
   }
 }
 
@@ -913,6 +815,11 @@ async function processAiReplyTask(taskId: string) {
     }, error)
 
     const message = error instanceof Error ? error.message : String(error)
+    // step 9: 日调用上限触发时不重试，直接落 FAILED（带 [RATE_LIMIT] 前缀方便过滤）
+    if (error instanceof AiRateLimitError) {
+      await markAiReplyTaskFailed(task.id, `[RATE_LIMIT] ${message}`)
+      return
+    }
     if (task.attemptCount < task.maxAttempts) {
       await requeueAiReplyTask(task.id, message, getAiReplyRetryDelayMs(task.attemptCount))
       return

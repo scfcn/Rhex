@@ -1,3 +1,7 @@
+import type { PrismaClient } from "@prisma/client"
+import type { SessionActor } from "@/db/session-actor-queries"
+import type { SiteSettingsData } from "@/lib/site-settings.types"
+
 export const ADDON_SLOT_KEYS = [
   "auth.login.captcha",
   "auth.login.form.after",
@@ -351,6 +355,7 @@ export interface AddonManifest {
     adminPages?: string[]
     publicApis?: string[]
     adminApis?: string[]
+    backgroundJobs?: string[]
     providers?: string[]
   }
   dependencies?: {
@@ -490,7 +495,501 @@ export interface AddonDataStoreApi {
   cleanup: (
     collectionName?: string,
   ) => Promise<{ deletedCount: number; scannedCount: number }>
+  clear: (
+    collectionName?: string,
+  ) => Promise<{ clearedCollections: number; clearedRecords: number }>
   getSchemaVersion: () => Promise<number>
+}
+
+export interface AddonBackgroundJobEnqueueOptions {
+  delayMs?: number
+  maxAttempts?: number
+}
+
+export interface AddonBackgroundJobHandle<TPayload = unknown> {
+  id: string
+  key: string
+  payload: TPayload
+  enqueuedAt: string
+  attempt: number
+  maxAttempts: number
+  availableAt: string | null
+}
+
+export type AddonBackgroundJobDeleteLocation =
+  | "memory-queue"
+  | "stream"
+  | "delayed"
+  | "dead-letter"
+
+export interface AddonBackgroundJobDeleteResult {
+  id: string
+  removed: boolean
+  removedFrom: AddonBackgroundJobDeleteLocation[]
+}
+
+export interface AddonBackgroundJobApi {
+  enqueue: <TPayload = unknown>(
+    jobKey: string,
+    payload: TPayload,
+    options?: AddonBackgroundJobEnqueueOptions,
+  ) => Promise<AddonBackgroundJobHandle<TPayload>>
+  remove: (jobId: string) => Promise<AddonBackgroundJobDeleteResult>
+}
+
+export interface AddonScheduledJobState {
+  token: string
+  jobId: string
+  nextRunAt: string | null
+}
+
+export interface AddonScheduleStatus {
+  state: "scheduled" | "missing" | "stale" | "disabled" | "incomplete"
+  message: string
+  token: string
+  jobId: string
+  nextRunAt: string | null
+}
+
+export interface AddonScheduleEnsureOptions<TPayload = Record<string, unknown>> {
+  enabled: boolean
+  configured: boolean
+  jobKey: string
+  delayMs: number
+  token?: string
+  refreshToken?: boolean
+  payload?: TPayload
+}
+
+export interface AddonSchedulerApi {
+  inspect: (input: {
+    enabled: boolean
+    configured: boolean
+    state: AddonScheduledJobState | null | undefined
+  }) => AddonScheduleStatus
+  ensure: <TPayload = Record<string, unknown>>(
+    currentState: AddonScheduledJobState | null | undefined,
+    options: AddonScheduleEnsureOptions<TPayload>,
+  ) => Promise<{
+    scheduled: boolean
+    state: AddonScheduledJobState
+  }>
+  cancel: (
+    currentState: AddonScheduledJobState | null | undefined,
+    options?: { nextToken?: string },
+  ) => Promise<AddonScheduledJobState>
+}
+
+export type AddonPostStatusMode = "AUTO" | "PUBLISHED" | "PENDING"
+export type AddonPostType = "NORMAL" | "BOUNTY" | "POLL" | "LOTTERY" | "AUCTION"
+export type AddonReadablePostStatus = "NORMAL" | "PENDING" | "DELETED" | "LOCKED" | "OFFLINE"
+export type AddonReadableCommentStatus = "NORMAL" | "HIDDEN" | "DELETED" | "PENDING"
+export type AddonSortDirection = "asc" | "desc"
+
+export interface AddonPostCreateInput {
+  authorId?: number
+  authorUsername?: string
+  status?: AddonPostStatusMode
+  title: string
+  content: string
+  boardSlug: string
+  postType?: AddonPostType
+  isAnonymous?: boolean
+  coverPath?: string | null
+  bountyPoints?: number | null
+  auctionConfig?: Record<string, unknown> | null
+  pollOptions?: string[]
+  pollExpiresAt?: string | null
+  commentsVisibleToAuthorOnly?: boolean
+  loginUnlockContent?: string
+  replyUnlockContent?: string
+  replyThreshold?: number | null
+  purchaseUnlockContent?: string
+  purchasePrice?: number | null
+  minViewLevel?: number | null
+  minViewVipLevel?: number | null
+  lotteryConfig?: Record<string, unknown> | null
+  redPacketConfig?: Record<string, unknown> | null
+  manualTags?: string[]
+  attachments?: Array<Record<string, unknown>>
+}
+
+export interface AddonPostCreateResult {
+  id: string
+  slug: string
+  status: string
+  boardId: string
+  authorId: number
+  shouldPending: boolean
+  contentAdjusted: boolean
+}
+
+export interface AddonUserSummary {
+  id: number
+  username: string
+  nickname: string | null
+  displayName: string
+  avatarPath: string | null
+  status: "ACTIVE" | "MUTED" | "BANNED" | "INACTIVE"
+  vipLevel: number
+}
+
+export interface AddonZoneSummary {
+  id: string | null
+  slug: string | null
+  name: string | null
+}
+
+export interface AddonBoardSummary {
+  id: string
+  slug: string
+  name: string
+  iconPath: string | null
+  zone: AddonZoneSummary | null
+}
+
+export interface AddonPostRecord {
+  id: string
+  slug: string
+  title: string
+  summary: string | null
+  content: string
+  coverPath: string | null
+  type: AddonPostType
+  status: AddonReadablePostStatus
+  reviewNote: string | null
+  isAnonymous: boolean
+  isPinned: boolean
+  pinScope: string | null
+  isFeatured: boolean
+  commentsVisibleToAuthorOnly: boolean
+  minViewLevel: number
+  minViewVipLevel: number
+  commentCount: number
+  viewCount: number
+  likeCount: number
+  favoriteCount: number
+  tipCount: number
+  tipTotalPoints: number
+  bountyPoints: number | null
+  createdAt: string
+  updatedAt: string
+  publishedAt: string | null
+  lastCommentedAt: string | null
+  activityAt: string
+  board: AddonBoardSummary
+  author: AddonUserSummary
+}
+
+export interface AddonPostQuerySort {
+  field:
+    | "createdAt"
+    | "updatedAt"
+    | "publishedAt"
+    | "lastCommentedAt"
+    | "activityAt"
+    | "commentCount"
+    | "viewCount"
+    | "likeCount"
+    | "favoriteCount"
+    | "tipCount"
+    | "tipTotalPoints"
+  direction?: AddonSortDirection
+}
+
+export interface AddonPostQueryOptions {
+  ids?: string[]
+  excludeIds?: string[]
+  boardIds?: string[]
+  boardSlugs?: string[]
+  zoneIds?: string[]
+  zoneSlugs?: string[]
+  authorIds?: number[]
+  authorUsernames?: string[]
+  statuses?: AddonReadablePostStatus[]
+  createdAfter?: string | null
+  createdBefore?: string | null
+  publishedAfter?: string | null
+  publishedBefore?: string | null
+  lastCommentedAfter?: string | null
+  lastCommentedBefore?: string | null
+  activityAfter?: string | null
+  activityBefore?: string | null
+  minCommentCount?: number
+  maxCommentCount?: number
+  minViewCount?: number
+  maxViewCount?: number
+  minLikeCount?: number
+  maxLikeCount?: number
+  minFavoriteCount?: number
+  maxFavoriteCount?: number
+  includePinned?: boolean
+  includeFeatured?: boolean
+  limit?: number
+  offset?: number
+  includeTotal?: boolean
+  sort?: AddonPostQuerySort[]
+}
+
+export interface AddonPostQueryResult {
+  items: AddonPostRecord[]
+  total: number | null
+  limit: number
+  offset: number
+}
+
+export interface AddonPostLikeInput {
+  actorId?: number
+  actorUsername?: string
+  postId: string
+}
+
+export interface AddonPostLikeResult {
+  postId: string
+  liked: true
+  changed: boolean
+  targetUserId: number | null
+}
+
+export interface AddonPostTipInput {
+  senderId?: number
+  senderUsername?: string
+  postId: string
+  amount: number
+  giftId?: string | null
+}
+
+export interface AddonPostTipResult {
+  postId: string
+  amount: number
+  pointName: string
+  recipientUserId: number
+  gift: {
+    id: string
+    name: string
+    price: number
+  } | null
+}
+
+export interface AddonPostsApi {
+  create: (input: AddonPostCreateInput) => Promise<AddonPostCreateResult>
+  query: (options?: AddonPostQueryOptions) => Promise<AddonPostQueryResult>
+  like: (input: AddonPostLikeInput) => Promise<AddonPostLikeResult>
+  tip: (input: AddonPostTipInput) => Promise<AddonPostTipResult>
+}
+
+export interface AddonCommentCreateInput {
+  authorId?: number
+  authorUsername?: string
+  postId: string
+  content: string
+  parentId?: string
+  replyToUserName?: string
+  replyToCommentId?: string
+  useAnonymousIdentity?: boolean
+  commentView?: "tree" | "flat"
+}
+
+export interface AddonCommentCreateResult {
+  id: string
+  postId: string
+  status: AddonReadableCommentStatus
+  parentId: string | null
+  replyToCommentId: string | null
+  replyToUserId: number | null
+  reviewRequired: boolean
+  contentAdjusted: boolean
+  targetPage: number
+  commentView: "tree" | "flat"
+}
+
+export interface AddonCommentRecord {
+  id: string
+  postId: string
+  parentId: string | null
+  replyToUserId: number | null
+  replyToCommentId: string | null
+  useAnonymousIdentity: boolean
+  content: string
+  status: AddonReadableCommentStatus
+  reviewNote: string | null
+  likeCount: number
+  createdAt: string
+  updatedAt: string
+  author: AddonUserSummary
+}
+
+export interface AddonCommentQuerySort {
+  field: "createdAt" | "updatedAt" | "likeCount"
+  direction?: AddonSortDirection
+}
+
+export interface AddonCommentQueryOptions {
+  ids?: string[]
+  postId?: string
+  postIds?: string[]
+  authorIds?: number[]
+  authorUsernames?: string[]
+  statuses?: AddonReadableCommentStatus[]
+  parentId?: string | null
+  createdAfter?: string | null
+  createdBefore?: string | null
+  updatedAfter?: string | null
+  updatedBefore?: string | null
+  minLikeCount?: number
+  maxLikeCount?: number
+  limit?: number
+  offset?: number
+  includeTotal?: boolean
+  sort?: AddonCommentQuerySort[]
+}
+
+export interface AddonCommentQueryResult {
+  items: AddonCommentRecord[]
+  total: number | null
+  limit: number
+  offset: number
+}
+
+export interface AddonCommentLikeInput {
+  actorId?: number
+  actorUsername?: string
+  commentId: string
+}
+
+export interface AddonCommentLikeResult {
+  commentId: string
+  liked: true
+  changed: boolean
+  targetUserId: number | null
+}
+
+export interface AddonCommentsApi {
+  create: (input: AddonCommentCreateInput) => Promise<AddonCommentCreateResult>
+  query: (options?: AddonCommentQueryOptions) => Promise<AddonCommentQueryResult>
+  like: (input: AddonCommentLikeInput) => Promise<AddonCommentLikeResult>
+}
+
+export interface AddonMessageSendInput {
+  senderId?: number
+  senderUsername?: string
+  recipientId?: number
+  recipientUsername?: string
+  body: string
+}
+
+export interface AddonMessageSendResult {
+  id: string
+  conversationId: string
+  content: string
+  createdAt: string
+  occurredAt: string
+  contentAdjusted: boolean
+}
+
+export interface AddonMessagesApi {
+  send: (input: AddonMessageSendInput) => Promise<AddonMessageSendResult>
+}
+
+export type AddonNotificationRelatedType =
+  | "POST"
+  | "COMMENT"
+  | "USER"
+  | "REPORT"
+  | "ANNOUNCEMENT"
+  | "YINYANG_CHALLENGE"
+
+export interface AddonNotificationCreateInput {
+  recipientId?: number
+  recipientUsername?: string
+  relatedId: string
+  title: string
+  content: string
+  relatedType?: AddonNotificationRelatedType
+  senderId?: number | null
+}
+
+export interface AddonNotificationRecord {
+  id: string
+  userId: number
+  type: "SYSTEM"
+  senderId: number | null
+  relatedType: AddonNotificationRelatedType
+  relatedId: string
+  title: string
+  content: string
+  createdAt: string
+}
+
+export interface AddonNotificationsApi {
+  create: (input: AddonNotificationCreateInput) => Promise<AddonNotificationRecord>
+  createMany: (
+    inputs: AddonNotificationCreateInput[],
+  ) => Promise<AddonNotificationRecord[]>
+}
+
+export interface AddonUserFollowInput {
+  followerId?: number
+  followerUsername?: string
+  targetUserId?: number
+  targetUsername?: string
+}
+
+export interface AddonUserFollowResult {
+  targetType: "user"
+  targetUserId: number
+  followed: true
+  changed: boolean
+}
+
+export interface AddonFollowsApi {
+  followUser: (input: AddonUserFollowInput) => Promise<AddonUserFollowResult>
+}
+
+export interface AddonPointAdjustInput {
+  targetUserId?: number
+  targetUsername?: string
+  delta: number
+  reason: string
+  scopeKey?: string
+  relatedType?: AddonNotificationRelatedType
+  relatedId?: string | null
+  insufficientMessage?: string
+}
+
+export interface AddonPointAdjustResult {
+  userId: number
+  pointName: string
+  finalDelta: number
+  afterBalance: number
+  scopeKey: string | null
+  effectsApplied: boolean
+}
+
+export interface AddonPointsApi {
+  adjust: (input: AddonPointAdjustInput) => Promise<AddonPointAdjustResult>
+}
+
+export interface AddonBoardSelectItem {
+  value: string
+  label: string
+}
+
+export interface AddonBoardSelectGroup {
+  zone: string
+  items: AddonBoardSelectItem[]
+}
+
+export interface AddonLifecycleDatabaseApi {
+  prisma: PrismaClient
+  queryRaw: <TRow = Record<string, unknown>>(
+    sql: string,
+    values?: unknown[],
+  ) => Promise<TRow[]>
+  executeRaw: (sql: string, values?: unknown[]) => Promise<number>
+  transaction: <TResult>(
+    task: (database: AddonLifecycleDatabaseApi) => Promise<TResult>,
+  ) => Promise<TResult>
 }
 
 export interface AddonExecutionContextBase extends AddonRuntimeDescriptor {
@@ -500,6 +999,9 @@ export interface AddonExecutionContextBase extends AddonRuntimeDescriptor {
   permissions: string[]
   hasPermission: (permission: string) => boolean
   assertPermission: (permission: string, message?: string) => void
+  getCurrentUser: () => Promise<SessionActor | null>
+  getSiteSettings: () => Promise<SiteSettingsData>
+  getBoardSelectOptions: () => Promise<AddonBoardSelectGroup[]>
   asset: (path?: string) => string
   publicPage: (path?: string) => string
   adminPage: (path?: string) => string
@@ -512,6 +1014,52 @@ export interface AddonExecutionContextBase extends AddonRuntimeDescriptor {
   readSecret: <T = unknown>(secretKey: string, fallback?: T) => Promise<T>
   writeSecret: <T = unknown>(secretKey: string, value: T) => Promise<void>
   data: AddonDataStoreApi
+  backgroundJobs: AddonBackgroundJobApi
+  scheduler: AddonSchedulerApi
+  posts: AddonPostsApi
+  comments: AddonCommentsApi
+  messages: AddonMessagesApi
+  notifications: AddonNotificationsApi
+  follows: AddonFollowsApi
+  points: AddonPointsApi
+}
+
+export type AddonLifecycleAction = "install" | "upgrade" | "uninstall"
+
+export interface AddonLifecycleContextBase extends AddonExecutionContextBase {
+  action: AddonLifecycleAction
+  readFileText: (path: string) => Promise<string>
+  readFileJson: <T = unknown>(path: string) => Promise<T>
+  database: AddonLifecycleDatabaseApi
+}
+
+export interface AddonInstallLifecycleContext extends AddonLifecycleContextBase {
+  action: "install"
+}
+
+export interface AddonUpgradeLifecycleContext extends AddonLifecycleContextBase {
+  action: "upgrade"
+  previousManifest: AddonManifest
+  previousVersion: string
+  nextVersion: string
+  previousRootDir: string
+}
+
+export interface AddonUninstallLifecycleContext extends AddonLifecycleContextBase {
+  action: "uninstall"
+  currentVersion: string
+}
+
+export interface AddonLifecycleHooks {
+  install?: (
+    context: AddonInstallLifecycleContext,
+  ) => AddonMaybePromise<void>
+  upgrade?: (
+    context: AddonUpgradeLifecycleContext,
+  ) => AddonMaybePromise<void>
+  uninstall?: (
+    context: AddonUninstallLifecycleContext,
+  ) => AddonMaybePromise<void>
 }
 
 export interface AddonSlotRenderContext<
@@ -666,6 +1214,24 @@ export interface AddonAsyncWaterfallHookRegistration<
   ) => AddonMaybePromise<TValue | undefined>
 }
 
+export interface AddonBackgroundJobHandlerContext<
+  TPayload = unknown,
+> extends AddonExecutionContextBase {
+  job: AddonBackgroundJobHandle<TPayload>
+  payload: TPayload
+}
+
+export interface AddonBackgroundJobRegistration<
+  TPayload = unknown,
+> {
+  key: string
+  title?: string
+  description?: string
+  handle: (
+    context: AddonBackgroundJobHandlerContext<TPayload>,
+  ) => AddonMaybePromise<void>
+}
+
 export interface AddonDataMigrationRegistration {
   version: number
   title?: string
@@ -683,6 +1249,9 @@ export interface AddonBuildApi {
   registerAdminPage: (registration: AddonPageRegistration) => void
   registerPublicApi: (registration: AddonApiRegistration) => void
   registerAdminApi: (registration: AddonApiRegistration) => void
+  registerBackgroundJob: <TPayload = unknown>(
+    registration: AddonBackgroundJobRegistration<TPayload>,
+  ) => void
   registerProvider: (registration: AddonProviderRegistration) => void
   registerActionHook: (
     registration: AddonActionHookRegistration,
@@ -700,6 +1269,7 @@ export interface AddonBuildApi {
 
 export interface AddonDefinition {
   setup: (api: AddonBuildApi) => AddonMaybePromise<void>
+  lifecycle?: AddonLifecycleHooks
 }
 
 export interface LoadedAddonRuntime extends AddonRuntimeDescriptor {
@@ -713,6 +1283,7 @@ export interface LoadedAddonRuntime extends AddonRuntimeDescriptor {
   adminPages: AddonPageRegistration[]
   publicApis: AddonApiRegistration[]
   adminApis: AddonApiRegistration[]
+  backgroundJobs: AddonBackgroundJobRegistration[]
   providers: AddonProviderRegistration[]
   actionHooks: AddonActionHookRegistration[]
   waterfallHooks: AddonWaterfallHookRegistration[]

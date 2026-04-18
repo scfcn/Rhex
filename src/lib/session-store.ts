@@ -27,9 +27,6 @@ function isPersistedSessionRecord(value: unknown): value is PersistedSessionReco
 }
 
 export async function persistSessionRecord(record: PersistedSessionRecord) {
-  if (!hasRedisUrl()) {
-    return
-  }
 
   const ttlSeconds = Math.max(1, record.expiresAt - Math.floor(Date.now() / 1000))
   const normalizedIp = normalizeIp(record.ip ?? null)
@@ -46,9 +43,6 @@ export async function persistSessionRecord(record: PersistedSessionRecord) {
 }
 
 export async function readPersistedSessionRecord(sessionId: string) {
-  if (!hasRedisUrl()) {
-    return null
-  }
 
   const rawRecord = await getRedis().get(getSessionRedisKey(sessionId))
 

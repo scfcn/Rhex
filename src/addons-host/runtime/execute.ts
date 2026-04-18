@@ -1,3 +1,5 @@
+import "server-only"
+
 import {
   buildAddonExecutionContext,
   loadAddonsRegistry,
@@ -5,7 +7,12 @@ import {
 } from "@/addons-host/runtime/loader"
 import { runWithAddonExecutionScope } from "@/addons-host/runtime/execution-scope"
 import { findAddonApiRoute, findAddonPageRoute } from "@/addons-host/runtime/routes"
-import { createAddonLifecycleLog, upsertAddonRegistryRecord } from "@/db/addon-registry-queries"
+import {
+  logRenderFailure,
+  persistAddonRenderFailure,
+  runAddonRenderCall,
+  type AddonRenderExecutionInput,
+} from "@/addons-host/runtime/internal/render-executor"
 import type {
   AddonApiResult,
   AddonApiScope,
@@ -36,12 +43,6 @@ export interface ExecutedAddonSurfaceResult<
   result: AddonRenderResult
 }
 
-interface AddonRenderExecutionInput {
-  request?: Request
-  pathname?: string
-  searchParams?: URLSearchParams
-}
-
 function resolveAddonSurfaceClientModuleUrl(addon: LoadedAddonRuntime, input?: string) {
   const target = typeof input === "string" ? input.trim() : ""
   if (!target) {
@@ -53,120 +54,6 @@ function resolveAddonSurfaceClientModuleUrl(addon: LoadedAddonRuntime, input?: s
   }
 
   return buildAddonExecutionContext(addon).asset(target)
-}
-
-async function logSurfaceFailure(input: {
-  addon: LoadedAddonRuntime
-  surface: string
-  key: string
-  error: unknown
-}) {
-  try {
-    await createAddonLifecycleLog({
-      addonId: input.addon.manifest.id,
-      action: "SURFACE_RENDER",
-      status: "FAILED",
-      message:
-        input.error instanceof Error
-          ? input.error.message
-          : `addon surface "${input.surface}" failed`,
-      metadataJson: {
-        surface: input.surface,
-        key: input.key,
-      },
-    })
-  } catch (logError) {
-    console.error(
-      `[addons-host:surface:${input.surface}] failed to persist lifecycle log`,
-      input.addon.manifest.id,
-      input.key,
-      logError,
-    )
-  }
-}
-
-async function logSlotFailure(input: {
-  addon: LoadedAddonRuntime
-  slot: AddonSlotKey
-  key: string
-  error: unknown
-}) {
-  try {
-    await createAddonLifecycleLog({
-      addonId: input.addon.manifest.id,
-      action: "SLOT_RENDER",
-      status: "FAILED",
-      message:
-        input.error instanceof Error
-          ? input.error.message
-          : `addon slot "${input.slot}" failed`,
-      metadataJson: {
-        slot: input.slot,
-        key: input.key,
-      },
-    })
-  } catch (logError) {
-    console.error(
-      `[addons-host:slot:${input.slot}] failed to persist lifecycle log`,
-      input.addon.manifest.id,
-      input.key,
-      logError,
-    )
-  }
-}
-
-function parseOptionalIsoDate(value?: string | null) {
-  if (!value) {
-    return null
-  }
-
-  const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
-}
-
-function buildAddonRegistryState(addon: LoadedAddonRuntime, lastErrorMessage: string) {
-  if (addon.state.uninstalledAt) {
-    return "UNINSTALLED" as const
-  }
-
-  if (lastErrorMessage) {
-    return "ERROR" as const
-  }
-
-  return addon.enabled ? "ENABLED" as const : "DISABLED" as const
-}
-
-async function persistAddonRenderFailure(addon: LoadedAddonRuntime, error: unknown) {
-  const message = error instanceof Error
-    ? error.message
-    : `addon "${addon.manifest.id}" render failed`
-
-  if (addon.state.lastErrorMessage === message && addon.state.lastErrorAt) {
-    return
-  }
-
-  const failedAt = new Date()
-
-  try {
-    await upsertAddonRegistryRecord({
-      addonId: addon.manifest.id,
-      name: addon.manifest.name,
-      version: addon.manifest.version,
-      description: addon.manifest.description ?? null,
-      sourceDir: addon.rootDir,
-      state: buildAddonRegistryState(addon, message),
-      enabled: addon.enabled,
-      manifestJson: addon.manifest,
-      permissionsJson: addon.manifest.permissions ?? [],
-      installedAt: parseOptionalIsoDate(addon.state.installedAt),
-      disabledAt: parseOptionalIsoDate(addon.state.disabledAt),
-      uninstalledAt: parseOptionalIsoDate(addon.state.uninstalledAt),
-      lastErrorAt: failedAt,
-      lastErrorMessage: message,
-    })
-  } catch {
-    // Ignore persistence failures so addon crashes remain isolated from the page request.
-  }
 }
 
 async function collectAddonSurfaceCandidates<
@@ -189,18 +76,16 @@ export async function executeAddonSlot<
 
   for (const candidate of registry.slotCandidatesBySlot.get(slot) ?? []) {
     try {
-      const result = await runWithAddonExecutionScope(candidate.addon, {
+      const result = await runAddonRenderCall({
+        addon: candidate.addon,
         action: `slot:${slot}:${candidate.registration.key}`,
-        request: input?.request,
-      }, async () => candidate.registration.render({
-        ...buildAddonExecutionContext(candidate.addon, {
-          request: input?.request,
-          pathname: input?.pathname,
-          searchParams: input?.searchParams,
+        input,
+        call: (ctx) => candidate.registration.render({
+          ...ctx,
+          slot,
+          props: (props ?? {}) as TProps,
         }),
-        slot,
-        props: (props ?? {}) as TProps,
-      }))
+      })
 
       if (!result) {
         continue
@@ -213,10 +98,12 @@ export async function executeAddonSlot<
         result,
       })
     } catch (error) {
-      await logSlotFailure({
+      await logRenderFailure({
         addon: candidate.addon,
-        slot,
+        kind: "SLOT_RENDER",
+        target: slot,
         key: candidate.registration.key,
+        metadataJson: { slot, key: candidate.registration.key },
         error,
       })
       await persistAddonRenderFailure(candidate.addon, error)
@@ -238,18 +125,16 @@ export async function executeAddonSurface<
   for (const candidate of candidates) {
     try {
       const result = candidate.registration.render
-        ? await runWithAddonExecutionScope(candidate.addon, {
+        ? await runAddonRenderCall({
+            addon: candidate.addon,
             action: `surface:${surface}:${candidate.registration.key}`,
-            request: input?.request,
-          }, async () => candidate.registration.render?.({
-            ...buildAddonExecutionContext(candidate.addon, {
-              request: input?.request,
-              pathname: input?.pathname,
-              searchParams: input?.searchParams,
+            input,
+            call: (ctx) => candidate.registration.render?.({
+              ...ctx,
+              surface,
+              props,
             }),
-            surface,
-            props,
-          }))
+          })
         : {
             clientModule: resolveAddonSurfaceClientModuleUrl(
               candidate.addon,
@@ -269,10 +154,12 @@ export async function executeAddonSurface<
         result,
       } satisfies ExecutedAddonSurfaceResult<TProps>
     } catch (error) {
-      await logSurfaceFailure({
+      await logRenderFailure({
         addon: candidate.addon,
-        surface,
+        kind: "SURFACE_RENDER",
+        target: surface,
         key: candidate.registration.key,
+        metadataJson: { surface, key: candidate.registration.key },
         error,
       })
       await persistAddonRenderFailure(candidate.addon, error)
@@ -299,18 +186,16 @@ export async function executeAddonSurfaceRender<
     }
 
     try {
-      const result = await runWithAddonExecutionScope(candidate.addon, {
+      const result = await runAddonRenderCall({
+        addon: candidate.addon,
         action: `surface:${surface}:${candidate.registration.key}`,
-        request: input?.request,
-      }, async () => candidate.registration.render?.({
-        ...buildAddonExecutionContext(candidate.addon, {
-          request: input?.request,
-          pathname: input?.pathname,
-          searchParams: input?.searchParams,
+        input,
+        call: (ctx) => candidate.registration.render?.({
+          ...ctx,
+          surface,
+          props,
         }),
-        surface,
-        props,
-      }))
+      })
 
       if (result) {
         return {
@@ -325,10 +210,12 @@ export async function executeAddonSurfaceRender<
         return null
       }
     } catch (error) {
-      await logSurfaceFailure({
+      await logRenderFailure({
         addon: candidate.addon,
-        surface,
+        kind: "SURFACE_RENDER",
+        target: surface,
         key: candidate.registration.key,
+        metadataJson: { surface, key: candidate.registration.key },
         error,
       })
       await persistAddonRenderFailure(candidate.addon, error)
@@ -349,14 +236,16 @@ export async function executeAddonPage(scope: AddonPageScope, addonId: string, r
   }
 
   const routePath = routeSegments?.filter(Boolean).join("/") ?? ""
-  const result = await runWithAddonExecutionScope(matched.addon, {
+  const result = await runAddonRenderCall({
+    addon: matched.addon,
     action: `page:${scope}:${matched.registration.key}`,
-  }, async () => matched.registration.render({
-    ...buildAddonExecutionContext(matched.addon),
-    scope,
-    routePath,
-    routeSegments: routeSegments ?? [],
-  }))
+    call: (ctx) => matched.registration.render({
+      ...ctx,
+      scope,
+      routePath,
+      routeSegments: routeSegments ?? [],
+    }),
+  })
 
   if (!result) {
     return null
@@ -383,6 +272,8 @@ export async function executeAddonApi(
 
   const routePath = routeSegments?.filter(Boolean).join("/") ?? ""
   const requestUrl = new URL(request.url)
+  // api 路径的 handle 一定返回 AddonApiResult（非 undefined），保留直接 scope 调用，
+  // 避免 runAddonRenderCall 的 `TResult | undefined` 返回污染下游 http.ts 类型。
   const result = await runWithAddonExecutionScope(matched.addon, {
     action: `api:${scope}:${matched.registration.key}`,
     request,

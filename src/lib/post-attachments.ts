@@ -22,6 +22,7 @@ import { countUserRepliesByPostId } from "@/db/comment-queries"
 import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
 import { POINT_LOG_EVENT_TYPES } from "@/lib/point-log-events"
 import { getSiteSettings, type SiteSettingsData } from "@/lib/site-settings"
+import { isHttpUrl } from "@/lib/shared/url"
 import { isVipActive, type VipStateSource } from "@/lib/vip-status"
 import { normalizeUploadExtension } from "@/lib/upload-rules"
 
@@ -144,12 +145,7 @@ function getExtensionFromExternalUrl(externalUrl: string) {
 }
 
 function assertHttpUrl(value: string, message: string) {
-  try {
-    const parsedUrl = new URL(value)
-    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
-      apiError(400, message)
-    }
-  } catch {
+  if (!isHttpUrl(value)) {
     apiError(400, message)
   }
 }

@@ -1,17 +1,9 @@
 import { resolvePagination } from "@/db/helpers"
 import { countPublicRssEntries, listPublicRssEntries, listPublicRssSources } from "@/db/rss-public-feed-queries"
+import { normalizeHttpUrl } from "@/lib/shared/url"
 
 function normalizeExternalUrl(value: string | null) {
-  if (!value) {
-    return null
-  }
-
-  try {
-    const url = new URL(value)
-    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : null
-  } catch {
-    return null
-  }
+  return normalizeHttpUrl(value)
 }
 
 export interface RssUniverseFeedPageData {

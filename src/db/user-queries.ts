@@ -52,7 +52,9 @@ export function findUserProfileByUsername(username: string) {
   })
 }
 
-export function findUserPostsByUsername(username: string) {
+export function findUserPostsByUsername(username: string, options: { skip?: number; take?: number } = {}) {
+  const take = Math.min(Math.max(1, options.take ?? 30), 50)
+
   return prisma.post.findMany({
     where: {
       status: "NORMAL",
@@ -63,31 +65,44 @@ export function findUserPostsByUsername(username: string) {
     },
     include: postListInclude,
     orderBy: [{ createdAt: "desc" }],
-    take: 30,
+    skip: options.skip ?? 0,
+    take,
   })
 }
 
-export function findUserRepliesByUsername(username: string, limit = 20) {
-  return prisma.comment.findMany({
-    where: {
+function buildVisibleUserRepliesWhere(username: string): Prisma.CommentWhereInput {
+  return {
+    status: "NORMAL",
+    user: {
+      username,
+    },
+    post: {
       status: "NORMAL",
-      user: {
-        username,
-      },
-      post: {
-        status: "NORMAL",
-        OR: [
-          { isAnonymous: false },
-          {
-            author: {
-              username: {
-                not: username,
-              },
+      OR: [
+        { isAnonymous: false },
+        {
+          author: {
+            username: {
+              not: username,
             },
           },
-        ],
-      },
+        },
+      ],
     },
+  }
+}
+
+export function countVisibleUserRepliesByUsername(username: string) {
+  return prisma.comment.count({
+    where: buildVisibleUserRepliesWhere(username),
+  })
+}
+
+export function findUserRepliesByUsername(username: string, options: { skip?: number; take?: number } = {}) {
+  const take = Math.min(Math.max(1, options.take ?? 20), 50)
+
+  return prisma.comment.findMany({
+    where: buildVisibleUserRepliesWhere(username),
     select: {
       id: true,
       content: true,
@@ -112,7 +127,8 @@ export function findUserRepliesByUsername(username: string, limit = 20) {
       },
     },
     orderBy: [{ createdAt: "desc" }],
-    take: Math.min(Math.max(1, limit), 50),
+    skip: options.skip ?? 0,
+    take,
   })
 }
 

@@ -16,6 +16,7 @@ export const GET = createRouteHandler(async ({ request }) => {
   const challenge = createPowCaptchaChallenge({
     scope,
     requestIp: getRequestIp(request),
+    requestUserAgent: request.headers.get("user-agent"),
   })
 
   return NextResponse.json(

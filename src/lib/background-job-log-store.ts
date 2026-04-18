@@ -5,7 +5,12 @@ import {
   BACKGROUND_JOB_EXECUTION_LOG_RETENTION_MS,
   getBackgroundJobExecutionLogKey,
 } from "@/lib/background-job-redis"
-import { connectRedisClient, createRedisConnection, getRedis, hasRedisUrl } from "@/lib/redis"
+import { connectRedisClient, getRedis } from "@/lib/redis"
+import {
+  getLogStoreMaxEntries,
+  pruneCappedLog,
+  queueCappedLogPrune,
+} from "@/lib/redis-capped-log"
 
 type JsonObject = Record<string, unknown>
 
@@ -106,15 +111,16 @@ function parseBackgroundJobExecutionLog(value: string) {
 }
 
 async function pruneBackgroundJobExecutionLogsWithRedis(redis: ReturnType<typeof getRedis>, nowMs: number) {
-  return redis.zremrangebyscore(
-    getBackgroundJobExecutionLogKey(),
-    "-inf",
-    String(nowMs - BACKGROUND_JOB_EXECUTION_LOG_RETENTION_MS),
-  )
+  return pruneCappedLog(redis, getBackgroundJobExecutionLogKey(), {
+    nowMs,
+    retentionMs: BACKGROUND_JOB_EXECUTION_LOG_RETENTION_MS,
+    maxEntries: getLogStoreMaxEntries(),
+    expireSeconds: BACKGROUND_JOB_EXECUTION_LOG_KEY_EXPIRE_SECONDS,
+  })
 }
 
 export async function persistBackgroundJobExecutionLog(input: PersistBackgroundJobExecutionLogInput) {
-  if (!hasRedisUrl() || input.scope !== "background-job") {
+  if (input.scope !== "background-job") {
     return
   }
 
@@ -136,15 +142,16 @@ export async function persistBackgroundJobExecutionLog(input: PersistBackgroundJ
 
   try {
     await connectRedisClient(redis)
-    await redis.multi()
-      .zadd(getBackgroundJobExecutionLogKey(), String(occurredAtMs), JSON.stringify(record))
-      .zremrangebyscore(
-        getBackgroundJobExecutionLogKey(),
-        "-inf",
-        String(occurredAtMs - BACKGROUND_JOB_EXECUTION_LOG_RETENTION_MS),
-      )
-      .expire(getBackgroundJobExecutionLogKey(), BACKGROUND_JOB_EXECUTION_LOG_KEY_EXPIRE_SECONDS)
-      .exec()
+    const key = getBackgroundJobExecutionLogKey()
+    const pipeline = redis.multi()
+      .zadd(key, String(occurredAtMs), JSON.stringify(record))
+    queueCappedLogPrune(pipeline, key, {
+      nowMs: occurredAtMs,
+      retentionMs: BACKGROUND_JOB_EXECUTION_LOG_RETENTION_MS,
+      maxEntries: getLogStoreMaxEntries(),
+      expireSeconds: BACKGROUND_JOB_EXECUTION_LOG_KEY_EXPIRE_SECONDS,
+    })
+    await pipeline.exec()
   } catch (error) {
     console.error("[background-job-log] persist failed", error)
   }
@@ -157,48 +164,22 @@ export async function getBackgroundJobExecutionLogPage(options?: {
   const requestedPage = normalizeRequestedPage(options?.page)
   const pageSize = normalizeRequestedPageSize(options?.pageSize)
 
-  if (!hasRedisUrl()) {
+
+
+  const redis = getRedis()
+
+  await connectRedisClient(redis)
+  await pruneBackgroundJobExecutionLogsWithRedis(redis, Date.now())
+  const total = Number(await redis.zcard(getBackgroundJobExecutionLogKey()).catch(() => 0))
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const page = Math.min(requestedPage, totalPages)
+  const start = Math.max(0, (page - 1) * pageSize)
+  const stop = start + pageSize - 1
+  const encodedItems = await redis.zrevrange(getBackgroundJobExecutionLogKey(), start, stop).catch(() => [])
+
+  if (!Array.isArray(encodedItems)) {
     return {
       items: [],
-      total: 0,
-      page: 1,
-      pageSize,
-      totalPages: 1,
-      hasPrevPage: false,
-      hasNextPage: false,
-    } satisfies BackgroundJobExecutionLogPage
-  }
-
-  const redis = createRedisConnection("background-job:admin-log")
-
-  try {
-    await connectRedisClient(redis)
-    await pruneBackgroundJobExecutionLogsWithRedis(redis, Date.now())
-    const total = Number(await redis.zcard(getBackgroundJobExecutionLogKey()).catch(() => 0))
-    const totalPages = Math.max(1, Math.ceil(total / pageSize))
-    const page = Math.min(requestedPage, totalPages)
-    const start = Math.max(0, (page - 1) * pageSize)
-    const stop = start + pageSize - 1
-    const encodedItems = await redis.zrevrange(getBackgroundJobExecutionLogKey(), start, stop).catch(() => [])
-
-    if (!Array.isArray(encodedItems)) {
-      return {
-        items: [],
-        total,
-        page,
-        pageSize,
-        totalPages,
-        hasPrevPage: page > 1,
-        hasNextPage: page < totalPages,
-      } satisfies BackgroundJobExecutionLogPage
-    }
-
-    const items = encodedItems
-      .map((item) => parseBackgroundJobExecutionLog(String(item)))
-      .filter((item): item is BackgroundJobExecutionLogRecord => Boolean(item))
-
-    return {
-      items,
       total,
       page,
       pageSize,
@@ -206,7 +187,19 @@ export async function getBackgroundJobExecutionLogPage(options?: {
       hasPrevPage: page > 1,
       hasNextPage: page < totalPages,
     } satisfies BackgroundJobExecutionLogPage
-  } finally {
-    redis.disconnect()
   }
+
+  const items = encodedItems
+    .map((item) => parseBackgroundJobExecutionLog(String(item)))
+    .filter((item): item is BackgroundJobExecutionLogRecord => Boolean(item))
+
+  return {
+    items,
+    total,
+    page,
+    pageSize,
+    totalPages,
+    hasPrevPage: page > 1,
+    hasNextPage: page < totalPages,
+  } satisfies BackgroundJobExecutionLogPage
 }

@@ -30,8 +30,6 @@ type SourceDraft = {
 }
 
 type QueueSettingsDraft = {
-  workerEnabled: boolean
-  schedulerIntervalSec: string
   maxConcurrentJobs: string
   maxRetryCount: string
   retryBackoffSec: string
@@ -69,8 +67,6 @@ function createEmptySourceDraft(): SourceDraft {
 
 function createQueueSettingsDraft(settings: RssAdminData["settings"]): QueueSettingsDraft {
   return {
-    workerEnabled: settings.workerEnabled,
-    schedulerIntervalSec: String(settings.schedulerIntervalSec),
     maxConcurrentJobs: String(settings.maxConcurrentJobs),
     maxRetryCount: String(settings.maxRetryCount),
     retryBackoffSec: String(settings.retryBackoffSec),
@@ -112,7 +108,7 @@ async function readJsonResponse<T>(input: RequestInfo | URL, init?: RequestInit)
 function getQueuePreviewSummary(items: QueuePreviewItem[]) {
   const latest = items[0]
   if (!latest) {
-    return "当前没有排队或执行中的队列记录。"
+    return "当前没有 Redis 队列快照。"
   }
 
   return `${latest.triggerType} 触发，状态 ${latest.status}，计划于 ${formatDateTime(latest.scheduledAt)}。`
@@ -187,7 +183,7 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
     }
   }, [globalLogsModalOpen, globalRunsModalOpen, initialData])
 
-  const activeSourceCount = useMemo(() => data.sources.filter((item) => item.status === "ACTIVE").length, [data.sources])
+  const enabledSourceCount = useMemo(() => data.sources.filter((item) => item.status === "ACTIVE").length, [data.sources])
   const sourceModalTitle = editingId ? "编辑 RSS 任务" : "新增 RSS 任务"
 
   async function loadAdminData(nextSourcePage = sourcePage) {
@@ -358,8 +354,6 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
         const message = await submitAction({
           action: "save-settings",
           settings: {
-            workerEnabled: queueSettings.workerEnabled,
-            schedulerIntervalSec: Number(queueSettings.schedulerIntervalSec || 0),
             maxConcurrentJobs: Number(queueSettings.maxConcurrentJobs || 0),
             maxRetryCount: Number(queueSettings.maxRetryCount || 0),
             retryBackoffSec: Number(queueSettings.retryBackoffSec || 0),
@@ -377,6 +371,22 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
         router.refresh()
       } catch (error) {
         setSettingsFeedback(error instanceof Error ? error.message : "队列配置保存失败")
+      }
+    })
+  }
+
+  function repairSchedulerJob() {
+    setSettingsFeedback("")
+    startTransition(async () => {
+      try {
+        const message = await submitAction({
+          action: "repair-scheduler",
+        }, "已重建 RSS 独立调度")
+        setSettingsFeedback(message)
+        await loadAdminData(sourcePage)
+        router.refresh()
+      } catch (error) {
+        setSettingsFeedback(error instanceof Error ? error.message : "调度任务重新挂起失败")
       }
     })
   }
@@ -480,7 +490,7 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
 
     const confirmed = await showConfirm({
       title: "清空队列快照",
-      description: "只会清除这个 RSS 源已结束的队列快照，不会删除待执行或执行中的队列任务。确认继续吗？",
+      description: "会清除这个 RSS 源已结束的 Redis 队列记录，不会删除待执行或执行中的任务；因为最近执行也来自这份记录，所以对应执行历史也会一起消失。确认继续吗？",
       confirmText: "清空快照",
       cancelText: "取消",
       variant: "danger",
@@ -586,15 +596,19 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="text-base font-semibold">RSS 抓取中心</h3>
-            <p className="mt-1 text-sm text-muted-foreground">持久化队列 + 独立 worker 设计，支持定时抓取、手动触发、失败重试、日志追踪和自动暂停保护。</p>
+            <p className="mt-1 text-sm text-muted-foreground">统一 background jobs + Redis 短期快照设计，每个 RSS 源都会按自己的间隔独立挂起下一次执行，支持手动触发、失败重试、日志追踪和自动暂停保护。</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <StatusPill label="Worker 状态" value={data.workerStatus.stateLabel} tone={data.workerStatus.online ? "success" : data.workerStatus.enabled ? "warning" : "muted"} />
-            <StatusPill label="运行中任务" value={String(activeSourceCount)} tone="success" />
-            <StatusPill label="待执行队列" value={String(data.queueSummary.pending)} tone="warning" />
+            <StatusPill label="独立调度" value={data.schedulerStatus.stateLabel} tone={data.schedulerStatus.scheduled ? "success" : "danger"} />
+            <StatusPill label="启用源" value={String(enabledSourceCount)} tone="success" />
+            <StatusPill label="待执行快照" value={String(data.queueSummary.pending)} tone="warning" />
             <StatusPill label="执行中" value={String(data.queueSummary.processing)} tone="info" />
+            <StatusPill label="失败快照" value={String(data.queueSummary.failed)} tone={data.queueSummary.failed > 0 ? "danger" : "muted"} />
             <Link href="/admin/apps/rss-harvest/entries">
               <Button type="button" variant="outline">采集数据</Button>
+            </Link>
+            <Link href="/admin/apps/worker">
+              <Button type="button" variant="outline">Worker 中心</Button>
             </Link>
             <Button type="button" variant="outline" onClick={() => void loadAdminData(sourcePage)} disabled={loadingData || isPending}>{loadingData ? "刷新中..." : "刷新数据"}</Button>
           </div>
@@ -603,23 +617,31 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
 
       <section className="space-y-4 rounded-[24px] border border-border bg-card p-5">
         <div>
-          <h4 className="text-sm font-semibold">队列与安全配置</h4>
-          <p className="mt-1 text-sm text-muted-foreground">控制 worker 开关、并发、重试、超时、抓取体积上限，以及首页宇宙栏目展示策略。</p>
+          <h4 className="text-sm font-semibold">调度与安全配置</h4>
+          <p className="mt-1 text-sm text-muted-foreground">控制并发、重试、超时、抓取体积上限，以及首页宇宙栏目展示策略。RSS 的下一次执行由每个源按自己的抓取间隔独立挂起，运行态连接和队列消费状态统一在 Worker 中心查看。</p>
         </div>
 
-        <div className="grid gap-4 rounded-[20px] border border-border bg-background p-4 md:grid-cols-2 xl:grid-cols-4">
-          <StatusMeta title="Worker 在线状态" value={data.workerStatus.stateLabel} detail={data.workerStatus.lastWorkerId ? `实例 ${data.workerStatus.lastWorkerId}` : "尚无实例标识"} />
-          <StatusMeta title="最近心跳" value={data.workerStatus.heartbeatAt ? formatDateTime(data.workerStatus.heartbeatAt) : "暂无"} detail={data.workerStatus.online ? "心跳在有效窗口内" : "超过有效窗口或未上报"} />
-          <StatusMeta title="最近循环" value={data.workerStatus.lastCycleAt ? formatDateTime(data.workerStatus.lastCycleAt) : "暂无"} detail={data.workerStatus.lastSummaryText ?? "暂无循环摘要"} />
-          <StatusMeta title="最近错误" value={data.workerStatus.lastErrorAt ? formatDateTime(data.workerStatus.lastErrorAt) : "无"} detail={data.workerStatus.lastErrorMessage ?? "暂无 worker 级错误"} />
+        <div className="grid gap-4 md:grid-cols-3">
+          <InfoCard
+            title="独立调度状态"
+            value={data.schedulerStatus.stateLabel}
+            detail={data.schedulerStatus.detail}
+          />
+          <InfoCard
+            title="源挂起进度"
+            value={data.schedulerStatus.locationLabel}
+            detail={data.schedulerStatus.jobId ? `最早的队列项 ID ${data.schedulerStatus.jobId}` : "当前没有可显示的队列项 ID。"}
+          />
+          <InfoCard
+            title="最早下次执行"
+            value={data.schedulerStatus.availableAt
+              ? formatDateTime(data.schedulerStatus.availableAt)
+              : "未安排"}
+            detail={data.schedulerStatus.enqueuedAt ? `入队于 ${formatDateTime(data.schedulerStatus.enqueuedAt)}` : "当前没有可显示的入队时间。"}
+          />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <label className="flex min-h-[44px] items-center justify-between gap-3 rounded-[16px] border border-border bg-background px-4 py-3 text-sm">
-            <span className="font-medium">启用 worker</span>
-            <input type="checkbox" checked={queueSettings.workerEnabled} onChange={(event) => setQueueSettings((current) => ({ ...current, workerEnabled: event.target.checked }))} className="h-4 w-4 rounded border-border" />
-          </label>
-          <Field label="调度轮询秒数" value={queueSettings.schedulerIntervalSec} onChange={(value) => setQueueSettings((current) => ({ ...current, schedulerIntervalSec: value }))} inputMode="numeric" />
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Field label="最大并发任务" value={queueSettings.maxConcurrentJobs} onChange={(value) => setQueueSettings((current) => ({ ...current, maxConcurrentJobs: value }))} inputMode="numeric" />
           <Field label="默认重试次数" value={queueSettings.maxRetryCount} onChange={(value) => setQueueSettings((current) => ({ ...current, maxRetryCount: value }))} inputMode="numeric" />
           <Field label="重试退避秒数" value={queueSettings.retryBackoffSec} onChange={(value) => setQueueSettings((current) => ({ ...current, retryBackoffSec: value }))} inputMode="numeric" />
@@ -632,11 +654,12 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
             <input type="checkbox" checked={queueSettings.homeDisplayEnabled} onChange={(event) => setQueueSettings((current) => ({ ...current, homeDisplayEnabled: event.target.checked }))} className="h-4 w-4 rounded border-border" />
           </label>
           <Field label="宇宙栏目每页条数" value={queueSettings.homePageSize} onChange={(value) => setQueueSettings((current) => ({ ...current, homePageSize: value }))} inputMode="numeric" />
-          <Field label="Worker User-Agent" value={queueSettings.userAgent} onChange={(value) => setQueueSettings((current) => ({ ...current, userAgent: value }))} className="xl:col-span-2" />
+          <Field label="抓取 User-Agent" value={queueSettings.userAgent} onChange={(value) => setQueueSettings((current) => ({ ...current, userAgent: value }))} className="xl:col-span-2" />
         </div>
 
         <div className="flex items-center gap-3">
-          <Button type="button" onClick={saveQueueSettings} disabled={isPending}>{isPending ? "保存中..." : "保存队列配置"}</Button>
+          <Button type="button" onClick={saveQueueSettings} disabled={isPending}>{isPending ? "保存中..." : "保存调度配置"}</Button>
+          <Button type="button" variant="outline" onClick={repairSchedulerJob} disabled={isPending}>{isPending ? "处理中..." : "重建独立调度"}</Button>
           {settingsFeedback ? <span className="text-sm text-muted-foreground">{settingsFeedback}</span> : null}
         </div>
       </section>
@@ -645,7 +668,7 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h4 className="text-sm font-semibold">新增 RSS 任务</h4>
-            <p className="mt-1 text-sm text-muted-foreground">通过模态框录入 RSS 地址、抓取频率、站点名称和审核策略，并支持单任务超时与重试覆盖。</p>
+            <p className="mt-1 text-sm text-muted-foreground">录入 RSS 地址、抓取频率、站点名称和审核策略，并支持单任务超时与重试覆盖。</p>
           </div>
           <Button type="button" onClick={openCreateSourceModal} disabled={isPending}>新增 RSS 任务</Button>
         </div>
@@ -653,10 +676,10 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
 
       <section className="space-y-4 rounded-[24px] border border-border bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h4 className="text-sm font-semibold">任务列表</h4>
-            <p className="mt-1 text-sm text-muted-foreground">支持立即执行、启动、停止和查看最近队列/执行概况。</p>
-          </div>
+            <div>
+              <h4 className="text-sm font-semibold">任务列表</h4>
+            <p className="mt-1 text-sm text-muted-foreground">支持立即执行、启动、停止和查看最近 Redis 队列记录 / 执行概况。</p>
+            </div>
           <span className="rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">
             共 {data.sourcePagination.total} 个源，第 {data.sourcePagination.page} / {data.sourcePagination.totalPages} 页
           </span>
@@ -692,8 +715,8 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
 
               <div className="mt-4 grid gap-3 lg:grid-cols-2">
                 <SummaryActionCard
-                  title="队列快照"
-                  caption={source.queueCount > 0 ? `累计 ${source.queueCount} 条队列记录` : "当前没有队列项"}
+                  title="Redis 队列快照"
+                  caption={source.queueCount > 0 ? `累计 ${source.queueCount} 条快照记录` : "当前没有快照项"}
                   summary={getQueuePreviewSummary(source.queuePreview)}
                   onOpen={() => openQueueModal(source.id)}
                 />
@@ -747,8 +770,8 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
         <div className="rounded-[24px] border border-border bg-card p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h4 className="text-sm font-semibold">爬虫日志</h4>
-              <p className="mt-1 text-sm text-muted-foreground">默认显示最新 20 条，查看更多后可分页追踪 worker 执行日志。</p>
+              <h4 className="text-sm font-semibold">Redis 短期日志</h4>
+              <p className="mt-1 text-sm text-muted-foreground">默认显示最新 20 条，查看更多后可分页追踪 Redis 中带 TTL 的 RSS 执行日志。</p>
             </div>
             <div className="flex gap-2">
               <Button type="button" variant="outline" onClick={openGlobalLogsModal}>查看更多</Button>
@@ -819,8 +842,8 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
 
       <Modal
         open={queueModalOpen}
-        title={queueModalData ? `${queueModalData.sourceName} · 队列快照` : "队列快照"}
-        description="展示该 RSS 源的队列状态、触发方式和错误信息。"
+        title={queueModalData ? `${queueModalData.sourceName} · Redis 队列快照` : "Redis 队列快照"}
+        description="展示该 RSS 源在 Redis 队列中的最近快照状态、触发方式和错误信息。"
         size="lg"
         onClose={() => setQueueModalOpen(false)}
       >
@@ -850,7 +873,7 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
       <Modal
         open={runsModalOpen}
         title={runsModalData ? `${runsModalData.sourceName} · 最近执行` : "最近执行"}
-        description="展示该 RSS 源的执行结果、抓取数量和错误信息。"
+        description="展示该 RSS 源基于 Redis 队列记录生成的执行结果、抓取数量和错误信息。"
         size="lg"
         onClose={() => setRunsModalOpen(false)}
       >
@@ -880,7 +903,7 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
       <Modal
         open={globalRunsModalOpen}
         title="全局最近执行"
-        description="分页查看全站 RSS 抓取执行记录。"
+        description="分页查看全站基于 Redis 队列记录生成的 RSS 抓取执行记录。"
         size="xl"
         onClose={() => setGlobalRunsModalOpen(false)}
       >
@@ -891,7 +914,7 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
       <Modal
         open={globalLogsModalOpen}
         title="爬虫日志"
-        description="分页查看全站 RSS worker 日志。"
+        description="分页查看全站 RSS 抓取日志。"
         size="xl"
         onClose={() => setGlobalLogsModalOpen(false)}
       >
@@ -978,7 +1001,7 @@ function ClientPagination({
 
 function RssQueuePreviewList({ items }: { items: QueuePreviewItem[] }) {
   if (items.length === 0) {
-    return <p className="text-sm text-muted-foreground">当前没有队列项。</p>
+    return <p className="text-sm text-muted-foreground">当前没有 Redis 队列快照。</p>
   }
 
   return (
@@ -1068,21 +1091,23 @@ function RssLogList({ items }: { items: LogItem[] }) {
   )
 }
 
-function StatusPill({ label, value, tone }: { label: string; value: string; tone: "success" | "warning" | "info" | "muted" }) {
+function StatusPill({ label, value, tone }: { label: string; value: string; tone: "success" | "warning" | "info" | "danger" | "muted" }) {
   const className = tone === "success"
     ? "bg-emerald-100 text-emerald-700"
     : tone === "warning"
       ? "bg-amber-100 text-amber-700"
       : tone === "info"
         ? "bg-sky-100 text-sky-700"
+        : tone === "danger"
+          ? "bg-rose-100 text-rose-700"
         : "bg-slate-100 text-slate-700"
 
   return <span className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs ${className}`}><span>{label}</span><strong>{value}</strong></span>
 }
 
-function StatusMeta({ title, value, detail }: { title: string; value: string; detail: string }) {
+function InfoCard({ title, value, detail }: { title: string; value: string; detail: string }) {
   return (
-    <div className="rounded-[16px] border border-border bg-card px-4 py-3">
+    <div className="rounded-[16px] border border-border bg-background px-4 py-3">
       <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{title}</p>
       <p className="mt-2 text-sm font-semibold">{value}</p>
       <p className="mt-1 break-all text-xs text-muted-foreground">{detail}</p>
@@ -1117,5 +1142,3 @@ function LogLevelBadge({ level }: { level: string }) {
 
   return <span className={`rounded-full px-2.5 py-1 text-[11px] ${className}`}>{level}</span>
 }
-
-

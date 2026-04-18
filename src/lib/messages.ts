@@ -23,8 +23,10 @@ import { Prisma, ConversationKind, UserStatus } from "@/db/types"
 import { apiError } from "@/lib/api-route"
 import { enforceSensitiveText } from "@/lib/content-safety"
 import { formatMonthDayTime } from "@/lib/formatters"
+import { containsMessageFileToken, containsMessageImageSyntax, protectMessageMediaTokens, summarizeMessagePreview } from "@/lib/message-media"
 import { messageEventBus } from "@/lib/message-event-bus"
 import { isPublicRouteError } from "@/lib/public-route-error"
+import { getSiteSettings } from "@/lib/site-settings"
 import { getUserDisplayName } from "@/lib/user-display"
 import { ensureUsersCanInteract } from "@/lib/user-blocks"
 import type {
@@ -260,7 +262,7 @@ async function getDatabaseBackedConversations(currentUserId: number): Promise<Me
         id: item.conversation.id,
         title: partner.displayName,
         subtitle: item.unreadCount > 0 ? `未读 ${item.unreadCount} 条` : latestMessage ? "最近互动" : "新会话",
-        preview: latestMessage?.body ?? "还没有消息，发一条开始聊天吧",
+        preview: latestMessage ? summarizeMessagePreview(latestMessage.body) : "还没有消息，发一条开始聊天吧",
         updatedAt: formatMonthDayTime(sortAt),
         unreadCount: item.unreadCount,
         participants,
@@ -441,15 +443,26 @@ export async function sendDirectMessage(senderId: number, recipientId: number, b
     apiError(400, "消息内容不能超过 1000 个字符")
   }
 
+  const settings = await getSiteSettings()
+  if (containsMessageImageSyntax(content) && !settings.messageImageUploadEnabled) {
+    apiError(403, "当前站点未开启私信图片发送")
+  }
+
+  if (containsMessageFileToken(content) && !settings.messageFileUploadEnabled) {
+    apiError(403, "当前站点未开启私信文件发送")
+  }
+
   const recipient = await getValidatedMessageRecipient(senderId, recipientId, {
     blockedMessage: "你已拉黑该用户，无法发送私信",
     blockedByMessage: "对方已将你拉黑，无法发送私信",
   })
 
-  const contentSafety = await enforceSensitiveText({ scene: "message.body", text: content })
+  const protectedContent = protectMessageMediaTokens(content)
+  const contentSafety = await enforceSensitiveText({ scene: "message.body", text: protectedContent.protectedText })
   const conversation = await getOrCreateConversation(senderId, recipient.id)
+  const sanitizedContent = protectedContent.restore(contentSafety.sanitizedText)
 
-  const message = await createDirectMessageInTransaction(conversation.id, senderId, recipient.id, contentSafety.sanitizedText)
+  const message = await createDirectMessageInTransaction(conversation.id, senderId, recipient.id, sanitizedContent)
   const sender = await findMessageRecipientById(senderId)
   const recipientUnreadMessageCount = await getUnreadConversationCount(recipient.id)
   const occurredAt = message.createdAt.toISOString()

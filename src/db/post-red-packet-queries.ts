@@ -5,6 +5,7 @@ import { upsertCommentEffectFeedback } from "@/db/comment-effect-feedback-querie
 import { PostRedPacketStatus, PostRedPacketTriggerType, Prisma } from "@/db/types"
 import { applyPointDelta, prepareScopedPointDelta, prepareScopedProbability } from "@/lib/point-center"
 import { buildRedPacketEffectFeedback } from "@/lib/post-reward-effect-feedback-builders"
+import { sleep } from "@/lib/shared/async"
 
 interface PostRedPacketEligibleCandidate {
   userId: number
@@ -86,12 +87,6 @@ function isCurrentUserEligibleForRandomClaim(params: {
 function isRetryablePostRewardPoolTransactionError(error: unknown) {
   return error instanceof Prisma.PrismaClientKnownRequestError
     && error.code === "P2034"
-}
-
-function sleep(ms: number) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms)
-  })
 }
 
 async function runPostRewardPoolTransactionWithRetry<T>(

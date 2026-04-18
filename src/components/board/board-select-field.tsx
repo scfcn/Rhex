@@ -63,7 +63,9 @@ export function BoardSelectField({
     [boardOptions, normalizedQuery],
   )
 
-  const selectedBoard = allBoards.find((item) => item.value === value) ?? allBoards[0]
+  const selectedBoard = value
+    ? allBoards.find((item) => item.value === value) ?? null
+    : null
 
   function closeDialog() {
     setOpen(false)

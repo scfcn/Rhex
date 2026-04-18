@@ -1,7 +1,5 @@
-"use client"
-
+import Link from "next/link"
 import type { ReactNode } from "react"
-import { useState } from "react"
 import { FileText, FolderOpen, MessageSquareText, Sparkles, type LucideIcon } from "lucide-react"
 
 import { Card, CardContent } from "@/components/ui/card"
@@ -19,7 +17,8 @@ interface UserRecentActivityPanelProps {
   title?: string
   description: string
   tabs: UserRecentActivityTab[]
-  defaultTabKey?: string
+  activeTabKey?: string
+  buildTabHref: (tabKey: string) => string
 }
 
 const defaultActivityTabMeta: Record<string, { icon: LucideIcon }> = {
@@ -33,11 +32,11 @@ export function UserRecentActivityPanel({
   title = "最近动态",
   description,
   tabs,
-  defaultTabKey,
+  activeTabKey,
+  buildTabHref,
 }: UserRecentActivityPanelProps) {
-  const fallbackTabKey = defaultTabKey ?? tabs[0]?.key ?? ""
-  const [activeTab, setActiveTab] = useState<string>(fallbackTabKey)
-  const resolvedActiveTab = tabs.some((tab) => tab.key === activeTab) ? activeTab : fallbackTabKey
+  const fallbackTabKey = tabs[0]?.key ?? ""
+  const resolvedActiveTab = tabs.some((tab) => tab.key === activeTabKey) ? activeTabKey : fallbackTabKey
   const currentTab = tabs.find((tab) => tab.key === resolvedActiveTab) ?? tabs[0]
   const totalCount = tabs.reduce((sum, tab) => sum + (typeof tab.count === "number" ? tab.count : 0), 0)
 
@@ -49,9 +48,9 @@ export function UserRecentActivityPanel({
             <h2 className="text-xl font-semibold text-foreground">{title}</h2>
             <p className="mt-1 text-sm text-muted-foreground">{description}</p>
           </div>
-      <span className="rounded-full bg-[#f5f5f5] dark:bg-slate-800 px-3 py-1 text-xs font-medium text-muted-foreground dark:text-slate-300">
-  共 {totalCount} 条活动
-</span>
+          <span className="rounded-full bg-[#f5f5f5] px-3 py-1 text-xs font-medium text-muted-foreground dark:bg-slate-800 dark:text-slate-300">
+            共 {totalCount} 条活动
+          </span>
         </div>
         <div className="space-y-4 pt-4">
           <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
@@ -60,10 +59,10 @@ export function UserRecentActivityPanel({
               const active = currentTab?.key === tab.key
 
               return (
-                <button
+                <Link
                   key={tab.key}
-                  type="button"
-                  onClick={() => setActiveTab(tab.key)}
+                  href={buildTabHref(tab.key)}
+                  scroll={false}
                   className={cn(
                     "inline-flex w-full items-center justify-center gap-1 rounded-full border px-2 py-2 text-xs font-medium transition-colors sm:gap-2 sm:px-4 sm:text-sm",
                     active
@@ -78,7 +77,7 @@ export function UserRecentActivityPanel({
                       {tab.count}
                     </span>
                   ) : null}
-                </button>
+                </Link>
               )
             })}
           </div>

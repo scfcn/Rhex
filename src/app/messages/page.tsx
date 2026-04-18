@@ -22,6 +22,7 @@ export default async function MessagesPage(props: PageProps<"/messages">) {
   const currentUser = await getCurrentUser()
   const conversationId = readSearchParam(searchParams?.conversation)
   const data = currentUser ? await getMessageCenterData(currentUser.id, conversationId) : null
+  const settings = currentUser ? await getSiteSettings() : null
 
   return (
     <div className="min-h-screen ">
@@ -40,6 +41,8 @@ export default async function MessagesPage(props: PageProps<"/messages">) {
           currentUser={currentUser}
           initialData={data}
           conversationId={conversationId}
+          messageImageUploadEnabled={Boolean(settings?.messageImageUploadEnabled)}
+          messageFileUploadEnabled={Boolean(settings?.messageFileUploadEnabled)}
           pageBefore={<AddonSlotRenderer slot="messages.page.before" />}
           pageAfter={<AddonSlotRenderer slot="messages.page.after" />}
           headerBefore={<AddonSlotRenderer slot="messages.header.before" />}

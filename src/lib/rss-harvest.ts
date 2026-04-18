@@ -1,64 +1,88 @@
-import { createHash, randomUUID } from "node:crypto"
-import { lookup } from "node:dns/promises"
-import { isIP } from "node:net"
-
-import { XMLParser } from "fast-xml-parser"
-
 import { prisma } from "@/db/client"
 import { resolvePagination, type PaginationResult } from "@/db/helpers"
 import type { Prisma, RssLogLevel, RssTriggerType } from "@/db/types"
 import {
-  cancelPendingQueueItemsForSource,
-  claimPendingRssQueueItems,
-  clearRssLogs as clearRssLogRecords,
-  clearRssQueueHistoryBySource,
-  clearRssRunHistory,
-  clearRssRunHistoryBySource,
-  countActiveQueueItemsForSource,
   countRssEntriesForSource,
-  countRssLogs,
-  countRssQueueSummary,
-  countRssQueueItemsBySource,
-  countRssRuns,
-  countRssRunsBySource,
-  countRssSources,
   createManyRssEntries,
-  createRssLogBatch,
-  createRssQueueRecord,
-  createRssRunRecord,
   createRssSourceRecord,
-  findDueRssSources,
-  findRssLogsForRunIds,
-  findRssRunsForSource,
-  findRssRunsPageForSource,
   findRssSourceByFeedUrl,
   findRssSourceById,
   getOrCreateRssSettingRecord,
-  listRecentRssLogsPage,
-  listRecentRssRunsPage,
-  listRssQueueItemsBySource,
-  listRssQueueItemsPageBySource,
-  listRssSourcesPage,
-  recoverExpiredRssQueueItems,
-  updateRssQueueRecord,
-  updateRssRunRecord,
+  listRssSourcesForAdmin,
   updateRssSettingRecord,
   updateRssSourceRecord,
-  type RssQueueWithSourceRecord,
-  type RssRunRecord,
   type RssSettingRecord,
   type RssSourceAdminRecord,
 } from "@/db/rss-harvest-queries"
 import { apiError } from "@/lib/api-route"
+import {
+  cancelDelayedBackgroundJob,
+  ensureDelayedBackgroundJob,
+  findDelayedBackgroundJob,
+  type DelayedBackgroundJobState,
+} from "@/lib/background-job-scheduler"
+import {
+  registerBackgroundJobHandler,
+  parseBackgroundJobEnvelopeString,
+  type BackgroundJobEnvelope,
+} from "@/lib/background-jobs"
+import { getBackgroundJobDelayedSetKey } from "@/lib/background-job-redis"
 import { formatDateTime } from "@/lib/formatters"
 import { logError, logInfo } from "@/lib/logger"
+import {
+  fetchFeedXml,
+  parseFeedXml,
+  resolveRssHarvestErrorMessage,
+  type FetchFeedResult,
+  type ParsedFeed,
+} from "@/lib/rss-harvest-feed"
+import {
+  claimPendingRssQueueRecord,
+  clearRssQueueHistory,
+  clearRssQueueHistoryBySource,
+  countRssExecutionItems,
+  countRssExecutionItemsBySource,
+  countRssQueueItemsBySource,
+  createRssQueueRecord,
+  findRssQueueWithSourceById,
+  listCompletedRssQueueIds,
+  listCompletedRssQueueIdsBySource,
+  listAllRssQueueItems,
+  listRssExecutionItemsPage,
+  listRssExecutionItemsPageBySource,
+  listRssQueueItemsBySource,
+  listRssQueueItemsPageBySource,
+  updateRssQueueRecord,
+  type RssQueueRecord,
+  type RssQueueWithSourceRecord,
+} from "@/lib/rss-harvest-queue-store"
+import { acquireRedisLease, type RedisLease } from "@/lib/redis-lease"
+import { connectRedisClient, createRedisKey, getRedis } from "@/lib/redis"
+import {
+  clearRssExecutionLogs,
+  deleteRssExecutionLogsByRunIds,
+  findRssExecutionLogsForRunIds,
+  getRssExecutionLogPage,
+  persistRssExecutionLogBatch,
+  type RssExecutionLogRecord,
+} from "@/lib/rss-harvest-log-store"
+import {
+  getRssSourceRuntimeState,
+  listRssSourceRuntimeStates,
+  updateRssSourceRuntimeState,
+  type RssSourceRuntimeState,
+} from "@/lib/rss-harvest-source-state"
+import { sleep } from "@/lib/shared/async"
+import { addMinutes, addSeconds, toIsoString } from "@/lib/shared/date"
 import { normalizeBoolean, normalizeNumber, normalizeText, normalizeTrimmedText } from "@/lib/shared/normalizers"
+import { toPrismaJsonValue } from "@/lib/shared/prisma-json"
 
-const RSS_ACCEPT_HEADER = "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.2"
-const DEFAULT_IDLE_SLEEP_MS = 5_000
-const DEFAULT_MAX_SOURCE_FETCH = 50
 const RSS_SOURCE_PAGE_SIZE = 10
 const RSS_MODAL_PAGE_SIZE = 20
+const RSS_PROCESS_QUEUE_BACKGROUND_JOB_NAME = "rss-harvest.process-queue-item" as const
+const RSS_PROCESSING_SLOT_TTL_MS = 60_000
+const RSS_PROCESSING_SLOT_RENEW_INTERVAL_MS = 20_000
+const RSS_PROCESSING_SLOT_WAIT_MS = 1_000
 const MIN_INTERVAL_MINUTES = 1
 const MAX_INTERVAL_MINUTES = 24 * 60
 const MIN_TIMEOUT_MS = 3_000
@@ -76,16 +100,6 @@ const MAX_FAILURE_PAUSE_THRESHOLD = 20
 const MIN_HOME_PAGE_SIZE = 1
 const MAX_HOME_PAGE_SIZE = 100
 
-const xmlParser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: "",
-  trimValues: true,
-  parseTagValue: false,
-  parseAttributeValue: false,
-  processEntities: false,
-  htmlEntities: false,
-})
-
 type LogBufferItem = {
   level: RssLogLevel
   stage: string
@@ -93,37 +107,9 @@ type LogBufferItem = {
   detailJson?: Prisma.InputJsonValue
 }
 
-type ParsedFeedItem = {
-  guid: string | null
-  linkUrl: string | null
-  title: string
-  author: string | null
-  summary: string | null
-  contentHtml: string | null
-  contentText: string | null
-  publishedAt: Date | null
-  dedupeKey: string
-  rawJson: Prisma.InputJsonValue
-}
-
-type ParsedFeed = {
-  title: string | null
-  items: ParsedFeedItem[]
-}
-
-type FetchFeedResult = {
-  finalUrl: string
-  httpStatus: number
-  contentType: string | null
-  responseBytes: number
-  body: string
-}
-
 export interface RssAdminData {
   settings: {
     id: string
-    workerEnabled: boolean
-    schedulerIntervalSec: number
     maxConcurrentJobs: number
     maxRetryCount: number
     retryBackoffSec: number
@@ -134,23 +120,16 @@ export interface RssAdminData {
     homeDisplayEnabled: boolean
     homePageSize: number
     userAgent: string
-    workerHeartbeatAt: string | null
-    workerLastCycleAt: string | null
-    workerLastWorkerId: string | null
-    workerLastSummaryJson: string | null
-    workerLastErrorAt: string | null
-    workerLastErrorMessage: string | null
   }
-  workerStatus: {
-    enabled: boolean
-    online: boolean
+  schedulerStatus: {
+    scheduled: boolean
     stateLabel: string
-    heartbeatAt: string | null
-    lastCycleAt: string | null
-    lastWorkerId: string | null
-    lastSummaryText: string | null
-    lastErrorAt: string | null
-    lastErrorMessage: string | null
+    location: string
+    locationLabel: string
+    jobId: string | null
+    enqueuedAt: string | null
+    availableAt: string | null
+    detail: string
   }
   queueSummary: {
     pending: number
@@ -267,150 +246,475 @@ export interface RssGlobalLogPageData {
   pagination: RssPaginationMeta
 }
 
-export interface RssWorkerCycleResult {
-  workerId: string
-  recoveredCount: number
-  scheduledCount: number
-  claimedCount: number
-  processedCount: number
+function getRssProcessingSlotKey(slotIndex: number) {
+  return createRedisKey("rss-harvest", "processing-slot", slotIndex)
 }
 
-function toIsoString(value: Date | string | null | undefined) {
-  if (!value) {
-    return null
-  }
+async function acquireRedisRssProcessingLease(limit: number): Promise<RedisLease> {
+  const effectiveLimit = Math.max(1, limit)
 
-  return new Date(value).toISOString()
-}
+  while (true) {
+    for (let slotIndex = 0; slotIndex < effectiveLimit; slotIndex += 1) {
+      const lease = await acquireRedisLease({
+        key: getRssProcessingSlotKey(slotIndex),
+        ttlMs: RSS_PROCESSING_SLOT_TTL_MS,
+      })
 
-function addMinutes(date: Date, minutes: number) {
-  return new Date(date.getTime() + minutes * 60_000)
-}
-
-function addSeconds(date: Date, seconds: number) {
-  return new Date(date.getTime() + seconds * 1_000)
-}
-
-function addMilliseconds(date: Date, milliseconds: number) {
-  return new Date(date.getTime() + milliseconds)
-}
-
-function sleep(ms: number) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms)
-  })
-}
-
-function asArray<T>(value: T | T[] | null | undefined) {
-  if (Array.isArray(value)) {
-    return value
-  }
-
-  if (value === null || typeof value === "undefined") {
-    return [] as T[]
-  }
-
-  return [value]
-}
-
-function textFromUnknown(value: unknown): string | null {
-  if (typeof value === "string") {
-    const trimmed = decodeBasicXmlEntities(value).trim()
-    return trimmed || null
-  }
-
-  if (!value || typeof value !== "object") {
-    return null
-  }
-
-  const record = value as Record<string, unknown>
-  const textValue = record["#text"] ?? record._ ?? record.value
-  if (typeof textValue === "string") {
-    const trimmed = decodeBasicXmlEntities(textValue).trim()
-    return trimmed || null
-  }
-
-  return null
-}
-
-function decodeBasicXmlEntities(value: string) {
-  const decodeCodePoint = (rawCode: string, radix: number, original: string) => {
-    const parsed = Number.parseInt(rawCode, radix)
-    if (Number.isNaN(parsed) || !Number.isInteger(parsed) || parsed < 0 || parsed > 0x10ffff) {
-      return original
+      if (lease) {
+        return lease
+      }
     }
 
-    try {
-      return String.fromCodePoint(parsed)
-    } catch {
-      return original
-    }
+    await sleep(RSS_PROCESSING_SLOT_WAIT_MS)
   }
-
-  return value
-    .replace(/&#(\d+);/g, (match, code) => decodeCodePoint(code, 10, match))
-    .replace(/&#x([0-9a-f]+);/gi, (match, code) => decodeCodePoint(code, 16, match))
-    .replace(/&quot;/gi, "\"")
-    .replace(/&apos;/gi, "'")
-    .replace(/&#39;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&amp;/gi, "&")
 }
 
-function firstText(...values: unknown[]) {
-  for (const value of values) {
-    const resolved = textFromUnknown(value)
-    if (resolved) {
-      return resolved
-    }
-  }
+async function withRssProcessingSlot<T>(limit: number, callback: () => Promise<T>) {
+  const lease = await acquireRedisRssProcessingLease(limit)
+  const renewTimer = setInterval(() => {
+    void lease.renew(RSS_PROCESSING_SLOT_TTL_MS).catch(() => false)
+  }, RSS_PROCESSING_SLOT_RENEW_INTERVAL_MS)
 
-  return null
+  try {
+    return await callback()
+  } finally {
+    clearInterval(renewTimer)
+    await lease.release().catch(() => false)
+  }
 }
 
-function stripHtmlTags(value: string | null) {
-  if (!value) {
+function resolveScheduledAtFromState(
+  state: DelayedBackgroundJobState,
+  fallback: Date,
+) {
+  if (!state.nextRunAt) {
+    return fallback
+  }
+
+  const nextRunAt = new Date(state.nextRunAt)
+  return Number.isNaN(nextRunAt.getTime())
+    ? fallback
+    : nextRunAt
+}
+
+function createRssQueueJobState(queueItem: Pick<RssQueueRecord, "backgroundJobId" | "scheduledAt">): DelayedBackgroundJobState {
+  return {
+    jobId: queueItem.backgroundJobId ?? "",
+    nextRunAt: queueItem.scheduledAt.toISOString(),
+  }
+}
+
+function readRssQueueIdFromBackgroundJobPayload(payload: unknown) {
+  if (!payload || typeof payload !== "object" || !("queueId" in payload)) {
     return null
   }
 
-  const normalized = decodeBasicXmlEntities(value)
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-
-  return normalized || null
+  const queueId = (payload as { queueId?: unknown }).queueId
+  return typeof queueId === "string" && queueId.trim()
+    ? queueId.trim()
+    : null
 }
 
-function parseOptionalDate(value: string | null) {
-  if (!value) {
-    return null
-  }
-
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? null : date
-}
-
-function toDetailJson(value: unknown): Prisma.InputJsonValue | undefined {
-  if (typeof value === "undefined") {
-    return undefined
-  }
-
-  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue
-}
-
-function buildDedupeKey(item: {
-  guid: string | null
-  linkUrl: string | null
-  title: string
-  contentText: string | null
-  publishedAt: Date | null
+async function cleanupStaleRssDelayedJobs(options?: {
+  queueId?: string
+  sourceId?: string
 }) {
-  const base = item.guid || item.linkUrl || `${item.title}\n${item.contentText ?? ""}\n${item.publishedAt?.toISOString() ?? ""}`
-  return createHash("sha256").update(base).digest("hex")
+  const targetQueueId = typeof options?.queueId === "string" && options.queueId.trim()
+    ? options.queueId.trim()
+    : null
+  const targetSourceId = typeof options?.sourceId === "string" && options.sourceId.trim()
+    ? options.sourceId.trim()
+    : null
+  const redis = getRedis()
+  let removedCount = 0
+
+  await connectRedisClient(redis)
+  const members = await redis.zrange(getBackgroundJobDelayedSetKey(), 0, -1).catch(() => [])
+
+  for (const member of members) {
+    const job = parseBackgroundJobEnvelopeString(String(member))
+    if (!job || job.name !== RSS_PROCESS_QUEUE_BACKGROUND_JOB_NAME) {
+      continue
+    }
+
+    const queueId = readRssQueueIdFromBackgroundJobPayload(job.payload)
+    if (!queueId) {
+      continue
+    }
+
+    if (targetQueueId && queueId !== targetQueueId) {
+      continue
+    }
+
+    const queueRecord = await findRssQueueWithSourceById(queueId)
+    if (targetSourceId && queueRecord?.sourceId !== targetSourceId) {
+      continue
+    }
+
+    const isCurrentPendingJob = queueRecord?.status === "PENDING" && queueRecord.backgroundJobId === job.id
+    if (isCurrentPendingJob) {
+      continue
+    }
+
+    const removed = await redis.zrem(getBackgroundJobDelayedSetKey(), member)
+    removedCount += Number(removed)
+  }
+
+  return { removedCount }
+}
+
+function hasSameScheduledAt(left: Date, right: Date) {
+  return Math.abs(left.getTime() - right.getTime()) < 1_000
+}
+
+async function syncPendingRssQueueBackgroundJob(
+  queueItem: RssQueueRecord,
+  scheduledAt: Date,
+  options?: {
+    forceReschedule?: boolean
+  },
+) {
+  const trackedJob = queueItem.backgroundJobId
+    ? await findDelayedBackgroundJob(queueItem.backgroundJobId)
+    : null
+
+  if (
+    !options?.forceReschedule
+    && trackedJob
+    && trackedJob.name === RSS_PROCESS_QUEUE_BACKGROUND_JOB_NAME
+  ) {
+    const trackedState = {
+      jobId: trackedJob.id,
+      nextRunAt: trackedJob.availableAt ?? queueItem.scheduledAt.toISOString(),
+    } satisfies DelayedBackgroundJobState
+    const trackedScheduledAt = resolveScheduledAtFromState(trackedState, queueItem.scheduledAt)
+
+    if (
+      queueItem.backgroundJobId !== trackedState.jobId
+      || !hasSameScheduledAt(queueItem.scheduledAt, trackedScheduledAt)
+    ) {
+      await updateRssQueueRecord(queueItem.id, {
+        backgroundJobId: trackedState.jobId,
+        scheduledAt: trackedScheduledAt,
+      })
+    }
+
+    if (hasSameScheduledAt(trackedScheduledAt, scheduledAt)) {
+      return {
+        synced: false,
+        reason: "already-scheduled",
+        jobId: trackedState.jobId,
+        scheduledAt: trackedScheduledAt,
+      } as const
+    }
+  }
+
+  await cleanupStaleRssDelayedJobs({
+    queueId: queueItem.id,
+  })
+
+  const ensuredJob = await ensureDelayedBackgroundJob(createRssQueueJobState(queueItem), {
+    enabled: true,
+    jobName: RSS_PROCESS_QUEUE_BACKGROUND_JOB_NAME,
+    payload: {
+      queueId: queueItem.id,
+    },
+    scheduledAt,
+    maxAttempts: 1,
+  })
+
+  if (!ensuredJob.scheduled || !ensuredJob.job) {
+    apiError(500, "RSS 延迟任务同步失败")
+  }
+
+  const nextScheduledAt = resolveScheduledAtFromState(ensuredJob.state, scheduledAt)
+  await updateRssQueueRecord(queueItem.id, {
+    backgroundJobId: ensuredJob.state.jobId,
+    scheduledAt: nextScheduledAt,
+  })
+
+  return {
+    synced: true,
+    reason: trackedJob ? "rescheduled" : "created",
+    jobId: ensuredJob.state.jobId,
+    scheduledAt: nextScheduledAt,
+  } as const
+}
+
+async function cancelPendingRssSourceQueueItems(sourceId: string, reason: string) {
+  const items = await listRssQueueItemsBySource(sourceId)
+  let count = 0
+
+  for (const item of items) {
+    if (item.status !== "PENDING") {
+      continue
+    }
+
+    await cancelDelayedBackgroundJob(createRssQueueJobState(item))
+    await cleanupStaleRssDelayedJobs({
+      queueId: item.id,
+      sourceId,
+    })
+    await updateRssQueueRecord(item.id, {
+      backgroundJobId: null,
+      status: "CANCELLED",
+      finishedAt: new Date(),
+      errorMessage: reason,
+      leaseExpiresAt: null,
+      workerId: null,
+    })
+    count += 1
+  }
+
+  return { count }
+}
+
+function resolveNextScheduledAtForUpdatedSource(
+  runtimeState: RssSourceRuntimeState,
+  nextEnabled: boolean,
+  nextIntervalMinutes: number,
+  options?: {
+    forceRecompute?: boolean
+  },
+) {
+  if (!nextEnabled) {
+    return null
+  }
+
+  const now = new Date()
+  if (!options?.forceRecompute) {
+    return now
+  }
+
+  if (!runtimeState.enabled) {
+    return now
+  }
+
+  if (!runtimeState.lastRunAt) {
+    return now
+  }
+
+  const nextRunAt = addMinutes(runtimeState.lastRunAt, nextIntervalMinutes)
+  return nextRunAt.getTime() > now.getTime()
+    ? nextRunAt
+    : now
+}
+
+function isActiveQueueStatus(status: RssQueueRecord["status"]) {
+  return status === "PENDING" || status === "PROCESSING"
+}
+
+function isAutomaticQueueItem(item: RssQueueRecord) {
+  return item.triggerType !== "MANUAL"
+}
+
+async function listActiveQueueItemsForSource(sourceId: string) {
+  const items = await listRssQueueItemsBySource(sourceId, 20)
+  return items.filter((item) => isActiveQueueStatus(item.status))
+}
+
+async function findAutomaticQueueItemForSource(sourceId: string) {
+  const items = await listActiveQueueItemsForSource(sourceId)
+  return items.find((item) => isAutomaticQueueItem(item)) ?? null
+}
+
+async function listEnabledRssSources() {
+  const sources = await listRssSourcesForAdmin()
+  const runtimeStates = await listRssSourceRuntimeStates(sources.map((item) => item.id))
+
+  return sources
+    .filter((source) => runtimeStates.get(source.id)?.enabled)
+    .sort((left, right) => {
+      const leftState = runtimeStates.get(left.id) ?? null
+      const rightState = runtimeStates.get(right.id) ?? null
+      const leftTime = leftState?.lastRunAt?.getTime() ?? 0
+      const rightTime = rightState?.lastRunAt?.getTime() ?? 0
+      return rightTime - leftTime
+    })
+}
+
+async function ensureRssSourceScheduled(source: RssSourceAdminRecord, options?: {
+  scheduledAt?: Date
+  forceReschedule?: boolean
+  runtimeState?: RssSourceRuntimeState
+}) {
+  const runtimeState = options?.runtimeState ?? await getRssSourceRuntimeState(source.id)
+  if (!runtimeState.enabled) {
+    return {
+      scheduled: false,
+      reason: "inactive",
+    } as const
+  }
+
+  const scheduledAt = options?.scheduledAt ?? new Date()
+  const existing = await findAutomaticQueueItemForSource(source.id)
+  if (existing) {
+    if (existing.status === "PENDING") {
+      const syncResult = await syncPendingRssQueueBackgroundJob(existing, scheduledAt, {
+        forceReschedule: options?.forceReschedule,
+      })
+
+      return {
+        scheduled: syncResult.synced,
+        reason: syncResult.reason,
+        scheduledAt: syncResult.scheduledAt,
+        queueId: existing.id,
+        jobId: syncResult.jobId,
+        status: existing.status,
+      } as const
+    }
+
+    return {
+      scheduled: false,
+      reason: "processing",
+      scheduledAt: existing.scheduledAt,
+      queueId: existing.id,
+      status: existing.status,
+    } as const
+  }
+
+  const result = await enqueueRssSourceJobInternal({
+    source,
+    triggerType: "SCHEDULED",
+    priority: 0,
+    scheduledAt,
+  })
+
+  if (!result.queued) {
+    return {
+      scheduled: false,
+      reason: "queue-rejected",
+      message: result.message,
+    } as const
+  }
+
+  return {
+    scheduled: true,
+    reason: "created",
+    scheduledAt,
+  } as const
+}
+
+async function getRssSchedulerStatus() {
+  const activeSources = await listEnabledRssSources()
+  const states = await Promise.all(activeSources.map(async (source) => {
+    const queueItem = await findAutomaticQueueItemForSource(source.id)
+    const backgroundJob = queueItem?.status === "PENDING"
+      && queueItem.backgroundJobId
+      ? await findDelayedBackgroundJob(queueItem.backgroundJobId)
+      : null
+    return {
+      source,
+      queueItem,
+      backgroundJob,
+    }
+  }))
+
+  const scheduledItems = states.filter((item) =>
+    item.queueItem
+    && (item.queueItem.status !== "PENDING" || item.backgroundJob),
+  )
+  const missingItems = states.filter((item) =>
+    !item.queueItem
+    || (item.queueItem.status === "PENDING" && !item.backgroundJob),
+  )
+  const nextScheduledItem = scheduledItems
+    .map((item) => item.queueItem)
+    .filter((item): item is RssQueueRecord => item !== null)
+    .filter((item) => item.status === "PENDING")
+    .sort((left, right) => left.scheduledAt.getTime() - right.scheduledAt.getTime())[0] ?? null
+  const latestActiveItem = scheduledItems
+    .map((item) => item.queueItem)
+    .filter((item): item is RssQueueRecord => Boolean(item))
+    .sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())[0] ?? null
+
+  if (activeSources.length === 0) {
+    return {
+      scheduled: true,
+      stateLabel: "无活跃源",
+      location: "idle",
+      locationLabel: "无需调度",
+      jobId: null,
+      enqueuedAt: null,
+      availableAt: null,
+      detail: "当前没有启用中的 RSS 源，因此没有需要挂起的独立定时任务。",
+    }
+  }
+
+  if (missingItems.length > 0) {
+    return {
+      scheduled: false,
+      stateLabel: "缺失",
+      location: "per-source",
+      locationLabel: `${scheduledItems.length}/${activeSources.length} 已挂起`,
+      jobId: nextScheduledItem?.id ?? latestActiveItem?.id ?? null,
+      enqueuedAt: nextScheduledItem
+        ? nextScheduledItem.createdAt.toISOString()
+        : latestActiveItem
+          ? latestActiveItem.createdAt.toISOString()
+          : null,
+      availableAt: nextScheduledItem ? nextScheduledItem.scheduledAt.toISOString() : null,
+      detail: `共有 ${missingItems.length} 个活跃 RSS 源缺少各自的下次执行任务，可手动重建独立调度。`,
+    }
+  }
+
+  return {
+    scheduled: true,
+    stateLabel: "正常",
+    location: "per-source",
+    locationLabel: `${scheduledItems.length}/${activeSources.length} 已挂起`,
+    jobId: nextScheduledItem?.id ?? latestActiveItem?.id ?? null,
+    enqueuedAt: nextScheduledItem
+      ? nextScheduledItem.createdAt.toISOString()
+      : latestActiveItem
+        ? latestActiveItem.createdAt.toISOString()
+        : null,
+    availableAt: nextScheduledItem ? nextScheduledItem.scheduledAt.toISOString() : null,
+    detail: nextScheduledItem
+      ? `所有活跃 RSS 源都已独立挂起，下一个任务计划于 ${formatDateTime(nextScheduledItem.scheduledAt)} 执行。`
+      : "所有活跃 RSS 源当前都由执行中的任务承接，完成后会继续独立续挂。",
+  }
+}
+
+export async function repairRssSchedulerJob() {
+  await cleanupStaleRssDelayedJobs()
+  const activeSources = await listEnabledRssSources()
+  let createdCount = 0
+  let skippedCount = 0
+
+  for (const source of activeSources) {
+    const runtimeState = await getRssSourceRuntimeState(source.id)
+    const result = await ensureRssSourceScheduled(source, {
+      scheduledAt: new Date(),
+      runtimeState,
+    })
+
+    if (result.scheduled) {
+      createdCount += 1
+    } else {
+      skippedCount += 1
+    }
+  }
+
+  logInfo({
+    scope: "rss-harvest",
+    action: "scheduler-repair",
+    metadata: {
+      activeSourceCount: activeSources.length,
+      createdCount,
+      skippedCount,
+      mode: "per-source",
+    },
+  })
+
+  return {
+    scheduled: createdCount > 0,
+    message: createdCount > 0
+      ? `已重建 ${createdCount} 个 RSS 源的独立调度`
+      : activeSources.length > 0
+        ? "当前所有活跃 RSS 源都已经挂起独立调度，无需重建"
+        : "当前没有活跃 RSS 源，无需重建调度",
+  }
 }
 
 function assertPositiveInteger(value: number, min: number, max: number, message: string) {
@@ -446,7 +750,6 @@ function normalizeAbsoluteHttpUrl(rawValue: unknown, fieldLabel: string) {
 }
 
 function normalizeSettingsInput(input: Record<string, unknown>) {
-  const schedulerIntervalSec = Math.trunc(normalizeNumber(input.schedulerIntervalSec, 30, { min: 5, max: 300 }))
   const maxConcurrentJobs = Math.trunc(normalizeNumber(input.maxConcurrentJobs, 2, { min: MIN_CONCURRENCY, max: MAX_CONCURRENCY }))
   const maxRetryCount = Math.trunc(normalizeNumber(input.maxRetryCount, 3, { min: MIN_RETRY_COUNT, max: MAX_RETRY_COUNT }))
   const retryBackoffSec = Math.trunc(normalizeNumber(input.retryBackoffSec, 300, { min: 10, max: 3600 }))
@@ -458,8 +761,6 @@ function normalizeSettingsInput(input: Record<string, unknown>) {
   const userAgent = normalizeTrimmedText(input.userAgent, 180, "bbs-rss-worker/1.0")
 
   return {
-    workerEnabled: normalizeBoolean(input.workerEnabled, true),
-    schedulerIntervalSec,
     maxConcurrentJobs,
     maxRetryCount,
     retryBackoffSec,
@@ -496,7 +797,7 @@ function normalizeSourceInput(input: Record<string, unknown>) {
     logoPath: normalizeTrimmedText(input.logoPath, 300) || null,
     intervalMinutes,
     requiresReview: normalizeBoolean(input.requiresReview, true),
-    status: normalizeBoolean(input.enabled, true) ? "ACTIVE" as const : "PAUSED" as const,
+    enabled: normalizeBoolean(input.enabled, true),
     requestTimeoutMs: timeoutValue,
     maxRetryCount: retryValue,
   }
@@ -505,8 +806,6 @@ function normalizeSourceInput(input: Record<string, unknown>) {
 function serializeSettings(record: RssSettingRecord) {
   return {
     id: record.id,
-    workerEnabled: record.workerEnabled,
-    schedulerIntervalSec: record.schedulerIntervalSec,
     maxConcurrentJobs: record.maxConcurrentJobs,
     maxRetryCount: record.maxRetryCount,
     retryBackoffSec: record.retryBackoffSec,
@@ -517,72 +816,25 @@ function serializeSettings(record: RssSettingRecord) {
     homeDisplayEnabled: record.homeDisplayEnabled,
     homePageSize: record.homePageSize,
     userAgent: record.userAgent,
-    workerHeartbeatAt: toIsoString(record.workerHeartbeatAt),
-    workerLastCycleAt: toIsoString(record.workerLastCycleAt),
-    workerLastWorkerId: record.workerLastWorkerId,
-    workerLastSummaryJson: stringifyLogDetail(record.workerLastSummaryJson),
-    workerLastErrorAt: toIsoString(record.workerLastErrorAt),
-    workerLastErrorMessage: record.workerLastErrorMessage,
   }
 }
 
-function getWorkerStatus(record: RssSettingRecord) {
-  const heartbeatAt = record.workerHeartbeatAt ? new Date(record.workerHeartbeatAt) : null
-  const timeoutMs = Math.max(record.schedulerIntervalSec * 3_000, 90_000)
-  const online = Boolean(
-    record.workerEnabled
-    && heartbeatAt
-    && Date.now() - heartbeatAt.getTime() <= timeoutMs,
-  )
-
-  const stateLabel = !record.workerEnabled
-    ? "已关闭"
-    : online
-      ? "在线"
-      : heartbeatAt
-        ? "离线"
-        : "未上报"
-
-  return {
-    enabled: record.workerEnabled,
-    online,
-    stateLabel,
-    heartbeatAt: toIsoString(record.workerHeartbeatAt),
-    lastCycleAt: toIsoString(record.workerLastCycleAt),
-    lastWorkerId: record.workerLastWorkerId,
-    lastSummaryText: stringifyLogDetail(record.workerLastSummaryJson),
-    lastErrorAt: toIsoString(record.workerLastErrorAt),
-    lastErrorMessage: record.workerLastErrorMessage,
-  }
-}
-
-function serializeRunRecord(run: RssRunRecord) {
+function serializeRunRecord(run: RssQueueRecord, sourceName: string) {
+  const startedAt = run.startedAt ?? run.createdAt
   return {
     id: run.id,
     sourceId: run.sourceId,
-    sourceName: run.source.siteName,
+    sourceName,
     status: run.status,
     triggerType: run.triggerType,
-    startedAt: run.startedAt.toISOString(),
+    startedAt: startedAt.toISOString(),
     finishedAt: toIsoString(run.finishedAt),
-    durationMs: run.durationMs,
+    durationMs: run.durationMs ?? (run.finishedAt ? run.finishedAt.getTime() - startedAt.getTime() : null),
     fetchedCount: run.fetchedCount,
     insertedCount: run.insertedCount,
     duplicateCount: run.duplicateCount,
     httpStatus: run.httpStatus,
     errorMessage: run.errorMessage,
-  }
-}
-
-function stringifyLogDetail(detailJson: Prisma.JsonValue | null) {
-  if (!detailJson) {
-    return null
-  }
-
-  try {
-    return JSON.stringify(detailJson)
-  } catch {
-    return null
   }
 }
 
@@ -610,14 +862,48 @@ function serializeQueuePreviewItem(item: Awaited<ReturnType<typeof listRssQueueI
   }
 }
 
-async function buildSourceAdminItem(source: RssSourceAdminRecord) {
-  const [runCount, entryCount, queueCount, queuePreview, recentRuns] = await Promise.all([
-    countRssRunsBySource(source.id),
-    countRssEntriesForSource(source.id),
-    countRssQueueItemsBySource(source.id),
-    listRssQueueItemsBySource(source.id, 1),
-    findRssRunsForSource(source.id, 1),
-  ])
+function sortAdminExecutionRecordsDesc(left: RssQueueRecord, right: RssQueueRecord) {
+  const leftTime = left.startedAt?.getTime() ?? left.createdAt.getTime()
+  const rightTime = right.startedAt?.getTime() ?? right.createdAt.getTime()
+  return rightTime - leftTime
+}
+
+function summarizeQueueItems(items: RssQueueRecord[]) {
+  let pending = 0
+  let processing = 0
+  let failed = 0
+
+  for (const item of items) {
+    if (item.status === "PENDING") pending += 1
+    if (item.status === "PROCESSING") processing += 1
+    if (item.status === "FAILED") failed += 1
+  }
+
+  return {
+    pending,
+    processing,
+    failed,
+  }
+}
+
+async function buildSourceAdminItem(
+  source: RssSourceAdminRecord,
+  runtimeState: RssSourceRuntimeState,
+  input: {
+    entryCount: number
+    queueItems: RssQueueRecord[]
+  },
+) {
+  const queueItems = input.queueItems
+  const queueCount = queueItems.length
+  const queueItemsPreviewWindow = queueItems.slice(0, 20)
+  const queuePreview = queueItemsPreviewWindow.slice(0, 1)
+  const executionItems = queueItems
+    .filter((item) => Boolean(item.startedAt))
+    .sort(sortAdminExecutionRecordsDesc)
+  const recentRuns = executionItems.slice(0, 1)
+  const runCount = executionItems.length
+  const automaticActiveItem = queueItemsPreviewWindow.find((item) => isAutomaticQueueItem(item) && isActiveQueueStatus(item.status)) ?? null
 
   return {
     id: source.id,
@@ -626,49 +912,52 @@ async function buildSourceAdminItem(source: RssSourceAdminRecord) {
     logoPath: source.logoPath ?? null,
     intervalMinutes: source.intervalMinutes,
     requiresReview: source.requiresReview,
-    status: source.status,
+    status: runtimeState.enabled ? "ACTIVE" : "PAUSED",
     requestTimeoutMs: source.requestTimeoutMs,
     maxRetryCount: source.maxRetryCount,
-    nextRunAt: toIsoString(source.nextRunAt),
-    lastRunAt: toIsoString(source.lastRunAt),
-    lastSuccessAt: toIsoString(source.lastSuccessAt),
-    lastErrorAt: toIsoString(source.lastErrorAt),
-    lastErrorMessage: source.lastErrorMessage,
-    failureCount: source.failureCount,
-    lastRunDurationMs: source.lastRunDurationMs,
+    nextRunAt: toIsoString(automaticActiveItem?.scheduledAt ?? null),
+    lastRunAt: toIsoString(runtimeState.lastRunAt),
+    lastSuccessAt: toIsoString(runtimeState.lastSuccessAt),
+    lastErrorAt: toIsoString(runtimeState.lastErrorAt),
+    lastErrorMessage: runtimeState.lastErrorMessage,
+    failureCount: runtimeState.failureCount,
+    lastRunDurationMs: runtimeState.lastRunDurationMs,
     createdAt: source.createdAt.toISOString(),
     updatedAt: source.updatedAt.toISOString(),
     runCount,
-    entryCount,
+    entryCount: input.entryCount,
     queueCount,
     queuePreview: queuePreview.map(serializeQueuePreviewItem),
-    recentRuns: recentRuns.map((run) => ({
-      id: run.id,
-      status: run.status,
-      triggerType: run.triggerType,
-      startedAt: run.startedAt.toISOString(),
-      finishedAt: toIsoString(run.finishedAt),
-      durationMs: run.durationMs,
-      fetchedCount: run.fetchedCount,
-      insertedCount: run.insertedCount,
-      duplicateCount: run.duplicateCount,
-      httpStatus: run.httpStatus,
-      errorMessage: run.errorMessage,
-    })),
+    recentRuns: recentRuns.map((run) => {
+      const serialized = serializeRunRecord(run, source.siteName)
+      return {
+        id: serialized.id,
+        status: serialized.status,
+        triggerType: serialized.triggerType,
+        startedAt: serialized.startedAt,
+        finishedAt: serialized.finishedAt,
+        durationMs: serialized.durationMs,
+        fetchedCount: serialized.fetchedCount,
+        insertedCount: serialized.insertedCount,
+        duplicateCount: serialized.duplicateCount,
+        httpStatus: serialized.httpStatus,
+        errorMessage: serialized.errorMessage,
+      }
+    }),
   }
 }
 
-function serializeLogRecord(log: Awaited<ReturnType<typeof listRecentRssLogsPage>>[number]) {
+function serializeLogRecord(log: RssExecutionLogRecord) {
   return {
     id: log.id,
     runId: log.runId,
-    sourceId: log.run.source.id,
-    sourceName: log.run.source.siteName,
+    sourceId: log.sourceId,
+    sourceName: log.sourceName,
     level: log.level,
     stage: log.stage,
     message: log.message,
-    detailText: stringifyLogDetail(log.detailJson),
-    createdAt: log.createdAt.toISOString(),
+    detailText: log.detailText,
+    createdAt: log.createdAt,
   }
 }
 
@@ -677,40 +966,105 @@ export async function getRssAdminData(options?: {
   recentRunsPage?: number
   recentLogsPage?: number
 }): Promise<RssAdminData> {
-  const [settings, queueSummary, sourceTotal, recentRunTotal, recentLogTotal] = await Promise.all([
+  await cleanupStaleRssDelayedJobs()
+  const [settings, schedulerStatus, allSources, recentLogsPage, allQueueItems] = await Promise.all([
     getOrCreateRssSettingRecord(),
-    countRssQueueSummary(),
-    countRssSources(),
-    countRssRuns(),
-    countRssLogs(),
+    getRssSchedulerStatus(),
+    listRssSourcesForAdmin(),
+    getRssExecutionLogPage({
+      page: options?.recentLogsPage,
+      pageSize: RSS_MODAL_PAGE_SIZE,
+    }),
+    listAllRssQueueItems(),
   ])
+  const queueSummary = summarizeQueueItems(allQueueItems)
+  const allExecutionItems = allQueueItems
+    .filter((item) => Boolean(item.startedAt))
+    .sort(sortAdminExecutionRecordsDesc)
+  const recentRunTotal = allExecutionItems.length
+  const queueItemsBySource = new Map<string, RssQueueRecord[]>()
 
-  const sourcePagination = resolvePagination({ page: options?.sourcePage, pageSize: RSS_SOURCE_PAGE_SIZE }, sourceTotal, [RSS_SOURCE_PAGE_SIZE], RSS_SOURCE_PAGE_SIZE)
+  for (const item of allQueueItems) {
+    const items = queueItemsBySource.get(item.sourceId) ?? []
+    items.push(item)
+    queueItemsBySource.set(item.sourceId, items)
+  }
+
+  const sourceRuntimeStates = await listRssSourceRuntimeStates(allSources.map((item) => item.id), {
+    queueItemsBySource,
+  })
+  const sortedSources = [...allSources].sort((left, right) => {
+    const leftEnabled = sourceRuntimeStates.get(left.id)?.enabled ? 1 : 0
+    const rightEnabled = sourceRuntimeStates.get(right.id)?.enabled ? 1 : 0
+    if (leftEnabled !== rightEnabled) {
+      return rightEnabled - leftEnabled
+    }
+
+    const updatedDiff = right.updatedAt.getTime() - left.updatedAt.getTime()
+    if (updatedDiff !== 0) {
+      return updatedDiff
+    }
+
+    return right.id.localeCompare(left.id)
+  })
+
+  const sourcePagination = resolvePagination({ page: options?.sourcePage, pageSize: RSS_SOURCE_PAGE_SIZE }, sortedSources.length, [RSS_SOURCE_PAGE_SIZE], RSS_SOURCE_PAGE_SIZE)
   const recentRunsPagination = resolvePagination({ page: options?.recentRunsPage, pageSize: RSS_MODAL_PAGE_SIZE }, recentRunTotal, [RSS_MODAL_PAGE_SIZE], RSS_MODAL_PAGE_SIZE)
-  const recentLogsPagination = resolvePagination({ page: options?.recentLogsPage, pageSize: RSS_MODAL_PAGE_SIZE }, recentLogTotal, [RSS_MODAL_PAGE_SIZE], RSS_MODAL_PAGE_SIZE)
 
-  const [sources, recentRuns, recentLogs] = await Promise.all([
-    listRssSourcesPage(sourcePagination.skip, sourcePagination.pageSize),
-    listRecentRssRunsPage(recentRunsPagination.skip, recentRunsPagination.pageSize),
-    listRecentRssLogsPage(recentLogsPagination.skip, recentLogsPagination.pageSize),
-  ])
+  const pagedSources = sortedSources.slice(sourcePagination.skip, sourcePagination.skip + sourcePagination.pageSize)
+  const recentRuns = allExecutionItems.slice(recentRunsPagination.skip, recentRunsPagination.skip + recentRunsPagination.pageSize)
 
-  const sourceItems = await Promise.all(sources.map((source) => buildSourceAdminItem(source)))
+  const sourceItems = await Promise.all(pagedSources.map(async (source) => buildSourceAdminItem(
+    source,
+    sourceRuntimeStates.get(source.id) ?? {
+      sourceId: source.id,
+      enabled: false,
+      lastRunAt: null,
+      lastSuccessAt: null,
+      lastErrorAt: null,
+      lastErrorMessage: null,
+      failureCount: 0,
+      lastRunDurationMs: null,
+      updatedAt: new Date(0),
+    },
+    {
+      entryCount: await countRssEntriesForSource(source.id),
+      queueItems: queueItemsBySource.get(source.id) ?? [],
+    },
+  )))
+  const recentRunSourceIds = Array.from(new Set(recentRuns.map((run) => run.sourceId)))
+  const recentRunSources = recentRunSourceIds.length > 0
+    ? await prisma.rssSource.findMany({
+      where: {
+        id: {
+          in: recentRunSourceIds,
+        },
+      },
+      select: {
+        id: true,
+        siteName: true,
+      },
+    })
+    : []
+  const recentRunSourceMap = new Map(recentRunSources.map((source) => [source.id, source.siteName]))
 
   return {
     settings: serializeSettings(settings),
-    workerStatus: getWorkerStatus(settings),
-    queueSummary: {
-      pending: queueSummary[0],
-      processing: queueSummary[1],
-      failed: queueSummary[2],
-    },
+    schedulerStatus,
+    queueSummary,
     sourcePagination: serializePagination(sourcePagination),
     sources: sourceItems,
     recentRunsPagination: serializePagination(recentRunsPagination),
-    recentRuns: recentRuns.map(serializeRunRecord),
-    recentLogsPagination: serializePagination(recentLogsPagination),
-    recentLogs: recentLogs.map(serializeLogRecord),
+    recentRuns: recentRuns.map((run) => serializeRunRecord(run, recentRunSourceMap.get(run.sourceId) ?? run.sourceId)),
+    recentLogsPagination: {
+      page: recentLogsPage.page,
+      pageSize: recentLogsPage.pageSize,
+      total: recentLogsPage.total,
+      totalPages: recentLogsPage.totalPages,
+      hasPrevPage: recentLogsPage.hasPrevPage,
+      hasNextPage: recentLogsPage.hasNextPage,
+    },
+    recentLogs: recentLogsPage.items.map(serializeLogRecord),
   }
 }
 
@@ -738,49 +1092,75 @@ export async function getRssSourceRunPage(sourceId: string, options?: { page?: n
     apiError(404, "RSS 任务不存在")
   }
 
-  const total = await countRssRunsBySource(sourceId)
+  const total = await countRssExecutionItemsBySource(sourceId)
   const pagination = resolvePagination({ page: options?.page, pageSize: RSS_MODAL_PAGE_SIZE }, total, [RSS_MODAL_PAGE_SIZE], RSS_MODAL_PAGE_SIZE)
-  const items = await findRssRunsPageForSource(sourceId, pagination.skip, pagination.pageSize)
+  const items = await listRssExecutionItemsPageBySource(sourceId, pagination.skip, pagination.pageSize)
 
   return {
     sourceId: source.id,
     sourceName: source.siteName,
-    items: items.map((run) => ({
-      id: run.id,
-      status: run.status,
-      triggerType: run.triggerType,
-      startedAt: run.startedAt.toISOString(),
-      finishedAt: toIsoString(run.finishedAt),
-      durationMs: run.durationMs,
-      fetchedCount: run.fetchedCount,
-      insertedCount: run.insertedCount,
-      duplicateCount: run.duplicateCount,
-      httpStatus: run.httpStatus,
-      errorMessage: run.errorMessage,
-    })),
+    items: items.map((run) => {
+      const serialized = serializeRunRecord(run, source.siteName)
+      return {
+        id: serialized.id,
+        status: serialized.status,
+        triggerType: serialized.triggerType,
+        startedAt: serialized.startedAt,
+        finishedAt: serialized.finishedAt,
+        durationMs: serialized.durationMs,
+        fetchedCount: serialized.fetchedCount,
+        insertedCount: serialized.insertedCount,
+        duplicateCount: serialized.duplicateCount,
+        httpStatus: serialized.httpStatus,
+        errorMessage: serialized.errorMessage,
+      }
+    }),
     pagination: serializePagination(pagination),
   }
 }
 
 export async function getRssRecentRunPage(options?: { page?: number }): Promise<RssGlobalRunPageData> {
-  const total = await countRssRuns()
+  const total = await countRssExecutionItems()
   const pagination = resolvePagination({ page: options?.page, pageSize: RSS_MODAL_PAGE_SIZE }, total, [RSS_MODAL_PAGE_SIZE], RSS_MODAL_PAGE_SIZE)
-  const items = await listRecentRssRunsPage(pagination.skip, pagination.pageSize)
+  const items = await listRssExecutionItemsPage(pagination.skip, pagination.pageSize)
+  const sourceIds = Array.from(new Set(items.map((item) => item.sourceId)))
+  const sources = sourceIds.length > 0
+    ? await prisma.rssSource.findMany({
+      where: {
+        id: {
+          in: sourceIds,
+        },
+      },
+      select: {
+        id: true,
+        siteName: true,
+      },
+    })
+    : []
+  const sourceMap = new Map(sources.map((source) => [source.id, source.siteName]))
 
   return {
-    items: items.map(serializeRunRecord),
+    items: items.map((run) => serializeRunRecord(run, sourceMap.get(run.sourceId) ?? run.sourceId)),
     pagination: serializePagination(pagination),
   }
 }
 
 export async function getRssRecentLogPage(options?: { page?: number }): Promise<RssGlobalLogPageData> {
-  const total = await countRssLogs()
-  const pagination = resolvePagination({ page: options?.page, pageSize: RSS_MODAL_PAGE_SIZE }, total, [RSS_MODAL_PAGE_SIZE], RSS_MODAL_PAGE_SIZE)
-  const items = await listRecentRssLogsPage(pagination.skip, pagination.pageSize)
+  const page = await getRssExecutionLogPage({
+    page: options?.page,
+    pageSize: RSS_MODAL_PAGE_SIZE,
+  })
 
   return {
-    items: items.map(serializeLogRecord),
-    pagination: serializePagination(pagination),
+    items: page.items.map(serializeLogRecord),
+    pagination: {
+      page: page.page,
+      pageSize: page.pageSize,
+      total: page.total,
+      totalPages: page.totalPages,
+      hasPrevPage: page.hasPrevPage,
+      hasNextPage: page.hasNextPage,
+    },
   }
 }
 
@@ -839,17 +1219,34 @@ export async function createRssSource(input: Record<string, unknown>) {
     apiError(400, "该 RSS 地址已经存在")
   }
 
-  return createRssSourceRecord({
+  const created = await createRssSourceRecord({
     siteName: normalized.siteName,
     feedUrl: normalized.feedUrl,
     logoPath: normalized.logoPath,
     intervalMinutes: normalized.intervalMinutes,
     requiresReview: normalized.requiresReview,
-    status: normalized.status,
     requestTimeoutMs: normalized.requestTimeoutMs,
     maxRetryCount: normalized.maxRetryCount,
-    nextRunAt: normalized.status === "ACTIVE" ? new Date() : null,
   })
+
+  const runtimeState = await updateRssSourceRuntimeState(created.id, {
+    enabled: normalized.enabled,
+    lastRunAt: null,
+    lastSuccessAt: null,
+    lastErrorAt: null,
+    lastErrorMessage: null,
+    failureCount: 0,
+    lastRunDurationMs: null,
+  })
+
+  if (runtimeState.enabled) {
+    await ensureRssSourceScheduled(created, {
+      scheduledAt: new Date(),
+      runtimeState,
+    })
+  }
+
+  return created
 }
 
 export async function updateRssSource(id: string, input: Record<string, unknown>) {
@@ -864,19 +1261,48 @@ export async function updateRssSource(id: string, input: Record<string, unknown>
     apiError(400, "该 RSS 地址已经存在")
   }
 
-  return updateRssSourceRecord(id, {
+  const runtimeState = await getRssSourceRuntimeState(id)
+  const wasActive = runtimeState.enabled
+  const intervalChanged = normalized.intervalMinutes !== source.intervalMinutes
+  const shouldForceReschedule = !wasActive || intervalChanged
+  const nextScheduledAt = resolveNextScheduledAtForUpdatedSource(
+    runtimeState,
+    normalized.enabled,
+    normalized.intervalMinutes,
+    {
+      forceRecompute: shouldForceReschedule,
+    },
+  )
+
+  const updated = await updateRssSourceRecord(id, {
     siteName: normalized.siteName,
     feedUrl: normalized.feedUrl,
     logoPath: normalized.logoPath,
     intervalMinutes: normalized.intervalMinutes,
     requiresReview: normalized.requiresReview,
-    status: normalized.status,
     requestTimeoutMs: normalized.requestTimeoutMs,
     maxRetryCount: normalized.maxRetryCount,
-    nextRunAt: normalized.status === "ACTIVE"
-      ? source.nextRunAt ?? new Date()
-      : null,
   })
+
+  const nextRuntimeState = await updateRssSourceRuntimeState(updated.id, {
+    enabled: normalized.enabled,
+  })
+
+  if (!nextRuntimeState.enabled) {
+    await cancelPendingRssSourceQueueItems(updated.id, "任务已由管理员停止")
+  } else {
+    await ensureRssSourceScheduled(updated, {
+      scheduledAt: nextScheduledAt ?? new Date(),
+      forceReschedule: shouldForceReschedule,
+      runtimeState: nextRuntimeState,
+    })
+  }
+
+  await cleanupStaleRssDelayedJobs({
+    sourceId: updated.id,
+  })
+
+  return updated
 }
 
 async function enqueueRssSourceJobInternal(params: {
@@ -886,22 +1312,70 @@ async function enqueueRssSourceJobInternal(params: {
   scheduledAt: Date
 }) {
   const settings = await getOrCreateRssSettingRecord()
-  const activeQueueCount = await countActiveQueueItemsForSource(params.source.id)
+  const activeItems = await listActiveQueueItemsForSource(params.source.id)
+  const processingItem = activeItems.find((item) => item.status === "PROCESSING") ?? null
 
-  if (activeQueueCount > 0) {
+  if (processingItem) {
     return {
       queued: false,
-      message: "当前任务已经在队列中或执行中",
+      message: "当前任务正在执行中，请等待本轮完成",
     }
   }
 
-  await createRssQueueRecord({
+  if (params.triggerType === "MANUAL") {
+    const pendingManualItem = activeItems.find((item) => item.status === "PENDING" && item.triggerType === "MANUAL")
+    if (pendingManualItem) {
+      return {
+        queued: false,
+        message: "当前已经有手动任务在等待执行",
+      }
+    }
+  } else {
+    const pendingAutomaticItem = activeItems.find((item) => item.status === "PENDING" && isAutomaticQueueItem(item))
+    if (pendingAutomaticItem) {
+      return {
+        queued: false,
+        message: "当前任务已经挂起了下一次自动执行",
+      }
+    }
+  }
+
+  const queueItem = await createRssQueueRecord({
     sourceId: params.source.id,
     triggerType: params.triggerType,
     priority: params.priority,
     scheduledAt: params.scheduledAt,
     maxAttempts: params.source.maxRetryCount ?? settings.maxRetryCount,
   })
+
+  try {
+    const ensuredJob = await ensureDelayedBackgroundJob(createRssQueueJobState(queueItem), {
+      enabled: true,
+      jobName: RSS_PROCESS_QUEUE_BACKGROUND_JOB_NAME,
+      payload: {
+        queueId: queueItem.id,
+      },
+      scheduledAt: params.scheduledAt,
+      maxAttempts: 1,
+    })
+
+    if (!ensuredJob.scheduled || !ensuredJob.job) {
+      apiError(500, "RSS 延迟任务创建失败")
+    }
+
+    await updateRssQueueRecord(queueItem.id, {
+      backgroundJobId: ensuredJob.state.jobId,
+      scheduledAt: resolveScheduledAtFromState(ensuredJob.state, params.scheduledAt),
+    })
+  } catch (error) {
+    await updateRssQueueRecord(queueItem.id, {
+      backgroundJobId: null,
+      status: "FAILED",
+      finishedAt: new Date(),
+      errorMessage: `统一任务队列入队失败：${resolveRssHarvestErrorMessage(error)}`,
+    })
+    throw error
+  }
 
   return {
     queued: true,
@@ -929,10 +1403,20 @@ export async function startRssSource(sourceId: string) {
     apiError(404, "RSS 任务不存在")
   }
 
-  return updateRssSourceRecord(sourceId, {
-    status: "ACTIVE",
-    nextRunAt: new Date(),
+  const runtimeState = await updateRssSourceRuntimeState(sourceId, {
+    enabled: true,
   })
+
+  await ensureRssSourceScheduled(source, {
+    scheduledAt: new Date(),
+    runtimeState,
+  })
+
+  await cleanupStaleRssDelayedJobs({
+    sourceId,
+  })
+
+  return source
 }
 
 export async function stopRssSource(sourceId: string) {
@@ -942,18 +1426,21 @@ export async function stopRssSource(sourceId: string) {
   }
 
   await Promise.all([
-    updateRssSourceRecord(sourceId, {
-      status: "PAUSED",
-      nextRunAt: null,
+    updateRssSourceRuntimeState(sourceId, {
+      enabled: false,
     }),
-    cancelPendingQueueItemsForSource(sourceId),
+    cancelPendingRssSourceQueueItems(sourceId, "任务已由管理员停止"),
   ])
+
+  await cleanupStaleRssDelayedJobs({
+    sourceId,
+  })
 
   return { id: sourceId }
 }
 
 export async function clearRssLogsHistory() {
-  const result = await clearRssLogRecords()
+  const result = await clearRssExecutionLogs()
   return {
     count: result.count,
   }
@@ -979,7 +1466,9 @@ export async function clearRssSourceRunHistory(sourceId: string) {
     apiError(404, "RSS 任务不存在")
   }
 
-  const result = await clearRssRunHistoryBySource(sourceId)
+  const queueIds = await listCompletedRssQueueIdsBySource(sourceId)
+  const result = await clearRssQueueHistoryBySource(sourceId)
+  await deleteRssExecutionLogsByRunIds(queueIds.map((item) => item.id))
   return {
     sourceId,
     sourceName: source.siteName,
@@ -988,13 +1477,15 @@ export async function clearRssSourceRunHistory(sourceId: string) {
 }
 
 export async function clearRssRunHistoryRecords() {
-  const result = await clearRssRunHistory()
+  const queueIds = await listCompletedRssQueueIds()
+  const result = await clearRssQueueHistory()
+  await deleteRssExecutionLogsByRunIds(queueIds.map((item) => item.id))
   return {
     count: result.count,
   }
 }
 
-async function createRunLogBuffer(runId: string) {
+async function createRunLogBuffer(runId: string, sourceId: string, sourceName: string) {
   const buffer: LogBufferItem[] = []
 
   function push(level: RssLogLevel, stage: string, message: string, detail?: unknown) {
@@ -1002,13 +1493,15 @@ async function createRunLogBuffer(runId: string) {
       level,
       stage,
       message,
-      detailJson: toDetailJson(detail),
+      detailJson: toPrismaJsonValue(detail),
     })
   }
 
   async function flush() {
-    await createRssLogBatch(buffer.map((item) => ({
+    await persistRssExecutionLogBatch(buffer.map((item) => ({
       runId,
+      sourceId,
+      sourceName,
       level: item.level,
       stage: item.stage,
       message: item.message,
@@ -1022,341 +1515,16 @@ async function createRunLogBuffer(runId: string) {
   }
 }
 
-function isPrivateIpv4(ip: string) {
-  const [a = 0, b = 0] = ip.split(".").map((item) => Number(item))
-
-  if (a === 10 || a === 127 || a === 0) return true
-  if (a === 169 && b === 254) return true
-  if (a === 172 && b >= 16 && b <= 31) return true
-  if (a === 192 && b === 168) return true
-  if (a === 100 && b >= 64 && b <= 127) return true
-  if (a === 198 && (b === 18 || b === 19)) return true
-  if (a >= 224) return true
-
-  return false
-}
-
-function isPrivateIpv6(ip: string) {
-  const normalized = ip.toLowerCase()
-
-  if (normalized === "::1" || normalized === "::") return true
-  if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true
-  if (normalized.startsWith("fe8") || normalized.startsWith("fe9") || normalized.startsWith("fea") || normalized.startsWith("feb")) return true
-
-  return false
-}
-
-async function assertSafeOutboundUrl(rawUrl: string) {
-  const url = new URL(rawUrl)
-
-  if (!["http:", "https:"].includes(url.protocol)) {
-    throw new Error("仅允许抓取 http 或 https 地址")
-  }
-
-  if (url.username || url.password) {
-    throw new Error("抓取地址不允许包含账号密码")
-  }
-
-  const hostname = url.hostname.trim().toLowerCase()
-  if (!hostname) {
-    throw new Error("抓取地址缺少主机名")
-  }
-
-  if (hostname === "localhost" || hostname.endsWith(".local")) {
-    throw new Error("禁止抓取本地或局域网地址")
-  }
-
-  const ipVersion = isIP(hostname)
-  if (ipVersion === 4) {
-    if (isPrivateIpv4(hostname)) {
-      throw new Error("禁止抓取内网 IPv4 地址")
-    }
-    return
-  }
-
-  if (ipVersion === 6) {
-    if (isPrivateIpv6(hostname)) {
-      throw new Error("禁止抓取内网 IPv6 地址")
-    }
-    return
-  }
-
-  const addresses = await lookup(hostname, { all: true, verbatim: true })
-  if (addresses.length === 0) {
-    throw new Error("主机名解析失败")
-  }
-
-  for (const address of addresses) {
-    if ((address.family === 4 && isPrivateIpv4(address.address)) || (address.family === 6 && isPrivateIpv6(address.address))) {
-      throw new Error("目标主机解析到了内网地址，已拒绝访问")
-    }
-  }
-}
-
-async function readResponseText(response: Response, maxResponseBytes: number) {
-  const reader = response.body?.getReader()
-  if (!reader) {
-    return { body: "", responseBytes: 0 }
-  }
-
-  let total = 0
-  let body = ""
-  const decoder = new TextDecoder()
-
-  while (true) {
-    const chunk = await reader.read()
-    if (chunk.done) {
-      break
-    }
-
-    total += chunk.value.byteLength
-    if (total > maxResponseBytes) {
-      throw new Error(`响应体超过上限 ${maxResponseBytes} 字节`)
-    }
-
-    body += decoder.decode(chunk.value, { stream: true })
-  }
-
-  body += decoder.decode()
-
-  return {
-    body,
-    responseBytes: total,
-  }
-}
-
-async function fetchFeedXml(params: {
-  feedUrl: string
-  fetchTimeoutMs: number
-  maxResponseBytes: number
-  maxRedirects: number
-  userAgent: string
-  onLog: (level: RssLogLevel, stage: string, message: string, detail?: unknown) => void
-}): Promise<FetchFeedResult> {
-  let currentUrl = params.feedUrl
-
-  for (let redirectCount = 0; redirectCount <= params.maxRedirects; redirectCount += 1) {
-    await assertSafeOutboundUrl(currentUrl)
-
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), params.fetchTimeoutMs)
-
-    try {
-      params.onLog("INFO", "fetch", "开始抓取 RSS 源", { url: currentUrl })
-
-      const response = await fetch(currentUrl, {
-        method: "GET",
-        redirect: "manual",
-        signal: controller.signal,
-        headers: {
-          Accept: RSS_ACCEPT_HEADER,
-          "User-Agent": params.userAgent,
-        },
-      })
-
-      const status = response.status
-      const location = response.headers.get("location")
-
-      if (status >= 300 && status < 400) {
-        if (!location) {
-          throw new Error(`收到 ${status} 重定向但缺少 Location`)
-        }
-
-        currentUrl = new URL(location, currentUrl).toString()
-        params.onLog("INFO", "fetch", "检测到重定向，继续校验并抓取", {
-          status,
-          nextUrl: currentUrl,
-        })
-        continue
-      }
-
-      if (!response.ok) {
-        throw new Error(`抓取失败，HTTP ${status}`)
-      }
-
-      const contentType = response.headers.get("content-type")
-      const { body, responseBytes } = await readResponseText(response, params.maxResponseBytes)
-
-      params.onLog("INFO", "fetch", "RSS 响应读取完成", {
-        status,
-        contentType,
-        responseBytes,
-      })
-
-      return {
-        finalUrl: currentUrl,
-        httpStatus: status,
-        contentType,
-        responseBytes,
-        body,
-      }
-    } finally {
-      clearTimeout(timeoutId)
-    }
-  }
-
-  throw new Error(`重定向次数超过上限 ${params.maxRedirects}`)
-}
-
-function resolveRssItemLink(rawValue: unknown, baseUrl: string) {
-  const value = firstText(rawValue)
-  if (!value) {
-    return null
-  }
-
-  try {
-    return new URL(value, baseUrl).toString()
-  } catch {
-    return null
-  }
-}
-
-function resolveAtomLink(rawValue: unknown, baseUrl: string) {
-  const candidates = asArray(rawValue as Record<string, unknown> | Array<Record<string, unknown>>)
-
-  for (const candidate of candidates) {
-    if (!candidate || typeof candidate !== "object") {
-      continue
-    }
-
-    const href = typeof candidate.href === "string" ? candidate.href.trim() : ""
-    const rel = typeof candidate.rel === "string" ? candidate.rel.trim() : ""
-    if (!href) {
-      continue
-    }
-
-    if (rel && rel !== "alternate") {
-      continue
-    }
-
-    try {
-      return new URL(href, baseUrl).toString()
-    } catch {
-      continue
-    }
-  }
-
-  return null
-}
-
-function mapRssItem(item: Record<string, unknown>, baseUrl: string): ParsedFeedItem | null {
-  const title = firstText(item.title) ?? firstText(item.link)
-  if (!title) {
-    return null
-  }
-
-  const contentHtml = firstText(item["content:encoded"], item.description, item.content)
-  const contentText = stripHtmlTags(contentHtml)
-  const guid = firstText(item.guid)
-  const linkUrl = resolveRssItemLink(item.link, baseUrl)
-  const publishedAt = parseOptionalDate(firstText(item.pubDate, item["dc:date"], item.published))
-
-  return {
-    guid,
-    linkUrl,
-    title,
-    author: firstText(item.author, item["dc:creator"], item.creator),
-    summary: firstText(item.description, item.summary) ?? contentText,
-    contentHtml,
-    contentText,
-    publishedAt,
-    dedupeKey: buildDedupeKey({
-      guid,
-      linkUrl,
-      title,
-      contentText,
-      publishedAt,
-    }),
-    rawJson: toDetailJson(item) ?? {},
-  }
-}
-
-function mapAtomEntry(entry: Record<string, unknown>, baseUrl: string): ParsedFeedItem | null {
-  const title = firstText(entry.title) ?? resolveAtomLink(entry.link, baseUrl)
-  if (!title) {
-    return null
-  }
-
-  const contentHtml = firstText(entry.content, entry.summary)
-  const contentText = stripHtmlTags(contentHtml)
-  const guid = firstText(entry.id)
-  const linkUrl = resolveAtomLink(entry.link, baseUrl)
-  const authorValue = typeof entry.author === "object" && entry.author
-    ? firstText((entry.author as Record<string, unknown>).name, entry.author)
-    : firstText(entry.author)
-  const publishedAt = parseOptionalDate(firstText(entry.updated, entry.published))
-
-  return {
-    guid,
-    linkUrl,
-    title,
-    author: authorValue,
-    summary: firstText(entry.summary) ?? contentText,
-    contentHtml,
-    contentText,
-    publishedAt,
-    dedupeKey: buildDedupeKey({
-      guid,
-      linkUrl,
-      title,
-      contentText,
-      publishedAt,
-    }),
-    rawJson: toDetailJson(entry) ?? {},
-  }
-}
-
-function parseFeedXml(xml: string, baseUrl: string): ParsedFeed {
-  const parsed = xmlParser.parse(xml) as Record<string, unknown>
-
-  if (parsed.rss && typeof parsed.rss === "object") {
-    const channel = (parsed.rss as Record<string, unknown>).channel as Record<string, unknown> | undefined
-    if (!channel) {
-      throw new Error("RSS 文档缺少 channel")
-    }
-
-    return {
-      title: firstText(channel.title),
-      items: asArray(channel.item as Record<string, unknown> | Array<Record<string, unknown>>)
-        .map((item) => mapRssItem(item, baseUrl))
-        .filter((item): item is ParsedFeedItem => Boolean(item)),
-    }
-  }
-
-  if (parsed.feed && typeof parsed.feed === "object") {
-    const feed = parsed.feed as Record<string, unknown>
-    return {
-      title: firstText(feed.title),
-      items: asArray(feed.entry as Record<string, unknown> | Array<Record<string, unknown>>)
-        .map((entry) => mapAtomEntry(entry, baseUrl))
-        .filter((item): item is ParsedFeedItem => Boolean(item)),
-    }
-  }
-
-  if (parsed["rdf:RDF"] && typeof parsed["rdf:RDF"] === "object") {
-    const feed = parsed["rdf:RDF"] as Record<string, unknown>
-    const channel = typeof feed.channel === "object" && feed.channel ? feed.channel as Record<string, unknown> : null
-
-    return {
-      title: firstText(channel?.title),
-      items: asArray(feed.item as Record<string, unknown> | Array<Record<string, unknown>>)
-        .map((item) => mapRssItem(item, baseUrl))
-        .filter((item): item is ParsedFeedItem => Boolean(item)),
-    }
-  }
-
-  throw new Error("无法识别 RSS/Atom 文档结构")
-}
-
 async function handleProcessSuccess(params: {
   item: RssQueueWithSourceRecord
-  runId: string
   logs: Awaited<ReturnType<typeof createRunLogBuffer>>
   feed: ParsedFeed
   fetchResult: FetchFeedResult
   startedAt: Date
 }) {
   const finishedAt = new Date()
+  const currentSource = await findRssSourceById(params.item.sourceId) ?? params.item.source
+  const runtimeState = await getRssSourceRuntimeState(params.item.sourceId)
   const inserted = await createManyRssEntries(params.feed.items.map((item) => ({
     sourceId: params.item.sourceId,
     guid: item.guid,
@@ -1377,8 +1545,13 @@ async function handleProcessSuccess(params: {
 
   const durationMs = finishedAt.getTime() - params.startedAt.getTime()
   const duplicateCount = Math.max(0, params.feed.items.length - inserted.count)
-  const nextRunAt = params.item.source.status === "ACTIVE"
-    ? addMinutes(finishedAt, params.item.source.intervalMinutes)
+  const existingAutomaticItem = runtimeState.enabled
+    ? params.item.triggerType === "MANUAL"
+      ? await findAutomaticQueueItemForSource(params.item.sourceId)
+      : null
+    : null
+  const nextRunAt = runtimeState.enabled
+    ? existingAutomaticItem?.scheduledAt ?? addMinutes(finishedAt, currentSource.intervalMinutes)
     : null
 
   params.logs.push("INFO", "store", "RSS 数据已写入数据库", {
@@ -1390,10 +1563,13 @@ async function handleProcessSuccess(params: {
   })
   await params.logs.flush()
 
-  await prisma.$transaction([
-    updateRssRunRecord(params.runId, {
+  await Promise.all([
+    updateRssQueueRecord(params.item.id, {
+      backgroundJobId: null,
       status: "SUCCEEDED",
+      leaseExpiresAt: null,
       finishedAt,
+      errorMessage: null,
       durationMs,
       httpStatus: params.fetchResult.httpStatus,
       contentType: params.fetchResult.contentType,
@@ -1401,110 +1577,162 @@ async function handleProcessSuccess(params: {
       fetchedCount: params.feed.items.length,
       insertedCount: inserted.count,
       duplicateCount,
-      errorMessage: null,
     }),
-    updateRssQueueRecord(params.item.id, {
-      status: "SUCCEEDED",
-      leaseExpiresAt: null,
-      finishedAt,
-      errorMessage: null,
-    }),
-    updateRssSourceRecord(params.item.sourceId, {
+    updateRssSourceRuntimeState(params.item.sourceId, {
       lastRunAt: params.startedAt,
       lastSuccessAt: finishedAt,
       lastErrorAt: null,
       lastErrorMessage: null,
       failureCount: 0,
       lastRunDurationMs: durationMs,
-      nextRunAt,
     }),
   ])
-}
 
-function resolveErrorMessage(error: unknown) {
-  if (error instanceof Error && error.message) {
-    return error.message
+  if (runtimeState.enabled) {
+    const nextSource = await findRssSourceById(params.item.sourceId)
+    if (nextSource) {
+      try {
+        await ensureRssSourceScheduled(nextSource, {
+          scheduledAt: nextRunAt ?? addMinutes(finishedAt, nextSource.intervalMinutes),
+        })
+      } catch (error) {
+        logError({
+          scope: "rss-harvest",
+          action: "schedule-next-source-run",
+          targetId: params.item.sourceId,
+        }, error)
+      }
+    }
   }
-
-  return "RSS 抓取失败"
 }
 
 async function handleProcessFailure(params: {
   item: RssQueueWithSourceRecord
   settings: RssSettingRecord
-  runId: string
   logs: Awaited<ReturnType<typeof createRunLogBuffer>>
   startedAt: Date
   error: unknown
 }) {
   const finishedAt = new Date()
+  const runtimeState = await getRssSourceRuntimeState(params.item.sourceId)
   const durationMs = finishedAt.getTime() - params.startedAt.getTime()
-  const errorMessage = resolveErrorMessage(params.error)
-  const failureCount = params.item.source.failureCount + 1
-  const shouldPauseSource = failureCount >= params.settings.failurePauseThreshold
-  const shouldRetry = !shouldPauseSource && params.item.source.status === "ACTIVE" && params.item.attemptCount < params.item.maxAttempts
+  const errorMessage = resolveRssHarvestErrorMessage(params.error)
+  const failureCount = runtimeState.failureCount + 1
+  const shouldPauseSource = runtimeState.enabled && failureCount >= params.settings.failurePauseThreshold
+  const canRetry = !shouldPauseSource && runtimeState.enabled && params.item.attemptCount < params.item.maxAttempts
 
   params.logs.push("ERROR", "run", "RSS 抓取执行失败", {
     errorMessage,
-    shouldRetry,
+    shouldRetry: canRetry,
     shouldPauseSource,
     attemptCount: params.item.attemptCount,
     maxAttempts: params.item.maxAttempts,
   })
   await params.logs.flush()
 
+  const retryScheduledAt = addSeconds(finishedAt, params.settings.retryBackoffSec)
+  let shouldRetry = false
+  let retryJobState: DelayedBackgroundJobState | null = null
+
+  if (canRetry) {
+    try {
+      const ensuredRetryJob = await ensureDelayedBackgroundJob({
+        jobId: "",
+        nextRunAt: retryScheduledAt.toISOString(),
+      }, {
+        enabled: true,
+        jobName: RSS_PROCESS_QUEUE_BACKGROUND_JOB_NAME,
+        payload: {
+          queueId: params.item.id,
+        },
+        scheduledAt: retryScheduledAt,
+        maxAttempts: 1,
+      })
+      retryJobState = ensuredRetryJob.state
+      shouldRetry = true
+    } catch (enqueueError) {
+      logError({
+        scope: "rss-harvest",
+        action: "retry-enqueue",
+        targetId: params.item.id,
+      }, enqueueError)
+    }
+  }
+
   const queueUpdate = shouldRetry
     ? updateRssQueueRecord(params.item.id, {
+        backgroundJobId: retryJobState?.jobId ?? null,
         status: "PENDING",
-        scheduledAt: addSeconds(finishedAt, params.settings.retryBackoffSec),
+        scheduledAt: resolveScheduledAtFromState(retryJobState ?? {
+          jobId: "",
+          nextRunAt: retryScheduledAt.toISOString(),
+        }, retryScheduledAt),
         leaseExpiresAt: null,
         startedAt: null,
+        finishedAt: null,
         workerId: null,
         errorMessage,
+        durationMs: null,
+        httpStatus: null,
+        contentType: null,
+        responseBytes: null,
+        fetchedCount: 0,
+        insertedCount: 0,
+        duplicateCount: 0,
       })
     : updateRssQueueRecord(params.item.id, {
+        backgroundJobId: null,
         status: "FAILED",
         leaseExpiresAt: null,
         finishedAt,
         errorMessage,
+        durationMs,
+        httpStatus: null,
+        contentType: null,
+        responseBytes: null,
+        fetchedCount: 0,
+        insertedCount: 0,
+        duplicateCount: 0,
       })
 
-  await prisma.$transaction([
-    updateRssRunRecord(params.runId, {
-      status: "FAILED",
-      finishedAt,
-      durationMs,
-      errorMessage,
-    }),
+  await Promise.all([
     queueUpdate,
-    updateRssSourceRecord(params.item.sourceId, {
-      status: shouldPauseSource ? "PAUSED" : params.item.source.status,
+    updateRssSourceRuntimeState(params.item.sourceId, {
+      enabled: shouldPauseSource ? false : runtimeState.enabled,
       lastRunAt: params.startedAt,
       lastErrorAt: finishedAt,
       lastErrorMessage: errorMessage,
       failureCount,
       lastRunDurationMs: durationMs,
-      nextRunAt: shouldPauseSource
-        ? null
-        : shouldRetry
-          ? addSeconds(finishedAt, params.settings.retryBackoffSec)
-          : params.item.source.status === "ACTIVE"
-            ? addMinutes(finishedAt, params.item.source.intervalMinutes)
-            : null,
     }),
   ])
+
+  if (shouldPauseSource) {
+    await cancelPendingRssSourceQueueItems(params.item.sourceId, "任务连续失败，已自动暂停")
+  }
+
+  if (!shouldPauseSource && runtimeState.enabled) {
+    const nextSource = await findRssSourceById(params.item.sourceId)
+    if (nextSource) {
+      const automaticQueueItem = await findAutomaticQueueItemForSource(params.item.sourceId)
+      try {
+        await ensureRssSourceScheduled(nextSource, {
+          scheduledAt: automaticQueueItem?.scheduledAt ?? addMinutes(finishedAt, nextSource.intervalMinutes),
+        })
+      } catch (scheduleError) {
+        logError({
+          scope: "rss-harvest",
+          action: "schedule-next-source-run",
+          targetId: params.item.sourceId,
+        }, scheduleError)
+      }
+    }
+  }
 }
 
 export async function processRssQueueItem(item: RssQueueWithSourceRecord, settings: RssSettingRecord) {
-  const startedAt = new Date()
-  const run = await createRssRunRecord({
-    sourceId: item.sourceId,
-    queueId: item.id,
-    triggerType: item.triggerType,
-    status: "RUNNING",
-    startedAt,
-  })
-  const logs = await createRunLogBuffer(run.id)
+  const startedAt = item.startedAt ?? new Date()
+  const logs = await createRunLogBuffer(item.id, item.sourceId, item.source.siteName)
 
   try {
     logs.push("INFO", "run", "开始执行 RSS 抓取任务", {
@@ -1535,7 +1763,6 @@ export async function processRssQueueItem(item: RssQueueWithSourceRecord, settin
 
     await handleProcessSuccess({
       item,
-      runId: run.id,
       logs,
       feed,
       fetchResult,
@@ -1555,7 +1782,6 @@ export async function processRssQueueItem(item: RssQueueWithSourceRecord, settin
     await handleProcessFailure({
       item,
       settings,
-      runId: run.id,
       logs,
       startedAt,
       error,
@@ -1563,130 +1789,81 @@ export async function processRssQueueItem(item: RssQueueWithSourceRecord, settin
   }
 }
 
-export async function scheduleDueRssSources(settings?: RssSettingRecord) {
-  const resolvedSettings = settings ?? await getOrCreateRssSettingRecord()
-  const now = new Date()
-  const dueSources = await findDueRssSources(now, DEFAULT_MAX_SOURCE_FETCH)
-  let scheduledCount = 0
-
-  for (const source of dueSources) {
-    const result = await enqueueRssSourceJobInternal({
-      source,
-      triggerType: "SCHEDULED",
-      priority: 0,
-      scheduledAt: now,
-    })
-
-    await updateRssSourceRecord(source.id, {
-      nextRunAt: addMinutes(now, source.intervalMinutes),
-    })
-
-    if (result.queued) {
-      scheduledCount += 1
-    }
-  }
-
-  if (scheduledCount > 0) {
-    logInfo({
-      scope: "rss-harvest",
-      action: "schedule",
-      metadata: {
-        scheduledCount,
-        schedulerIntervalSec: resolvedSettings.schedulerIntervalSec,
-      },
-    })
-  }
-
-  return scheduledCount
-}
-
-export async function runRssWorkerCycle(workerId: string = randomUUID()): Promise<RssWorkerCycleResult> {
+async function executeRssProcessQueueJob(
+  queueId: string,
+  job: BackgroundJobEnvelope<typeof RSS_PROCESS_QUEUE_BACKGROUND_JOB_NAME>,
+) {
   const settings = await getOrCreateRssSettingRecord()
-  if (!settings.workerEnabled) {
-    return {
-      workerId,
-      recoveredCount: 0,
-      scheduledCount: 0,
-      claimedCount: 0,
-      processedCount: 0,
-    }
+  const queueItem = await findRssQueueWithSourceById(queueId)
+  if (!queueItem) {
+    return
   }
 
-  const now = new Date()
-  const recovered = await recoverExpiredRssQueueItems(now)
-  const scheduledCount = await scheduleDueRssSources(settings)
-  const claimed = await claimPendingRssQueueItems({
-    now,
-    limit: settings.maxConcurrentJobs,
-    workerId,
-    leaseExpiresAt: addMilliseconds(now, settings.fetchTimeoutMs + 60_000),
+  if (queueItem.status !== "PENDING") {
+    return
+  }
+
+  if (
+    queueItem.triggerType !== "MANUAL"
+    && !(await getRssSourceRuntimeState(queueItem.sourceId)).enabled
+  ) {
+    await updateRssQueueRecord(queueId, {
+      backgroundJobId: null,
+      status: "CANCELLED",
+      finishedAt: new Date(),
+      errorMessage: "RSS 源已暂停，任务已取消",
+      workerId: `bg:${job.id}`,
+      leaseExpiresAt: null,
+    })
+    return
+  }
+
+  await withRssProcessingSlot(settings.maxConcurrentJobs, async () => {
+    const latestQueueItem = await findRssQueueWithSourceById(queueId)
+    if (!latestQueueItem || latestQueueItem.status !== "PENDING") {
+      return
+    }
+
+    if (
+      latestQueueItem.triggerType !== "MANUAL"
+      && !(await getRssSourceRuntimeState(latestQueueItem.sourceId)).enabled
+    ) {
+      await updateRssQueueRecord(queueId, {
+        backgroundJobId: null,
+        status: "CANCELLED",
+        finishedAt: new Date(),
+        errorMessage: "RSS 源已暂停，任务已取消",
+        workerId: `bg:${job.id}`,
+        leaseExpiresAt: null,
+      })
+      return
+    }
+
+    const startedAt = new Date()
+    const claimedItem = await claimPendingRssQueueRecord(queueId, {
+      workerId: `bg:${job.id}`,
+      startedAt,
+    })
+
+    if (!claimedItem) {
+      return
+    }
+
+    await processRssQueueItem({
+      ...claimedItem,
+      source: latestQueueItem.source,
+    }, settings)
   })
-
-  if (claimed.length > 0) {
-    await Promise.allSettled(claimed.map((item) => processRssQueueItem(item, settings)))
-  }
-
-  return {
-    workerId,
-    recoveredCount: recovered.count,
-    scheduledCount,
-    claimedCount: claimed.length,
-    processedCount: claimed.length,
-  }
 }
 
-export async function startRssWorkerLoop(options?: {
-  workerId?: string
-  signal?: AbortSignal
-}) {
-  const workerId = options?.workerId ?? randomUUID()
-
-  while (!options?.signal?.aborted) {
-    try {
-      const settings = await getOrCreateRssSettingRecord()
-      const cycle = await runRssWorkerCycle(workerId)
-      const cycleAt = new Date()
-      await updateRssSettingRecord(settings.id, {
-        workerHeartbeatAt: cycleAt,
-        workerLastCycleAt: cycleAt,
-        workerLastWorkerId: workerId,
-        workerLastSummaryJson: toDetailJson(cycle),
-        workerLastErrorAt: null,
-        workerLastErrorMessage: null,
-      })
-      logInfo({
-        scope: "rss-harvest",
-        action: "worker-cycle",
-        metadata: { ...cycle },
-      })
-
-      await sleep(Math.max(settings.schedulerIntervalSec * 1_000, DEFAULT_IDLE_SLEEP_MS))
-    } catch (error) {
-      const cycleAt = new Date()
-      try {
-        const settings = await getOrCreateRssSettingRecord()
-        await updateRssSettingRecord(settings.id, {
-          workerHeartbeatAt: cycleAt,
-          workerLastCycleAt: cycleAt,
-          workerLastWorkerId: workerId,
-          workerLastErrorAt: cycleAt,
-          workerLastErrorMessage: resolveErrorMessage(error),
-        })
-      } catch {
-        // Ignore persistence errors here and keep the worker loop alive.
-      }
-
-      logError({
-        scope: "rss-harvest",
-        action: "worker-loop",
-        targetId: workerId,
-      }, error)
-      await sleep(DEFAULT_IDLE_SLEEP_MS)
-    }
-  }
-}
+registerBackgroundJobHandler(
+  RSS_PROCESS_QUEUE_BACKGROUND_JOB_NAME,
+  async (payload, job) => {
+    await executeRssProcessQueueJob(payload.queueId, job)
+  },
+)
 
 export async function formatRssRunLogs(runIds: string[]) {
-  const logs = await findRssLogsForRunIds(runIds)
+  const logs = await findRssExecutionLogsForRunIds(runIds)
   return logs.map((log) => `${formatDateTime(log.createdAt)} [${log.level}] ${log.stage}: ${log.message}`)
 }

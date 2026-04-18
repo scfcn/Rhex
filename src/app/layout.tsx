@@ -148,12 +148,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         isAuthenticated: false,
         user: null,
       }
-  const rhexSite = {
-    siteName: settings.siteName,
-    pointName: settings.pointName,
-    leftSidebarDisplayMode: settings.leftSidebarDisplayMode,
-    markdownImageUploadEnabled: settings.markdownImageUploadEnabled,
-  }
+  const rhexSite = settings
 
   return (
 

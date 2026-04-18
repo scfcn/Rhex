@@ -105,7 +105,7 @@ export function LoginForm({
     }
 
     const successMessage = "登录成功，正在跳转到首页…"
-    setMessage(successMessage)
+    //setMessage(successMessage)
     toast.success(successMessage, "登录成功")
     router.push("/")
     router.refresh()

@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client"
 
 import { prisma } from "@/db/client"
+import { toNullablePrismaJsonValue } from "@/lib/shared/prisma-json"
 
 type AddonRegistryState = "ENABLED" | "DISABLED" | "UNINSTALLED" | "ERROR"
 const prismaClient = prisma
@@ -77,15 +78,7 @@ function isMissingAddonRegistryTableError(error: unknown) {
 }
 
 function toJsonValue(value: unknown) {
-  if (typeof value === "undefined") {
-    return undefined
-  }
-
-  if (value === null) {
-    return Prisma.JsonNull
-  }
-
-  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue
+  return toNullablePrismaJsonValue(value)
 }
 
 function deriveAddonRegistryState(input: {

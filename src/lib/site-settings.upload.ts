@@ -37,6 +37,8 @@ export interface SiteSettingsUploadData {
   attachmentMinUploadVipLevel: number
   attachmentAllowedExtensions: string[]
   attachmentMaxFileSizeMb: number
+  messageImageUploadEnabled: boolean
+  messageFileUploadEnabled: boolean
   markdownEmojiMapJson?: string | null
   markdownEmojiMap: SiteSettingsMarkdownEmojiItem[]
   appStateJson?: string | null

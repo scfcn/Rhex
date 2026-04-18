@@ -40,9 +40,9 @@ export function BackgroundWorkerAdminPage({ data, pageQueryEntries = [] }: Backg
           tone={data.runtime.transport === "redis" ? "info" : "warning"}
         />
         <WorkerStatCard
-          title="活跃 Worker 连接"
+          title="消费连接"
           value={data.queue.liveWorkerCount === null ? "N/A" : formatNumber(data.queue.liveWorkerCount)}
-          hint={data.queue.liveWorkerCount === null ? "当前未启用 Redis 监控" : `并发上限 ${formatNumber(data.runtime.concurrency)}`}
+          hint={data.queue.liveWorkerCount === null ? "当前未启用 Redis 监控" : `lane 并发上限 ${formatNumber(data.runtime.concurrency)}`}
           icon={<ListRestart className="h-4 w-4" />}
           tone={data.queue.liveWorkerCount && data.queue.liveWorkerCount > 0 ? "success" : "warning"}
         />
@@ -75,13 +75,15 @@ export function BackgroundWorkerAdminPage({ data, pageQueryEntries = [] }: Backg
             <StatusMeta title="Pending ACK" value={data.queue.pendingCount === null ? "N/A" : formatNumber(data.queue.pendingCount)} detail="已取出但尚未确认完成的任务数" />
             <StatusMeta title="延迟任务" value={data.queue.delayedCount === null ? "N/A" : formatNumber(data.queue.delayedCount)} detail="尚未到可执行时间的任务数" />
             <StatusMeta title="执行日志" value={data.runtime.redisEnabled ? "Redis 24h" : "未启用"} detail={data.runtime.redisEnabled ? "background-job 关键事件会写入 Redis，保留最近 24 小时。" : "未启用 Redis 时，仅保留进程 stdout / stderr 日志。"} />
+            <StatusMeta title="辅助连接" value={data.queue.auxiliaryConnectionCount === null ? "N/A" : formatNumber(data.queue.auxiliaryConnectionCount)} detail="transport / shared 等后台辅助 Redis 连接。" />
+            <StatusMeta title="管理连接" value={data.queue.adminConnectionCount === null ? "N/A" : formatNumber(data.queue.adminConnectionCount)} detail="Web 后台页查询日志、快照等只读管理连接。" />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="border-b">
             <CardTitle>Worker 连接</CardTitle>
-            <CardDescription>基于 Redis `CLIENT LIST` 的当前在线连接快照。</CardDescription>
+            <CardDescription>基于 Redis `CLIENT LIST` 的在线连接快照，区分消费 lane、辅助连接和管理连接。</CardDescription>
           </CardHeader>
           <CardContent className="px-0 py-0">
             {data.queue.liveWorkers.length === 0 ? (
@@ -96,6 +98,7 @@ export function BackgroundWorkerAdminPage({ data, pageQueryEntries = [] }: Backg
                   <TableRow className="hover:bg-transparent">
                     <TableHead>连接名</TableHead>
                     <TableHead className="w-[120px]">进程角色</TableHead>
+                    <TableHead className="w-[120px]">连接类型</TableHead>
                     <TableHead className="w-[110px]">PID</TableHead>
                     <TableHead className="w-[180px]">连接职责</TableHead>
                     <TableHead className="w-[200px]">地址 / Idle</TableHead>
@@ -107,6 +110,20 @@ export function BackgroundWorkerAdminPage({ data, pageQueryEntries = [] }: Backg
                       <TableCell className="align-top text-xs text-muted-foreground">{worker.name}</TableCell>
                       <TableCell className="align-top">
                         <Badge variant="outline" className="rounded-full">{worker.processRole}</Badge>
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <Badge
+                          variant="outline"
+                          className="rounded-full"
+                        >
+                          {worker.connectionKind === "lane"
+                            ? "消费 lane"
+                            : worker.connectionKind === "transport"
+                              ? "辅助"
+                              : worker.connectionKind === "admin"
+                                ? "管理"
+                                : "其他"}
+                        </Badge>
                       </TableCell>
                       <TableCell className="align-top text-sm">{worker.pid}</TableCell>
                       <TableCell className="align-top text-sm">{worker.connectionRole}</TableCell>
@@ -123,39 +140,41 @@ export function BackgroundWorkerAdminPage({ data, pageQueryEntries = [] }: Backg
         </Card>
       </section>
 
-      <Card>
-        <CardHeader className="border-b">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-col gap-1">
-              <CardTitle>延迟任务明细</CardTitle>
-              <CardDescription>展示当前 Redis 延迟队列里最早执行的一批任务，方便直接确认具体任务体。</CardDescription>
+      <section className="grid gap-4 xl:grid-cols-2">
+        <Card>
+          <CardHeader className="border-b">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-col gap-1">
+                <CardTitle>延迟任务明细</CardTitle>
+                <CardDescription>展示当前 Redis 延迟队列里最早执行的一批任务，方便直接确认具体任务体。</CardDescription>
+              </div>
+              <Badge variant="outline" className="rounded-full">
+                {data.queue.delayedCount === null ? "N/A" : `${formatNumber(data.queue.delayedCount)} 个待执行`}
+              </Badge>
             </div>
-            <Badge variant="outline" className="rounded-full">
-              {data.queue.delayedCount === null ? "N/A" : `${formatNumber(data.queue.delayedCount)} 个待执行`}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="py-4">
-          <BackgroundJobDelayedList data={data} pageQueryEntries={pageQueryEntries} />
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent className="py-4">
+            <BackgroundJobDelayedList data={data} pageQueryEntries={pageQueryEntries} />
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader className="border-b">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-col gap-1">
-              <CardTitle>Worker 执行日志</CardTitle>
-              <CardDescription>最近 24 小时写入 Redis 的 background-job 运行日志，包含开始、成功、重试、死信和 worker 事件。</CardDescription>
+        <Card>
+          <CardHeader className="border-b">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-col gap-1">
+                <CardTitle>Worker 执行日志</CardTitle>
+                <CardDescription>最近 24 小时写入 Redis 的 background-job 运行日志，包含开始、成功、重试、死信和 worker 事件。</CardDescription>
+              </div>
+              <Badge variant="outline" className="rounded-full">
+                {`共 ${formatNumber(data.executionLogs.pagination.total)} 条日志`}
+              </Badge>
             </div>
-            <Badge variant="outline" className="rounded-full">
-              {`共 ${formatNumber(data.executionLogs.pagination.total)} 条日志`}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="py-4">
-          <BackgroundJobExecutionLogList data={data} pageQueryEntries={pageQueryEntries} />
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent className="py-4">
+            <BackgroundJobExecutionLogList data={data} pageQueryEntries={pageQueryEntries} />
+          </CardContent>
+        </Card>
+      </section>
 
       <Card>
         <CardHeader className="border-b">

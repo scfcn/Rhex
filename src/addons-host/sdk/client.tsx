@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { createRoot } from "react-dom/client"
+import type { SiteSettingsData } from "@/lib/site-settings.types"
 import {
   AlertCircle,
   ArrowRight,
@@ -264,6 +265,7 @@ import { toast } from "@/components/ui/toast"
 import { Toggle } from "@/components/ui/toggle"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipRoot, TooltipTrigger } from "@/components/ui/tooltip"
+import { BoardSelectField } from "@/components/board/board-select-field"
 import { ForumPostStreamView } from "@/components/forum/forum-post-stream-view"
 import { LevelBadge } from "@/components/level-badge"
 import { LevelIcon } from "@/components/level-icon"
@@ -593,6 +595,7 @@ export type AddonClientSdkUtils = typeof addonClientUtils
 
 const addonClientCustom = Object.freeze({
   AvatarVipBadge,
+  BoardSelectField,
   ForumPostStreamView,
   LevelBadge,
   LevelIcon,
@@ -692,12 +695,7 @@ export interface RhexClientSession {
   user: RhexClientSessionUser | null
 }
 
-export interface RhexClientSite {
-  siteName: string
-  pointName: string
-  leftSidebarDisplayMode: string
-  markdownImageUploadEnabled: boolean
-}
+export type RhexClientSite = SiteSettingsData
 
 export interface RhexClientGlobal extends AddonClientSdk {
   sdkVersion: 1

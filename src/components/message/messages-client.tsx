@@ -10,6 +10,7 @@ import { useInboxRealtime } from "@/components/inbox-realtime-provider"
 import { MessageConversationSidebar } from "@/components/message/message-conversation-sidebar"
 import { MessageThreadPanel } from "@/components/message/message-thread-panel"
 import { Button } from "@/components/ui/rbutton"
+import { summarizeMessagePreview } from "@/lib/message-media"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type {
   MessageBubbleItem,
@@ -25,6 +26,8 @@ interface MessagesClientProps {
   } | null
   initialData: MessageCenterData | null
   conversationId?: string
+  messageImageUploadEnabled: boolean
+  messageFileUploadEnabled: boolean
   pageBefore?: ReactNode
   pageAfter?: ReactNode
   headerBefore?: ReactNode
@@ -48,6 +51,8 @@ export function MessagesClient({
   currentUser,
   initialData,
   conversationId,
+  messageImageUploadEnabled,
+  messageFileUploadEnabled,
   pageBefore,
   pageAfter,
   headerBefore,
@@ -147,14 +152,14 @@ export function MessagesClient({
     promoteConversation(conversationKey)
     setLiveConversationPatches((current) => ({
       ...current,
-      [conversationKey]: {
-        ...current[conversationKey],
-        title: activeConversation.title,
-        subtitle: "实时会话",
-        preview: message.body,
-        updatedAt: message.createdAt,
-        unreadCount: 0,
-        participants: activeConversation.participants,
+        [conversationKey]: {
+          ...current[conversationKey],
+          title: activeConversation.title,
+          subtitle: "实时会话",
+          preview: summarizeMessagePreview(message.body),
+          updatedAt: message.createdAt,
+          unreadCount: 0,
+          participants: activeConversation.participants,
       },
     }))
 
@@ -321,7 +326,7 @@ export function MessagesClient({
           [conversationIdFromEvent]: {
             title: existingConversation?.title ?? payload.senderDisplayName ?? currentPatch?.title,
             subtitle: isActiveConversation ? "实时会话" : nextUnreadCount > 0 ? `未读 ${nextUnreadCount} 条` : "最近互动",
-            preview: payload.content ?? existingConversation?.preview ?? currentPatch?.preview,
+            preview: payload.content ? summarizeMessagePreview(payload.content) : (existingConversation?.preview ?? currentPatch?.preview),
             updatedAt: payload.createdAtLabel ?? existingConversation?.updatedAt ?? currentPatch?.updatedAt,
             unreadCount: nextUnreadCount,
             participants: existingConversation?.participants ?? currentPatch?.participants ?? (
@@ -439,6 +444,8 @@ export function MessagesClient({
             conversation={data.activeConversation}
             currentUserId={currentUser.id}
             usingDemoData={data.usingDemoData}
+            messageImageUploadEnabled={messageImageUploadEnabled}
+            messageFileUploadEnabled={messageFileUploadEnabled}
             onMessageSent={handleLocalMessageSent}
             onLoadHistory={handleLoadHistory}
             loadingHistory={loadingHistory}

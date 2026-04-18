@@ -1,8 +1,13 @@
+"use client"
+
 import Link from "next/link"
-import { ExternalLink, Pin } from "lucide-react"
+import { useState } from "react"
+import { ChevronLeft, ChevronRight, ExternalLink, Pin } from "lucide-react"
 
 import { MarkdownContent } from "@/components/markdown-content"
+import { Button } from "@/components/ui/button"
 import type { SiteDocumentItem } from "@/lib/site-documents"
+import { cn } from "@/lib/utils"
 
 interface HelpDocumentPageContentProps {
   items: SiteDocumentItem[]
@@ -10,43 +15,80 @@ interface HelpDocumentPageContentProps {
 }
 
 export function HelpDocumentPageContent({ items, activeItem }: HelpDocumentPageContentProps) {
+  const [navOpen, setNavOpen] = useState(true)
+
   return (
     <div>
       <section className="overflow-hidden rounded-[24px] border border-border bg-card shadow-xs shadow-black/5 dark:shadow-black/30">
-        <div className="grid xl:grid-cols-[220px_minmax(0,1fr)]">
-          <aside className="border-b border-border xl:border-b-0 xl:border-r">
-            <div className="p-2">
-              <div className="mb-2 px-2 py-2 text-xs font-semibold tracking-[0.18em] text-muted-foreground">帮助文档</div>
-              <div className="space-y-1.5">
-                {items.map((item) => {
-                  const isActive = item.sourceType === "DOCUMENT" && activeItem?.id === item.id
-                  const content = (
-                    <div className="flex min-w-0 items-center gap-2">
-                      {item.isPinned ? <Pin className="h-3.5 w-3.5 shrink-0 text-orange-500" /> : null}
-                      <span style={{ color: item.titleColor ?? undefined }} className={item.titleBold ? "truncate font-semibold" : "truncate font-medium"}>
-                        {item.title}
-                      </span>
-                      {item.isExternal ? <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : null}
-                    </div>
-                  )
+        <div className={cn("grid transition-[grid-template-columns] duration-200 ease-out", navOpen && "xl:grid-cols-[240px_minmax(0,1fr)]")}>
+          {navOpen ? (
+            <aside className="border-b border-border xl:border-b-0 xl:border-r">
+              <div className="p-2">
+                <div className="mb-2 flex items-center justify-between gap-3 px-2 py-2">
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold tracking-[0.18em] text-muted-foreground">帮助文档</div>
+                    <div className="mt-1 text-[11px] text-muted-foreground">共 {items.length} 篇内容</div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="shrink-0 rounded-full px-3 text-xs"
+                    onClick={() => setNavOpen(false)}
+                  >
+                    收起
+                    <ChevronLeft data-icon="inline-end" />
+                  </Button>
+                </div>
+                <div className="space-y-1.5">
+                  {items.map((item) => {
+                    const isActive = item.sourceType === "DOCUMENT" && activeItem?.id === item.id
+                    const content = (
+                      <div className="flex min-w-0 items-center gap-2">
+                        {item.isPinned ? <Pin className="h-3.5 w-3.5 shrink-0 text-orange-500" /> : null}
+                        <span style={{ color: item.titleColor ?? undefined }} className={item.titleBold ? "truncate font-semibold" : "truncate font-medium"}>
+                          {item.title}
+                        </span>
+                        {item.isExternal ? <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : null}
+                      </div>
+                    )
 
-                  const className = isActive
-                    ? "block rounded-[14px] border border-foreground/10 bg-accent px-2.5 py-2 text-[13px]"
-                    : "block rounded-[14px] border border-transparent px-2.5 py-2 text-[13px] transition-colors hover:border-border hover:bg-accent/60"
+                    const className = isActive
+                      ? "block rounded-[14px] border border-foreground/10 bg-accent px-2.5 py-2 text-[13px]"
+                      : "block rounded-[14px] border border-transparent px-2.5 py-2 text-[13px] transition-colors hover:border-border hover:bg-accent/60"
 
-                  if (item.isExternal) {
-                    return <a key={item.id} href={item.href} target="_blank" rel="noreferrer" className={className}>{content}</a>
-                  }
+                    if (item.isExternal) {
+                      return <a key={item.id} href={item.href} target="_blank" rel="noreferrer" className={className}>{content}</a>
+                    }
 
-                  return <Link key={item.id} href={item.href} className={className}>{content}</Link>
-                })}
+                    return <Link key={item.id} href={item.href} className={className}>{content}</Link>
+                  })}
 
-                {items.length === 0 ? <div className="rounded-[14px] border border-dashed border-border px-3 py-4 text-xs leading-6 text-muted-foreground">当前还没有已发布帮助文档。</div> : null}
+                  {items.length === 0 ? <div className="rounded-[14px] border border-dashed border-border px-3 py-4 text-xs leading-6 text-muted-foreground">当前还没有已发布帮助文档。</div> : null}
+                </div>
               </div>
-            </div>
-          </aside>
+            </aside>
+          ) : null}
 
           <div className="p-5 md:p-6">
+            {!navOpen ? (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-dashed border-border bg-muted/20 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold tracking-[0.16em] text-muted-foreground">帮助目录已收起</p>
+                  <p className="mt-1 text-xs text-muted-foreground">展开后可快速切换文档，当前正文区域会占用更多宽度。</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 rounded-full px-3 text-xs"
+                  onClick={() => setNavOpen(true)}
+                >
+                  展开目录
+                  <ChevronRight data-icon="inline-end" />
+                </Button>
+              </div>
+            ) : null}
             {activeItem ? (
               <article className="flex min-h-[420px] flex-col">
                 <h2 style={{ color: activeItem.titleColor ?? undefined }} className={activeItem.titleBold ? "text-2xl font-semibold" : "text-2xl font-medium"}>

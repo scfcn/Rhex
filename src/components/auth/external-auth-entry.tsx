@@ -17,7 +17,7 @@ interface ExternalAuthEntryProps {
 }
 
 function EntryLink({ href, children, useDocumentNavigation = false }: { href: string; children: React.ReactNode; useDocumentNavigation?: boolean }) {
-  const className = cn(buttonVariants({ variant: "outline", size: "lg" }), "w-full")
+  const className = cn(buttonVariants({ variant: "outline", size: "sm" }), "min-w-0 w-full px-2")
 
   if (useDocumentNavigation) {
     return (
@@ -90,11 +90,11 @@ export function ExternalAuthEntry({ settings, mode, addonEntries = [], className
         <span>{mode === "login" ? "其它登录方式" : "快捷注册方式"}</span>
         <Separator />
       </div>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         {items.map((item) => (
           <EntryLink key={item.key} href={item.href} useDocumentNavigation={item.useDocumentNavigation}>
             {item.icon}
-            {item.label}
+            <span className="truncate">{item.label}</span>
           </EntryLink>
         ))}
       </div>

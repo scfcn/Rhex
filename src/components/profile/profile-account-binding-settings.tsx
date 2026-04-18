@@ -13,7 +13,6 @@ import { formatDateTime } from "@/lib/formatters"
 interface ProviderBindingItem {
   provider: string
   label: string
-  enabled: boolean
   accountId: string | null
   connected: boolean
   connectMode: "url" | "connected-only"
@@ -85,6 +84,9 @@ export function ProfileAccountBindingSettings({ providers, passkey }: ProfileAcc
   const [bindingPasskey, setBindingPasskey] = useState(false)
   const [unlinkingPasskeyId, setUnlinkingPasskeyId] = useState<string | null>(null)
   const [flash, setFlash] = useState<{ type: "success" | "error"; message: string } | null>(null)
+  const hasProviders = providers.length > 0
+  const showPasskeySection = passkey.enabled
+  const showEmptyState = !hasProviders && !showPasskeySection
 
   useEffect(() => {
     setSupportPasskey(browserSupportsWebAuthn())
@@ -222,150 +224,160 @@ export function ProfileAccountBindingSettings({ providers, passkey }: ProfileAcc
         </div>
       ) : null}
 
-      <div className="rounded-[24px] bg-card p-5 ">
-        <div className="flex items-start gap-3 ">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-secondary text-muted-foreground">
-            <Link2 className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold">第三方账号</p>
-            <p className="mt-2 text-xs leading-6 text-muted-foreground">
-              绑定后可以直接使用对应渠道登录当前站内账户。内置渠道支持在这里直接发起绑定；插件追加渠道会在绑定成功后显示，并支持在这里解绑。
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
-          {providers.map((binding) => (
-            <div key={binding.provider} className="rounded-[22px] bg-background p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold">{binding.label}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {binding.enabled ? (binding.connected ? buildProviderMeta(binding) : "当前未绑定") : "后台未开启该登录方式"}
-                  </p>
-                </div>
-                <span className={binding.connected ? "rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700" : "rounded-full bg-secondary px-3 py-1 text-xs font-medium text-muted-foreground"}>
-                  {binding.connected ? "已绑定" : "未绑定"}
-                </span>
-              </div>
-
-              {binding.connected ? (
-                <div className="mt-4 space-y-1 text-xs leading-6 text-muted-foreground">
-                  {binding.providerUsername ? <p>用户名：{binding.providerUsername}</p> : null}
-                  {binding.providerEmail ? <p>邮箱：{binding.providerEmail}</p> : null}
-                  {!isBuiltinProvider(binding.provider) ? <p>渠道标识：{binding.provider}</p> : null}
-                  <p>绑定时间：{formatBindingDateTime(binding.connectedAt)}</p>
-                </div>
-              ) : null}
-
-              <div className="mt-4">
-                {binding.connected ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full gap-2"
-                    disabled={activeProvider === binding.provider}
-                    onClick={() => void unlinkProvider(binding.provider, binding.label)}
-                  >
-                    {getProviderIcon(binding.provider)}
-                    {activeProvider === binding.provider ? "解绑中..." : `解绑 ${binding.label}`}
-                  </Button>
-                ) : binding.connectMode === "url" && binding.connectUrl ? (
-                  <Button
-                    type="button"
-                    className="w-full gap-2"
-                    disabled={!binding.enabled || activeProvider === binding.provider}
-                    onClick={() => connectProvider(binding)}
-                  >
-                    {getProviderIcon(binding.provider)}
-                    {activeProvider === binding.provider ? "跳转中..." : `绑定 ${binding.label}`}
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full gap-2"
-                    disabled
-                  >
-                    {getProviderIcon(binding.provider)}
-                    当前仅支持显示与解绑
-                  </Button>
-                )}
-              </div>
+      {hasProviders ? (
+        <div className="rounded-[24px] bg-card p-5 ">
+          <div className="flex items-start gap-3 ">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-secondary text-muted-foreground">
+              <Link2 className="h-5 w-5" />
             </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="rounded-[24px] bg-card p-5">
-        <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-secondary text-muted-foreground">
-            <KeyRound className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold">Passkey</p>
-            <p className="mt-2 text-xs leading-6 text-muted-foreground">
-              Passkey 可以绑定多把钥匙，适合不同设备分别录入。绑定后可直接免密码登录。
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-5 rounded-[22px] bg-background p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold">Passkey 列表</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {passkey.enabled
-                  ? `当前共绑定 ${passkey.items.length} 把 Passkey`
-                  : "后台未开启 Passkey 登录"}
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">第三方账号</p>
+              <p className="mt-2 text-xs leading-6 text-muted-foreground">
+                绑定后可以直接使用对应渠道登录当前站内账户。内置渠道支持在这里直接发起绑定；插件追加渠道会在绑定成功后显示，并支持在这里解绑。
               </p>
             </div>
-            <Button type="button" className="gap-2 sm:min-w-[140px]" disabled={!passkey.enabled || !supportPasskey || bindingPasskey} onClick={() => void bindPasskey()}>
-              <KeyRound className="h-4 w-4" />
-              {bindingPasskey ? "绑定中..." : "新增 Passkey"}
-            </Button>
           </div>
 
-          {!supportPasskey ? (
-            <p className="mt-4 rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-700">
-              当前浏览器不支持 WebAuthn / Passkey，请更换现代浏览器后再绑定。
-            </p>
-          ) : null}
-
-          <div className="mt-4 space-y-3">
-            {passkey.items.length === 0 ? (
-              <div className="rounded-[18px] border border-dashed border-border px-4 py-5 text-sm text-muted-foreground">
-                当前还没有绑定任何 Passkey。
-              </div>
-            ) : passkey.items.map((item) => (
-              <div key={item.id} className="rounded-[18px] px-4 py-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold">{item.name}</p>
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs leading-6 text-muted-foreground">
-                      <span>设备：{item.deviceType || "未知设备"}</span>
-                      <span>备份：{item.backedUp ? "已备份" : "未备份"}</span>
-                      <span>创建：{formatBindingDateTime(item.createdAt)}</span>
-                      <span>最近使用：{formatBindingDateTime(item.lastUsedAt)}</span>
-                    </div>
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            {providers.map((binding) => (
+              <div key={binding.provider} className="rounded-[22px] bg-background p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">{binding.label}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {binding.connected ? buildProviderMeta(binding) : "当前未绑定"}
+                    </p>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="gap-2 sm:min-w-[120px]"
-                    disabled={unlinkingPasskeyId === item.id}
-                    onClick={() => void unlinkPasskey(item.id)}
-                  >
-                    <KeyRound className="h-4 w-4" />
-                    {unlinkingPasskeyId === item.id ? "解绑中..." : "解绑"}
-                  </Button>
+                  <span className={binding.connected ? "rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700" : "rounded-full bg-secondary px-3 py-1 text-xs font-medium text-muted-foreground"}>
+                    {binding.connected ? "已绑定" : "未绑定"}
+                  </span>
+                </div>
+
+                {binding.connected ? (
+                  <div className="mt-4 space-y-1 text-xs leading-6 text-muted-foreground">
+                    {binding.providerUsername ? <p>用户名：{binding.providerUsername}</p> : null}
+                    {binding.providerEmail ? <p>邮箱：{binding.providerEmail}</p> : null}
+                    {!isBuiltinProvider(binding.provider) ? <p>渠道标识：{binding.provider}</p> : null}
+                    <p>绑定时间：{formatBindingDateTime(binding.connectedAt)}</p>
+                  </div>
+                ) : null}
+
+                <div className="mt-4">
+                  {binding.connected ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full gap-2"
+                      disabled={activeProvider === binding.provider}
+                      onClick={() => void unlinkProvider(binding.provider, binding.label)}
+                    >
+                      {getProviderIcon(binding.provider)}
+                      {activeProvider === binding.provider ? "解绑中..." : `解绑 ${binding.label}`}
+                    </Button>
+                  ) : binding.connectMode === "url" && binding.connectUrl ? (
+                    <Button
+                      type="button"
+                      className="w-full gap-2"
+                      disabled={activeProvider === binding.provider}
+                      onClick={() => connectProvider(binding)}
+                    >
+                      {getProviderIcon(binding.provider)}
+                      {activeProvider === binding.provider ? "跳转中..." : `绑定 ${binding.label}`}
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full gap-2"
+                      disabled
+                    >
+                      {getProviderIcon(binding.provider)}
+                      当前仅支持显示与解绑
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         </div>
-      </div>
+      ) : null}
+
+      {showPasskeySection ? (
+        <div className="rounded-[24px] bg-card p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-secondary text-muted-foreground">
+              <KeyRound className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">Passkey</p>
+              <p className="mt-2 text-xs leading-6 text-muted-foreground">
+                Passkey 可以绑定多把钥匙，适合不同设备分别录入。绑定后可直接免密码登录。
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-[22px] bg-background p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold">Passkey 列表</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {`当前共绑定 ${passkey.items.length} 把 Passkey`}
+                </p>
+              </div>
+              <Button type="button" className="gap-2 sm:min-w-[140px]" disabled={!supportPasskey || bindingPasskey} onClick={() => void bindPasskey()}>
+                <KeyRound className="h-4 w-4" />
+                {bindingPasskey ? "绑定中..." : "新增 Passkey"}
+              </Button>
+            </div>
+
+            {!supportPasskey ? (
+              <p className="mt-4 rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-700">
+                当前浏览器不支持 WebAuthn / Passkey，请更换现代浏览器后再绑定。
+              </p>
+            ) : null}
+
+            <div className="mt-4 space-y-3">
+              {passkey.items.length === 0 ? (
+                <div className="rounded-[18px] border border-dashed border-border px-4 py-5 text-sm text-muted-foreground">
+                  当前还没有绑定任何 Passkey。
+                </div>
+              ) : passkey.items.map((item) => (
+                <div key={item.id} className="rounded-[18px] px-4 py-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold">{item.name}</p>
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs leading-6 text-muted-foreground">
+                        <span>设备：{item.deviceType || "未知设备"}</span>
+                        <span>备份：{item.backedUp ? "已备份" : "未备份"}</span>
+                        <span>创建：{formatBindingDateTime(item.createdAt)}</span>
+                        <span>最近使用：{formatBindingDateTime(item.lastUsedAt)}</span>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="gap-2 sm:min-w-[120px]"
+                      disabled={unlinkingPasskeyId === item.id}
+                      onClick={() => void unlinkPasskey(item.id)}
+                    >
+                      <KeyRound className="h-4 w-4" />
+                      {unlinkingPasskeyId === item.id ? "解绑中..." : "解绑"}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showEmptyState ? (
+        <div className="rounded-[24px] bg-card p-5">
+          <div className="rounded-[22px] border border-dashed border-border px-4 py-5 text-sm text-muted-foreground">
+            当前站点未开启可管理的登录方式。
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

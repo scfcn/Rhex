@@ -11,6 +11,10 @@ import {
   findLoadedAddonById,
   loadAddonsRuntimeFresh,
 } from "@/addons-host/runtime/loader"
+import {
+  addonMayUseBackgroundJobs,
+  cleanupAddonBackgroundJobs,
+} from "@/addons-host/runtime/background-jobs"
 import type { AddonStateRecord, LoadedAddonRuntime } from "@/addons-host/types"
 import {
   createAddonLifecycleLog,
@@ -191,6 +195,7 @@ async function syncAddonRegistryStateSnapshot(): Promise<SyncedAddonRegistrySnap
       .filter((addonId) => !loadedAddonIds.has(addonId))
 
     for (const staleAddonId of staleAddonIds) {
+      await cleanupAddonBackgroundJobs(staleAddonId)
       await deleteAddonConfigValues(staleAddonId)
       await deleteAddonDataStore(staleAddonId)
       await deleteAddonSecretValues(staleAddonId)
@@ -376,6 +381,9 @@ export async function runAddonManagementAction(action: AddonManagementAction, ad
         message: `已禁用插件 ${addon.manifest.name}`,
       })
       refreshAddonRuntime(resolvedAddonId)
+      if (addonMayUseBackgroundJobs(addon)) {
+        await cleanupAddonBackgroundJobs(resolvedAddonId)
+      }
       return {
         data: await getAddonsAdminData(),
         message: `已禁用插件 ${addon.manifest.name}`,

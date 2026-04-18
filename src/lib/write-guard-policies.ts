@@ -66,6 +66,25 @@ export function createRequestWriteGuardOptions<Name extends RequestWriteGuardPol
     userId?: number | null
   },
 ): Omit<WriteGuardOptions, "identity"> & { request: Request; userId?: number | null } {
+  const options = createWriteGuardOptions(name, {
+    input: params.input,
+    userId: params.userId ?? null,
+  })
+
+  return {
+    ...options,
+    request: params.request,
+    userId: params.userId ?? null,
+  }
+}
+
+export function createWriteGuardOptions<Name extends RequestWriteGuardPolicyName>(
+  name: Name,
+  params: {
+    input: WriteGuardInput
+    userId?: number | null
+  },
+): Omit<WriteGuardOptions, "identity"> {
   const policy = writeGuardConfig[name] as WriteGuardPolicyConfig
 
   if (!policy) {
@@ -82,8 +101,6 @@ export function createRequestWriteGuardOptions<Name extends RequestWriteGuardPol
     cooldownMessage: policy.cooldownMessage,
     dedupeWindowMs: policy.dedupe?.windowMs,
     releaseOnError: policy.releaseOnError,
-    request: params.request,
-    userId: params.userId ?? null,
     ...(dedupeKey ? { dedupeKey } : {}),
   }
 }

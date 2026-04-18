@@ -230,6 +230,8 @@ export default async function AdminSettingsPage(
                   ? siteSettings!.attachmentAllowedExtensions
                   : ["zip", "rar", "7z", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt"],
               attachmentMaxFileSizeMb: Number(siteSettings!.attachmentMaxFileSizeMb ?? 20),
+              messageImageUploadEnabled: Boolean(siteSettings!.messageImageUploadEnabled),
+              messageFileUploadEnabled: Boolean(siteSettings!.messageFileUploadEnabled),
             }}
             levelOptions={uploadLevelOptions}
             vipLevelOptions={uploadVipLevelOptions}

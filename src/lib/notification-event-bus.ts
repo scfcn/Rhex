@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 
 import { logError } from "@/lib/logger"
 import type { InboxStreamEvent, NotificationCountStreamEvent } from "@/lib/message-types"
-import { connectRedisClient, createRedisConnection, createRedisKey, hasRedisUrl } from "@/lib/redis"
+import { connectRedisClient, createRedisConnection, createRedisKey } from "@/lib/redis"
 
 type NotificationEventListener = (event: NotificationCountStreamEvent) => void
 
@@ -44,10 +44,7 @@ class NotificationEventBus {
   }
 
   async publish(event: NotificationCountStreamEvent) {
-    if (!hasRedisUrl()) {
-      this.publishLocal(event)
-      return
-    }
+ 
 
     try {
       const runtime = getRedisNotificationEventBusRuntime()
@@ -170,9 +167,6 @@ function getRedisNotificationEventBusRuntime() {
 }
 
 export async function ensureNotificationEventBusRuntimeReady() {
-  if (!hasRedisUrl()) {
-    return
-  }
 
   await getRedisNotificationEventBusRuntime().ensureSubscriberReady()
 }

@@ -52,6 +52,8 @@ interface AdminUploadSettingsFormProps {
     attachmentMinUploadVipLevel: number
     attachmentAllowedExtensions: string[]
     attachmentMaxFileSizeMb: number
+    messageImageUploadEnabled: boolean
+    messageFileUploadEnabled: boolean
   }
   levelOptions: AccessThresholdOption[]
   vipLevelOptions: AccessThresholdOption[]
@@ -163,6 +165,8 @@ export function AdminUploadSettingsForm({
   const [attachmentMinUploadVipLevel, setAttachmentMinUploadVipLevel] = useState(String(normalizedAttachmentMinUploadVipLevel))
   const [attachmentAllowedExtensions, setAttachmentAllowedExtensions] = useState(normalizedAttachmentAllowedExtensions.join(", "))
   const [attachmentMaxFileSizeMb, setAttachmentMaxFileSizeMb] = useState(String(normalizedAttachmentMaxFileSizeMb))
+  const [messageImageUploadEnabled, setMessageImageUploadEnabled] = useState(Boolean(initialSettings.messageImageUploadEnabled))
+  const [messageFileUploadEnabled, setMessageFileUploadEnabled] = useState(Boolean(initialSettings.messageFileUploadEnabled))
   const [feedback, setFeedback] = useState("")
   const [isPending, startTransition] = useTransition()
   const [activeTab, setActiveTab] = useState<UploadSettingsTabKey>(() => resolveUploadTab(initialSubTab))
@@ -218,6 +222,8 @@ export function AdminUploadSettingsForm({
             attachmentMinUploadVipLevel: Number(attachmentMinUploadVipLevel),
             attachmentAllowedExtensions,
             attachmentMaxFileSizeMb: Number(attachmentMaxFileSizeMb),
+            messageImageUploadEnabled,
+            messageFileUploadEnabled,
             section: "upload",
           })
           setFeedback(result.message)
@@ -379,6 +385,8 @@ export function AdminUploadSettingsForm({
         {activeTab === "attachment" ? (
           <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <SettingsToggleField label="私信图片发送" checked={messageImageUploadEnabled} onChange={setMessageImageUploadEnabled} description="开启后，私信输入框支持上传和粘贴发送图片，并以内嵌图片消息展示。" />
+              <SettingsToggleField label="私信文件发送" checked={messageFileUploadEnabled} onChange={setMessageFileUploadEnabled} description="开启后，私信支持上传文件，并以 file::FILENAME:FILEURL 的专用消息卡片展示。" />
               <SettingsToggleField label="启用附件上传" checked={attachmentUploadEnabled} onChange={setAttachmentUploadEnabled} description="关闭后不再允许上传站内附件，但仍可继续添加网盘链接附件。" />
               <SettingsToggleField label="启用附件下载" checked={attachmentDownloadEnabled} onChange={setAttachmentDownloadEnabled} description="关闭后仅拦截站内附件的下载与购买入口，网盘附件的信息查看不受影响。" />
               <div className="md:col-span-2 xl:col-span-2">
@@ -399,7 +407,7 @@ export function AdminUploadSettingsForm({
               <SettingsInputField label="附件大小上限（MB）" type="number" value={attachmentMaxFileSizeMb} onChange={setAttachmentMaxFileSizeMb} />
             </div>
             <p className="text-xs leading-6 text-muted-foreground">
-              上传型附件会复用现有存储策略写入本地或对象存储；下载时统一走站内接口完成权限校验与下载次数统计。网盘附件不占用站内存储，且不受站内上传/下载开关影响，但仍受各附件自身的等级、积分和回复权限控制。
+              私信图片会复用站点图片上传规则，私信文件会复用当前附件格式与大小限制；两者都沿用同一套存储策略。上传型附件会复用现有存储策略写入本地或对象存储；下载时统一走站内接口完成权限校验与下载次数统计。网盘附件不占用站内存储，且不受站内上传/下载开关影响，但仍受各附件自身的等级、积分和回复权限控制。
             </p>
           </div>
         ) : null}

@@ -10,6 +10,8 @@ import { normalizeUploadProvider } from "@/lib/upload-provider"
 import { buildUploadStoragePath } from "@/lib/upload-path"
 import { getUploadMimeType } from "@/lib/upload-rules"
 import { applyTextWatermarkToBuffer } from "@/lib/watermark-lib.server"
+import { saveWithAddonUploadProvider } from "@/lib/addon-upload-providers"
+import type { AddonUploadActor } from "@/addons-host/upload-types"
 
 export interface SavedUploadFile {
   fileName: string
@@ -25,6 +27,11 @@ export interface PreparedUploadFile {
   buffer: Buffer
   fileHash: string
   detectedMime: string
+}
+
+export interface SaveUploadedFileOptions {
+  request?: Request
+  actor?: AddonUploadActor | null
 }
 
 type UploadSettings = Awaited<ReturnType<typeof getServerSiteSettings>>
@@ -309,7 +316,24 @@ async function saveToOss(
   }
 }
 
-export async function saveUploadedFile(file: File, preparedFile: PreparedUploadFile, folder = "avatars"): Promise<SavedUploadFile> {
+export async function saveUploadedFile(
+  file: File,
+  preparedFile: PreparedUploadFile,
+  folder = "avatars",
+  options?: SaveUploadedFileOptions,
+): Promise<SavedUploadFile> {
+  const addonSaved = await saveWithAddonUploadProvider({
+    request: options?.request,
+    actor: options?.actor,
+    file,
+    preparedFile,
+    folder,
+  })
+
+  if (addonSaved) {
+    return addonSaved
+  }
+
   const settings = await getServerSiteSettings()
   const uploadProvider = normalizeUploadProvider(settings.uploadProvider)
 

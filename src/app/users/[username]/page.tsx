@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 
 import { AddonSlotRenderer } from "@/addons-host"
 import { AccessDeniedCard } from "@/components/access-denied-card"
+import { PageNumberPagination } from "@/components/page-number-pagination"
 import { AiAgentIndicator } from "@/components/user/ai-agent-indicator"
 import { AnonymousUserIndicator } from "@/components/user/anonymous-user-indicator"
 import { ForumPostStream } from "@/components/forum/forum-post-stream"
@@ -32,7 +33,8 @@ import { isUserFollowingTarget } from "@/lib/follows"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getUserProfileAccessState } from "@/lib/user-blocks"
 import { cn } from "@/lib/utils"
-import { getUserProfile, getUserPosts, getUserRecentReplies } from "@/lib/users"
+import { readSearchParam } from "@/lib/search-params"
+import { getUserProfile, getUserPostsPage, getUserRecentRepliesPage } from "@/lib/users"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
 
 const profileCardClassName = "rounded-2xl border  shadow-xs"
@@ -46,6 +48,58 @@ const identityTagClassNames = {
   warning: "rounded-full bg-yellow-100 px-3 py-1 text-xs font-medium text-yellow-700 dark:bg-yellow-500/15 dark:text-yellow-200",
   plain: "rounded-full bg-secondary px-3 py-1 text-xs font-medium text-muted-foreground dark:bg-white/6 dark:text-slate-300",
 } satisfies Record<"plain" | "vip" | "level" | "orange" | "sky" | "danger" | "warning", string>
+
+const userActivityTabKeys = ["introduction", "posts", "collections", "replies"] as const
+
+type UserActivityTabKey = typeof userActivityTabKeys[number]
+
+function parsePageParam(value: string | string[] | undefined) {
+  const page = Number(readSearchParam(value))
+  return Number.isInteger(page) && page > 0 ? page : 1
+}
+
+function resolveUserActivityTab(value: string | undefined, pages: { postsPage: number; repliesPage: number }): UserActivityTabKey {
+  if (value && userActivityTabKeys.includes(value as UserActivityTabKey)) {
+    return value as UserActivityTabKey
+  }
+
+  if (pages.postsPage > 1) {
+    return "posts"
+  }
+
+  if (pages.repliesPage > 1) {
+    return "replies"
+  }
+
+  return "introduction"
+}
+
+function buildUserActivityHref(
+  username: string,
+  currentState: { tab: UserActivityTabKey; postsPage: number; repliesPage: number },
+  overrides: Partial<{ tab: UserActivityTabKey; postsPage: number; repliesPage: number }> = {},
+) {
+  const nextState = {
+    ...currentState,
+    ...overrides,
+  }
+  const searchParams = new URLSearchParams()
+
+  if (nextState.tab !== "introduction" || nextState.postsPage > 1 || nextState.repliesPage > 1) {
+    searchParams.set("tab", nextState.tab)
+  }
+
+  if (nextState.postsPage > 1) {
+    searchParams.set("postsPage", String(nextState.postsPage))
+  }
+
+  if (nextState.repliesPage > 1) {
+    searchParams.set("repliesPage", String(nextState.repliesPage))
+  }
+
+  const query = searchParams.toString()
+  return query ? `/users/${username}?${query}` : `/users/${username}`
+}
 
 export async function generateMetadata(props: PageProps<"/users/[username]">): Promise<Metadata> {
   const params = await props.params;
@@ -66,6 +120,10 @@ export async function generateMetadata(props: PageProps<"/users/[username]">): P
 
 export default async function UserPage(props: PageProps<"/users/[username]">) {
   const params = await props.params;
+  const searchParams = props.searchParams ? await props.searchParams : undefined
+  const postsPage = parsePageParam(searchParams?.postsPage)
+  const repliesPage = parsePageParam(searchParams?.repliesPage)
+  const activityTab = resolveUserActivityTab(readSearchParam(searchParams?.tab), { postsPage, repliesPage })
   const [user, settings, currentUser, aiAgentUserId] = await Promise.all([getUserProfile(params.username), getSiteSettings(), getCurrentUser(), getAiAgentUserId()])
 
   if (!user) {
@@ -100,9 +158,33 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
   const canViewIntroduction = canViewUserProfileVisibility(user.introductionVisibility, visibilityContext)
   const introduction = user.introduction.trim()
 
-  const [posts, recentReplies, publicCollections, badgeItems, isFollowingUser] = await Promise.all([
-    canViewRecentActivity ? getUserPosts(params.username) : Promise.resolve([]),
-    canViewRecentActivity ? getUserRecentReplies(params.username) : Promise.resolve([]),
+  const [postsPageData, recentRepliesPageData, publicCollections, badgeItems, isFollowingUser] = await Promise.all([
+    canViewRecentActivity
+      ? getUserPostsPage(params.username, { page: postsPage })
+      : Promise.resolve({
+          items: [],
+          pagination: {
+            page: 1,
+            pageSize: 10,
+            total: 0,
+            totalPages: 1,
+            hasPrevPage: false,
+            hasNextPage: false,
+          },
+        }),
+    canViewRecentActivity
+      ? getUserRecentRepliesPage(params.username, { page: repliesPage })
+      : Promise.resolve({
+          items: [],
+          pagination: {
+            page: 1,
+            pageSize: 6,
+            total: 0,
+            totalPages: 1,
+            hasPrevPage: false,
+            hasNextPage: false,
+          },
+        }),
     getPublicFavoriteCollectionsByUsername(params.username, { page: 1 }),
     getGrantedBadgesForUser(user.id),
     currentUser && currentUser.id !== user.id && !profileAccess.relation.isBlocked
@@ -113,6 +195,11 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
         })
       : Promise.resolve(false),
   ])
+  const activityRouteState = {
+    tab: activityTab,
+    postsPage: postsPageData.pagination.page,
+    repliesPage: recentRepliesPageData.pagination.page,
+  }
 
   const canToggleFollow = (!currentUser || currentUser.id !== user.id) && !profileAccess.relation.isBlocked
   const isAnonymousMaskUser = settings.anonymousPostMaskUserId === user.id
@@ -274,7 +361,8 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
             <AddonSlotRenderer slot="user.activity.before" />
             <UserRecentActivityPanel
               description={canViewRecentActivity ? "" : ""}
-              defaultTabKey="introduction"
+              activeTabKey={activityTab}
+              buildTabHref={(tabKey) => buildUserActivityHref(params.username, activityRouteState, { tab: tabKey as UserActivityTabKey })}
               tabs={[
                 {
                   key: "introduction",
@@ -300,17 +388,31 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
                 {
                   key: "posts",
                   label: "帖子",
-                  count: posts.length,
+                  count: canViewRecentActivity ? user.postCount : 0,
                   content: !canViewRecentActivity ? (
                     <div className="rounded-xl border border-dashed  px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/2">
                       {user.activityVisibility === "MEMBERS" ? "该用户将最近帖子设置为登录后可见。" : "该用户未公开最近帖子。"}
                     </div>
-                  ) : posts.length === 0 ? (
+                  ) : postsPageData.items.length === 0 ? (
                     <div className="rounded-xl border border-dashed  px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/2">
                       最近还没有发布帖子。
                     </div>
                   ) : (
-                    <ForumPostStream posts={posts} compactFirstItem={false} />
+                    <div className="space-y-4">
+                      <ForumPostStream posts={postsPageData.items} compactFirstItem={false} />
+                      {postsPageData.pagination.totalPages > 1 ? (
+                        <PageNumberPagination
+                          page={postsPageData.pagination.page}
+                          totalPages={postsPageData.pagination.totalPages}
+                          hasPrevPage={postsPageData.pagination.hasPrevPage}
+                          hasNextPage={postsPageData.pagination.hasNextPage}
+                          buildHref={(targetPage) => buildUserActivityHref(params.username, activityRouteState, {
+                            tab: "posts",
+                            postsPage: targetPage,
+                          })}
+                        />
+                      ) : null}
+                    </div>
                   ),
                 },
                 {
@@ -322,9 +424,25 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
                 {
                   key: "replies",
                   label: "回复",
-                  count: recentReplies.length,
+                  count: canViewRecentActivity ? recentRepliesPageData.pagination.total : 0,
                   content: canViewRecentActivity
-                    ? <UserRecentRepliesList replies={recentReplies} postLinkDisplayMode={settings.postLinkDisplayMode} />
+                    ? (
+                      <div className="space-y-4">
+                        <UserRecentRepliesList replies={recentRepliesPageData.items} postLinkDisplayMode={settings.postLinkDisplayMode} />
+                        {recentRepliesPageData.pagination.totalPages > 1 ? (
+                          <PageNumberPagination
+                            page={recentRepliesPageData.pagination.page}
+                            totalPages={recentRepliesPageData.pagination.totalPages}
+                            hasPrevPage={recentRepliesPageData.pagination.hasPrevPage}
+                            hasNextPage={recentRepliesPageData.pagination.hasNextPage}
+                            buildHref={(targetPage) => buildUserActivityHref(params.username, activityRouteState, {
+                              tab: "replies",
+                              repliesPage: targetPage,
+                            })}
+                          />
+                        ) : null}
+                      </div>
+                    )
                     : (
                       <div className="rounded-xl border border-dashed  px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/2">
                         {user.activityVisibility === "MEMBERS" ? "该用户将最近回复设置为登录后可见。" : "该用户未公开最近回复。"}

@@ -1,11 +1,10 @@
 import { prisma } from "@/db/client"
 
 import { apiError, type JsonObject } from "@/lib/api-route"
-import { defaultSiteSettingsCreateInput } from "@/lib/site-settings-defaults"
+import { getAiAppConfig, isRecord, updateAiAppConfig } from "@/lib/ai/config"
 import { parseNonNegativeSafeInteger, parsePositiveSafeInteger } from "@/lib/shared/safe-integer"
 
 const AI_REPLY_APP_KEY = "app.ai-reply"
-const SITE_SETTINGS_SENSITIVE_KEY = "__siteSensitiveSettings"
 const AI_REPLY_SENSITIVE_KEY = "aiReplyConfig"
 
 const AI_REPLY_DEFAULTS = {
@@ -29,21 +28,6 @@ const AI_REPLY_DEFAULTS = {
   commentReplyPrompt: "当有人在评论里 @你 时，请结合主楼和当前评论链语义，在楼中楼直接回应当前评论。",
 } as const
 
-type AiReplyStateRecord = {
-  AppId: string
-  enabled: boolean
-  installedAt: string | null
-  uninstalledAt: string | null
-  config: Record<string, unknown>
-  status: string
-  version: string | null
-  sourceDir: string | null
-  lastActivatedAt: string | null
-  lastErrorAt: string | null
-  lastErrorMessage: string | null
-  failureCount: number
-}
-
 export interface AiReplyConfigData {
   enabled: boolean
   baseUrl: string
@@ -64,193 +48,95 @@ export interface ServerAiReplyConfigData extends Omit<AiReplyConfigData, "apiKey
   apiKey: string | null
 }
 
-export interface ResolvedAiReplyConfigDraft {
-  record: {
-    id: string
-    appStateJson: string | null
-    sensitiveStateJson: string | null
-  }
-  config: ServerAiReplyConfigData
-  agentUser: {
-    id: number
-    username: string
-    nickname: string | null
-    status: string
-  } | null
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value)
-}
-
-function parseJsonRoot(raw: string | null | undefined) {
-  if (!raw) {
-    return {}
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as unknown
-    return isRecord(parsed) ? parsed : {}
-  } catch {
-    return {}
-  }
-}
-
-function readAiReplyStateRecord(appStateJson: string | null | undefined): AiReplyStateRecord | null {
-  const root = parseJsonRoot(appStateJson)
-  const record = root[AI_REPLY_APP_KEY]
-
-  if (!isRecord(record)) {
-    return null
-  }
-
-  return {
-    AppId: typeof record.AppId === "string" ? record.AppId : AI_REPLY_APP_KEY,
-    enabled: typeof record.enabled === "boolean" ? record.enabled : Boolean(record.enabled),
-    installedAt: typeof record.installedAt === "string" ? record.installedAt : null,
-    uninstalledAt: typeof record.uninstalledAt === "string" ? record.uninstalledAt : null,
-    config: isRecord(record.config) ? record.config : {},
-    status: typeof record.status === "string" ? record.status : "active",
-    version: typeof record.version === "string" ? record.version : null,
-    sourceDir: typeof record.sourceDir === "string" ? record.sourceDir : null,
-    lastActivatedAt: typeof record.lastActivatedAt === "string" ? record.lastActivatedAt : null,
-    lastErrorAt: typeof record.lastErrorAt === "string" ? record.lastErrorAt : null,
-    lastErrorMessage: typeof record.lastErrorMessage === "string" ? record.lastErrorMessage : null,
-    failureCount: parseNonNegativeSafeInteger(record.failureCount) ?? 0,
-  }
-}
-
-function readSensitiveState(raw: string | null | undefined) {
-  const root = parseJsonRoot(raw)
-  const state = root[SITE_SETTINGS_SENSITIVE_KEY]
-  return isRecord(state) ? state : {}
-}
-
-function normalizeBoolean(value: unknown, fallback: boolean) {
-  if (typeof value === "boolean") {
-    return value
-  }
-
+function normalizeBoolean(value: unknown, fallback: boolean): boolean {
+  if (typeof value === "boolean") return value
   if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase()
-    if (["1", "true", "yes", "on"].includes(normalized)) {
-      return true
-    }
-    if (["0", "false", "no", "off"].includes(normalized)) {
-      return false
-    }
+    const v = value.trim().toLowerCase()
+    if (["1", "true", "yes", "on"].includes(v)) return true
+    if (["0", "false", "no", "off"].includes(v)) return false
   }
-
   return fallback
 }
 
-function normalizeNullableString(value: unknown) {
-  return typeof value === "string" && value.trim() ? value.trim() : null
+function normalizeNullableString(value: unknown): string | null {
+  if (typeof value !== "string") return null
+  const trimmed = value.trim()
+  return trimmed ? trimmed : null
 }
 
-function normalizeString(value: unknown, fallback: string, maxLength: number) {
-  const normalized = typeof value === "string" ? value.trim() : fallback
-  const sliced = normalized.slice(0, maxLength)
-  return sliced || fallback
+function normalizeOptionalString(value: unknown, fallback: string, maxLength: number): string {
+  const raw = typeof value === "string" ? value : fallback
+  const trimmed = raw.trim()
+  return trimmed.slice(0, maxLength)
 }
 
-function normalizeOptionalString(value: unknown, fallback: string, maxLength: number) {
-  const normalized = typeof value === "string" ? value.trim() : fallback
-  return normalized.slice(0, maxLength)
+function normalizeRequiredString(value: unknown, fallback: string, maxLength: number): string {
+  const result = normalizeOptionalString(value, fallback, maxLength)
+  return result || fallback
 }
 
-function normalizeBaseUrl(value: unknown, fallback: string) {
-  const normalized = normalizeString(value, fallback, 500)
-  return normalized.replace(/\/+$/, "") || fallback
+function normalizeBaseUrl(value: unknown, fallback: string): string {
+  const base = normalizeRequiredString(value, fallback, 500)
+  return base.replace(/\/+$/, "") || fallback
 }
 
-function normalizeTemperature(value: unknown, fallback: number) {
+function normalizeTemperature(value: unknown, fallback: number): number {
   const parsed = typeof value === "number"
     ? value
     : Number.parseFloat(typeof value === "string" ? value.trim() : "")
-
-  if (!Number.isFinite(parsed)) {
-    return fallback
-  }
-
+  if (!Number.isFinite(parsed)) return fallback
   return Math.min(2, Math.max(0, Number(parsed.toFixed(2))))
 }
 
-function normalizeAgentUserId(value: unknown, fallback: number | null) {
+function normalizeAgentUserId(value: unknown, fallback: number | null): number | null {
+  if (value === null) return null
   const parsed = parsePositiveSafeInteger(value)
   return typeof parsed === "number" ? parsed : fallback
 }
 
-function normalizeAiReplyConfig(record: AiReplyStateRecord | null, apiKey: string | null): ServerAiReplyConfigData {
-  const config = record?.config ?? {}
+function clampPositiveInt(value: unknown, fallback: number, min: number, max: number): number {
+  const parsed = parsePositiveSafeInteger(value)
+  const base = typeof parsed === "number" ? parsed : fallback
+  return Math.min(max, Math.max(min, base))
+}
 
+function clampNonNegativeInt(value: unknown, fallback: number, min: number, max: number): number {
+  const parsed = parseNonNegativeSafeInteger(value)
+  const base = typeof parsed === "number" ? parsed : fallback
+  return Math.min(max, Math.max(min, base))
+}
+
+function normalizeAiReplyConfig(entry: Record<string, unknown> | null, apiKey: string | null): ServerAiReplyConfigData {
+  const cfg = entry && isRecord(entry.config) ? (entry.config as Record<string, unknown>) : {}
   return {
-    enabled: normalizeBoolean(record?.enabled, AI_REPLY_DEFAULTS.enabled),
-    baseUrl: normalizeBaseUrl(config.baseUrl, AI_REPLY_DEFAULTS.baseUrl),
-    model: normalizeOptionalString(config.model, AI_REPLY_DEFAULTS.model, 200),
-    agentUserId: normalizeAgentUserId(config.agentUserId, AI_REPLY_DEFAULTS.agentUserId),
-    respondToPostMentions: normalizeBoolean(config.respondToPostMentions, AI_REPLY_DEFAULTS.respondToPostMentions),
-    respondToCommentMentions: normalizeBoolean(config.respondToCommentMentions, AI_REPLY_DEFAULTS.respondToCommentMentions),
-    temperature: normalizeTemperature(config.temperature, AI_REPLY_DEFAULTS.temperature),
-    maxOutputTokens: Math.min(4_000, Math.max(64, parsePositiveSafeInteger(config.maxOutputTokens) ?? AI_REPLY_DEFAULTS.maxOutputTokens)),
-    timeoutMs: Math.min(120_000, Math.max(5_000, parsePositiveSafeInteger(config.timeoutMs) ?? AI_REPLY_DEFAULTS.timeoutMs)),
-    systemPrompt: normalizeOptionalString(config.systemPrompt, AI_REPLY_DEFAULTS.systemPrompt, 4_000),
-    postReplyPrompt: normalizeOptionalString(config.postReplyPrompt, AI_REPLY_DEFAULTS.postReplyPrompt, 2_000),
-    commentReplyPrompt: normalizeOptionalString(config.commentReplyPrompt, AI_REPLY_DEFAULTS.commentReplyPrompt, 2_000),
+    enabled: normalizeBoolean(entry?.enabled, AI_REPLY_DEFAULTS.enabled),
+    baseUrl: normalizeBaseUrl(cfg.baseUrl, AI_REPLY_DEFAULTS.baseUrl),
+    model: normalizeOptionalString(cfg.model, AI_REPLY_DEFAULTS.model, 200),
+    agentUserId: normalizeAgentUserId(cfg.agentUserId, AI_REPLY_DEFAULTS.agentUserId),
+    respondToPostMentions: normalizeBoolean(cfg.respondToPostMentions, AI_REPLY_DEFAULTS.respondToPostMentions),
+    respondToCommentMentions: normalizeBoolean(cfg.respondToCommentMentions, AI_REPLY_DEFAULTS.respondToCommentMentions),
+    temperature: normalizeTemperature(cfg.temperature, AI_REPLY_DEFAULTS.temperature),
+    maxOutputTokens: clampPositiveInt(cfg.maxOutputTokens, AI_REPLY_DEFAULTS.maxOutputTokens, 64, 4_000),
+    timeoutMs: clampNonNegativeInt(cfg.timeoutMs, AI_REPLY_DEFAULTS.timeoutMs, 5_000, 120_000),
+    systemPrompt: normalizeRequiredString(cfg.systemPrompt, AI_REPLY_DEFAULTS.systemPrompt, 4_000),
+    postReplyPrompt: normalizeRequiredString(cfg.postReplyPrompt, AI_REPLY_DEFAULTS.postReplyPrompt, 2_000),
+    commentReplyPrompt: normalizeRequiredString(cfg.commentReplyPrompt, AI_REPLY_DEFAULTS.commentReplyPrompt, 2_000),
     apiKey,
   }
 }
 
-function toPublicAiReplyConfig(config: ServerAiReplyConfigData): AiReplyConfigData {
-  const { apiKey, ...rest } = config
-
-  return {
-    ...rest,
-    apiKeyConfigured: Boolean(apiKey),
-  }
-}
-
-async function getOrCreateAiReplySettingsRecord() {
-  const existing = await prisma.siteSetting.findFirst({
-    orderBy: { createdAt: "asc" },
-    select: {
-      id: true,
-      appStateJson: true,
-      sensitiveStateJson: true,
-    },
-  })
-
-  if (existing) {
-    return existing
-  }
-
-  return prisma.siteSetting.create({
-    data: defaultSiteSettingsCreateInput,
-    select: {
-      id: true,
-      appStateJson: true,
-      sensitiveStateJson: true,
-    },
-  })
-}
-
 export async function getServerAiReplyConfig(): Promise<ServerAiReplyConfigData> {
-  const record = await getOrCreateAiReplySettingsRecord()
-  const stateRecord = readAiReplyStateRecord(record.appStateJson)
-  const sensitiveState = readSensitiveState(record.sensitiveStateJson)
-  const aiReplySensitiveState = isRecord(sensitiveState[AI_REPLY_SENSITIVE_KEY])
-    ? sensitiveState[AI_REPLY_SENSITIVE_KEY]
-    : {}
-  const apiKey = normalizeNullableString(aiReplySensitiveState.apiKey)
-
-  return normalizeAiReplyConfig(stateRecord, apiKey)
+  const { appStateEntry, sensitiveEntry } = await getAiAppConfig(AI_REPLY_APP_KEY, { sensitiveKey: AI_REPLY_SENSITIVE_KEY })
+  const apiKey = normalizeNullableString(sensitiveEntry.apiKey)
+  return normalizeAiReplyConfig(appStateEntry, apiKey)
 }
 
 export async function getAiReplyConfig(): Promise<AiReplyConfigData> {
-  return toPublicAiReplyConfig(await getServerAiReplyConfig())
+  const { apiKey, ...rest } = await getServerAiReplyConfig()
+  return { ...rest, apiKeyConfigured: Boolean(apiKey) }
 }
 
-export function isAiReplyConfigRunnable(config: ServerAiReplyConfigData) {
+export function isAiReplyConfigRunnable(config: ServerAiReplyConfigData): boolean {
   return Boolean(
     config.enabled
     && config.agentUserId
@@ -260,7 +146,7 @@ export function isAiReplyConfigRunnable(config: ServerAiReplyConfigData) {
   )
 }
 
-export function isAiReplyConfigTestable(config: ServerAiReplyConfigData) {
+export function isAiReplyConfigTestable(config: ServerAiReplyConfigData): boolean {
   return Boolean(
     config.agentUserId
     && config.model.trim()
@@ -269,13 +155,13 @@ export function isAiReplyConfigTestable(config: ServerAiReplyConfigData) {
   )
 }
 
-function buildNextAiReplyStateRecord(existing: AiReplyStateRecord | null, config: ServerAiReplyConfigData): AiReplyStateRecord {
-  const installedAt = existing?.installedAt ?? new Date().toISOString()
-
+function buildNextAiReplyStateEntry(existing: Record<string, unknown> | null, config: ServerAiReplyConfigData) {
+  const pickStr = (k: string): string | null => (existing && typeof existing[k] === "string" ? (existing[k] as string) : null)
+  const now = new Date().toISOString()
   return {
     AppId: AI_REPLY_APP_KEY,
     enabled: config.enabled,
-    installedAt,
+    installedAt: pickStr("installedAt") ?? now,
     uninstalledAt: null,
     config: {
       baseUrl: config.baseUrl,
@@ -290,75 +176,37 @@ function buildNextAiReplyStateRecord(existing: AiReplyStateRecord | null, config
       postReplyPrompt: config.postReplyPrompt,
       commentReplyPrompt: config.commentReplyPrompt,
     },
-    status: "active",
-    version: existing?.version ?? "hosted",
-    sourceDir: existing?.sourceDir ?? "src",
-    lastActivatedAt: new Date().toISOString(),
+    status: "active" as const,
+    version: pickStr("version") ?? "hosted",
+    sourceDir: pickStr("sourceDir") ?? "src",
+    lastActivatedAt: now,
     lastErrorAt: null,
     lastErrorMessage: null,
     failureCount: 0,
   }
 }
 
-function mergeAiReplyAppState(appStateJson: string | null | undefined, config: ServerAiReplyConfigData) {
-  const root = parseJsonRoot(appStateJson)
-  const existing = readAiReplyStateRecord(appStateJson)
-  root[AI_REPLY_APP_KEY] = buildNextAiReplyStateRecord(existing, config)
-  return JSON.stringify(root)
-}
-
-function mergeAiReplySensitiveState(
-  sensitiveStateJson: string | null | undefined,
-  params: { apiKey: string | null },
-) {
-  const root = parseJsonRoot(sensitiveStateJson)
-  const state = readSensitiveState(sensitiveStateJson)
-
-  root[SITE_SETTINGS_SENSITIVE_KEY] = {
-    ...state,
-    [AI_REPLY_SENSITIVE_KEY]: {
-      apiKey: normalizeNullableString(params.apiKey),
-    },
-  }
-
-  return JSON.stringify(root)
-}
-
 export async function resolveAiReplyConfigDraftFromAdminInput(body: JsonObject) {
-  const record = await getOrCreateAiReplySettingsRecord()
-  const current = await getServerAiReplyConfig()
-  const rawConfig = body.config
-  const rawSecret = body.secret
+  const snapshot = await getAiAppConfig(AI_REPLY_APP_KEY, { sensitiveKey: AI_REPLY_SENSITIVE_KEY })
+  const current = normalizeAiReplyConfig(snapshot.appStateEntry, normalizeNullableString(snapshot.sensitiveEntry.apiKey))
 
-  const configInput = isRecord(rawConfig) ? rawConfig : {}
-  const secretInput = isRecord(rawSecret) ? rawSecret : {}
+  const configInput: Record<string, unknown> = isRecord(body.config) ? (body.config as Record<string, unknown>) : {}
+  const secretInput: Record<string, unknown> = isRecord(body.secret) ? (body.secret as Record<string, unknown>) : {}
 
-  const agentUsernameInput = typeof configInput.agentUsername === "string"
-    ? configInput.agentUsername.trim()
-    : undefined
+  const agentUsernameInput = typeof configInput.agentUsername === "string" ? configInput.agentUsername.trim() : undefined
 
   let nextAgentUserId = current.agentUserId
-
   if (typeof agentUsernameInput === "string") {
     if (!agentUsernameInput) {
       nextAgentUserId = null
     } else {
       const agentUser = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { username: agentUsernameInput },
-            { nickname: agentUsernameInput },
-          ],
-        },
-        select: {
-          id: true,
-        },
+        where: { OR: [{ username: agentUsernameInput }, { nickname: agentUsernameInput }] },
+        select: { id: true },
       })
-
       if (!agentUser) {
         apiError(400, "AI 代理账号不存在，请填写正确的用户名或昵称")
       }
-
       nextAgentUserId = agentUser.id
     }
   }
@@ -366,12 +214,7 @@ export async function resolveAiReplyConfigDraftFromAdminInput(body: JsonObject) 
   const resolvedAgentUser = nextAgentUserId
     ? await prisma.user.findUnique({
         where: { id: nextAgentUserId },
-        select: {
-          id: true,
-          username: true,
-          nickname: true,
-          status: true,
-        },
+        select: { id: true, username: true, nickname: true, status: true },
       })
     : null
 
@@ -383,19 +226,16 @@ export async function resolveAiReplyConfigDraftFromAdminInput(body: JsonObject) 
     respondToPostMentions: normalizeBoolean(configInput.respondToPostMentions, current.respondToPostMentions),
     respondToCommentMentions: normalizeBoolean(configInput.respondToCommentMentions, current.respondToCommentMentions),
     temperature: normalizeTemperature(configInput.temperature, current.temperature),
-    maxOutputTokens: Math.min(4_000, Math.max(64, parsePositiveSafeInteger(configInput.maxOutputTokens) ?? current.maxOutputTokens)),
-    timeoutMs: Math.min(120_000, Math.max(5_000, parsePositiveSafeInteger(configInput.timeoutMs) ?? current.timeoutMs)),
-    systemPrompt: normalizeOptionalString(configInput.systemPrompt, current.systemPrompt, 4_000),
-    postReplyPrompt: normalizeOptionalString(configInput.postReplyPrompt, current.postReplyPrompt, 2_000),
-    commentReplyPrompt: normalizeOptionalString(configInput.commentReplyPrompt, current.commentReplyPrompt, 2_000),
+    maxOutputTokens: clampPositiveInt(configInput.maxOutputTokens, current.maxOutputTokens, 64, 4_000),
+    timeoutMs: clampNonNegativeInt(configInput.timeoutMs, current.timeoutMs, 5_000, 120_000),
+    systemPrompt: normalizeRequiredString(configInput.systemPrompt, current.systemPrompt, 4_000),
+    postReplyPrompt: normalizeRequiredString(configInput.postReplyPrompt, current.postReplyPrompt, 2_000),
+    commentReplyPrompt: normalizeRequiredString(configInput.commentReplyPrompt, current.commentReplyPrompt, 2_000),
     apiKey: current.apiKey,
   }
 
   const clearApiKey = normalizeBoolean(secretInput.clearApiKey, false)
-  const nextApiKeyInput = typeof secretInput.apiKey === "string"
-    ? secretInput.apiKey.trim()
-    : ""
-
+  const nextApiKeyInput = typeof secretInput.apiKey === "string" ? secretInput.apiKey.trim() : ""
   if (clearApiKey) {
     nextConfig.apiKey = null
   } else if (nextApiKeyInput) {
@@ -403,24 +243,20 @@ export async function resolveAiReplyConfigDraftFromAdminInput(body: JsonObject) 
   }
 
   return {
-    record,
+    record: snapshot.record,
+    appStateEntry: snapshot.appStateEntry,
     config: nextConfig,
     agentUser: resolvedAgentUser,
-  } satisfies ResolvedAiReplyConfigDraft
+  }
 }
 
-export async function updateAiReplyConfigFromAdminInput(body: JsonObject) {
+export async function updateAiReplyConfigFromAdminInput(body: JsonObject): Promise<AiReplyConfigData> {
   const resolved = await resolveAiReplyConfigDraftFromAdminInput(body)
-
-  await prisma.siteSetting.update({
-    where: { id: resolved.record.id },
-    data: {
-      appStateJson: mergeAiReplyAppState(resolved.record.appStateJson, resolved.config),
-      sensitiveStateJson: mergeAiReplySensitiveState(resolved.record.sensitiveStateJson, {
-        apiKey: resolved.config.apiKey,
-      }),
-    },
+  await updateAiAppConfig(AI_REPLY_APP_KEY, {
+    record: resolved.record,
+    sensitiveKey: AI_REPLY_SENSITIVE_KEY,
+    appStateEntry: buildNextAiReplyStateEntry(resolved.appStateEntry, resolved.config),
+    sensitiveEntry: { apiKey: normalizeNullableString(resolved.config.apiKey) },
   })
-
   return getAiReplyConfig()
 }

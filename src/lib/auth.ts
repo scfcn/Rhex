@@ -1,18 +1,13 @@
 import { cache } from "react"
 
 import { findSessionActorByUsername, type SessionActor } from "@/db/session-actor-queries"
-import { getRequestIpFromHeaders } from "@/lib/request-ip"
-import { getSessionCookieName, parseSessionToken } from "@/lib/session"
+import { getRequestIp, getRequestIpFromHeaders } from "@/lib/request-ip"
+import { getSessionCookieName, parseSessionToken, readSessionTokenFromCookieHeader } from "@/lib/session"
 
 export type { SessionActor } from "@/db/session-actor-queries"
 
-export const getCurrentSessionActor = cache(async (): Promise<SessionActor | null> => {
-  const { cookies, headers } = await import("next/headers")
-  const [cookieStore, headerStore] = await Promise.all([cookies(), headers()])
-  const token = cookieStore.get(getSessionCookieName())?.value
-  const session = await parseSessionToken(token, {
-    requestIp: getRequestIpFromHeaders(headerStore),
-  })
+async function resolveSessionActor(token: string | undefined, requestIp?: string | null): Promise<SessionActor | null> {
+  const session = await parseSessionToken(token, { requestIp })
 
   if (!session) {
     return null
@@ -38,7 +33,27 @@ export const getCurrentSessionActor = cache(async (): Promise<SessionActor | nul
     console.error(error)
     return null
   }
+}
+
+export const getCurrentSessionActor = cache(async (): Promise<SessionActor | null> => {
+  const { cookies, headers } = await import("next/headers")
+  const [cookieStore, headerStore] = await Promise.all([cookies(), headers()])
+  return resolveSessionActor(
+    cookieStore.get(getSessionCookieName())?.value,
+    getRequestIpFromHeaders(headerStore),
+  )
 })
+
+export async function getSessionActorFromRequest(request?: Pick<Request, "headers"> | null) {
+  if (!request) {
+    return null
+  }
+
+  return resolveSessionActor(
+    readSessionTokenFromCookieHeader(request.headers.get("cookie")),
+    getRequestIp(request),
+  )
+}
 
 export const getCurrentUser = getCurrentSessionActor
 

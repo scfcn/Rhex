@@ -100,7 +100,7 @@ function decorateMarkdownImages(html: string) {
       return `<img${attrs}>`
     }
 
-    attrs = prependHtmlClass(attrs, "my-4 max-w-full rounded-2xl border border-border")
+    attrs = prependHtmlClass(attrs, "my-4 max-w-full")
     attrs = appendHtmlAttributeIfMissing(attrs, "fetchpriority", "low")
     return `<img${attrs}>`
   })

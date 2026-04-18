@@ -97,9 +97,10 @@ export function InboxRealtimeProvider({
       return
     }
 
+    const currentAttentionTitle = attentionTitleRef.current
     attentionTitleRef.current = ""
 
-    if (baseTitleRef.current && document.title !== baseTitleRef.current) {
+    if (currentAttentionTitle && baseTitleRef.current && document.title === currentAttentionTitle) {
       document.title = baseTitleRef.current
     }
   }, [])
@@ -113,19 +114,22 @@ export function InboxRealtimeProvider({
       baseTitleRef.current = document.title
     }
 
-    const titleElement = document.querySelector("title")
-    if (!titleElement) {
-      return
-    }
-
     const observer = new MutationObserver(() => {
-      if (document.title !== attentionTitleRef.current) {
-        baseTitleRef.current = document.title
+      if (!document.title || document.title === attentionTitleRef.current) {
+        return
+      }
+
+      baseTitleRef.current = document.title
+
+      if (attentionTitleRef.current) {
+        document.title = attentionTitleRef.current
       }
     })
 
-    observer.observe(titleElement, {
+    observer.observe(document.head, {
       childList: true,
+      characterData: true,
+      subtree: true,
     })
 
     return () => {

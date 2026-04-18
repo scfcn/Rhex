@@ -13,6 +13,7 @@ import {
 } from "@/db/rss-entry-admin-queries"
 import { apiError } from "@/lib/api-route"
 import { normalizePageSize, normalizePositiveInteger, normalizeText, normalizeTrimmedText } from "@/lib/shared/normalizers"
+import { normalizeHttpUrl } from "@/lib/shared/url"
 
 const RSS_ENTRY_PAGE_SIZE_OPTIONS = [20, 50, 100] as const
 const RSS_ENTRY_DEFAULT_PAGE_SIZE = 20
@@ -109,19 +110,12 @@ function normalizeOptionalAbsoluteUrl(value: unknown) {
     return null
   }
 
-  let parsed: URL
-  try {
-    parsed = new URL(text)
-  } catch {
-    apiError(400, "链接地址格式不正确")
-  }
-
-  if (!["http:", "https:"].includes(parsed.protocol)) {
+  const normalized = normalizeHttpUrl(text, { clearHash: true })
+  if (!normalized) {
     apiError(400, "链接地址只支持 http 或 https")
   }
 
-  parsed.hash = ""
-  return parsed.toString()
+  return normalized
 }
 
 function buildWhereInput(query: {

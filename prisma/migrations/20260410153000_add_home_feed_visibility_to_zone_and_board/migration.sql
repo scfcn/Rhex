@@ -1,5 +1,0 @@
-ALTER TABLE "Zone"
-ADD COLUMN "showInHomeFeed" BOOLEAN NOT NULL DEFAULT true;
-
-ALTER TABLE "Board"
-ADD COLUMN "showInHomeFeed" BOOLEAN;

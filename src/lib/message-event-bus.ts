@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 
 import { logError } from "@/lib/logger"
 import type { InboxSnapshotStreamEvent, MessageStreamEvent } from "@/lib/message-types"
-import { connectRedisClient, createRedisConnection, createRedisKey, hasRedisUrl } from "@/lib/redis"
+import { connectRedisClient, createRedisConnection, createRedisKey } from "@/lib/redis"
 
 export type { MessageStreamEvent } from "@/lib/message-types"
 
@@ -65,10 +65,7 @@ class MessageEventBus {
   }
 
   async publish(event: MessageStreamEvent) {
-    if (!hasRedisUrl()) {
-      this.publishLocal(event)
-      return
-    }
+
 
     try {
       const runtime = getRedisMessageEventBusRuntime()
@@ -195,10 +192,6 @@ function getRedisMessageEventBusRuntime() {
 }
 
 export async function ensureMessageEventBusRuntimeReady() {
-  if (!hasRedisUrl()) {
-    return
-  }
-
   await getRedisMessageEventBusRuntime().ensureSubscriberReady()
 }
 

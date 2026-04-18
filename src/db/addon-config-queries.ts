@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client"
 
 import { prisma } from "@/db/client"
+import { toNullablePrismaJsonValue } from "@/lib/shared/prisma-json"
 
 const prismaClient = prisma
 let addonConfigTableAvailability: boolean | null = null
@@ -11,15 +12,7 @@ function isMissingAddonConfigTableError(error: unknown) {
 }
 
 function toJsonValue(value: unknown) {
-  if (typeof value === "undefined") {
-    return undefined
-  }
-
-  if (value === null) {
-    return Prisma.JsonNull
-  }
-
-  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue
+  return toNullablePrismaJsonValue(value)
 }
 
 async function detectAddonConfigTableAvailability() {

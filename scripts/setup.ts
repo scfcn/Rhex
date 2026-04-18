@@ -104,7 +104,7 @@ function shouldForceSeed() {
 
 function runSchemaStep() {
 
-  runStep("npx", ["prisma", "db", "push"], "同步数据库结构")
+  runStep("npx", ["prisma", "db", "push","--accept-data-loss"], "同步数据库结构")
 }
 
 function runPrismaScript<T>(script: string) {

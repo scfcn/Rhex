@@ -1,12 +1,18 @@
 import crypto from "node:crypto"
 
+import {
+  consumeOneTimeCaptchaToken,
+  hmacSign,
+  resolveCaptchaSecret,
+  timingSafeEqualString,
+} from "@/lib/captcha-common"
 import { PublicRouteError } from "@/lib/public-route-error"
-import { createRedisKey } from "@/lib/redis"
-import { acquireRedisLease } from "@/lib/redis-lease"
+import { REDIS_KEY_SCOPES } from "@/lib/redis-keys"
 
-const DEFAULT_POW_DIFFICULTY = 5
+const DEFAULT_POW_DIFFICULTY = 4
+const DEFAULT_MOBILE_POW_DIFFICULTY = 3
 const DEFAULT_POW_EXPIRE_SECONDS = 40
-const POW_CONSUME_SCOPE = "pow-captcha-consume"
+const POW_MISSING_SECRET_MESSAGE = "缺少 POW_CAPTCHA_SECRET_KEY 或 CAPTCHA_SECRET_KEY，无法校验 PoW 验证码"
 
 export type PowCaptchaScope = "login" | "register"
 
@@ -19,6 +25,7 @@ export interface PowCaptchaChallenge {
 interface CreatePowCaptchaChallengeOptions {
   scope: PowCaptchaScope
   requestIp?: string | null
+  requestUserAgent?: string | null
 }
 
 interface VerifyPowCaptchaSolutionOptions {
@@ -29,14 +36,11 @@ interface VerifyPowCaptchaSolutionOptions {
 }
 
 function resolveSecret() {
-  const secret = process.env.POW_CAPTCHA_SECRET_KEY?.trim()
-    || process.env.CAPTCHA_SECRET_KEY?.trim()
-
-  if (!secret) {
-    throw new Error("缺少 POW_CAPTCHA_SECRET_KEY 或 CAPTCHA_SECRET_KEY，无法校验 PoW 验证码")
-  }
-
-  return secret
+  return resolveCaptchaSecret({
+    primaryEnv: "POW_CAPTCHA_SECRET_KEY",
+    fallbackEnv: "CAPTCHA_SECRET_KEY",
+    missingMessage: POW_MISSING_SECRET_MESSAGE,
+  })
 }
 
 function parseConfigInteger(raw: string | undefined, fallback: number, min: number, max: number) {
@@ -49,7 +53,7 @@ function parseConfigInteger(raw: string | undefined, fallback: number, min: numb
 }
 
 function createSignature(payload: string) {
-  return crypto.createHmac("sha256", resolveSecret()).update(payload).digest("hex")
+  return hmacSign(resolveSecret(), payload, "hex")
 }
 
 function createContextHash(input: string) {
@@ -57,10 +61,7 @@ function createContextHash(input: string) {
 }
 
 function verifySignature(payload: string, signature: string) {
-  const expected = Buffer.from(createSignature(payload), "utf8")
-  const received = Buffer.from(signature, "utf8")
-
-  return expected.length === received.length && crypto.timingSafeEqual(expected, received)
+  return timingSafeEqualString(createSignature(payload), signature)
 }
 
 function normalizeNonce(raw: unknown) {
@@ -90,6 +91,11 @@ function normalizeScope(raw: unknown): PowCaptchaScope {
 
 function getRequestIpHash(requestIp?: string | null) {
   return createContextHash(requestIp?.trim().toLowerCase() || "anonymous")
+}
+
+function isMobileUserAgent(userAgent?: string | null) {
+  const normalizedUserAgent = userAgent?.toLowerCase() ?? ""
+  return /android|iphone|ipad|mobile/.test(normalizedUserAgent)
 }
 
 function parseChallenge(challenge: string) {
@@ -123,14 +129,12 @@ function parseChallenge(challenge: string) {
 }
 
 async function consumePowChallenge(challengeId: string, scope: PowCaptchaScope, expiresAt: number) {
-  const lease = await acquireRedisLease({
-    key: createRedisKey(POW_CONSUME_SCOPE, scope, challengeId),
-    ttlMs: Math.max(1, expiresAt - Date.now()),
+  await consumeOneTimeCaptchaToken({
+    scope: REDIS_KEY_SCOPES.powCaptcha.consume,
+    keyParts: [scope, challengeId],
+    expiresAt,
+    conflictMessage: "工作量证明已被使用，请重新验证",
   })
-
-  if (!lease) {
-    throw new PublicRouteError("工作量证明已被使用，请重新验证")
-  }
 }
 
 export function hasPowCaptchaSecret() {
@@ -140,8 +144,12 @@ export function hasPowCaptchaSecret() {
   )
 }
 
-export function getPowCaptchaDifficulty() {
-  return parseConfigInteger(process.env.POW_CAPTCHA_DIFFICULTY, DEFAULT_POW_DIFFICULTY, 1, 6)
+export function getPowCaptchaDifficulty(userAgent?: string | null) {
+  const fallbackDifficulty = isMobileUserAgent(userAgent)
+    ? DEFAULT_MOBILE_POW_DIFFICULTY
+    : DEFAULT_POW_DIFFICULTY
+
+  return parseConfigInteger(process.env.POW_CAPTCHA_DIFFICULTY, fallbackDifficulty, 1, 6)
 }
 
 export function getPowCaptchaExpireSeconds() {
@@ -157,7 +165,7 @@ export function createPowCaptchaChallenge(options: CreatePowCaptchaChallengeOpti
   const challengeId = crypto.randomBytes(12).toString("hex")
   const issuedAt = Date.now()
   const expiresAt = issuedAt + getPowCaptchaExpireSeconds() * 1000
-  const difficulty = getPowCaptchaDifficulty()
+  const difficulty = getPowCaptchaDifficulty(options.requestUserAgent)
   const scope = normalizeScope(options.scope)
   const ipHash = getRequestIpHash(options.requestIp)
   const payload = `${randomData}-${issuedAt}-${expiresAt}-${difficulty}-${scope}-${ipHash}-${challengeId}`

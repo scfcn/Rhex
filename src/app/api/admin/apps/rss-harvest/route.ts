@@ -14,6 +14,7 @@ import {
   getRssRecentRunPage,
   getRssSourceQueuePage,
   getRssSourceRunPage,
+  repairRssSchedulerJob,
   saveRssSettings,
   startRssSource,
   stopRssSource,
@@ -22,6 +23,21 @@ import {
 } from "@/lib/rss-harvest"
 
 export const dynamic = "force-dynamic"
+
+function revalidateRssAdminPaths(options?: {
+  includeAppsIndex?: boolean
+  includeWorkerPage?: boolean
+}) {
+  if (options?.includeAppsIndex) {
+    revalidatePath("/admin/apps")
+  }
+
+  revalidatePath("/admin/apps/rss-harvest")
+
+  if (options?.includeWorkerPage) {
+    revalidatePath("/admin/apps/worker")
+  }
+}
 
 export const GET = createAdminRouteHandler<unknown>(async ({ request }) => {
   const url = new URL(request.url)
@@ -68,17 +84,20 @@ export const POST = createAdminRouteHandler<unknown>(async ({ request, adminUser
 
   if (action === "save-settings") {
     await saveRssSettings(body.settings && typeof body.settings === "object" ? body.settings as Record<string, unknown> : {})
-    await writeAdminLog(adminUser.id, "rss.settings.update", "RSS_SETTING", "global", "管理员更新了 RSS 抓取队列配置", requestIp)
-    revalidatePath("/admin/apps")
-    revalidatePath("/admin/apps/rss-harvest")
-    return apiSuccess(undefined, "队列配置已保存")
+    await writeAdminLog(adminUser.id, "rss.settings.update", "RSS_SETTING", "global", "管理员更新了 RSS 抓取调度配置", requestIp)
+    revalidateRssAdminPaths({
+      includeAppsIndex: true,
+    })
+    return apiSuccess(undefined, "调度配置已保存")
   }
 
   if (action === "create-source") {
     const created = await createRssSource(body.source && typeof body.source === "object" ? body.source as Record<string, unknown> : {})
     await writeAdminLog(adminUser.id, "rss.source.create", "RSS_SOURCE", created.id, `创建 RSS 任务 ${created.siteName}`, requestIp)
-    revalidatePath("/admin/apps")
-    revalidatePath("/admin/apps/rss-harvest")
+    revalidateRssAdminPaths({
+      includeAppsIndex: true,
+      includeWorkerPage: true,
+    })
     return apiSuccess(undefined, "RSS 任务已创建")
   }
 
@@ -92,7 +111,9 @@ export const POST = createAdminRouteHandler<unknown>(async ({ request, adminUser
     const sourceId = typeof body.sourceId === "string" ? body.sourceId.trim() : ""
     const updated = await updateRssSource(sourceId, body.source && typeof body.source === "object" ? body.source as Record<string, unknown> : {})
     await writeAdminLog(adminUser.id, "rss.source.update", "RSS_SOURCE", updated.id, `更新 RSS 任务 ${updated.siteName}`, requestIp)
-    revalidatePath("/admin/apps/rss-harvest")
+    revalidateRssAdminPaths({
+      includeWorkerPage: true,
+    })
     return apiSuccess(undefined, "RSS 任务已更新")
   }
 
@@ -100,15 +121,19 @@ export const POST = createAdminRouteHandler<unknown>(async ({ request, adminUser
     const sourceId = typeof body.sourceId === "string" ? body.sourceId.trim() : ""
     const source = await startRssSource(sourceId)
     await writeAdminLog(adminUser.id, "rss.source.start", "RSS_SOURCE", source.id, `启动 RSS 任务 ${source.siteName}`, requestIp)
-    revalidatePath("/admin/apps/rss-harvest")
+    revalidateRssAdminPaths({
+      includeWorkerPage: true,
+    })
     return apiSuccess(undefined, "RSS 任务已启动")
   }
 
   if (action === "stop-source") {
     const sourceId = typeof body.sourceId === "string" ? body.sourceId.trim() : ""
     await stopRssSource(sourceId)
-    await writeAdminLog(adminUser.id, "rss.source.stop", "RSS_SOURCE", sourceId, "停止 RSS 任务并取消待执行队列", requestIp)
-    revalidatePath("/admin/apps/rss-harvest")
+    await writeAdminLog(adminUser.id, "rss.source.stop", "RSS_SOURCE", sourceId, "停止 RSS 任务并取消待执行 Redis 队列快照", requestIp)
+    revalidateRssAdminPaths({
+      includeWorkerPage: true,
+    })
     return apiSuccess(undefined, "RSS 任务已停止")
   }
 
@@ -116,22 +141,33 @@ export const POST = createAdminRouteHandler<unknown>(async ({ request, adminUser
     const sourceId = typeof body.sourceId === "string" ? body.sourceId.trim() : ""
     const result = await enqueueRssSourceRunNow(sourceId)
     await writeAdminLog(adminUser.id, "rss.source.run-now", "RSS_SOURCE", sourceId, "手动触发 RSS 抓取任务", requestIp)
-    revalidatePath("/admin/apps/rss-harvest")
+    revalidateRssAdminPaths({
+      includeWorkerPage: true,
+    })
+    return apiSuccess(undefined, result.message)
+  }
+
+  if (action === "repair-scheduler") {
+    const result = await repairRssSchedulerJob()
+    await writeAdminLog(adminUser.id, "rss.scheduler.repair", "RSS_SETTING", "global", result.message, requestIp)
+    revalidateRssAdminPaths({
+      includeWorkerPage: true,
+    })
     return apiSuccess(undefined, result.message)
   }
 
   if (action === "clear-logs") {
     const result = await clearRssLogsHistory()
-    await writeAdminLog(adminUser.id, "rss.logs.clear", "RSS_LOG", "global", `清空 RSS 抓取日志 ${result.count} 条`, requestIp)
-    revalidatePath("/admin/apps/rss-harvest")
+    await writeAdminLog(adminUser.id, "rss.logs.clear", "RSS_LOG", "global", `清空 RSS Redis 短期日志 ${result.count} 条`, requestIp)
+    revalidateRssAdminPaths()
     return apiSuccess(undefined, result.count > 0 ? `已清空 ${result.count} 条日志` : "暂无日志可清空")
   }
 
   if (action === "clear-source-queue") {
     const sourceId = typeof body.sourceId === "string" ? body.sourceId.trim() : ""
     const result = await clearRssSourceQueueHistory(sourceId)
-    await writeAdminLog(adminUser.id, "rss.source.queue.clear", "RSS_SOURCE", sourceId, `清空 RSS 队列快照 ${result.sourceName} ${result.count} 条`, requestIp)
-    revalidatePath("/admin/apps/rss-harvest")
+    await writeAdminLog(adminUser.id, "rss.source.queue.clear", "RSS_SOURCE", sourceId, `清空 RSS Redis 队列快照 ${result.sourceName} ${result.count} 条`, requestIp)
+    revalidateRssAdminPaths()
     return apiSuccess(undefined, result.count > 0 ? `已清空 ${result.count} 条队列快照` : "暂无已完成的队列快照可清空")
   }
 
@@ -139,14 +175,14 @@ export const POST = createAdminRouteHandler<unknown>(async ({ request, adminUser
     const sourceId = typeof body.sourceId === "string" ? body.sourceId.trim() : ""
     const result = await clearRssSourceRunHistory(sourceId)
     await writeAdminLog(adminUser.id, "rss.source.runs.clear", "RSS_SOURCE", sourceId, `清空 RSS 执行记录 ${result.sourceName} ${result.count} 条`, requestIp)
-    revalidatePath("/admin/apps/rss-harvest")
+    revalidateRssAdminPaths()
     return apiSuccess(undefined, result.count > 0 ? `已清空 ${result.count} 条执行记录` : "暂无已完成的执行记录可清空")
   }
 
   if (action === "clear-runs") {
     const result = await clearRssRunHistoryRecords()
     await writeAdminLog(adminUser.id, "rss.runs.clear", "RSS_RUN", "global", `清空 RSS 全局执行记录 ${result.count} 条`, requestIp)
-    revalidatePath("/admin/apps/rss-harvest")
+    revalidateRssAdminPaths()
     return apiSuccess(undefined, result.count > 0 ? `已清空 ${result.count} 条全局执行记录` : "暂无已完成的执行记录可清空")
   }
 
