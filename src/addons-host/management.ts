@@ -310,9 +310,13 @@ function refreshAddonRuntime(addonId: string) {
   revalidateAddonManagementPaths(addonId)
 }
 
-function safeRevalidatePath(targetPath: string) {
+function safeRevalidatePath(targetPath: string, type?: "page" | "layout") {
   try {
-    revalidatePath(targetPath)
+    if (type) {
+      revalidatePath(targetPath, type)
+    } else {
+      revalidatePath(targetPath)
+    }
   } catch {
     // Ignore when called outside a Next.js request context, e.g. CLI scripts.
   }
@@ -332,6 +336,10 @@ export async function runAddonManagementAction(action: AddonManagementAction, ad
   if (action === "clear-cache") {
     const result = await clearRecoveredAddonErrors()
     revalidateAddonManagementPaths(addonId?.trim() || "")
+    // 额外刷掉 Next.js Full Route Cache：插件 slot（如 layout.body.end / home.right.top）
+    // 分布在根 layout 和各页面，这里用 layout 级 revalidate 一次性清理所有被 SSR 缓存的页面，
+    // 让下一个请求重新走 SSR 并拉到最新的插件渲染结果（仍需插件代码已重载）。
+    safeRevalidatePath("/", "layout")
     return {
       data: await getAddonsAdminData(),
       message:

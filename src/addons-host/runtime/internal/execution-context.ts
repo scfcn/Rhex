@@ -23,20 +23,25 @@ import {
   enqueueAddonBackgroundJob,
   removeAddonBackgroundJob,
 } from "@/addons-host/runtime/background-jobs"
-import { getSessionActorFromRequest } from "@/lib/auth"
+import { getCurrentUser, getSessionActorFromRequest } from "@/lib/auth"
 import {
   cancelScheduledBackgroundJob,
   ensureScheduledBackgroundJob,
   inspectScheduledJobState,
 } from "@/lib/background-job-scheduler"
 import { getSiteSettings as getPublicSiteSettings } from "@/lib/site-settings"
-import { createAddonLifecycleLog } from "@/db/addon-registry-queries"
+import {
+  ADDON_RUNTIME_LOG_DEDUPE_WINDOW_MS,
+  createAddonLifecycleLog,
+} from "@/db/addon-registry-queries"
+import { prisma } from "@/db/client"
 import type {
   AddonBoardSelectGroup,
   AddonExecutionContextBase,
   LoadedAddonRuntime,
 } from "@/addons-host/types"
 
+import { buildAddonDatabaseApi } from "../database"
 import { loadAddonBoardSelectOptions } from "./board-select"
 import { buildAddonDomainFacades } from "./execution-facades"
 
@@ -58,6 +63,7 @@ export function buildAddonExecutionContext(addon: LoadedAddonRuntime, input?: {
         message:
           message
           || `addon "${addon.manifest.id}" requires permission "${permission}"`,
+        dedupeWindowMs: ADDON_RUNTIME_LOG_DEDUPE_WINDOW_MS,
         metadataJson: {
           permission,
           pathname: input?.pathname ?? null,
@@ -70,6 +76,7 @@ export function buildAddonExecutionContext(addon: LoadedAddonRuntime, input?: {
       )
     }
   }
+  const database = buildAddonDatabaseApi(addon, assertRuntimePermission, prisma)
 
   return {
     manifest: addon.manifest,
@@ -90,7 +97,9 @@ export function buildAddonExecutionContext(addon: LoadedAddonRuntime, input?: {
     assertPermission: assertRuntimePermission,
     getCurrentUser: () => {
       if (!currentUserPromise) {
-        currentUserPromise = getSessionActorFromRequest(input?.request)
+        currentUserPromise = input?.request
+          ? getSessionActorFromRequest(input.request)
+          : getCurrentUser()
       }
 
       return currentUserPromise
@@ -191,6 +200,7 @@ export function buildAddonExecutionContext(addon: LoadedAddonRuntime, input?: {
       )
       await writeAddonSecretValue(addon.manifest.id, secretKey, value)
     },
+    database,
     backgroundJobs: {
       enqueue: async (jobKey, payload, options) => {
         assertRuntimePermission(

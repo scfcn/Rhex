@@ -1,6 +1,5 @@
 import { promises as fs } from "node:fs"
 import path from "node:path"
-import { pathToFileURL } from "node:url"
 
 import type { PrismaClient } from "@prisma/client"
 
@@ -11,7 +10,12 @@ import {
   ADDON_PUBLIC_API_PREFIX,
   ADDON_PUBLIC_PAGE_PREFIX,
 } from "@/addons-host/runtime/constants"
+import {
+  DEFAULT_SERVER_ENTRY_RELATIVE_PATH,
+  importAddonDefinition,
+} from "@/addons-host/runtime/internal/manifest-loader"
 import { runWithAddonExecutionScope } from "@/addons-host/runtime/execution-scope"
+import { buildAddonDatabaseApi } from "@/addons-host/runtime/database"
 import {
   fileExists,
   readJsonFile,
@@ -32,8 +36,6 @@ import type {
   AddonUpgradeLifecycleContext,
   LoadedAddonRuntime,
 } from "@/addons-host/types"
-
-const DEFAULT_SERVER_ENTRY_RELATIVE_PATH = "dist/server.mjs"
 
 type AddonLifecycleTarget = {
   definition: AddonDefinition
@@ -101,19 +103,6 @@ function buildLifecycleRuntime(manifest: AddonManifest, rootDir: string, state?:
   }
 }
 
-async function importAddonDefinition(entryServerPath: string): Promise<AddonDefinition> {
-  const entryStat = await fs.stat(entryServerPath)
-  const entryUrl = `${pathToFileURL(entryServerPath).href}?v=${entryStat.mtimeMs}`
-  const moduleExports = await import(/* webpackIgnore: true */ entryUrl)
-  const candidate = (moduleExports.default ?? moduleExports) as Partial<AddonDefinition> | undefined
-
-  if (!candidate || typeof candidate.setup !== "function") {
-    throw new Error("addon server entry must export an object with setup(api)")
-  }
-
-  return candidate as AddonDefinition
-}
-
 export async function importAddonLifecycleTargetFromDirectory(
   rootDir: string,
   state?: AddonStateRecord,
@@ -129,7 +118,7 @@ export async function importAddonLifecycleTargetFromDirectory(
     throw new Error("插件服务端入口不存在")
   }
 
-  const definition = await importAddonDefinition(entryServerPath)
+  const definition = await importAddonDefinition(rootDir, entryServerPath)
   const runtime = buildLifecycleRuntime(manifest, rootDir, state)
   runtime.entryServerPath = entryServerPath
 
@@ -138,36 +127,6 @@ export async function importAddonLifecycleTargetFromDirectory(
     entryServerPath,
     manifest,
     runtime,
-  }
-}
-
-function buildLifecycleDatabaseApi(
-  runtime: LoadedAddonRuntime,
-  assertPermission: (permission: string, message?: string) => void,
-  client: PrismaClient,
-): AddonLifecycleDatabaseApi {
-  const createPermissionMessage = (permission: "database:sql" | "database:orm") =>
-    `addon "${runtime.manifest.id}" is not allowed to use ${permission === "database:orm" ? "host ORM" : "database SQL"}`
-
-  return {
-    get prisma() {
-      assertPermission("database:orm", createPermissionMessage("database:orm"))
-      return client
-    },
-    queryRaw: async <TRow = Record<string, unknown>>(sql: string, values: unknown[] = []) => {
-      assertPermission("database:sql", createPermissionMessage("database:sql"))
-      return client.$queryRawUnsafe(sql, ...values) as Promise<TRow[]>
-    },
-    executeRaw: async (sql, values = []) => {
-      assertPermission("database:sql", createPermissionMessage("database:sql"))
-      return client.$executeRawUnsafe(sql, ...values)
-    },
-    transaction: async (task) => client.$transaction(async (tx) =>
-      task(buildLifecycleDatabaseApi(
-        runtime,
-        assertPermission,
-        tx as unknown as PrismaClient,
-      ))),
   }
 }
 
@@ -210,7 +169,11 @@ function buildLifecycleContext(
   input: LifecycleRunInput,
 ) {
   const baseContext = buildAddonExecutionContext(target.runtime)
-  const database = buildLifecycleDatabaseApi(target.runtime, baseContext.assertPermission, prisma)
+  const database = buildAddonDatabaseApi(
+    target.runtime,
+    baseContext.assertPermission,
+    prisma as unknown as PrismaClient,
+  ) as AddonLifecycleDatabaseApi
   const shared = {
     ...baseContext,
     readFileText: async (targetPath: string) => {

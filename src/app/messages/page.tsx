@@ -37,7 +37,6 @@ export default async function MessagesPage(props: PageProps<"/messages">) {
         }}
       >
         <MessagesClient
-          key={`${currentUser?.id ?? 0}:${conversationId ?? ""}`}
           currentUser={currentUser}
           initialData={data}
           conversationId={conversationId}

@@ -432,6 +432,16 @@ async function resolveConversationReference(currentUserId: number, conversationI
   }
 }
 
+export async function getMessageConversationDetail(currentUserId: number, conversationId: string): Promise<MessageConversationDetail | null> {
+  const resolvedConversation = await resolveConversationReference(currentUserId, conversationId)
+
+  return resolvedConversation?.kind === "database"
+    ? await getDatabaseConversationDetail(currentUserId, resolvedConversation.conversationId)
+    : resolvedConversation?.kind === "draft"
+      ? buildDraftConversationDetail(currentUserId, resolvedConversation.recipient)
+      : null
+}
+
 export async function sendDirectMessage(senderId: number, recipientId: number, body: string) {
   const content = body.trim()
 
@@ -548,12 +558,7 @@ export async function getMessageCenterData(currentUserId: number, conversationId
 
     if (conversationId) {
       try {
-        const resolvedConversation = await resolveConversationReference(currentUserId, conversationId)
-        activeConversation = resolvedConversation?.kind === "database"
-          ? await getDatabaseConversationDetail(currentUserId, resolvedConversation.conversationId)
-          : resolvedConversation?.kind === "draft"
-            ? buildDraftConversationDetail(currentUserId, resolvedConversation.recipient)
-            : null
+        activeConversation = await getMessageConversationDetail(currentUserId, conversationId)
       } catch (error) {
         errorMessage = normalizeMessageCenterError(error)
 

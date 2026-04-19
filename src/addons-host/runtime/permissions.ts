@@ -34,6 +34,8 @@ export const ADDON_RUNTIME_PERMISSIONS = [
   "notification:create",
   "follow:user",
   "points:adjust",
+  "badge:query",
+  "badge:grant",
   "post:tip",
   "network:external",
   "auth:integrate",

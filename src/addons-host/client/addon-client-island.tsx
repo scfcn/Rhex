@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import type { Root } from "react-dom/client"
 
 import {
   createAddonClientSdk,
@@ -88,24 +87,8 @@ export function AddonClientIsland({ moduleUrl, props, fallback = null }: AddonCl
     [serializedProps]
   )
   const sdk = React.useMemo(() => createAddonClientSdk(), [])
-  const componentRootRef = React.useRef<Root | null>(null)
   const [ready, setReady] = React.useState(false)
-
-  const unmountComponentRoot = React.useCallback(async () => {
-    const root = componentRootRef.current
-    if (!root) {
-      return
-    }
-
-    componentRootRef.current = null
-
-    await new Promise<void>((resolve) => {
-      queueMicrotask(() => {
-        root.unmount()
-        resolve()
-      })
-    })
-  }, [])
+  const [LoadedComponent, setLoadedComponent] = React.useState<AddonClientComponent | null>(null)
 
   React.useEffect(() => {
     let cleanup: (() => void | Promise<void>) | null = null
@@ -114,8 +97,9 @@ export function AddonClientIsland({ moduleUrl, props, fallback = null }: AddonCl
     const container = containerRef.current
 
     setReady(false)
+    setLoadedComponent(null)
 
-    if (!container || !moduleUrl) {
+    if (!moduleUrl) {
       return
     }
 
@@ -140,19 +124,15 @@ export function AddonClientIsland({ moduleUrl, props, fallback = null }: AddonCl
           }
 
           shouldClearContainer = false
-
-          const root = componentRootRef.current ?? sdk.createRoot(container)
-          componentRootRef.current = root
-          root.render(
-            <AddonClientErrorBoundary key={moduleUrl} fallback={fallback} moduleUrl={moduleUrl}>
-              <Component {...stableProps} sdk={sdk} />
-            </AddonClientErrorBoundary>
-          )
+          setLoadedComponent(() => Component)
           setReady(true)
           return
         }
 
-        await unmountComponentRoot()
+        if (!container) {
+          throw new Error(`Addon client module "${moduleUrl}" requires a mount container`)
+        }
+
         if (disposed) {
           return
         }
@@ -193,22 +173,22 @@ export function AddonClientIsland({ moduleUrl, props, fallback = null }: AddonCl
         container.innerHTML = ""
       }
     }
-  }, [fallback, moduleUrl, sdk, stableProps, unmountComponentRoot])
-
-  React.useEffect(() => {
-    return () => {
-      void unmountComponentRoot()
-    }
-  }, [unmountComponentRoot])
+  }, [moduleUrl, sdk, stableProps])
 
   return (
     <>
       {!ready ? fallback : null}
-      <div
-        ref={containerRef}
-        data-addon-client-module={moduleUrl}
-        hidden={!ready && Boolean(fallback)}
-      />
+      {LoadedComponent ? (
+        <AddonClientErrorBoundary key={moduleUrl} fallback={fallback} moduleUrl={moduleUrl}>
+          <LoadedComponent {...stableProps} sdk={sdk} />
+        </AddonClientErrorBoundary>
+      ) : (
+        <div
+          ref={containerRef}
+          data-addon-client-module={moduleUrl}
+          hidden={!ready && Boolean(fallback)}
+        />
+      )}
     </>
   )
 }

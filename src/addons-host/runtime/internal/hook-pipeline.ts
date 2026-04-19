@@ -1,6 +1,9 @@
 import "server-only"
 
-import { createAddonLifecycleLog } from "@/db/addon-registry-queries"
+import {
+  ADDON_RUNTIME_LOG_DEDUPE_WINDOW_MS,
+  createAddonLifecycleLog,
+} from "@/db/addon-registry-queries"
 import type { LoadedAddonRuntime } from "@/addons-host/types"
 
 /**
@@ -36,6 +39,7 @@ export async function logHookFailure(input: {
       input.error instanceof Error
         ? input.error.message
         : `addon hook "${input.hook}" failed`,
+    dedupeWindowMs: ADDON_RUNTIME_LOG_DEDUPE_WINDOW_MS,
     metadataJson: {
       kind: input.kind,
       hook: input.hook,

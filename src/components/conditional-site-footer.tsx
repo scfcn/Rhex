@@ -10,7 +10,7 @@ export function ConditionalSiteFooter({
 }) {
   const pathname = usePathname()
 
-  if (pathname?.startsWith("/admin")) {
+  if (pathname?.startsWith("/admin") || pathname?.startsWith("/addons/")) {
     return null
   }
 

@@ -70,7 +70,10 @@ type AddonLifecycleLogInput = {
   status: string
   message?: string | null
   metadataJson?: unknown
+  dedupeWindowMs?: number | null
 }
+
+export const ADDON_RUNTIME_LOG_DEDUPE_WINDOW_MS = 5 * 60 * 1000
 
 function isMissingAddonRegistryTableError(error: unknown) {
   return error instanceof Prisma.PrismaClientKnownRequestError
@@ -79,6 +82,26 @@ function isMissingAddonRegistryTableError(error: unknown) {
 
 function toJsonValue(value: unknown) {
   return toNullablePrismaJsonValue(value)
+}
+
+function normalizeJsonForComparison(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeJsonForComparison(item))
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right, "zh-CN"))
+        .map(([key, nestedValue]) => [key, normalizeJsonForComparison(nestedValue)]),
+    )
+  }
+
+  return value ?? null
+}
+
+function stringifyComparableJson(value: unknown) {
+  return JSON.stringify(normalizeJsonForComparison(value ?? null))
 }
 
 function deriveAddonRegistryState(input: {
@@ -307,13 +330,42 @@ export async function createAddonLifecycleLog(input: AddonLifecycleLogInput) {
   }
 
   try {
+    const normalizedMetadataJson = toJsonValue(input.metadataJson)
+
+    if ((input.dedupeWindowMs ?? 0) > 0) {
+      const createdAfter = new Date(Date.now() - Math.max(0, Number(input.dedupeWindowMs ?? 0)))
+      const recentLogs = await prismaClient.addonLifecycleLog.findMany({
+        where: {
+          addonId: input.addonId,
+          action: input.action,
+          status: input.status,
+          message: input.message ?? null,
+          createdAt: {
+            gte: createdAfter,
+          },
+        },
+        orderBy: [{ createdAt: "desc" }],
+        take: 10,
+        select: addonLifecycleLogSelect,
+      })
+
+      const expectedMetadata = stringifyComparableJson(normalizedMetadataJson)
+      const duplicateLog = recentLogs.find((item) => (
+        stringifyComparableJson(item.metadataJson) === expectedMetadata
+      ))
+
+      if (duplicateLog) {
+        return duplicateLog
+      }
+    }
+
     return await prismaClient.addonLifecycleLog.create({
       data: {
         addonId: input.addonId,
         action: input.action,
         status: input.status,
         message: input.message ?? null,
-        metadataJson: toJsonValue(input.metadataJson),
+        metadataJson: normalizedMetadataJson,
       },
       select: addonLifecycleLogSelect,
     })

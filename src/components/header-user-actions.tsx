@@ -26,7 +26,7 @@ function formatUnreadBadge(count: number) {
     return null
   }
 
-  return count > 9 ? "9+" : String(count)
+  return count > 99 ? "99+" : String(count)
 }
 
 function HeaderUnreadBadge({ count, className }: { count: number; className?: string }) {
@@ -37,7 +37,7 @@ function HeaderUnreadBadge({ count, className }: { count: number; className?: st
   }
 
   return (
-    <span className={`absolute flex min-h-4 min-w-4 items-center justify-center rounded-full border border-background bg-rose-500 px-1 text-[10px] font-semibold leading-none text-white shadow-[0_4px_12px_rgba(244,63,94,0.22)] dark:border-background dark:bg-rose-300 dark:text-rose-950 dark:shadow-none ${className ?? ""}`}>
+    <span className={`absolute flex min-h-4 min-w-4 items-center justify-center rounded-full border border-background bg-rose-500 px-1.5 text-[10px] font-semibold leading-none text-white shadow-[0_4px_12px_rgba(244,63,94,0.22)] dark:border-background dark:bg-rose-300 dark:text-rose-950 dark:shadow-none ${className ?? ""}`}>
       {label}
     </span>
   )
@@ -208,8 +208,8 @@ export function HeaderUserActions({ user }: HeaderUserActionsProps) {
 
 <Button variant="ghost"  type="button" onClick={() => setDesktopMenuOpen((current) => !current)}
             aria-expanded={desktopMenuOpen}
-            aria-haspopup="menu"  size="icon" className="size-8 rounded-md">
-            <User className="h-4 w-4" />
+            aria-haspopup="menu"  size="icon" className="size-8 rounded-md p-0">
+            <UserAvatar name={user.nickname ?? user.username} avatarPath={user.avatarPath} size="sm" isVip={vipActive} vipLevel={vipLevel} />
           </Button>
           {desktopMenuOpen ? (
             <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-44 rounded-2xl border border-border bg-background p-2 shadow-2xl">

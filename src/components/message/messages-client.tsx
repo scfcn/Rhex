@@ -2,19 +2,20 @@
 
 import Link from "next/link"
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { MessageSquareMore } from "lucide-react"
 
 import { AddonSurfaceClientRenderer } from "@/addons-host/client/addon-surface-client-renderer"
 import { useInboxRealtime } from "@/components/inbox-realtime-provider"
 import { MessageConversationSidebar } from "@/components/message/message-conversation-sidebar"
-import { MessageThreadPanel } from "@/components/message/message-thread-panel"
+import { MessageThreadPanel, type LocalMessageSentPayload } from "@/components/message/message-thread-panel"
 import { Button } from "@/components/ui/rbutton"
 import { summarizeMessagePreview } from "@/lib/message-media"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type {
   MessageBubbleItem,
   MessageCenterData,
+  MessageConversationDetail,
   MessageConversationListItem,
   MessageHistoryResult,
   MessageParticipantProfile,
@@ -62,11 +63,24 @@ export function MessagesClient({
   threadBefore,
   threadAfter,
 }: MessagesClientProps) {
-  const router = useRouter()
+  const searchParams = useSearchParams()
   const { subscribe } = useInboxRealtime()
   const activeConversationIdRef = useRef<string | undefined>(undefined)
   const dataRef = useRef<MessageCenterData | null>(initialData)
+  const conversationRequestTokenRef = useRef(0)
+  const conversationRequestsRef = useRef(new Map<string, Promise<MessageConversationDetail | null>>())
   const [deletingConversationId, setDeletingConversationId] = useState("")
+  const [loadingConversationId, setLoadingConversationId] = useState("")
+  const [conversationErrors, setConversationErrors] = useState<Record<string, string>>({})
+  const [conversationDetailsById, setConversationDetailsById] = useState<Record<string, MessageConversationDetail>>(() => {
+    const activeConversation = initialData?.activeConversation
+
+    return activeConversation
+      ? {
+          [activeConversation.id]: activeConversation,
+        }
+      : {}
+  })
   const [deletedConversationIds, setDeletedConversationIds] = useState<string[]>([])
   const [historyLoadingConversationId, setHistoryLoadingConversationId] = useState("")
   const [historyErrors, setHistoryErrors] = useState<Record<string, string>>({})
@@ -76,8 +90,44 @@ export function MessagesClient({
   const [optimisticMessagesByConversation, setOptimisticMessagesByConversation] = useState<Record<string, MessageBubbleItem[]>>({})
   const [liveConversationPatches, setLiveConversationPatches] = useState<Record<string, LiveConversationPatch>>({})
   const [promotedConversationIds, setPromotedConversationIds] = useState<string[]>([])
+  const currentUserId = currentUser?.id
+  const requestedConversationId = useMemo(() => {
+    const value = searchParams.get("conversation")?.trim() ?? ""
+    return value || conversationId
+  }, [conversationId, searchParams])
 
-  const data = useMemo(() => buildMessageCenterView(initialData, {
+  const resolveConversationDetail = useCallback((requestedId?: string) => {
+    if (!requestedId) {
+      return null
+    }
+
+    const directMatch = conversationDetailsById[requestedId]
+    if (directMatch) {
+      return directMatch
+    }
+
+    const initialActiveConversation = initialData?.activeConversation
+    if (requestedId === conversationId && initialActiveConversation) {
+      return conversationDetailsById[initialActiveConversation.id] ?? initialActiveConversation
+    }
+
+    const requestedRecipientId = requestedId.startsWith("user-")
+      ? Number(requestedId.slice("user-".length))
+      : Number.NaN
+
+    if (!Number.isFinite(requestedRecipientId)) {
+      return null
+    }
+
+    return Object.values(conversationDetailsById).find((detail) => detail.recipientId === requestedRecipientId) ?? null
+  }, [conversationDetailsById, conversationId, initialData])
+
+  const activeConversationSource = useMemo(
+    () => resolveConversationDetail(requestedConversationId),
+    [requestedConversationId, resolveConversationDetail],
+  )
+
+  const data = useMemo(() => buildMessageCenterView(initialData, activeConversationSource, {
     deletedConversationIds,
     historyHasMoreByConversation,
     historyMessagesByConversation,
@@ -85,8 +135,7 @@ export function MessagesClient({
     liveConversationPatches,
     optimisticMessagesByConversation,
     promotedConversationIds,
-  }), [deletedConversationIds, historyHasMoreByConversation, historyMessagesByConversation, incomingMessagesByConversation, initialData, liveConversationPatches, optimisticMessagesByConversation, promotedConversationIds])
-  const currentUserId = currentUser?.id
+  }), [activeConversationSource, deletedConversationIds, historyHasMoreByConversation, historyMessagesByConversation, incomingMessagesByConversation, initialData, liveConversationPatches, optimisticMessagesByConversation, promotedConversationIds])
   const shouldUseLiveInboxEvents = Boolean(currentUserId && data && !data.usingDemoData)
   const pageError = data?.errorMessage?.trim() ?? ""
 
@@ -98,24 +147,172 @@ export function MessagesClient({
     return data.activeConversation.id
   }, [data])
 
+  const activeConversationError = requestedConversationId ? (conversationErrors[requestedConversationId] ?? "") : ""
+  const loadingConversation = Boolean(requestedConversationId && loadingConversationId === requestedConversationId && !activeConversationSource)
   const loadingHistory = historyLoadingConversationId !== "" && historyLoadingConversationId === activeConversationId
   const historyError = activeConversationId ? (historyErrors[activeConversationId] ?? "") : ""
 
   useEffect(() => {
-    activeConversationIdRef.current = activeConversationId
-  }, [activeConversationId, conversationId])
+    const activeConversation = initialData?.activeConversation
+    if (!activeConversation) {
+      return
+    }
+
+    setConversationDetailsById((current) => ({
+      ...current,
+      [activeConversation.id]: activeConversation,
+    }))
+  }, [initialData])
+
+  const updateConversationUrl = useCallback((nextConversationId?: string, options?: { replace?: boolean }) => {
+    if ((requestedConversationId ?? "") === (nextConversationId ?? "") && !options?.replace) {
+      return
+    }
+
+    const nextSearchParams = new URLSearchParams(searchParams.toString())
+    if (nextConversationId) {
+      nextSearchParams.set("conversation", nextConversationId)
+    } else {
+      nextSearchParams.delete("conversation")
+    }
+
+    const nextQuery = nextSearchParams.toString()
+    const nextUrl = nextQuery ? `/messages?${nextQuery}` : "/messages"
+
+    if (options?.replace) {
+      window.history.replaceState(null, "", nextUrl)
+      return
+    }
+
+    window.history.pushState(null, "", nextUrl)
+  }, [requestedConversationId, searchParams])
+
+  const requestConversationDetail = useCallback(async (requestedId: string) => {
+    const cachedConversation = resolveConversationDetail(requestedId)
+    if (cachedConversation) {
+      return cachedConversation
+    }
+
+    const currentRequest = conversationRequestsRef.current.get(requestedId)
+    if (currentRequest) {
+      return currentRequest
+    }
+
+    const nextRequest = (async () => {
+      const response = await fetch(`/api/messages/conversation?conversationId=${encodeURIComponent(requestedId)}`, {
+        cache: "no-store",
+      })
+      const payload = await response.json().catch(() => null)
+
+      if (!response.ok || payload?.code !== 0) {
+        throw new Error(payload?.message ?? "加载会话失败")
+      }
+
+      const detail = (payload?.data ?? null) as MessageConversationDetail | null
+      if (detail) {
+        setConversationDetailsById((current) => ({
+          ...current,
+          [detail.id]: detail,
+        }))
+      }
+
+      return detail
+    })()
+
+    conversationRequestsRef.current.set(requestedId, nextRequest)
+
+    try {
+      return await nextRequest
+    } finally {
+      conversationRequestsRef.current.delete(requestedId)
+    }
+  }, [resolveConversationDetail])
+
+  const prefetchConversation = useCallback((requestedId: string) => {
+    if (!requestedId || resolveConversationDetail(requestedId)) {
+      return
+    }
+
+    void requestConversationDetail(requestedId).catch(() => undefined)
+  }, [requestConversationDetail, resolveConversationDetail])
+
+  const handleSelectConversation = useCallback((nextConversationId: string, options?: { replace?: boolean }) => {
+    prefetchConversation(nextConversationId)
+    updateConversationUrl(nextConversationId, options)
+  }, [prefetchConversation, updateConversationUrl])
 
   useEffect(() => {
-    if (!conversationId?.startsWith("user-")) {
+    activeConversationIdRef.current = activeConversationId
+  }, [activeConversationId, requestedConversationId])
+
+  useEffect(() => {
+    if (!requestedConversationId?.startsWith("user-")) {
       return
     }
 
-    if (!activeConversationId || activeConversationId === conversationId) {
+    if (!activeConversationId || activeConversationId === requestedConversationId) {
       return
     }
 
-    router.replace(`/messages?conversation=${activeConversationId}`, { scroll: false })
-  }, [activeConversationId, conversationId, router])
+    updateConversationUrl(activeConversationId, { replace: true })
+  }, [activeConversationId, requestedConversationId, updateConversationUrl])
+
+  useEffect(() => {
+    if (!requestedConversationId || activeConversationSource || !currentUserId) {
+      setLoadingConversationId("")
+      return
+    }
+
+    const requestToken = ++conversationRequestTokenRef.current
+    setLoadingConversationId(requestedConversationId)
+    setConversationErrors((current) => ({
+      ...current,
+      [requestedConversationId]: "",
+    }))
+
+    void requestConversationDetail(requestedConversationId)
+      .then((detail) => {
+        if (conversationRequestTokenRef.current !== requestToken) {
+          return
+        }
+
+        setLoadingConversationId("")
+        if (!detail) {
+          setConversationErrors((current) => ({
+            ...current,
+            [requestedConversationId]: "会话不存在或已不可用",
+          }))
+        }
+      })
+      .catch((error) => {
+        if (conversationRequestTokenRef.current !== requestToken) {
+          return
+        }
+
+        setLoadingConversationId("")
+        setConversationErrors((current) => ({
+          ...current,
+          [requestedConversationId]: error instanceof Error ? error.message : "加载会话失败",
+        }))
+      })
+  }, [activeConversationSource, currentUserId, requestConversationDetail, requestedConversationId])
+
+  useEffect(() => {
+    if (!requestedConversationId || !activeConversationSource) {
+      return
+    }
+
+    setConversationErrors((current) => {
+      if (!current[requestedConversationId]) {
+        return current
+      }
+
+      return {
+        ...current,
+        [requestedConversationId]: "",
+      }
+    })
+  }, [activeConversationSource, requestedConversationId])
 
   useEffect(() => {
     dataRef.current = data
@@ -142,24 +339,46 @@ export function MessagesClient({
     }
   }, [])
 
-  function handleLocalMessageSent(message: MessageBubbleItem) {
-    const activeConversation = data?.activeConversation
-    const conversationKey = activeConversation?.id
-    if (!activeConversation || !conversationKey) {
+  function handleLocalMessageSent({ conversationId: conversationKey, message, previousConversationId }: LocalMessageSentPayload) {
+    const sourceConversation = resolveConversationDetail(previousConversationId ?? conversationKey) ?? data?.activeConversation
+    if (!sourceConversation) {
       return
+    }
+
+    if (previousConversationId && previousConversationId !== conversationKey) {
+      setConversationDetailsById((current) => {
+        const previousConversation = current[previousConversationId] ?? sourceConversation
+        const next = {
+          ...current,
+          [conversationKey]: {
+            ...previousConversation,
+            id: conversationKey,
+            subtitle: "实时会话",
+            updatedAt: message.createdAt,
+            messages: mergeMessages(previousConversation.messages, [message]),
+          },
+        }
+
+        if (previousConversationId in next) {
+          delete next[previousConversationId]
+        }
+
+        return next
+      })
+      updateConversationUrl(conversationKey, { replace: true })
     }
 
     promoteConversation(conversationKey)
     setLiveConversationPatches((current) => ({
       ...current,
-        [conversationKey]: {
-          ...current[conversationKey],
-          title: activeConversation.title,
-          subtitle: "实时会话",
-          preview: summarizeMessagePreview(message.body),
-          updatedAt: message.createdAt,
-          unreadCount: 0,
-          participants: activeConversation.participants,
+      [conversationKey]: {
+        ...current[conversationKey],
+        title: sourceConversation.title,
+        subtitle: "实时会话",
+        preview: summarizeMessagePreview(message.body),
+        updatedAt: message.createdAt,
+        unreadCount: 0,
+        participants: sourceConversation.participants,
       },
     }))
 
@@ -245,11 +464,20 @@ export function MessagesClient({
     const nextConversationId = nextConversations[0]?.id
 
     setDeletedConversationIds((current) => current.includes(conversationIdToDelete) ? current : [...current, conversationIdToDelete])
+    setConversationDetailsById((current) => {
+      if (!current[conversationIdToDelete]) {
+        return current
+      }
+
+      const next = { ...current }
+      delete next[conversationIdToDelete]
+      return next
+    })
 
     setDeletingConversationId("")
 
     if (activeConversationId === conversationIdToDelete) {
-      router.push(nextConversationId ? `/messages?conversation=${nextConversationId}` : "/messages", { scroll: false })
+      updateConversationUrl(nextConversationId, { replace: true })
       return
     }
   }
@@ -290,12 +518,21 @@ export function MessagesClient({
 
       if (payload.type === "conversation.deleted") {
         setDeletedConversationIds((current) => current.includes(payload.conversationId) ? current : [...current, payload.conversationId])
+        setConversationDetailsById((current) => {
+          if (!current[payload.conversationId]) {
+            return current
+          }
+
+          const next = { ...current }
+          delete next[payload.conversationId]
+          return next
+        })
 
         if (activeConversationIdRef.current === payload.conversationId) {
           const latestData = dataRef.current
           const nextConversations = latestData?.conversations.filter((conversation) => conversation.id !== payload.conversationId) ?? []
           const nextConversationId = nextConversations[0]?.id
-          router.push(nextConversationId ? `/messages?conversation=${nextConversationId}` : "/messages", { scroll: false })
+          updateConversationUrl(nextConversationId, { replace: true })
         }
 
         return
@@ -365,9 +602,9 @@ export function MessagesClient({
         void markConversationRead(conversationIdFromEvent)
       }
     })
-  }, [currentUserId, markConversationRead, promoteConversation, router, shouldUseLiveInboxEvents, subscribe])
+  }, [currentUserId, markConversationRead, promoteConversation, shouldUseLiveInboxEvents, subscribe, updateConversationUrl])
 
-  const isMobileThreadVisible = Boolean(data?.activeConversation)
+  const isMobileThreadVisible = Boolean(requestedConversationId)
 
   const headerContent = !currentUser || !data ? null : (
     <>
@@ -376,7 +613,7 @@ export function MessagesClient({
         surface="messages.header"
         surfaceProps={{
           activeConversationId,
-          conversationId,
+          conversationId: requestedConversationId,
           currentUser,
           data,
           isMobileThreadVisible,
@@ -401,7 +638,7 @@ export function MessagesClient({
       surface="messages.sidebar"
       surfaceProps={{
         activeConversationId,
-        conversationId,
+        conversationId: requestedConversationId,
         currentUser,
         data,
         deletingConversationId,
@@ -413,8 +650,10 @@ export function MessagesClient({
           {sidebarBefore}
           <MessageConversationSidebar
             conversations={data.conversations}
-            activeConversationId={data.activeConversation?.id}
+            activeConversationId={activeConversationId}
             deletingConversationId={deletingConversationId}
+            onSelectConversation={handleSelectConversation}
+            onPrefetchConversation={prefetchConversation}
             onDeleteConversation={handleDeleteConversation}
             mobileHidden={isMobileThreadVisible}
           />
@@ -429,7 +668,7 @@ export function MessagesClient({
       surface="messages.thread"
       surfaceProps={{
         activeConversationId,
-        conversationId,
+        conversationId: requestedConversationId,
         currentUser,
         data,
         handleLoadHistory,
@@ -446,11 +685,13 @@ export function MessagesClient({
             usingDemoData={data.usingDemoData}
             messageImageUploadEnabled={messageImageUploadEnabled}
             messageFileUploadEnabled={messageFileUploadEnabled}
+            loadingConversation={loadingConversation}
+            conversationError={activeConversationError}
             onMessageSent={handleLocalMessageSent}
             onLoadHistory={handleLoadHistory}
             loadingHistory={loadingHistory}
             historyError={historyError}
-            onBack={data.activeConversation ? () => router.push("/messages", { scroll: false }) : undefined}
+            onBack={requestedConversationId ? () => updateConversationUrl(undefined) : undefined}
           />
           {threadAfter}
         </>
@@ -492,7 +733,7 @@ export function MessagesClient({
         surface="messages.page"
         surfaceProps={{
           activeConversationId,
-          conversationId,
+          conversationId: requestedConversationId,
           currentUser,
           data,
           deletingConversationId,
@@ -510,7 +751,7 @@ export function MessagesClient({
   )
 }
 
-function buildMessageCenterView(initialData: MessageCenterData | null, patches: {
+function buildMessageCenterView(initialData: MessageCenterData | null, activeConversation: MessageConversationDetail | null, patches: {
   deletedConversationIds: string[]
   historyHasMoreByConversation: Record<string, boolean>
   historyMessagesByConversation: Record<string, MessageBubbleItem[]>
@@ -524,8 +765,7 @@ function buildMessageCenterView(initialData: MessageCenterData | null, patches: 
   }
 
   const deletedConversationIdSet = new Set(patches.deletedConversationIds)
-  const initialActiveConversation = initialData.activeConversation
-  const activeConversationId = initialActiveConversation?.id
+  const activeConversationId = activeConversation?.id
   const conversationsById = new Map<string, MessageConversationListItem>()
 
   for (const conversation of initialData.conversations) {
@@ -599,7 +839,7 @@ function buildMessageCenterView(initialData: MessageCenterData | null, patches: 
     patches.promotedConversationIds,
   )
 
-  if (!initialActiveConversation || deletedConversationIdSet.has(initialActiveConversation.id)) {
+  if (!activeConversation || deletedConversationIdSet.has(activeConversation.id)) {
     return {
       ...initialData,
       conversations,
@@ -607,22 +847,22 @@ function buildMessageCenterView(initialData: MessageCenterData | null, patches: 
     }
   }
 
-  const resolvedActiveConversationId = initialActiveConversation.id
+  const resolvedActiveConversationId = activeConversation.id
   const historyMessages = patches.historyMessagesByConversation[resolvedActiveConversationId] ?? []
   const incomingMessages = patches.incomingMessagesByConversation[resolvedActiveConversationId] ?? []
   const optimisticMessages = patches.optimisticMessagesByConversation[resolvedActiveConversationId] ?? []
   const livePatch = patches.liveConversationPatches[resolvedActiveConversationId]
-  const messages = mergeMessages(historyMessages, initialActiveConversation.messages, incomingMessages, optimisticMessages)
+  const messages = mergeMessages(historyMessages, activeConversation.messages, incomingMessages, optimisticMessages)
 
   return {
     ...initialData,
     conversations,
     activeConversation: {
-      ...initialActiveConversation,
-      subtitle: livePatch?.subtitle ?? (messages.length > 0 ? "实时会话" : initialActiveConversation.subtitle),
-      updatedAt: livePatch?.updatedAt ?? messages.at(-1)?.createdAt ?? initialActiveConversation.updatedAt,
+      ...activeConversation,
+      subtitle: livePatch?.subtitle ?? (messages.length > 0 ? "实时会话" : activeConversation.subtitle),
+      updatedAt: livePatch?.updatedAt ?? messages.at(-1)?.createdAt ?? activeConversation.updatedAt,
       messages,
-      hasMoreHistory: patches.historyHasMoreByConversation[resolvedActiveConversationId] ?? initialActiveConversation.hasMoreHistory,
+      hasMoreHistory: patches.historyHasMoreByConversation[resolvedActiveConversationId] ?? activeConversation.hasMoreHistory,
     },
   }
 }

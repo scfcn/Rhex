@@ -1020,6 +1020,52 @@ export interface AddonPointsApi {
   adjust: (input: AddonPointAdjustInput) => Promise<AddonPointAdjustResult>
 }
 
+export interface AddonBadgeSummary {
+  id: string
+  code: string
+  name: string
+  description: string | null
+  iconPath: string | null
+  iconText: string | null
+  color: string
+  imageUrl: string | null
+  category: string | null
+  pointsCost: number
+  status: boolean
+  isHidden: boolean
+  grantedUserCount: number
+}
+
+export interface AddonBadgeListOptions {
+  includeHidden?: boolean
+  includeDisabled?: boolean
+}
+
+export interface AddonBadgeLookupInput {
+  userId?: number
+  username?: string
+}
+
+export interface AddonBadgeGrantInput extends AddonBadgeLookupInput {
+  badgeId: string
+  grantReason?: string
+  allowDuplicate?: boolean
+}
+
+export interface AddonBadgeGrantResult {
+  badgeId: string
+  userId: number
+  granted: boolean
+  alreadyGranted: boolean
+  badge: AddonBadgeSummary
+}
+
+export interface AddonBadgesApi {
+  list: (options?: AddonBadgeListOptions) => Promise<AddonBadgeSummary[]>
+  getGrantedIds: (input: AddonBadgeLookupInput) => Promise<string[]>
+  grant: (input: AddonBadgeGrantInput) => Promise<AddonBadgeGrantResult>
+}
+
 export interface AddonBoardSelectItem {
   value: string
   label: string
@@ -1030,7 +1076,7 @@ export interface AddonBoardSelectGroup {
   items: AddonBoardSelectItem[]
 }
 
-export interface AddonLifecycleDatabaseApi {
+export interface AddonDatabaseApi {
   prisma: PrismaClient
   queryRaw: <TRow = Record<string, unknown>>(
     sql: string,
@@ -1038,9 +1084,11 @@ export interface AddonLifecycleDatabaseApi {
   ) => Promise<TRow[]>
   executeRaw: (sql: string, values?: unknown[]) => Promise<number>
   transaction: <TResult>(
-    task: (database: AddonLifecycleDatabaseApi) => Promise<TResult>,
+    task: (database: AddonDatabaseApi) => Promise<TResult>,
   ) => Promise<TResult>
 }
+
+export type AddonLifecycleDatabaseApi = AddonDatabaseApi
 
 export interface AddonExecutionContextBase extends AddonRuntimeDescriptor {
   request?: Request
@@ -1063,6 +1111,7 @@ export interface AddonExecutionContextBase extends AddonRuntimeDescriptor {
   writeConfig: <T = unknown>(configKey: string, value: T) => Promise<void>
   readSecret: <T = unknown>(secretKey: string, fallback?: T) => Promise<T>
   writeSecret: <T = unknown>(secretKey: string, value: T) => Promise<void>
+  database: AddonDatabaseApi
   data: AddonDataStoreApi
   backgroundJobs: AddonBackgroundJobApi
   scheduler: AddonSchedulerApi
@@ -1072,6 +1121,7 @@ export interface AddonExecutionContextBase extends AddonRuntimeDescriptor {
   notifications: AddonNotificationsApi
   follows: AddonFollowsApi
   points: AddonPointsApi
+  badges: AddonBadgesApi
 }
 
 export type AddonLifecycleAction = "install" | "upgrade" | "uninstall"
@@ -1404,11 +1454,19 @@ export function pickPreferredAddonSurfaceOverride(
   return items.find((item) => item.surface === surface) ?? null
 }
 
+export interface AddonPageChromeOptions {
+  header?: boolean
+  footer?: boolean
+  leftSidebar?: boolean
+  rightSidebar?: boolean
+}
+
 export interface AddonPageRegistration {
   key: string
   path?: string
   title?: string
   description?: string
+  chrome?: AddonPageChromeOptions
   render: (context: AddonPageRenderContext) => AddonMaybePromise<AddonPageRenderResult | null | undefined>
 }
 

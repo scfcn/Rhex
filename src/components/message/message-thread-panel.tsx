@@ -3,7 +3,6 @@
 import Link from "next/link"
 import type { ChangeEvent, ClipboardEvent, KeyboardEvent } from "react"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
-import { useRouter } from "next/navigation"
 import { ChevronLeft, ChevronUp, ImageIcon, MessageSquareMore, Paperclip, Send, SmilePlus } from "lucide-react"
 
 import { EmojiPicker } from "@/components/emoji-picker"
@@ -14,25 +13,92 @@ import { UserAvatar } from "@/components/user/user-avatar"
 import { cn } from "@/lib/utils"
 import type { MessageBubbleItem, MessageConversationDetail, MessageSendResult } from "@/lib/message-types"
 
+export interface LocalMessageSentPayload {
+  conversationId: string
+  message: MessageBubbleItem
+  previousConversationId?: string
+}
+
 interface MessageThreadPanelProps {
   conversation: MessageConversationDetail | null
   currentUserId: number
   usingDemoData: boolean
   messageImageUploadEnabled: boolean
   messageFileUploadEnabled: boolean
-  onMessageSent: (message: MessageBubbleItem) => void
+  loadingConversation?: boolean
+  conversationError?: string
+  onMessageSent: (payload: LocalMessageSentPayload) => void
   onLoadHistory: () => void
   loadingHistory: boolean
   historyError: string
   onBack?: () => void
 }
 
-export function MessageThreadPanel({ conversation, currentUserId, usingDemoData, messageImageUploadEnabled, messageFileUploadEnabled, onMessageSent, onLoadHistory, loadingHistory, historyError, onBack }: MessageThreadPanelProps) {
+export function MessageThreadPanel({
+  conversation,
+  currentUserId,
+  usingDemoData,
+  messageImageUploadEnabled,
+  messageFileUploadEnabled,
+  loadingConversation = false,
+  conversationError = "",
+  onMessageSent,
+  onLoadHistory,
+  loadingHistory,
+  historyError,
+  onBack,
+}: MessageThreadPanelProps) {
   const recipient = useMemo(() => resolveRecipient(conversation, currentUserId), [conversation, currentUserId])
 
   const recipientProfileHref = recipient ? `/users/${recipient.username}` : null
 
   if (!conversation || !recipient) {
+    if (loadingConversation) {
+      return (
+        <div className="flex min-h-[calc(100vh-164px)] items-center justify-center rounded-[28px] border border-border bg-card px-6 text-center shadow-soft max-sm:min-h-[calc(100dvh-56px)] max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0 max-sm:shadow-none">
+          <div>
+            {onBack ? (
+              <button
+                type="button"
+                onClick={onBack}
+                className="mx-auto mb-6 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border text-muted-foreground transition hover:bg-accent hover:text-foreground xl:hidden"
+                aria-label="返回会话列表"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+            ) : null}
+            <MessageSquareMore className="mx-auto h-10 w-10 animate-pulse text-muted-foreground" />
+            <p className="mt-4 text-sm uppercase tracking-[0.28em] text-muted-foreground">Chat Thread</p>
+            <h2 className="mt-3 text-2xl font-semibold">正在加载会话</h2>
+            <p className="mt-3 text-sm leading-7 text-muted-foreground">会话内容正在加载，请稍候。</p>
+          </div>
+        </div>
+      )
+    }
+
+    if (conversationError) {
+      return (
+        <div className="flex min-h-[calc(100vh-164px)] items-center justify-center rounded-[28px] border border-dashed border-rose-200/80 bg-card px-6 text-center shadow-soft max-sm:min-h-[calc(100dvh-56px)] max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0 max-sm:shadow-none dark:border-rose-400/20">
+          <div>
+            {onBack ? (
+              <button
+                type="button"
+                onClick={onBack}
+                className="mx-auto mb-6 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border text-muted-foreground transition hover:bg-accent hover:text-foreground xl:hidden"
+                aria-label="返回会话列表"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+            ) : null}
+            <MessageSquareMore className="mx-auto h-10 w-10 text-rose-500 dark:text-rose-300" />
+            <p className="mt-4 text-sm uppercase tracking-[0.28em] text-muted-foreground">Chat Thread</p>
+            <h2 className="mt-3 text-2xl font-semibold">会话不可用</h2>
+            <p className="mt-3 text-sm leading-7 text-muted-foreground">{conversationError}</p>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div className="flex min-h-[calc(100vh-164px)] items-center justify-center rounded-[28px] border border-dashed border-border bg-card px-6 text-center shadow-soft max-sm:min-h-[calc(100dvh-56px)] max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0 max-sm:shadow-none">
         <div>
@@ -85,13 +151,12 @@ function MessageThreadPanelContent({
   usingDemoData: boolean
   messageImageUploadEnabled: boolean
   messageFileUploadEnabled: boolean
-  onMessageSent: (message: MessageBubbleItem) => void
+  onMessageSent: (payload: LocalMessageSentPayload) => void
   onLoadHistory: () => void
   loadingHistory: boolean
   historyError: string
   onBack?: () => void
 }) {
-  const router = useRouter()
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const threadRef = useRef<HTMLDivElement | null>(null)
   const imageInputRef = useRef<HTMLInputElement | null>(null)
@@ -188,20 +253,22 @@ function MessageThreadPanelContent({
     const result = payload?.data as MessageSendResult | undefined
 
     if (result) {
-      onMessageSent({
-        id: result.id,
-        body: result.content,
-        createdAt: result.createdAt,
-        occurredAt: result.occurredAt,
-        senderId: currentUserId,
-        senderName: "我",
-        senderAvatarPath: null,
-        isMine: true,
-      })
+      const nextConversationId = result.conversationId || conversation.id
 
-      if (result.conversationId !== conversation.id) {
-        router.replace(`/messages?conversation=${result.conversationId}`, { scroll: false })
-      }
+      onMessageSent({
+        conversationId: nextConversationId,
+        previousConversationId: nextConversationId !== conversation.id ? conversation.id : undefined,
+        message: {
+          id: result.id,
+          body: result.content,
+          createdAt: result.createdAt,
+          occurredAt: result.occurredAt,
+          senderId: currentUserId,
+          senderName: "我",
+          senderAvatarPath: null,
+          isMine: true,
+        },
+      })
     }
 
     if (options?.clearDraft) {

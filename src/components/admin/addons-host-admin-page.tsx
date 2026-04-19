@@ -139,13 +139,25 @@ function PreviewMeta({ label, value }: { label: string; value: string }) {
   )
 }
 
+function getInstallActionLabel(action: AddonInstallPreviewData["installAction"]) {
+  switch (action) {
+    case "upgrade":
+      return "升级"
+    case "overwrite":
+      return "覆盖安装"
+    case "install":
+    default:
+      return "安装"
+  }
+}
+
 export function AddonsHostAdminPage({ initialData }: AddonsHostAdminPageProps) {
   const [data, setData] = useState(initialData)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [replaceExisting, setReplaceExisting] = useState(false)
   const [enableAfterInstall, setEnableAfterInstall] = useState(true)
   const [installPreview, setInstallPreview] = useState<AddonInstallPreviewData | null>(null)
   const [installPreviewOpen, setInstallPreviewOpen] = useState(false)
+  const [replaceConfirmOpen, setReplaceConfirmOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [pendingOverviewAction, setPendingOverviewAction] = useState<"sync" | "clear-cache" | null>(null)
   const [pendingInstallPhase, setPendingInstallPhase] = useState<"inspect" | "install" | null>(null)
@@ -179,10 +191,10 @@ export function AddonsHostAdminPage({ initialData }: AddonsHostAdminPageProps) {
 
   function resetInstallSelection() {
     setSelectedFile(null)
-    setReplaceExisting(false)
     setEnableAfterInstall(true)
     setInstallPreview(null)
     setInstallPreviewOpen(false)
+    setReplaceConfirmOpen(false)
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
@@ -200,7 +212,6 @@ export function AddonsHostAdminPage({ initialData }: AddonsHostAdminPageProps) {
           const formData = new FormData()
           formData.set("file", selectedFile)
           formData.set("intent", "inspect")
-          formData.set("replaceExisting", String(replaceExisting))
           formData.set("enableAfterInstall", String(enableAfterInstall))
           setPendingInstallPhase("inspect")
 
@@ -230,7 +241,7 @@ export function AddonsHostAdminPage({ initialData }: AddonsHostAdminPageProps) {
     })
   }
 
-  function installAddon() {
+  function installAddon(replaceExisting = false) {
     if (!selectedFile) {
       toast.warning("请先选择一个 zip 插件包", "缺少文件")
       return
@@ -262,7 +273,11 @@ export function AddonsHostAdminPage({ initialData }: AddonsHostAdminPageProps) {
 
           setData(result.data)
           resetInstallSelection()
-          const successTitle = result.message?.includes("升级") ? "升级成功" : "安装成功"
+          const successTitle = result.message?.includes("覆盖安装")
+            ? "覆盖成功"
+            : result.message?.includes("升级")
+              ? "升级成功"
+              : "安装成功"
           toast.success(result.message ?? "插件已安装", successTitle)
         } catch (error) {
           toast.error(error instanceof Error ? error.message : "插件安装失败", "安装失败")
@@ -293,22 +308,15 @@ export function AddonsHostAdminPage({ initialData }: AddonsHostAdminPageProps) {
                     setSelectedFile(event.target.files?.[0] ?? null)
                     setInstallPreview(null)
                     setInstallPreviewOpen(false)
+                    setReplaceConfirmOpen(false)
                   }}
                 />
                 <p className="text-xs text-muted-foreground">
-                  支持 zip 根目录直接包含 `addon.json`，也支持单层插件目录包裹。
+                  支持 zip 根目录直接包含 `addon.json`，也支持单层插件目录包裹。若检测到相同插件 ID，会在安装前要求再次确认升级或覆盖安装。
                 </p>
               </div>
 
               <div className="space-y-4 rounded-2xl border border-border bg-muted/30 p-4">
-                <label className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-medium">覆盖安装 / 升级</p>
-                    <p className="text-xs text-muted-foreground">如果插件目录已存在，会先在 staging 校验并执行升级 hook，成功后再把旧目录移动到 `.trash`。</p>
-                  </div>
-                  <Switch checked={replaceExisting} onCheckedChange={setReplaceExisting} />
-                </label>
-
                 <label className="flex items-center justify-between gap-4">
                   <div>
                     <p className="text-sm font-medium">安装后立即启用</p>
@@ -442,9 +450,9 @@ export function AddonsHostAdminPage({ initialData }: AddonsHostAdminPageProps) {
           setInstallPreviewOpen(false)
         }}
         closeDisabled={pendingInstallPhase === "install"}
-        title="安装权限确认"
+        title="安装确认"
         description={installPreview
-          ? `即将${installPreview.installAction === "upgrade" ? "升级" : "安装"}插件“${installPreview.name}”。请先确认它声明的权限。`
+          ? `即将${getInstallActionLabel(installPreview.installAction)}插件“${installPreview.name}”。请先确认它声明的权限。`
           : "请确认插件权限后再继续安装。"}
         footer={(
           <>
@@ -456,10 +464,26 @@ export function AddonsHostAdminPage({ initialData }: AddonsHostAdminPageProps) {
               取消
             </Button>
             <Button
-              onClick={installAddon}
+              onClick={() => {
+                if (!installPreview) {
+                  return
+                }
+
+                if (installPreview.requiresReplaceConfirmation) {
+                  setInstallPreviewOpen(false)
+                  setReplaceConfirmOpen(true)
+                  return
+                }
+
+                installAddon(false)
+              }}
               disabled={!installPreview || pendingInstallPhase === "install"}
             >
-              {pendingInstallPhase === "install" ? "安装中..." : "确认并继续"}
+              {pendingInstallPhase === "install"
+                ? "安装中..."
+                : installPreview?.requiresReplaceConfirmation
+                  ? "下一步"
+                  : `确认并${getInstallActionLabel(installPreview?.installAction ?? "install")}`}
             </Button>
           </>
         )}
@@ -469,12 +493,21 @@ export function AddonsHostAdminPage({ initialData }: AddonsHostAdminPageProps) {
             <div className="grid gap-3 sm:grid-cols-2">
               <PreviewMeta label="插件标识" value={installPreview.addonId} />
               <PreviewMeta label="版本" value={installPreview.version} />
-              <PreviewMeta label="动作" value={installPreview.installAction === "upgrade" ? "升级" : "安装"} />
+              <PreviewMeta label="动作" value={getInstallActionLabel(installPreview.installAction)} />
               <PreviewMeta label="安装后状态" value={installPreview.enableAfterInstall ? "立即启用" : "仅安装"} />
               {installPreview.existingVersion ? (
                 <PreviewMeta label="当前已装版本" value={installPreview.existingVersion} />
               ) : null}
             </div>
+
+            {installPreview.requiresReplaceConfirmation ? (
+              <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+                检测到已存在相同插件 ID。
+                {installPreview.installAction === "upgrade"
+                  ? " 新版本号更高，下一步会要求你再次确认升级。"
+                  : " 当前上传版本没有高于已安装版本，下一步会要求你再次确认覆盖安装。"}
+              </div>
+            ) : null}
 
             {installPreview.description ? (
               <div className="rounded-2xl border border-border bg-muted/30 px-4 py-3">
@@ -518,6 +551,57 @@ export function AddonsHostAdminPage({ initialData }: AddonsHostAdminPageProps) {
                   该插件未在 `addon.json` 中声明任何权限。
                 </div>
               )}
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={replaceConfirmOpen}
+        onClose={() => {
+          setReplaceConfirmOpen(false)
+        }}
+        closeDisabled={pendingInstallPhase === "install"}
+        title={installPreview ? `${getInstallActionLabel(installPreview.installAction)}确认` : "二次确认"}
+        description={installPreview
+          ? `检测到已安装同 ID 插件“${installPreview.addonId}”，请再次确认是否继续${getInstallActionLabel(installPreview.installAction)}。`
+          : "请确认是否继续当前操作。"}
+        footer={(
+          <>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setReplaceConfirmOpen(false)
+                setInstallPreviewOpen(true)
+              }}
+              disabled={pendingInstallPhase === "install"}
+            >
+              返回
+            </Button>
+            <Button
+              onClick={() => installAddon(true)}
+              disabled={!installPreview || pendingInstallPhase === "install"}
+            >
+              {pendingInstallPhase === "install"
+                ? "安装中..."
+                : `确认并${getInstallActionLabel(installPreview?.installAction ?? "overwrite")}`}
+            </Button>
+          </>
+        )}
+      >
+        {installPreview ? (
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <PreviewMeta label="插件标识" value={installPreview.addonId} />
+              <PreviewMeta label="当前已装版本" value={installPreview.existingVersion ?? "未知"} />
+              <PreviewMeta label="上传版本" value={installPreview.version} />
+              <PreviewMeta label="即将执行" value={getInstallActionLabel(installPreview.installAction)} />
+            </div>
+
+            <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm leading-6 text-foreground">
+              {installPreview.installAction === "upgrade"
+                ? "确认后会执行升级流程：先校验并运行升级生命周期，再替换旧插件目录。"
+                : "确认后会覆盖当前已安装插件目录。原目录会被移动到 `.trash`，但这次操作不会按版本升级处理。"}
             </div>
           </div>
         ) : null}

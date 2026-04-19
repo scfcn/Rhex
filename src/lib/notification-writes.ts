@@ -226,6 +226,7 @@ async function publishNotificationCountEvents(userIds: number[], reason: "create
 
 export async function createNotification(params: NotificationDraft & { client?: NotificationWriteClient }) {
   const { client: _client, ...draft } = params
+  void _client
   await fireNotificationCreateBefore(draft)
   const notification = await createNotificationEntry(params)
   revalidateUserSurfaceCache(notification.userId)
@@ -422,6 +423,8 @@ async function fireNotificationCreateAfter(
   _draft: NotificationDraft,
   _record: { id: string; createdAt: Date } | null,
 ) {
+  void _draft
+  void _record
   try {
     await executeAddonActionHook("notification.create.after", {})
   } catch (error) {

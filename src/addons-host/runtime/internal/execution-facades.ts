@@ -30,6 +30,11 @@ import {
   createAddonNotification,
   createAddonNotifications,
 } from "@/addons-host/runtime/notifications"
+import {
+  getAddonGrantedBadgeIds,
+  grantAddonBadge,
+  listAddonBadges,
+} from "@/addons-host/runtime/badges"
 import { adjustAddonPoints } from "@/addons-host/runtime/points"
 import {
   createAddonPost,
@@ -44,7 +49,7 @@ import type {
 
 export type AddonDomainFacades = Pick<
   AddonExecutionContextBase,
-  "posts" | "comments" | "messages" | "notifications" | "follows" | "points" | "data"
+  "posts" | "comments" | "messages" | "notifications" | "follows" | "points" | "badges" | "data"
 >
 
 interface DomainFacadeBuildInput {
@@ -118,6 +123,20 @@ export function buildAddonDomainFacades(
       adjust: async (pointInput) => {
         assertRuntimePermission("points:adjust", `addon "${addonId}" is not allowed to adjust points`)
         return adjustAddonPoints(pointInput)
+      },
+    },
+    badges: {
+      list: async (options) => {
+        assertRuntimePermission("badge:query", `addon "${addonId}" is not allowed to query badges`)
+        return listAddonBadges(options)
+      },
+      getGrantedIds: async (badgeLookupInput) => {
+        assertRuntimePermission("badge:query", `addon "${addonId}" is not allowed to query badge grants`)
+        return getAddonGrantedBadgeIds(badgeLookupInput)
+      },
+      grant: async (badgeGrantInput) => {
+        assertRuntimePermission("badge:grant", `addon "${addonId}" is not allowed to grant badges`)
+        return grantAddonBadge(badgeGrantInput)
       },
     },
     data: {

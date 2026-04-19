@@ -91,7 +91,9 @@ export function mapForumFeedItemsToDisplayItems(
       authorNameClassName: getVipNameClass(authorIsVip, item.authorVipLevel, { emphasize: true }),
       metaPrimary: currentSort === "new" ? item.publishedAt : item.lastRepliedAt,
       metaPrimaryRaw: currentSort === "new" ? item.publishedAtRaw : item.lastRepliedAtRaw,
-      metaSecondary: (currentSort === "latest" || currentSort === "following") && item.latestReplyAuthorName ? `最新回复 ${item.latestReplyAuthorName}` : null,
+      metaSecondary: (currentSort === "latest" || currentSort === "new" || currentSort === "hot" || currentSort === "following") && item.latestReplyAuthorName
+        ? `最新回复 ${item.latestReplyAuthorName}`
+        : null,
       commentCount: item.commentCount,
       commentAccentColor: commentHeat.color,
       coverImage: item.coverImage,

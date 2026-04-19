@@ -25,7 +25,10 @@ import {
 import { runWithAddonExecutionScope } from "@/addons-host/runtime/execution-scope"
 import { normalizeAddonManifest } from "@/addons-host/runtime/manifest"
 import { readAddonStateMap } from "@/addons-host/runtime/state"
-import { createAddonLifecycleLog } from "@/db/addon-registry-queries"
+import {
+  ADDON_RUNTIME_LOG_DEDUPE_WINDOW_MS,
+  createAddonLifecycleLog,
+} from "@/db/addon-registry-queries"
 import type { AddonManifest, LoadedAddonRuntime } from "@/addons-host/types"
 
 // ---- 门面 re-export：保持对外 API 稳定 ----------------------------------
@@ -163,7 +166,7 @@ export async function loadAddonsRuntimeFresh(): Promise<LoadedAddonRuntime[]> {
 
     try {
       const { api, snapshot } = createAddonBuildApi(manifest, warnings)
-      const definition = await importAddonDefinition(serverEntryPath)
+      const definition = await importAddonDefinition(rootDir, serverEntryPath)
       await runWithAddonExecutionScope(runtime, {
         action: "setup",
       }, async () => {
@@ -194,6 +197,7 @@ export async function loadAddonsRuntimeFresh(): Promise<LoadedAddonRuntime[]> {
         action: "LOAD",
         status: "FAILED",
         message: runtime.loadError,
+        dedupeWindowMs: ADDON_RUNTIME_LOG_DEDUPE_WINDOW_MS,
         metadataJson: {
           entryServerPath: runtime.entryServerPath,
         },

@@ -2,7 +2,11 @@ import "server-only"
 
 import { buildAddonExecutionContext } from "@/addons-host/runtime/internal/execution-context"
 import { runWithAddonExecutionScope } from "@/addons-host/runtime/execution-scope"
-import { createAddonLifecycleLog, upsertAddonRegistryRecord } from "@/db/addon-registry-queries"
+import {
+  ADDON_RUNTIME_LOG_DEDUPE_WINDOW_MS,
+  createAddonLifecycleLog,
+  upsertAddonRegistryRecord,
+} from "@/db/addon-registry-queries"
 import type { LoadedAddonRuntime } from "@/addons-host/types"
 
 /**
@@ -78,6 +82,7 @@ export async function logRenderFailure(input: {
         input.error instanceof Error
           ? input.error.message
           : `addon ${fallbackLabel} "${input.target}" failed`,
+      dedupeWindowMs: ADDON_RUNTIME_LOG_DEDUPE_WINDOW_MS,
       metadataJson: input.metadataJson,
     })
   } catch (logError) {

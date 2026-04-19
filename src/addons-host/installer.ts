@@ -50,6 +50,8 @@ interface InstallAddonFromZipInput {
   enableAfterInstall?: boolean
 }
 
+type AddonInstallAction = "install" | "upgrade" | "overwrite"
+
 function normalizeZipEntryName(entryName: string) {
   return entryName
     .replaceAll("\\", "/")
@@ -128,15 +130,78 @@ function classifyInstallPermissionRisk(permission: string) {
     "notification:create",
     "follow:user",
     "points:adjust",
+    "badge:grant",
     "post:tip",
   ].includes(permission)
     ? "sensitive"
     : "normal"
 }
 
+function isNumericVersionToken(value: string) {
+  return /^\d+$/.test(value)
+}
+
+function tokenizeVersion(version: string) {
+  return version
+    .trim()
+    .split(/[^0-9A-Za-z]+/)
+    .filter(Boolean)
+}
+
+function compareAddonVersions(nextVersion: string, currentVersion: string) {
+  const nextTokens = tokenizeVersion(nextVersion)
+  const currentTokens = tokenizeVersion(currentVersion)
+  const maxLength = Math.max(nextTokens.length, currentTokens.length)
+
+  for (let index = 0; index < maxLength; index += 1) {
+    const nextToken = nextTokens[index] ?? ""
+    const currentToken = currentTokens[index] ?? ""
+
+    if (nextToken === currentToken) {
+      continue
+    }
+
+    if (isNumericVersionToken(nextToken) && isNumericVersionToken(currentToken)) {
+      const nextNumber = Number(nextToken)
+      const currentNumber = Number(currentToken)
+      if (nextNumber === currentNumber) {
+        continue
+      }
+      return nextNumber > currentNumber ? 1 : -1
+    }
+
+    const compared = nextToken.localeCompare(currentToken, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    })
+    if (compared !== 0) {
+      return compared > 0 ? 1 : -1
+    }
+  }
+
+  return 0
+}
+
+function resolveAddonInstallAction(input: {
+  targetExists: boolean
+  nextVersion: string
+  existingVersion?: string | null
+}): AddonInstallAction {
+  if (!input.targetExists) {
+    return "install"
+  }
+
+  if (!input.existingVersion) {
+    return "overwrite"
+  }
+
+  return compareAddonVersions(input.nextVersion, input.existingVersion) > 0
+    ? "upgrade"
+    : "overwrite"
+}
+
 export async function inspectAddonZip(input: {
   zipBuffer: Buffer
-  replaceExisting?: boolean
   enableAfterInstall?: boolean
 }): Promise<AddonInstallPreviewData> {
   if (!input.zipBuffer || input.zipBuffer.byteLength === 0) {
@@ -171,13 +236,14 @@ export async function inspectAddonZip(input: {
 
     const targetDirectory = getAddonDirectory(manifest.id)
     const targetExists = await fileExists(targetDirectory)
-    if (targetExists && !input.replaceExisting) {
-      throw new Error(`插件目录已存在：${manifest.id}，如需升级请开启“覆盖安装 / 升级”`)
-    }
-
     const existingVersion = targetExists
       ? (await readAddonManifestFromDirectory(targetDirectory)).version
       : null
+    const installAction = resolveAddonInstallAction({
+      targetExists,
+      nextVersion: manifest.version,
+      existingVersion,
+    })
 
     return {
       addonId: manifest.id,
@@ -188,9 +254,10 @@ export async function inspectAddonZip(input: {
         key: permission,
         risk: classifyInstallPermissionRisk(permission),
       })),
-      installAction: targetExists ? "upgrade" : "install",
+      installAction,
       existingVersion,
-      replaceExisting: Boolean(input.replaceExisting),
+      hasExisting: targetExists,
+      requiresReplaceConfirmation: targetExists,
       enableAfterInstall: input.enableAfterInstall !== false,
     }
   } finally {
@@ -225,8 +292,20 @@ export async function installAddonFromZip(input: InstallAddonFromZipInput) {
 
     const targetDirectory = getAddonDirectory(manifest.id)
     const targetExists = await fileExists(targetDirectory)
+    const existingVersion = targetExists
+      ? (await readAddonManifestFromDirectory(targetDirectory)).version
+      : null
+    const installAction = resolveAddonInstallAction({
+      targetExists,
+      nextVersion: manifest.version,
+      existingVersion,
+    })
     if (targetExists && !input.replaceExisting) {
-      throw new Error(`插件目录已存在：${manifest.id}`)
+      throw new Error(
+        installAction === "upgrade"
+          ? `检测到同 ID 插件 ${manifest.id}，请先确认是否升级`
+          : `检测到同 ID 插件 ${manifest.id}，请先确认是否覆盖安装`,
+      )
     }
 
     const existingAddon = targetExists
@@ -332,15 +411,18 @@ export async function installAddonFromZip(input: InstallAddonFromZipInput) {
         addonId: installedAddon.manifest.id,
         action: targetExists && input.replaceExisting ? "UPGRADE" : "INSTALL",
         status: "SUCCEEDED",
-        message: targetExists && input.replaceExisting
+        message: installAction === "upgrade"
           ? `已升级插件 ${installedAddon.manifest.name}`
-          : `已安装插件 ${installedAddon.manifest.name}`,
+          : installAction === "overwrite"
+            ? `已覆盖安装插件 ${installedAddon.manifest.name}`
+            : `已安装插件 ${installedAddon.manifest.name}`,
         metadataJson: {
           originalName: input.originalName ?? null,
           replaceExisting: Boolean(input.replaceExisting),
           enableAfterInstall,
           previousVersion,
           nextVersion: installedAddon.manifest.version,
+          installAction,
         },
       })
 
@@ -356,7 +438,11 @@ export async function installAddonFromZip(input: InstallAddonFromZipInput) {
       version: manifest.version,
       replacedExisting: Boolean(targetExists && input.replaceExisting),
       enabled: enableAfterInstall,
-      action: targetExists && input.replaceExisting ? "upgraded" as const : "installed" as const,
+      action: installAction === "upgrade"
+        ? "upgraded" as const
+        : installAction === "overwrite"
+          ? "overwritten" as const
+          : "installed" as const,
     }
   } catch (error) {
     await removeDirectoryIfExists(extractedWorkingDir)

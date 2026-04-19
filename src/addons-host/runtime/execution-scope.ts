@@ -3,7 +3,10 @@ import "server-only"
 import { AsyncLocalStorage } from "node:async_hooks"
 
 import type { LoadedAddonRuntime } from "@/addons-host/types"
-import { createAddonLifecycleLog } from "@/db/addon-registry-queries"
+import {
+  ADDON_RUNTIME_LOG_DEDUPE_WINDOW_MS,
+  createAddonLifecycleLog,
+} from "@/db/addon-registry-queries"
 import { addonHasPermission } from "@/addons-host/runtime/permissions"
 
 interface AddonExecutionScopeState {
@@ -119,6 +122,7 @@ export function installAddonFetchGuard() {
         action: "NETWORK_DENIED",
         status: "FAILED",
         message: `addon "${addonId}" is not allowed to access external network resources`,
+        dedupeWindowMs: ADDON_RUNTIME_LOG_DEDUPE_WINDOW_MS,
         metadataJson: {
           action: scope.action,
           url: resolvedUrl?.toString() ?? null,

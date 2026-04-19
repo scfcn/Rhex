@@ -43,7 +43,6 @@ export const POST = createAdminRouteHandler<AddonsAdminData | AddonInstallPrevie
   if (intent === "inspect") {
     return apiSuccess(await inspectAddonZip({
       zipBuffer,
-      replaceExisting,
       enableAfterInstall,
     }))
   }
@@ -59,6 +58,8 @@ export const POST = createAdminRouteHandler<AddonsAdminData | AddonInstallPrevie
     await getAddonsAdminData(),
     installed.action === "upgraded"
       ? `已升级插件 ${installed.name}`
+      : installed.action === "overwritten"
+        ? `已覆盖安装插件 ${installed.name}`
       : `已安装插件 ${installed.name}`,
   )
 }, {

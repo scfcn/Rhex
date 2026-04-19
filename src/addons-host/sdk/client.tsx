@@ -169,6 +169,7 @@ import {
   InputGroupText,
   InputGroupTextarea,
 } from "@/components/ui/input-group"
+import { IconPicker } from "@/components/ui/icon-picker"
 import { Input } from "@/components/ui/input"
 import {
   NavigationMenu,
@@ -487,6 +488,7 @@ const addonClientUi = Object.freeze({
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
+  IconPicker,
   Input,
   InputGroup,
   InputGroupAddon,

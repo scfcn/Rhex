@@ -79,8 +79,9 @@ export interface AddonInstallPreviewData {
   version: string
   description: string | null
   permissions: AddonInstallPermissionItem[]
-  installAction: "install" | "upgrade"
+  installAction: "install" | "upgrade" | "overwrite"
   existingVersion: string | null
-  replaceExisting: boolean
+  hasExisting: boolean
+  requiresReplaceConfirmation: boolean
   enableAfterInstall: boolean
 }

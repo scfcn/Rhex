@@ -1,8 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo, useRef, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useMemo, useState } from "react"
 import { Search, Trash2 } from "lucide-react"
 
 import { UserAvatar } from "@/components/user/user-avatar"
@@ -13,13 +12,21 @@ interface MessageConversationSidebarProps {
   conversations: MessageConversationListItem[]
   activeConversationId?: string
   deletingConversationId?: string
+  onSelectConversation: (conversationId: string) => void
+  onPrefetchConversation?: (conversationId: string) => void
   onDeleteConversation: (conversationId: string) => void
   mobileHidden?: boolean
 }
 
-export function MessageConversationSidebar({ conversations, activeConversationId, deletingConversationId, onDeleteConversation, mobileHidden = false }: MessageConversationSidebarProps) {
-  const router = useRouter()
-  const listRef = useRef<HTMLDivElement | null>(null)
+export function MessageConversationSidebar({
+  conversations,
+  activeConversationId,
+  deletingConversationId,
+  onSelectConversation,
+  onPrefetchConversation,
+  onDeleteConversation,
+  mobileHidden = false,
+}: MessageConversationSidebarProps) {
   const [keyword, setKeyword] = useState("")
 
   const filteredConversations = useMemo(() => {
@@ -33,17 +40,6 @@ export function MessageConversationSidebar({ conversations, activeConversationId
       return [item.title, item.subtitle, item.preview].some((value) => value.toLowerCase().includes(normalized))
     })
   }, [conversations, keyword])
-
-  function handleSelect(conversationId: string) {
-    const currentScrollTop = listRef.current?.scrollTop ?? 0
-    router.push(`/messages?conversation=${conversationId}`, { scroll: false })
-
-    requestAnimationFrame(() => {
-      if (listRef.current) {
-        listRef.current.scrollTop = currentScrollTop
-      }
-    })
-  }
 
   return (
     <div
@@ -72,7 +68,7 @@ export function MessageConversationSidebar({ conversations, activeConversationId
         </div>
       </div>
 
-      <div ref={listRef} className="flex-1 space-y-2 overflow-y-auto p-2.5 max-sm:px-3 max-sm:pb-[calc(env(safe-area-inset-bottom)+12px)] max-sm:pt-3">
+      <div className="flex-1 space-y-2 overflow-y-auto p-2.5 max-sm:px-3 max-sm:pb-[calc(env(safe-area-inset-bottom)+12px)] max-sm:pt-3">
         {filteredConversations.length === 0 ? <p className="px-3 py-8 text-sm text-muted-foreground">没有匹配的会话。</p> : null}
         {filteredConversations.map((conversation) => {
           const active = conversation.id === activeConversationId
@@ -104,9 +100,16 @@ export function MessageConversationSidebar({ conversations, activeConversationId
                     {conversation.unreadCount > 0 ? <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full border border-background bg-rose-500 px-1 text-[10px] font-semibold text-white shadow-[0_4px_12px_rgba(244,63,94,0.22)] dark:border-card dark:bg-rose-300 dark:text-rose-950 dark:shadow-none">{conversation.unreadCount > 99 ? "99+" : conversation.unreadCount}</span> : null}
                   </div>
                 </Link>
-                <button type="button" onClick={() => handleSelect(conversation.id)} className="flex min-w-0 flex-1 items-center text-left">
+                <button
+                  type="button"
+                  onClick={() => onSelectConversation(conversation.id)}
+                  onFocus={() => onPrefetchConversation?.(conversation.id)}
+                  onMouseEnter={() => onPrefetchConversation?.(conversation.id)}
+                  onTouchStart={() => onPrefetchConversation?.(conversation.id)}
+                  className="flex min-w-0 flex-1 items-center text-left"
+                >
                   <div className="min-w-0 flex-1">
-                      {conversation.title}
+                    <p className="truncate text-sm font-semibold">{conversation.title}</p>
                     <p className={cn("mt-1 truncate text-xs", hasUnread && !active ? "text-foreground/65 dark:text-foreground/60" : "text-muted-foreground")}>{conversation.updatedAt}</p>
                   </div>
                 </button>
