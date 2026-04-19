@@ -1049,22 +1049,6 @@ export interface AddonExecutionContextBase extends AddonRuntimeDescriptor {
   permissions: string[]
   hasPermission: (permission: string) => boolean
   assertPermission: (permission: string, message?: string) => void
-  /**
-   * Server-only shadcn UI 组件集合（与 client.tsx 的 addonClientUi 同名清单，custom 字段除外）。
-   * 仅供 addon 在服务端 render（slot/page/surface）时通过 createElement 组合 UI；
-   * 客户端组件请直接 `import { addonClientUi } from "@/addons-host/sdk/client"`。
-   */
-  ui: import("./sdk/server-ui").AddonServerSdkUi
-  /** Server-only Lucide 图标集合，与 client.tsx 的 addonClientIcons 同清单。 */
-  icons: import("./sdk/server-ui").AddonServerSdkIcons
-  /** Tailwind class 合并工具（即 `@/lib/utils` 的 `cn`）。 */
-  cn: typeof import("@/lib/utils").cn
-  /**
-   * 将 React 元素渲染为静态 HTML 字符串（基于 react-dom/server `renderToStaticMarkup`）。
-   * 用于 slot/page/surface 等需返回 HTML 字符串的场景；不写入 hydration 标记，
-   * 客户端交互需 addon 自行提供 client-entry。
-   */
-  renderToHtml: (element: import("react").ReactNode) => string
   getCurrentUser: () => Promise<SessionActor | null>
   getSiteSettings: () => Promise<SiteSettingsData>
   getBoardSelectOptions: () => Promise<AddonBoardSelectGroup[]>

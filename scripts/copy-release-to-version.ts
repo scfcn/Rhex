@@ -8,6 +8,7 @@ const includeEntries = [
   "LICENSE",
   "src",
   ".npmrc",
+  ".gitignore",
   "docs",
   "public",
   "prisma",

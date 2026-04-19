@@ -14,6 +14,7 @@
     "setup:start:prod": "pnpm run setup:prod && cross-env NODE_OPTIONS=--max-old-space-size=2560 pnpm run start:prod",
     "lint": "eslint .",
     "worker": "cross-env NODE_ENV=production NODE_OPTIONS=--conditions=react-server tsx scripts/worker.ts",
+    "worker:debug": "cross-env NODE_ENV=production NODE_OPTIONS=\"--conditions=react-server --stack-trace-limit=100\" tsx scripts/worker.ts",
     "version:sync": "tsx scripts/copy-release-to-version.ts",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",

@@ -2,7 +2,11 @@
 @import 'yet-another-react-lightbox/styles.css' layer(base);
 @import 'yet-another-react-lightbox/plugins/counter.css' layer(base);
 
-@import 'tailwindcss';
+@import 'tailwindcss' source(none);
+
+/* 只扫源码扩展名；禁用自动发现，避免 uploads/ 等二进制被 Oxide scanner 吞入 */
+@source './**/*.{ts,tsx,js,jsx,mjs,cjs,mdx,md}';
+@source '../../addons/**/*.{ts,tsx,js,jsx,mjs,cjs,mdx,md,html}';
 
 @custom-variant dark (&:is(.dark *));
 
