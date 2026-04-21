@@ -19,6 +19,7 @@ import {
   TableInsertPanel,
 } from "@/components/refined-rich-post-editor/editor-panels"
 import { EditorBody, EditorHeader, EditorToolbar } from "@/components/refined-rich-post-editor/editor-surface"
+import { FloatingSelectionToolbar } from "@/components/refined-rich-post-editor/selection-toolbar"
 import type {
   EditorSelectionRange,
   EditorSelectionStore,
@@ -311,6 +312,20 @@ export function RefinedRichPostEditor({
         onChange={panels.base64Dialog.setValue}
         onClose={panels.base64Dialog.dismissDialog}
         onConfirm={commands.handleInsertBase64}
+      />
+      <FloatingSelectionToolbar
+        visible={!disabled && (viewState.activeTab === "write" || viewState.activeTab === "live-preview")}
+        isClient={isClient}
+        textareaRef={textareaRef}
+        selectionStore={selectionStore}
+        platform={shortcutPlatform}
+        onMouseDown={commands.handleToolbarMouseDown}
+        onBold={commands.toolbarActions.bold}
+        onUnderline={commands.toolbarActions.underline}
+        onStrike={commands.toolbarActions.strike}
+        onHighlight={commands.toolbarActions.highlight}
+        onInlineCode={() => commands.toolbarActions.codeFormat("inline-code")}
+        onQuote={commands.toolbarActions.quote}
       />
       <MediaInsertPanel
         open={panels.mediaPanel.open}

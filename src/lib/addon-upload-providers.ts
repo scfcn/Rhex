@@ -63,7 +63,7 @@ function normalizeAddonUploadResult(input: {
     fileSize:
       typeof input.value.fileSize === "number" && Number.isFinite(input.value.fileSize) && input.value.fileSize > 0
         ? input.value.fileSize
-        : input.preparedFile.buffer.byteLength,
+        : input.preparedFile.fileSize,
     mimeType: normalizeOptionalString(input.value.mimeType) || input.preparedFile.detectedMime,
     fileHash: normalizeOptionalString(input.value.fileHash) || input.preparedFile.fileHash,
   }
@@ -124,4 +124,3 @@ export async function saveWithAddonUploadProvider(input: {
 
   return null
 }
-

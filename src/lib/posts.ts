@@ -99,6 +99,7 @@ export interface SitePostItem {
   lastRepliedAt?: string
   lastRepliedAtRaw?: string
   latestReplyAuthorName?: string | null
+  latestReplyAuthorUsername?: string | null
   latestReplyExcerpt?: string | null
 
   excerpt: string

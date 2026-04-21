@@ -483,8 +483,8 @@ export function CommentThreadReplyItem({
                     {isAdmin ? <AdminCommentStatusNotice status={reply.status} /> : null}
                     <CommentReviewStatusNotice status={reply.status} reviewNote={reply.reviewNote} isAdmin={isAdmin} isOwner={canEditCurrentReply} />
                     {isFlatLayout && (reply.replyToCommentExcerpt ?? reply.parentCommentExcerpt) ? (
-                      <div className="mb-2.5 flex items-start gap-2">
-                        <CornerDownRight className="mt-3 h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
+                      <div className="mb-2.5 flex items-center gap-2">
+                        <CornerDownRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />
                         <div className="min-w-0 flex-1 rounded-2xl border border-border/70 bg-secondary/30 px-3 py-2.5 text-[12px] leading-5 text-muted-foreground">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <span className="font-medium text-foreground/80">{reply.replyToCommentAuthor ?? reply.parentCommentAuthor ? `回复 @${reply.replyToCommentAuthor ?? reply.parentCommentAuthor}` : "回复原评论"}</span>
@@ -492,7 +492,7 @@ export function CommentThreadReplyItem({
                               <button
                                 type="button"
                                 onClick={() => onJumpToParentComment?.(referenceCommentId ?? parentCommentId, parentCommentHref)}
-                                className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-foreground/80 transition-colors hover:bg-accent hover:text-foreground"
+                                className="rounded-full border border-transparent bg-transparent px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-border hover:bg-background hover:text-foreground focus-visible:border-border focus-visible:bg-background focus-visible:text-foreground"
                               >
                                 查看原文
                               </button>
@@ -511,9 +511,10 @@ export function CommentThreadReplyItem({
                 )}
               </div>
 
-              <div className={cn("flex w-full items-center gap-2 text-[11px] text-muted-foreground", replyRewardBadges ? "justify-between" : "justify-end", editingCommentId === reply.id && "border-t border-border/50 pt-2")}>
-                {replyRewardBadges ? <div className="flex min-w-0 flex-wrap items-center gap-2">{replyRewardBadges}</div> : null}
-                <div className="flex flex-wrap items-center justify-end gap-1.5">
+              <div className={cn("flex w-full items-center gap-2 text-[11px] text-muted-foreground", editingCommentId === reply.id && "border-t border-border/50 pt-2")}>
+                <CommentLikeButton commentId={reply.id} initialCount={reply.likes} initialLiked={reply.viewerLiked} />
+                {replyRewardBadges ? <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">{replyRewardBadges}</div> : <div className="min-w-0 flex-1" />}
+                <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
                   {!hideFloatingActionButtons && replyActions.length > 0 ? (
                     <CommentAdminActionMenu
                       actions={replyActions}
@@ -523,8 +524,6 @@ export function CommentThreadReplyItem({
                       }}
                     />
                   ) : null}
-                  <CommentLikeButton commentId={reply.id} initialCount={reply.likes} initialLiked={reply.viewerLiked} />
-
                   {canReply ? (
                     <button
                       type="button"
@@ -675,9 +674,10 @@ export function CommentThreadCommentItem({
                 )}
               </div>
 
-              <div className={cn("flex w-full items-center gap-2 text-[11px] text-muted-foreground sm:text-xs", commentRewardBadges ? "justify-between" : "justify-end", editingCommentId === comment.id && "border-t border-border/60 pt-2")}>
-                {commentRewardBadges ? <div className="flex min-w-0 flex-wrap items-center gap-2">{commentRewardBadges}</div> : null}
-                <div className="flex flex-wrap items-center justify-end gap-1.5">
+              <div className={cn("flex w-full items-center gap-2 text-[11px] text-muted-foreground sm:text-xs", editingCommentId === comment.id && "border-t border-border/60 pt-2")}>
+                <CommentLikeButton commentId={comment.id} initialCount={comment.likes} initialLiked={comment.viewerLiked} />
+                {commentRewardBadges ? <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">{commentRewardBadges}</div> : <div className="min-w-0 flex-1" />}
+                <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
                   {!hideFloatingActionButtons && commentActions.length > 0 ? (
                     <CommentAdminActionMenu
                       actions={commentActions}
@@ -695,8 +695,6 @@ export function CommentThreadCommentItem({
                       }}
                     />
                   ) : null}
-                  <CommentLikeButton commentId={comment.id} initialCount={comment.likes} initialLiked={comment.viewerLiked} />
-
                   {currentUserId && currentUserId !== comment.authorId ? (
                     <ReportDialog
                       targetType="COMMENT"

@@ -2,6 +2,7 @@ import Link from "next/link"
 import { Fragment, type CSSProperties, type ReactNode } from "react"
 import { ArrowUpRight, ShieldCheck, Sparkles } from "lucide-react"
 
+import { executeAddonWaterfallHook } from "@/addons-host/runtime/hooks"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -43,7 +44,7 @@ function getInitials(name: string) {
     .toUpperCase()
 }
 
-export function AdminShell({
+export async function AdminShell({
   currentKey,
   adminName,
   adminRole = "ADMIN",
@@ -61,6 +62,14 @@ export function AdminShell({
       { label: "后台控制台", href: "/admin" },
       { label: currentItem.label },
     ]
+  const { value: hookedBreadcrumbs } = await executeAddonWaterfallHook(
+    "breadcrumb.items",
+    resolvedBreadcrumbs,
+  )
+  const finalBreadcrumbs =
+    Array.isArray(hookedBreadcrumbs) && hookedBreadcrumbs.length > 0
+      ? hookedBreadcrumbs
+      : resolvedBreadcrumbs
 
   return (
     <SidebarProvider
@@ -145,8 +154,8 @@ export function AdminShell({
               />
               <Breadcrumb>
                 <BreadcrumbList>
-                  {resolvedBreadcrumbs.map((item, index) => {
-                    const isLast = index === resolvedBreadcrumbs.length - 1
+                  {finalBreadcrumbs.map((item, index) => {
+                    const isLast = index === finalBreadcrumbs.length - 1
 
                     return (
                       <Fragment key={`${item.label}-${index}`}>

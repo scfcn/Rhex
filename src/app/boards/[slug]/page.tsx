@@ -7,7 +7,6 @@ import { BoardSidebarPanels } from "@/components/board/board-sidebar-panels"
 import { BoardFollowButton } from "@/components/board/board-follow-button"
 import { CollapsibleInfoCard } from "@/components/collapsible-info-card"
 import { ForumPageShell } from "@/components/forum/forum-page-shell"
-import { ForumPostStream } from "@/components/forum/forum-post-stream"
 import { InfiniteForumPostStream } from "@/components/forum/infinite-forum-post-stream"
 import { PageNumberPagination } from "@/components/page-number-pagination"
 import { RssSubscribeButton } from "@/components/rss/rss-subscribe-button"
@@ -18,7 +17,7 @@ import { getHomeAnnouncements } from "@/lib/announcements"
 import { getCurrentUser } from "@/lib/auth"
 import { checkBoardPermission } from "@/lib/board-access"
 import { getBoardBySlug, getBoardModerators, getBoardPosts, getBoards, isUserFollowingBoard } from "@/lib/boards"
-import { mapSitePostsToDisplayItems } from "@/lib/forum-post-stream-display"
+import { buildAddonHookSearchParams, buildHookedPostStreamDisplayItems } from "@/lib/addon-feed-posts"
 import { getHomeSidebarHotTopics, resolveSidebarUser } from "@/lib/home-sidebar"
 import { POST_LIST_LOAD_MODE_INFINITE } from "@/lib/post-list-load-mode"
 import { DEFAULT_ALLOWED_POST_TYPES, normalizePostTypes } from "@/lib/post-types"
@@ -26,6 +25,7 @@ import { readSearchParam } from "@/lib/search-params"
 import { buildMetadataKeywords } from "@/lib/seo"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getZones } from "@/lib/zones"
+import { ForumPostStreamView } from "@/components/forum/forum-post-stream-view"
 
 
 
@@ -122,7 +122,13 @@ export default async function BoardPage(props: PageProps<"/boards/[slug]">) {
     ? await isUserFollowingBoard(currentUser.id, board.id)
     : false
   const sidebarUser = await resolveSidebarUser(currentUser, settings)
-  const postDisplayItems = mapSitePostsToDisplayItems(posts, settings, ["GLOBAL", "ZONE", "BOARD"])
+  const postDisplayItems = await buildHookedPostStreamDisplayItems({
+    posts,
+    settings,
+    visiblePinScopes: ["GLOBAL", "ZONE", "BOARD"],
+    pathname: `/boards/${board.slug}`,
+    searchParams: buildAddonHookSearchParams(searchParams),
+  })
   const useInfinitePostList = board.postListLoadMode === POST_LIST_LOAD_MODE_INFINITE
 
 
@@ -176,7 +182,13 @@ export default async function BoardPage(props: PageProps<"/boards/[slug]">) {
                           postLinkDisplayMode={settings.postLinkDisplayMode}
                         />
                       ) : (
-                        <ForumPostStream posts={posts} listDisplayMode={board.postListDisplayMode} showBoard={false} showPinnedDivider={page === 1} />
+                        <ForumPostStreamView
+                          items={postDisplayItems}
+                          listDisplayMode={board.postListDisplayMode}
+                          showBoard={false}
+                          showPinnedDivider={page === 1}
+                          postLinkDisplayMode={settings.postLinkDisplayMode}
+                        />
                       )}
 
                       {posts.length === 0 ? <div className="rounded-md border bg-background p-8 text-sm text-muted-foreground">当前节点还没有内容。</div> : null}

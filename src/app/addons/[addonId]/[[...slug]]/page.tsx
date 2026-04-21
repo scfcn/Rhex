@@ -57,6 +57,7 @@ export default async function AddonPublicPage({ params }: AddonPageProps) {
   const showFooter = chrome.footer === true
   const showLeftSidebar = chrome.leftSidebar === true
   const showRightSidebar = chrome.rightSidebar === true
+  const showPageHeading = chrome.pageHeading !== false
   const needsShellData = showLeftSidebar || showRightSidebar
   const settingsPromise = needsShellData ? getSiteSettings() : Promise.resolve(null)
   const currentUserPromise = showRightSidebar ? getCurrentUser() : Promise.resolve(null)
@@ -77,15 +78,17 @@ export default async function AddonPublicPage({ params }: AddonPageProps) {
     : null
   const mainContent = (
     <main className={showLeftSidebar || showRightSidebar ? "py-1 pb-12 mt-6 min-w-0" : "mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6"}>
-      <section className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{resolved.addon.manifest.id}</p>
-        <h1 className="text-3xl font-semibold tracking-tight">{resolved.registration.title || resolved.addon.manifest.name}</h1>
-        {resolved.registration.description || resolved.addon.manifest.description ? (
-          <p className="max-w-3xl text-sm leading-7 text-muted-foreground">
-            {resolved.registration.description || resolved.addon.manifest.description}
-          </p>
-        ) : null}
-      </section>
+      {showPageHeading ? (
+        <section className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{resolved.addon.manifest.id}</p>
+          <h1 className="text-3xl font-semibold tracking-tight">{resolved.registration.title || resolved.addon.manifest.name}</h1>
+          {resolved.registration.description || resolved.addon.manifest.description ? (
+            <p className="max-w-3xl text-sm leading-7 text-muted-foreground">
+              {resolved.registration.description || resolved.addon.manifest.description}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       <AddonRenderBlock addonId={resolved.addon.manifest.id} blockKey={renderBlockKey} result={renderResult} />
     </main>

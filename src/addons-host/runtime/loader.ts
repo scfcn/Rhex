@@ -29,7 +29,15 @@ import {
   ADDON_RUNTIME_LOG_DEDUPE_WINDOW_MS,
   createAddonLifecycleLog,
 } from "@/db/addon-registry-queries"
-import type { AddonManifest, LoadedAddonRuntime } from "@/addons-host/types"
+import {
+  buildAddonRelationCatalog,
+  validateAddonManifestRelations,
+} from "@/addons-host/runtime/relations"
+import type {
+  AddonManifest,
+  AddonStateRecord,
+  LoadedAddonRuntime,
+} from "@/addons-host/types"
 
 // ---- 门面 re-export：保持对外 API 稳定 ----------------------------------
 export {
@@ -59,6 +67,84 @@ import {
 import { buildAddonPermissionCache } from "@/addons-host/runtime/internal/permission-guard"
 import { applyAddonDataMigrations } from "@/addons-host/runtime/internal/data-migrations"
 
+interface DiscoveredAddonManifestEntry {
+  entryName: string
+  rootDir: string
+  state: AddonStateRecord
+  manifest: AddonManifest | null
+  manifestError: string | null
+}
+
+async function recordAddonLoadError(
+  runtime: LoadedAddonRuntime,
+  message: string,
+  metadata?: Record<string, unknown>,
+) {
+  runtime.loadError = message
+  runtime.state = {
+    ...runtime.state,
+    lastErrorAt: new Date().toISOString(),
+    lastErrorMessage: message,
+  }
+
+  await createAddonLifecycleLog({
+    addonId: runtime.manifest.id,
+    action: "LOAD",
+    status: "FAILED",
+    message,
+    dedupeWindowMs: ADDON_RUNTIME_LOG_DEDUPE_WINDOW_MS,
+    metadataJson: {
+      entryServerPath: runtime.entryServerPath,
+      ...(metadata ?? {}),
+    },
+  })
+}
+
+async function applyAddonRuntimeRelationErrors(runtimes: LoadedAddonRuntime[]) {
+  let changed = false
+
+  while (true) {
+    const relationCatalog = buildAddonRelationCatalog(
+      runtimes.map((runtime) => ({
+        manifest: runtime.manifest,
+        enabled: runtime.enabled,
+        loadError: runtime.loadError,
+      })),
+    )
+
+    let iterationChanged = false
+
+    for (const runtime of runtimes) {
+      if (!runtime.enabled || runtime.loadError) {
+        continue
+      }
+
+      const relationCheck = validateAddonManifestRelations({
+        manifest: runtime.manifest,
+        enabled: true,
+        catalog: relationCatalog,
+        includeDependencyLoadErrors: true,
+      })
+
+      if (relationCheck.blockingIssues.length === 0) {
+        continue
+      }
+
+      await recordAddonLoadError(runtime, relationCheck.blockingIssues.join("；"), {
+        relationIssues: relationCheck.blockingIssues,
+      })
+      iterationChanged = true
+      changed = true
+    }
+
+    if (!iterationChanged) {
+      break
+    }
+  }
+
+  return changed
+}
+
 export async function loadAddonsRuntimeFresh(): Promise<LoadedAddonRuntime[]> {
   const addonsRoot = getAddonsRootDirectory()
   if (!(await fileExists(addonsRoot))) {
@@ -70,7 +156,7 @@ export async function loadAddonsRuntimeFresh(): Promise<LoadedAddonRuntime[]> {
     readAddonStateMap(),
   ])
 
-  const runtimes: LoadedAddonRuntime[] = []
+  const discoveredAddons: DiscoveredAddonManifestEntry[] = []
 
   for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name, "zh-CN"))) {
     if (!entry.isDirectory() || entry.name.startsWith(".")) {
@@ -83,19 +169,53 @@ export async function loadAddonsRuntimeFresh(): Promise<LoadedAddonRuntime[]> {
       continue
     }
 
-    let manifest: AddonManifest
-
     try {
-      manifest = normalizeAddonManifest(await readJsonFile<unknown>(manifestPath))
+      discoveredAddons.push({
+        entryName: entry.name,
+        rootDir,
+        state: stateMap[entry.name] ?? {},
+        manifest: normalizeAddonManifest(await readJsonFile<unknown>(manifestPath)),
+        manifestError: null,
+      })
     } catch (error) {
+      discoveredAddons.push({
+        entryName: entry.name,
+        rootDir,
+        state: stateMap[entry.name] ?? {},
+        manifest: null,
+        manifestError: error instanceof Error ? error.message : "invalid addon manifest",
+      })
+    }
+  }
+
+  const relationCatalog = buildAddonRelationCatalog(
+    discoveredAddons.flatMap((item) => {
+      if (!item.manifest) {
+        return []
+      }
+
+      return [{
+        manifest: item.manifest,
+        enabled: buildAddonRuntimeDescriptor(item.manifest, item.rootDir, item.state).enabled,
+      }]
+    }),
+  )
+
+  const runtimes: LoadedAddonRuntime[] = []
+
+  for (const discoveredAddon of discoveredAddons) {
+    if (!discoveredAddon.manifest) {
       const fallbackManifest: AddonManifest = {
-        id: entry.name,
-        name: entry.name,
+        id: discoveredAddon.entryName,
+        name: discoveredAddon.entryName,
         version: "0.0.0",
         description: "Invalid addon manifest",
       }
-      const state = stateMap[entry.name] ?? {}
-      const descriptor = buildAddonRuntimeDescriptor(fallbackManifest, rootDir, state)
+      const descriptor = buildAddonRuntimeDescriptor(
+        fallbackManifest,
+        discoveredAddon.rootDir,
+        discoveredAddon.state,
+      )
       const permissionCache = buildAddonPermissionCache(fallbackManifest)
       runtimes.push({
         ...descriptor,
@@ -115,23 +235,30 @@ export async function loadAddonsRuntimeFresh(): Promise<LoadedAddonRuntime[]> {
         waterfallHooks: [],
         asyncWaterfallHooks: [],
         dataMigrations: [],
-        loadError: error instanceof Error ? error.message : "invalid addon manifest",
+        loadError: discoveredAddon.manifestError ?? "invalid addon manifest",
       })
       continue
     }
 
-    const state = stateMap[manifest.id] ?? {}
+    const manifest = discoveredAddon.manifest
+    const state = stateMap[manifest.id] ?? discoveredAddon.state
     const warnings: string[] = []
     const permissionCache = buildAddonPermissionCache(manifest)
     if (!isValidAddonId(manifest.id)) {
       warnings.push(`addon id "${manifest.id}" is not a recommended identifier`)
     }
-    if (manifest.id !== entry.name) {
-      warnings.push(`addon folder "${entry.name}" does not match manifest id "${manifest.id}"`)
+    if (manifest.id !== discoveredAddon.entryName) {
+      warnings.push(`addon folder "${discoveredAddon.entryName}" does not match manifest id "${manifest.id}"`)
     }
 
-    const descriptor = buildAddonRuntimeDescriptor(manifest, rootDir, state)
-    const serverEntryPath = await resolveAddonServerEntryPath(rootDir, manifest)
+    const descriptor = buildAddonRuntimeDescriptor(manifest, discoveredAddon.rootDir, state)
+    const relationCheck = validateAddonManifestRelations({
+      manifest,
+      enabled: descriptor.enabled,
+      catalog: relationCatalog,
+    })
+    warnings.push(...relationCheck.warnings)
+    const serverEntryPath = await resolveAddonServerEntryPath(discoveredAddon.rootDir, manifest)
     const runtime: LoadedAddonRuntime = {
       ...descriptor,
       permissionSet: permissionCache.permissionSet,
@@ -158,6 +285,14 @@ export async function loadAddonsRuntimeFresh(): Promise<LoadedAddonRuntime[]> {
       continue
     }
 
+    if (relationCheck.blockingIssues.length > 0) {
+      await recordAddonLoadError(runtime, relationCheck.blockingIssues.join("；"), {
+        relationIssues: relationCheck.blockingIssues,
+      })
+      runtimes.push(runtime)
+      continue
+    }
+
     if (!serverEntryPath) {
       runtime.loadError = "addon server entry not found"
       runtimes.push(runtime)
@@ -166,7 +301,7 @@ export async function loadAddonsRuntimeFresh(): Promise<LoadedAddonRuntime[]> {
 
     try {
       const { api, snapshot } = createAddonBuildApi(manifest, warnings)
-      const definition = await importAddonDefinition(rootDir, serverEntryPath)
+      const definition = await importAddonDefinition(discoveredAddon.rootDir, serverEntryPath)
       await runWithAddonExecutionScope(runtime, {
         action: "setup",
       }, async () => {
@@ -186,26 +321,16 @@ export async function loadAddonsRuntimeFresh(): Promise<LoadedAddonRuntime[]> {
       runtime.dataMigrations = snapshot.dataMigrations
       await applyAddonDataMigrations(runtime)
     } catch (error) {
-      runtime.loadError = error instanceof Error ? error.message : "failed to load addon server entry"
-      runtime.state = {
-        ...runtime.state,
-        lastErrorAt: new Date().toISOString(),
-        lastErrorMessage: runtime.loadError,
-      }
-      await createAddonLifecycleLog({
-        addonId: runtime.manifest.id,
-        action: "LOAD",
-        status: "FAILED",
-        message: runtime.loadError,
-        dedupeWindowMs: ADDON_RUNTIME_LOG_DEDUPE_WINDOW_MS,
-        metadataJson: {
-          entryServerPath: runtime.entryServerPath,
-        },
-      })
+      await recordAddonLoadError(
+        runtime,
+        error instanceof Error ? error.message : "failed to load addon server entry",
+      )
     }
 
     runtimes.push(runtime)
   }
+
+  await applyAddonRuntimeRelationErrors(runtimes)
 
   return runtimes
 }

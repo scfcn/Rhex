@@ -84,4 +84,7 @@ export interface AddonInstallPreviewData {
   hasExisting: boolean
   requiresReplaceConfirmation: boolean
   enableAfterInstall: boolean
+  relationBlockingIssues: string[]
+  relationWarnings: string[]
+  canInstall: boolean
 }

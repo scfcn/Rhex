@@ -1,5 +1,9 @@
 import mermaid from "mermaid"
+import { createElement } from "react"
+import { createRoot, type Root } from "react-dom/client"
 
+import { MarkdownLinkIndicator } from "@/components/markdown-link-indicator"
+import { buildMarkdownLinkAriaLabel, getMarkdownLinkHint } from "@/lib/markdown/link-hint"
 import { escapeHtml } from "@/lib/markdown/shared"
 
 export interface LightboxImage {
@@ -12,6 +16,10 @@ interface Base64SegmentMatch {
   end: number
   value: string
   decoded: string
+}
+
+interface MarkdownLinkIndicatorHost extends HTMLSpanElement {
+  __mdLinkIndicatorRoot?: Root
 }
 
 const BASE64_CANDIDATE_PATTERN = /[A-Za-z0-9+/]+={0,2}/g
@@ -77,33 +85,34 @@ export function bindImageLightbox(container: HTMLElement, onOpen: (images: Light
   }
 }
 
-function isExternalMarkdownLink(href: string) {
-  const normalizedHref = href.trim()
-  if (!normalizedHref) {
-    return false
+function createMarkdownLinkIndicatorHost(href: string) {
+  const host = document.createElement("span") as MarkdownLinkIndicatorHost
+  host.className = "md-link-indicator inline-flex shrink-0"
+
+  const root = createRoot(host)
+  host.__mdLinkIndicatorRoot = root
+  root.render(createElement(MarkdownLinkIndicator, { href }))
+
+  return host
+}
+
+function disposeMarkdownLinkIndicatorHost(host: MarkdownLinkIndicatorHost) {
+  const root = host.__mdLinkIndicatorRoot
+  host.__mdLinkIndicatorRoot = undefined
+  host.remove()
+
+  if (!root) {
+    return
   }
 
-  if (/^(mailto:|tel:)/i.test(normalizedHref)) {
-    return true
-  }
-
-  if (typeof window === "undefined") {
-    return /^(https?:)?\/\//i.test(normalizedHref)
-  }
-
-  try {
-    const resolvedUrl = new URL(normalizedHref, window.location.origin)
-    if (!["http:", "https:"].includes(resolvedUrl.protocol)) {
-      return false
-    }
-
-    return resolvedUrl.origin !== window.location.origin
-  } catch {
-    return false
-  }
+  // Defer unmounting the ad-hoc root to avoid conflicting with the current render.
+  setTimeout(() => {
+    root.unmount()
+  }, 0)
 }
 
 function enhanceMarkdownLinks(container: HTMLElement) {
+  const cleanups: Array<() => void> = []
   const links = Array.from(container.querySelectorAll<HTMLAnchorElement>("a[href]"))
 
   for (const link of links) {
@@ -116,28 +125,39 @@ function enhanceMarkdownLinks(container: HTMLElement) {
       continue
     }
 
-    link.classList.add("inline-flex", "items-center", "gap-1", "align-baseline")
+    link.classList.add("inline-flex", "flex-wrap", "items-center", "gap-1", "align-baseline")
 
     const href = link.getAttribute("href")?.trim() ?? ""
-    const isExternal = isExternalMarkdownLink(href)
+    const hint = getMarkdownLinkHint(href)
+    const existingIndicator = link.querySelector<MarkdownLinkIndicatorHost>(":scope > .md-link-indicator")
 
-    if (isExternal) {
-      link.setAttribute("title", "外部链接，请注意目标站点安全")
-      link.setAttribute("aria-label", `${link.textContent?.trim() || "外部链接"}（外部链接，请注意目标站点安全）`)
-    }
+    link.removeAttribute("title")
 
-    if (link.querySelector(":scope > .md-link-icon")) {
+    if (!hint) {
+      if (existingIndicator) {
+        disposeMarkdownLinkIndicatorHost(existingIndicator)
+      }
+
       continue
     }
 
-    const icon = document.createElement("span")
-    icon.className = "md-link-icon text-[0.72em] opacity-70"
-    icon.setAttribute("aria-hidden", "true")
-    icon.textContent = isExternal ? "↗" : "⌁"
-    if(isExternal){
-link.appendChild(icon)
+    link.setAttribute("aria-label", buildMarkdownLinkAriaLabel(link.textContent, hint))
+
+    if (existingIndicator) {
+      continue
     }
-    
+
+    const indicatorHost = createMarkdownLinkIndicatorHost(href)
+    link.append(indicatorHost)
+    cleanups.push(() => {
+      disposeMarkdownLinkIndicatorHost(indicatorHost)
+    })
+  }
+
+  return () => {
+    for (const cleanup of cleanups) {
+      cleanup()
+    }
   }
 }
 
@@ -312,36 +332,63 @@ function createBase64TokenElement(original: string, decoded: string) {
   const wrapper = document.createElement("span")
   wrapper.dataset.base64Token = "true"
   wrapper.dataset.base64State = "collapsed"
-  wrapper.className = "md-base64-token my-1 inline-flex max-w-full flex-wrap items-center gap-2 rounded-2xl border border-sky-200/80 bg-sky-50/80 px-2.5 py-1.5 align-middle shadow-xs shadow-sky-100/80 dark:border-sky-500/20 dark:bg-sky-500/10 dark:shadow-none"
+  wrapper.className = "md-base64-token my-1 inline-flex max-w-full flex-wrap items-center gap-1.5 align-middle"
+
+  const collapsedView = document.createElement("span")
+  collapsedView.dataset.base64View = "collapsed"
+  collapsedView.className = "inline-flex max-w-full flex-wrap items-center gap-1.5"
 
   const source = document.createElement("code")
-  source.className = "max-w-full break-all rounded-xl bg-white/85 px-2.5 py-1.5 font-mono text-[12px] leading-6 text-sky-900 dark:bg-slate-950/80 dark:text-sky-100"
+  source.className = "max-w-full break-all bg-transparent p-0 font-mono text-[12px] leading-6 text-muted-foreground"
   source.textContent = original
 
   const decodeButton = document.createElement("button")
   decodeButton.type = "button"
   decodeButton.dataset.base64Action = "decode"
-  decodeButton.className = "inline-flex h-7 shrink-0 items-center justify-center rounded-full border border-sky-200 bg-white px-3 text-[11px] font-medium text-sky-700 transition hover:bg-sky-50 dark:border-sky-500/25 dark:bg-slate-950/80 dark:text-sky-200 dark:hover:bg-slate-900"
-  decodeButton.textContent = "解密"
+  decodeButton.className = "inline-flex shrink-0 items-center text-[12px] leading-6 text-foreground/80 underline-offset-4 transition hover:text-foreground hover:underline"
+  decodeButton.textContent = "原文"
+  decodeButton.title = "查看原文"
+
+  const collapsedSeparator = document.createElement("span")
+  collapsedSeparator.className = "shrink-0 text-[12px] leading-6 text-muted-foreground/55"
+  collapsedSeparator.textContent = "|"
+
+  collapsedView.append(source, collapsedSeparator, decodeButton)
+
+  const decodedView = document.createElement("span")
+  decodedView.dataset.base64View = "decoded"
+  decodedView.className = "inline-flex max-w-full flex-wrap items-center gap-1.5"
+  decodedView.hidden = true
 
   const restoreButton = document.createElement("button")
   restoreButton.type = "button"
   restoreButton.dataset.base64Action = "restore"
-  restoreButton.className = "hidden inline-flex h-7 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-[11px] font-medium text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950/80 dark:text-slate-200 dark:hover:bg-slate-900"
+  restoreButton.className = "inline-flex shrink-0 items-center text-[12px] leading-6 text-foreground/80 underline-offset-4 transition hover:text-foreground hover:underline"
   restoreButton.textContent = "恢复"
+  restoreButton.title = "恢复为 Base64"
 
   const copyButton = document.createElement("button")
   copyButton.type = "button"
   copyButton.dataset.base64Action = "copy"
-  copyButton.className = "hidden inline-flex h-7 shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-white px-3 text-[11px] font-medium text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-500/25 dark:bg-slate-950/80 dark:text-emerald-200 dark:hover:bg-slate-900"
-  copyButton.textContent = "复制明文"
+  copyButton.className = "inline-flex shrink-0 items-center text-[12px] leading-6 text-foreground/80 underline-offset-4 transition hover:text-foreground hover:underline"
+  copyButton.textContent = "复制"
+  copyButton.title = "复制解密内容"
+
+  const decodedSeparator = document.createElement("span")
+  decodedSeparator.className = "shrink-0 text-[12px] leading-6 text-muted-foreground/55"
+  decodedSeparator.textContent = "|"
+
+  const restoreSeparator = document.createElement("span")
+  restoreSeparator.className = "shrink-0 text-[12px] leading-6 text-muted-foreground/55"
+  restoreSeparator.textContent = "|"
 
   const decodedContent = document.createElement("span")
   decodedContent.dataset.base64Decoded = "true"
-  decodedContent.className = "hidden basis-full whitespace-pre-wrap break-all rounded-xl bg-white/90 px-3 py-2 text-sm leading-6 text-slate-700 dark:bg-slate-950/90 dark:text-slate-100"
+  decodedContent.className = "max-w-full whitespace-pre-wrap break-all text-[13px] leading-6 text-foreground"
   decodedContent.textContent = decoded
 
-  wrapper.append(source, decodeButton, restoreButton, copyButton, decodedContent)
+  decodedView.append(decodedContent, decodedSeparator, copyButton, restoreSeparator, restoreButton)
+  wrapper.append(collapsedView, decodedView)
   return wrapper
 }
 
@@ -418,20 +465,18 @@ export function bindBase64Inspector(container: HTMLElement) {
       return
     }
 
+    const collapsedView = token.querySelector<HTMLElement>("[data-base64-view='collapsed']")
+    const decodedView = token.querySelector<HTMLElement>("[data-base64-view='decoded']")
     const decodedContent = token.querySelector<HTMLElement>("[data-base64-decoded='true']")
-    const decodeButton = token.querySelector<HTMLButtonElement>("button[data-base64-action='decode']")
-    const restoreButton = token.querySelector<HTMLButtonElement>("button[data-base64-action='restore']")
     const copyButton = token.querySelector<HTMLButtonElement>("button[data-base64-action='copy']")
 
-    if (!decodedContent || !decodeButton || !restoreButton || !copyButton) {
+    if (!collapsedView || !decodedView || !decodedContent || !copyButton) {
       return
     }
 
     if (button.dataset.base64Action === "decode") {
-      decodedContent.classList.remove("hidden")
-      decodeButton.classList.add("hidden")
-      restoreButton.classList.remove("hidden")
-      copyButton.classList.remove("hidden")
+      collapsedView.hidden = true
+      decodedView.hidden = false
       token.dataset.base64State = "decoded"
       return
     }
@@ -458,10 +503,8 @@ export function bindBase64Inspector(container: HTMLElement) {
       return
     }
 
-    decodedContent.classList.add("hidden")
-    restoreButton.classList.add("hidden")
-    copyButton.classList.add("hidden")
-    decodeButton.classList.remove("hidden")
+    decodedView.hidden = true
+    collapsedView.hidden = false
     token.dataset.base64State = "collapsed"
   }
 
@@ -569,8 +612,11 @@ async function renderMermaidBlocks(container: HTMLElement) {
 }
 
 export async function enhanceMarkdown(container: HTMLElement) {
-  enhanceMarkdownLinks(container)
+  const removeMarkdownLinkIndicators = enhanceMarkdownLinks(container)
   appendHeadingAnchors(container)
   appendCodeCopyButtons(container)
   await renderMermaidBlocks(container)
+  return () => {
+    removeMarkdownLinkIndicators()
+  }
 }

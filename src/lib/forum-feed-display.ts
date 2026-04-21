@@ -31,6 +31,8 @@ export interface FeedDisplayItem {
   metaPrimary: string
   metaPrimaryRaw?: string
   metaSecondary?: string | null
+  latestReplyAuthorName?: string | null
+  latestReplyAuthorUsername?: string | null
   commentCount: number
   commentAccentColor: string
   coverImage?: string | null
@@ -94,6 +96,8 @@ export function mapForumFeedItemsToDisplayItems(
       metaSecondary: (currentSort === "latest" || currentSort === "new" || currentSort === "hot" || currentSort === "following") && item.latestReplyAuthorName
         ? `最新回复 ${item.latestReplyAuthorName}`
         : null,
+      latestReplyAuthorName: item.latestReplyAuthorName ?? null,
+      latestReplyAuthorUsername: item.latestReplyAuthorUsername ?? null,
       commentCount: item.commentCount,
       commentAccentColor: commentHeat.color,
       coverImage: item.coverImage,

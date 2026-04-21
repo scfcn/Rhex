@@ -1096,7 +1096,7 @@
       top: 0;
       height: calc(100vh - 3.5rem);
       width: 16rem;
-      overflow-y: auto;
+      overflow: hidden;
       border-right: 1px solid hsl(var(--border));
       background: hsl(var(--background) / 0.96);
       padding: 0.75rem 0.75rem 1rem;
@@ -1245,6 +1245,56 @@
   .reactEasyCrop_Cover_Vertical {
     width: auto;
     height: 100%;
+  }
+
+  .forum-page-sidebar-scroll-area {
+    height: 100%;
+  }
+
+  .forum-page-sidebar-scroll-area [data-slot='scroll-area-scrollbar'] {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease, background-color 0.18s ease;
+  }
+
+  .forum-page-sidebar-scroll-area [data-slot='scroll-area-scrollbar'][data-orientation='vertical'] {
+    width: 0.4rem;
+    padding: 1px;
+    border-left: none;
+  }
+
+  .forum-page-sidebar-scroll-area [data-slot='scroll-area-scrollbar'][data-orientation='horizontal'] {
+    height: 0.4rem;
+    padding: 1px;
+    border-top: none;
+  }
+
+  .forum-page-sidebar-scroll-area:hover [data-slot='scroll-area-scrollbar'],
+  .forum-page-sidebar-scroll-area:focus-within [data-slot='scroll-area-scrollbar'] {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .forum-page-sidebar-scroll-area:hover [data-slot='scroll-area-scrollbar'][data-orientation='vertical'],
+  .forum-page-sidebar-scroll-area:focus-within [data-slot='scroll-area-scrollbar'][data-orientation='vertical'] {
+    background: hsl(var(--sidebar-accent) / 0.28);
+  }
+
+  .forum-page-sidebar-scroll-area:hover [data-slot='scroll-area-scrollbar'][data-orientation='horizontal'],
+  .forum-page-sidebar-scroll-area:focus-within [data-slot='scroll-area-scrollbar'][data-orientation='horizontal'] {
+    background: hsl(var(--sidebar-accent) / 0.2);
+  }
+
+  .forum-page-sidebar-scroll-area [data-slot='scroll-area-thumb'] {
+    border: 1px solid hsl(var(--sidebar) / 0.78);
+    background:
+      linear-gradient(180deg, hsl(var(--sidebar-foreground) / 0.24), hsl(var(--sidebar-foreground) / 0.42));
+  }
+
+  .forum-page-sidebar-scroll-area:hover [data-slot='scroll-area-thumb'],
+  .forum-page-sidebar-scroll-area:focus-within [data-slot='scroll-area-thumb'] {
+    background:
+      linear-gradient(180deg, hsl(var(--sidebar-foreground) / 0.32), hsl(var(--sidebar-foreground) / 0.5));
   }
 
   .reactEasyCrop_CropArea {

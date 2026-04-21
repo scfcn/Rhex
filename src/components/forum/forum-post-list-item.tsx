@@ -55,6 +55,8 @@ interface ForumPostListItemProps {
     metaPrimary: string
     metaPrimaryRaw?: string
     metaSecondary?: string | null
+    latestReplyAuthorName?: string | null
+    latestReplyAuthorUsername?: string | null
     commentCount: number
     commentAccentColor: string
   }
@@ -75,6 +77,20 @@ export function ForumPostListItem({
   const isRestrictedAuthor = item.authorStatus === "BANNED" || item.authorStatus === "MUTED"
   const pinTone = getPostPinTone(item.pinScope, true)
   const postPath = getPostPath({ id: item.id, slug: item.slug }, { mode: postLinkDisplayMode })
+  const secondaryMeta = item.latestReplyAuthorName ? (
+    <span className="inline-flex items-center gap-1">
+      <span>最新回复</span>
+      {item.latestReplyAuthorUsername ? (
+        <Link href={`/users/${item.latestReplyAuthorUsername}`} className="hover:underline">
+          {item.latestReplyAuthorName}
+        </Link>
+      ) : (
+        <span>{item.latestReplyAuthorName}</span>
+      )}
+    </span>
+  ) : item.metaSecondary ? (
+    <span>{item.metaSecondary}</span>
+  ) : null
 
   return (
     <div className={cn(
@@ -147,10 +163,10 @@ export function ForumPostListItem({
           <TimeTooltip value={item.metaPrimaryRaw}>
             <span>{item.metaPrimary}</span>
           </TimeTooltip>
-          {item.metaSecondary ? (
+          {secondaryMeta ? (
             <>
               <span>•</span>
-              <span>{item.metaSecondary}</span>
+              {secondaryMeta}
             </>
           ) : null}
         </div>

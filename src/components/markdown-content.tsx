@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils"
 
 interface MarkdownContentProps {
   content: string
+  html?: string
   className?: string
   emptyText?: string
   markdownEmojiMap?: MarkdownEmojiItem[]
@@ -108,14 +109,17 @@ const MarkdownBody = memo(function MarkdownBody({ html, className, onOpenLightbo
 
     const removeBase64Inspector = bindBase64Inspector(container)
     const removeBrokenImagePlaceholders = bindBrokenImagePlaceholders(container)
+    let removeMarkdownEnhancements = () => {}
     let removeImageLightbox = () => {}
     let cancelled = false
 
-    void enhanceMarkdown(container).then(() => {
+    void enhanceMarkdown(container).then((cleanup) => {
       if (cancelled) {
+        cleanup()
         return
       }
 
+      removeMarkdownEnhancements = cleanup
       removeImageLightbox = bindImageLightbox(container, onOpenLightbox)
     })
 
@@ -123,6 +127,7 @@ const MarkdownBody = memo(function MarkdownBody({ html, className, onOpenLightbo
       cancelled = true
       removeBase64Inspector()
       removeBrokenImagePlaceholders()
+      removeMarkdownEnhancements()
       removeImageLightbox()
     }
   }, [html, onOpenLightbox])
@@ -137,11 +142,17 @@ const MarkdownBody = memo(function MarkdownBody({ html, className, onOpenLightbo
   )
 })
 
-export function MarkdownContent({ content, className, emptyText, markdownEmojiMap, expandImagesWhenImageOnly = false, imageOnly }: MarkdownContentProps) {
+export function MarkdownContent({ content, html, className, emptyText, markdownEmojiMap, expandImagesWhenImageOnly = false, imageOnly }: MarkdownContentProps) {
   const [lightbox, setLightbox] = useState<LightboxState | null>(null)
   const normalized = content.replace(/\r\n/g, "\n").trim()
   const resolvedMarkdownEmojiMap = useMarkdownEmojiMap(markdownEmojiMap)
-  const html = useMemo(() => (normalized ? renderMarkdown(normalized, resolvedMarkdownEmojiMap) : ""), [normalized, resolvedMarkdownEmojiMap])
+  const resolvedHtml = useMemo(() => {
+    if (typeof html === "string") {
+      return html
+    }
+
+    return normalized ? renderMarkdown(normalized, resolvedMarkdownEmojiMap) : ""
+  }, [html, normalized, resolvedMarkdownEmojiMap])
   const isImageOnly = useMemo(() => {
     if (!expandImagesWhenImageOnly) {
       return false
@@ -151,19 +162,19 @@ export function MarkdownContent({ content, className, emptyText, markdownEmojiMa
       return imageOnly
     }
 
-    return isImageOnlyMarkdownHtml(html)
-  }, [expandImagesWhenImageOnly, html, imageOnly])
+    return isImageOnlyMarkdownHtml(resolvedHtml)
+  }, [expandImagesWhenImageOnly, imageOnly, resolvedHtml])
   const handleOpenLightbox = useCallback((images: LightboxImage[], index: number) => {
     setLightbox({ images, index })
   }, [])
 
-  if (!normalized) {
+  if (!resolvedHtml) {
     return emptyText ? <p className="text-sm text-muted-foreground">{emptyText}</p> : null
   }
 
   return (
     <>
-      <MarkdownBody html={html} className={className} onOpenLightbox={handleOpenLightbox} isImageOnly={isImageOnly} />
+      <MarkdownBody html={resolvedHtml} className={className} onOpenLightbox={handleOpenLightbox} isImageOnly={isImageOnly} />
       {lightbox ? (
         <LightboxPortal
           lightbox={lightbox}

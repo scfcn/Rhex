@@ -6,9 +6,10 @@ import type {
 } from "@/addons-host/types"
 
 export interface AddonUploadPreparedFile {
-  buffer: Uint8Array
+  buffer: Uint8Array | null
   fileHash: string
   detectedMime: string
+  fileSize: number
 }
 
 export interface AddonUploadActor {
@@ -46,4 +47,3 @@ export interface AddonUploadProviderRuntimeHooks {
     AddonUploadProviderSaveResult | null | undefined
   >
 }
-

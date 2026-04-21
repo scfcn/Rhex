@@ -219,7 +219,7 @@ export function createUserRouteHandler<T = unknown>(
   return createRouteHandler(handler, {
     errorMessage: options?.errorMessage,
     logPrefix: options?.logPrefix,
-    buildContext: async (request) => {
+    buildContext: async (request, routeContext) => {
       const { getCurrentSessionActor } = await import("@/lib/auth")
       const currentUser = await getCurrentSessionActor()
 
@@ -254,7 +254,7 @@ export function createUserRouteHandler<T = unknown>(
         apiError(403, "当前账号状态不可执行该操作")
       }
 
-      return { request, currentUser }
+      return { request, currentUser, routeContext }
     },
   })
 }

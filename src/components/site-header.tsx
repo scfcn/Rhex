@@ -7,7 +7,6 @@ import { MobileHeaderQuickActions } from "@/components/mobile-header-quick-actio
 import { ThemeToggle } from "@/components/theme-toggle"
 import { getCurrentUser } from "@/lib/auth"
 import { getBoards } from "@/lib/boards"
-import { Button } from "@/components/ui/rbutton"
 import { SearchForm } from "@/components/search-form"
 import { resolveSiteIconPath } from "@/lib/site-branding"
 import { getSiteSettings } from "@/lib/site-settings"
@@ -35,13 +34,16 @@ export async function SiteHeader() {
   const [user, settings, zones, boards] = await Promise.all([getCurrentUser(), getSiteSettings(), getZones(), getBoards()])
   const surfaceSnapshot = await resolveUserSurfaceSnapshot(user)
   const checkedInToday = surfaceSnapshot?.checkedInToday ?? false
+  const canAccessAdmin = Boolean(user && (user.role === "ADMIN" || user.role === "MODERATOR"))
   const headerUser = user
     ? {
+      id: user.id,
         username: user.username,
         nickname: user.nickname,
         avatarPath: user.avatarPath,
         vipLevel: (user as { vipLevel?: number }).vipLevel,
         vipExpiresAt: (user as { vipExpiresAt?: Date | string | null }).vipExpiresAt?.toString?.() ?? null,
+        canAccessAdmin,
       }
     : null
 
@@ -87,11 +89,6 @@ export async function SiteHeader() {
             <div className="ml-auto flex h-14 items-center gap-1.5">
               <AddonSlotRenderer slot="layout.header.right" />
               <ThemeToggle />
-              {user && (user.role === "ADMIN" || user.role === "MODERATOR") ? (
-                <Link href="/admin" className="hidden sm:inline-flex">
-                  <Button variant="ghost" className="h-8 rounded-md px-3">后台</Button>
-                </Link>
-              ) : null}
               <HeaderUserActions user={headerUser} />
 
             </div>

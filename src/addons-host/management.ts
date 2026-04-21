@@ -8,9 +8,14 @@ import type {
 } from "@/addons-host/admin-types"
 import {
   clearAddonsRuntimeCache,
-  findLoadedAddonById,
   loadAddonsRuntimeFresh,
 } from "@/addons-host/runtime/loader"
+import {
+  buildAddonRelationCatalog,
+  collectDependentAddonIssues,
+  collectReverseConflictIssues,
+  validateAddonManifestRelations,
+} from "@/addons-host/runtime/relations"
 import {
   addonMayUseBackgroundJobs,
   cleanupAddonBackgroundJobs,
@@ -322,6 +327,16 @@ function safeRevalidatePath(targetPath: string, type?: "page" | "layout") {
   }
 }
 
+function buildAddonRelationSnapshot(addons: LoadedAddonRuntime[]) {
+  return buildAddonRelationCatalog(
+    addons.map((addon) => ({
+      manifest: addon.manifest,
+      enabled: addon.enabled,
+      loadError: addon.loadError,
+    })),
+  )
+}
+
 export async function runAddonManagementAction(action: AddonManagementAction, addonId?: string | null) {
   if (action === "sync") {
     clearAddonsRuntimeCache()
@@ -354,16 +369,43 @@ export async function runAddonManagementAction(action: AddonManagementAction, ad
     throw new Error("缺少插件标识")
   }
 
-  const addon = await findLoadedAddonById(resolvedAddonId)
+  const addons = await loadAddonsRuntimeFresh()
+  const addon = addons.find((item) => item.manifest.id === resolvedAddonId) ?? null
   if (!addon) {
     throw new Error(`插件不存在：${resolvedAddonId}`)
   }
 
   const ensuredState = ensureAddonStateSnapshot(addon.state)
   const now = new Date().toISOString()
+  const relationCatalog = buildAddonRelationSnapshot(addons)
 
   switch (action) {
-    case "enable":
+    case "enable": {
+      relationCatalog.set(addon.manifest.id, {
+        manifest: addon.manifest,
+        enabled: true,
+        loadError: null,
+      })
+
+      const relationCheck = validateAddonManifestRelations({
+        manifest: addon.manifest,
+        enabled: true,
+        catalog: relationCatalog,
+        includeDependencyLoadErrors: true,
+      })
+      for (const issue of collectReverseConflictIssues({
+        manifest: addon.manifest,
+        catalog: relationCatalog,
+      })) {
+        if (!relationCheck.blockingIssues.includes(issue)) {
+          relationCheck.blockingIssues.push(issue)
+        }
+      }
+
+      if (relationCheck.blockingIssues.length > 0) {
+        throw new Error(relationCheck.blockingIssues.join("；"))
+      }
+
       await persistAddonState(addon, {
         ...ensuredState,
         enabled: true,
@@ -384,7 +426,16 @@ export async function runAddonManagementAction(action: AddonManagementAction, ad
         data: await getAddonsAdminData(),
         message: `已启用插件 ${addon.manifest.name}`,
       }
-    case "disable":
+    }
+    case "disable": {
+      const dependentAddonIssues = collectDependentAddonIssues({
+        addonId: resolvedAddonId,
+        catalog: relationCatalog,
+      })
+      if (dependentAddonIssues.length > 0) {
+        throw new Error(dependentAddonIssues.join("；"))
+      }
+
       await persistAddonState(addon, {
         ...ensuredState,
         enabled: false,
@@ -405,7 +456,16 @@ export async function runAddonManagementAction(action: AddonManagementAction, ad
         data: await getAddonsAdminData(),
         message: `已禁用插件 ${addon.manifest.name}`,
       }
+    }
     case "remove": {
+      const dependentAddonIssues = collectDependentAddonIssues({
+        addonId: resolvedAddonId,
+        catalog: relationCatalog,
+      })
+      if (dependentAddonIssues.length > 0) {
+        throw new Error(dependentAddonIssues.join("；"))
+      }
+
       const { removeInstalledAddon } = await import("@/addons-host/installer")
       await removeInstalledAddon(resolvedAddonId)
       refreshAddonRuntime(resolvedAddonId)

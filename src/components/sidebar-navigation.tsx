@@ -4,6 +4,7 @@ import Link from "next/link"
 import { ChevronLeft } from "lucide-react"
 
 import { LevelIcon } from "@/components/level-icon"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import type { LeftSidebarDisplayMode } from "@/lib/site-settings"
 import { cn } from "@/lib/utils"
 
@@ -79,79 +80,86 @@ export function SidebarNavigation({
         </button>
       ) : null}
 
-      <aside className={cn("forum-page-sidebar-inner sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto py-1 pr-4", isDocked && "forum-page-sidebar-docked-inner")}>
-        <div className="py-4">
-          <div className="mb-6">
-            <nav className="space-y-1">
-              <div className="forum-page-sidebar-home-row flex items-center gap-2">
-                <Link
-                  href="/"
-                  className={cn(
-                    baseItemClass,
-                    "forum-page-home-link flex-1",
-                    !activeZoneSlug && !activeBoardSlug ? activeItemClass : inactiveItemClass,
-                  )}
-                  title="首页"
-                >
-                  <span className="text-lg">🏠</span>
-                  <span>首页</span>
-                </Link>
-                <button
-                  type="button"
-                  onClick={onToggle}
-                  className="forum-page-sidebar-toggle inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                  aria-label={collapsed ? "展开左侧导航" : "收起左侧导航"}
-                  title={collapsed ? "展开左侧导航" : "收起左侧导航"}
-                >
-                  <ChevronLeft className="forum-page-sidebar-toggle-icon h-4 w-4 transition-transform" />
-                </button>
-              </div>
-
-              {visibleZones.map((zone) => {
-                const isActive = activeZoneSlug === zone.slug
-
-                return (
+      <aside
+        className={cn(
+          "forum-page-sidebar-inner sticky top-14 h-[calc(100vh-3.5rem)] overflow-hidden py-1 pr-4",
+          isDocked && "forum-page-sidebar-docked-inner",
+        )}
+      >
+        <ScrollArea className="forum-page-sidebar-scroll-area h-full">
+          <div className="py-4">
+            <div className="mb-6">
+              <nav className="space-y-1">
+                <div className="forum-page-sidebar-home-row flex items-center gap-2">
                   <Link
-                    key={zone.id}
-                    href={`/zones/${zone.slug}`}
-                    className={cn(baseItemClass, "forum-page-sidebar-item", isActive ? activeItemClass : inactiveItemClass)}
-                    title={zone.name}
+                    href="/"
+                    className={cn(
+                      baseItemClass,
+                      "forum-page-home-link flex-1",
+                      !activeZoneSlug && !activeBoardSlug ? activeItemClass : inactiveItemClass,
+                    )}
+                    title="首页"
                   >
-                    <LevelIcon icon={zone.icon} className="h-4 w-4 text-lg" svgClassName="[&>svg]:block" />
-                    <span className="forum-page-sidebar-item-label">{zone.name}</span>
+                    <span className="text-lg">🏠</span>
+                    <span>首页</span>
                   </Link>
-                )
-              })}
-            </nav>
-          </div>
+                  <button
+                    type="button"
+                    onClick={onToggle}
+                    className="forum-page-sidebar-toggle inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    aria-label={collapsed ? "展开左侧导航" : "收起左侧导航"}
+                    title={collapsed ? "展开左侧导航" : "收起左侧导航"}
+                  >
+                    <ChevronLeft className="forum-page-sidebar-toggle-icon h-4 w-4 transition-transform" />
+                  </button>
+                </div>
 
-          <div>
-            <div className="forum-page-sidebar-section-header mb-2 px-4">
-              <div className="flex items-center justify-between">
-                <h3 className="forum-page-sidebar-section-title text-xs font-semibold uppercase tracking-wider text-muted-foreground">兴趣节点</h3>
-                <Link href="/funs" className="forum-page-sidebar-section-link text-xs text-muted-foreground hover:text-foreground">全部</Link>
-                <div className="forum-page-sidebar-section-divider mx-auto hidden h-px w-8 bg-border" />
-              </div>
+                {visibleZones.map((zone) => {
+                  const isActive = activeZoneSlug === zone.slug
+
+                  return (
+                    <Link
+                      key={zone.id}
+                      href={`/zones/${zone.slug}`}
+                      className={cn(baseItemClass, "forum-page-sidebar-item", isActive ? activeItemClass : inactiveItemClass)}
+                      title={zone.name}
+                    >
+                      <LevelIcon icon={zone.icon} className="h-4 w-4 text-lg" svgClassName="[&>svg]:block" />
+                      <span className="forum-page-sidebar-item-label">{zone.name}</span>
+                    </Link>
+                  )
+                })}
+              </nav>
             </div>
-            <nav className="space-y-1">
-              {boards.map((board) => {
-                const isActive = activeBoardSlug === board.slug
 
-                return (
-                  <Link
-                    key={board.id}
-                    href={`/boards/${board.slug}`}
-                    className={cn(baseItemClass, "forum-page-sidebar-item", isActive ? activeItemClass : inactiveItemClass)}
-                    title={board.name}
-                  >
-                    <LevelIcon icon={board.icon} className="h-4 w-4 text-lg" svgClassName="[&>svg]:block" />
-                    <span className="forum-page-sidebar-item-label truncate">{board.name}</span>
-                  </Link>
-                )
-              })}
-            </nav>
+            <div>
+              <div className="forum-page-sidebar-section-header mb-2 px-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="forum-page-sidebar-section-title text-xs font-semibold uppercase tracking-wider text-muted-foreground">兴趣节点</h3>
+                  <Link href="/funs" className="forum-page-sidebar-section-link text-xs text-muted-foreground hover:text-foreground">全部</Link>
+                  <div className="forum-page-sidebar-section-divider mx-auto hidden h-px w-8 bg-border" />
+                </div>
+              </div>
+              <nav className="space-y-1">
+                {boards.map((board) => {
+                  const isActive = activeBoardSlug === board.slug
+
+                  return (
+                    <Link
+                      key={board.id}
+                      href={`/boards/${board.slug}`}
+                      className={cn(baseItemClass, "forum-page-sidebar-item", isActive ? activeItemClass : inactiveItemClass)}
+                      title={board.name}
+                    >
+                      <LevelIcon icon={board.icon} className="h-4 w-4 text-lg" svgClassName="[&>svg]:block" />
+                      <span className="forum-page-sidebar-item-label truncate">{board.name}</span>
+                    </Link>
+                  )
+                })}
+              </nav>
+            </div>
           </div>
-        </div>
+        </ScrollArea>
       </aside>
     </div>
   )

@@ -4,7 +4,6 @@ import { notFound, redirect } from "next/navigation"
 import { AccessDeniedCard } from "@/components/access-denied-card"
 import { CollapsibleInfoCard } from "@/components/collapsible-info-card"
 import { ForumPageShell } from "@/components/forum/forum-page-shell"
-import { ForumPostStream } from "@/components/forum/forum-post-stream"
 import { InfiniteForumPostStream } from "@/components/forum/infinite-forum-post-stream"
 import { PageNumberPagination } from "@/components/page-number-pagination"
 
@@ -15,7 +14,7 @@ import { getHomeAnnouncements } from "@/lib/announcements"
 import { getCurrentUser } from "@/lib/auth"
 import { checkBoardPermission } from "@/lib/board-access"
 import { getBoards } from "@/lib/boards"
-import { mapSitePostsToDisplayItems } from "@/lib/forum-post-stream-display"
+import { buildAddonHookSearchParams, buildHookedPostStreamDisplayItems } from "@/lib/addon-feed-posts"
 import { getHomeSidebarHotTopics, resolveSidebarUser } from "@/lib/home-sidebar"
 
 import { DEFAULT_ALLOWED_POST_TYPES } from "@/lib/post-types"
@@ -25,6 +24,7 @@ import { buildMetadataKeywords } from "@/lib/seo"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getZoneBoards, getZoneBySlug, getZonePosts, getZones } from "@/lib/zones"
 import { RssSubscribeButton } from "@/components/rss/rss-subscribe-button"
+import { ForumPostStreamView } from "@/components/forum/forum-post-stream-view"
 
 
 function buildZonePageHref(slug: string, page = 1) {
@@ -109,7 +109,13 @@ export default async function ZonePage(props: PageProps<"/zones/[slug]">) {
     redirect(buildZonePageHref(params.slug, page))
   }
   const sidebarUser = await resolveSidebarUser(currentUser, settings)
-  const postDisplayItems = mapSitePostsToDisplayItems(posts, settings, ["GLOBAL", "ZONE"])
+  const postDisplayItems = await buildHookedPostStreamDisplayItems({
+    posts,
+    settings,
+    visiblePinScopes: ["GLOBAL", "ZONE"],
+    pathname: `/zones/${zone.slug}`,
+    searchParams: buildAddonHookSearchParams(searchParams),
+  })
   const useInfinitePostList = zone.postListLoadMode === POST_LIST_LOAD_MODE_INFINITE
 
 
@@ -171,7 +177,12 @@ export default async function ZonePage(props: PageProps<"/zones/[slug]">) {
                       postLinkDisplayMode={settings.postLinkDisplayMode}
                     />
                   ) : (
-                    <ForumPostStream posts={posts} listDisplayMode={zone.postListDisplayMode} visiblePinScopes={["GLOBAL", "ZONE"]} showPinnedDivider={page === 1} />
+                    <ForumPostStreamView
+                      items={postDisplayItems}
+                      listDisplayMode={zone.postListDisplayMode}
+                      showPinnedDivider={page === 1}
+                      postLinkDisplayMode={settings.postLinkDisplayMode}
+                    />
                   )}
 
                   {posts.length === 0 ? <div className="rounded-md border bg-background p-8 text-sm text-muted-foreground">当前分区下还没有公开内容。</div> : null}

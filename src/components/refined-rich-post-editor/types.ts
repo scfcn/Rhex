@@ -60,6 +60,12 @@ export type FloatingPanelPosition = {
   maxHeight: number
 }
 
+export type SelectionToolbarPosition = {
+  top: number
+  left: number
+  placement: "above" | "below"
+}
+
 export type ToolbarTipDefinition = {
   label: string
   shortcuts?: PlatformShortcutMap

@@ -1,8 +1,8 @@
 import { apiError, apiSuccess, createRouteHandler } from "@/lib/api-route"
+import { buildHookedPostStreamDisplayItems } from "@/lib/addon-feed-posts"
 import { getCurrentUser } from "@/lib/auth"
 import { checkBoardPermission } from "@/lib/board-access"
 import { getBoardBySlug, getBoardPosts } from "@/lib/boards"
-import { mapSitePostsToDisplayItems } from "@/lib/forum-post-stream-display"
 import { DEFAULT_ALLOWED_POST_TYPES, normalizePostTypes } from "@/lib/post-types"
 import { getSiteSettings } from "@/lib/site-settings"
 
@@ -59,7 +59,14 @@ export const GET = createRouteHandler(async ({ request, routeContext }) => {
 
   return apiSuccess({
     ...result,
-    items: mapSitePostsToDisplayItems(result.items, settings, ["GLOBAL", "ZONE", "BOARD"]),
+    items: await buildHookedPostStreamDisplayItems({
+      posts: result.items,
+      settings,
+      visiblePinScopes: ["GLOBAL", "ZONE", "BOARD"],
+      pathname: `/boards/${slug}`,
+      request,
+      searchParams: new URL(request.url).searchParams,
+    }),
   })
 }, {
   errorMessage: "获取节点帖子失败",

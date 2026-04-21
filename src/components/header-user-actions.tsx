@@ -1,23 +1,33 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Bell, MessageSquareMore, User } from "lucide-react"
+import { Bell, Gem, LayoutDashboard, LogOut, Medal, MessageSquareMore, Settings, TrendingUp, User, Wallet } from "lucide-react"
 
 import { useInboxRealtime } from "@/components/inbox-realtime-provider"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/rbutton"
 import { UserAvatar } from "@/components/user/user-avatar"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
 
-
 interface HeaderUserActionsProps {
   user: {
+    id:number,
     username: string
     nickname?: string | null
     avatarPath?: string | null
     vipLevel?: number
     vipExpiresAt?: string | null
+    canAccessAdmin?: boolean
   } | null
 }
 
@@ -43,60 +53,105 @@ function HeaderUnreadBadge({ count, className }: { count: number; className?: st
   )
 }
 
+function UserMenuContent({
+  user,
+  showIdentity,
+  includeVip,
+  includeAdminEntry,
+  onLogout,
+  className,
+}: {
+  user: NonNullable<HeaderUserActionsProps["user"]>
+  showIdentity?: boolean
+  includeVip?: boolean
+  includeAdminEntry?: boolean
+  onLogout: () => Promise<void>
+  className?: string
+}) {
+  const userDisplayName = user.nickname ?? user.username
+
+  return (
+    <DropdownMenuContent align="end" className={className}>
+      {showIdentity ? (
+        <>
+          <DropdownMenuGroup>
+            <DropdownMenuLabel className="px-2 py-1.5">
+              <div className="flex flex-col gap-0.5">
+                <span className="truncate">{userDisplayName}</span>
+                <span className="truncate">UID:{user.id} @{user.username}</span>
+              </div>
+            </DropdownMenuLabel>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+        </>
+      ) : null}
+      <DropdownMenuGroup>
+        <DropdownMenuItem render={<Link href={`/users/${user.username}`} />}>
+          <User />
+          个人主页
+        </DropdownMenuItem>
+          <DropdownMenuItem render={<Link href="/settings?tab=level" />}>
+            <TrendingUp />
+            我的等级
+          </DropdownMenuItem>
+      
+          <DropdownMenuItem render={<Link href="/settings?tab=points" />}>
+            <Wallet />
+            积分明细
+            <DropdownMenuShortcut>账单</DropdownMenuShortcut>
+          </DropdownMenuItem>
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+        <DropdownMenuItem render={<Link href="/settings" />}>
+          <Settings />
+          设置
+        </DropdownMenuItem>
+        {includeVip ? (
+          <DropdownMenuItem render={<Link href="/vip" />}>
+            <Gem />
+            VIP
+          </DropdownMenuItem>
+        ) : null}
+        <DropdownMenuItem render={<Link href="/settings?tab=badges" />}>
+          <Medal />
+          勋章
+        </DropdownMenuItem>
+        {includeAdminEntry ? (
+          <DropdownMenuItem render={<Link href="/admin" />}>
+            <LayoutDashboard />
+            后台
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+        <DropdownMenuItem
+          variant="destructive"
+          onClick={() => {
+            void onLogout()
+          }}
+        >
+          <LogOut />
+          退出
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
+    </DropdownMenuContent>
+  )
+}
 
 export function HeaderUserActions({ user }: HeaderUserActionsProps) {
-
   const router = useRouter()
   const { unreadMessageCount, unreadNotificationCount } = useInboxRealtime()
-  const mobileMenuRef = useRef<HTMLDivElement | null>(null)
-  const desktopMenuRef = useRef<HTMLDivElement | null>(null)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [desktopMenuOpen, setDesktopMenuOpen] = useState(false)
 
   async function handleLogout() {
     await fetch("/api/auth/logout", {
       method: "POST",
       cache: "no-store",
     })
-    setMobileMenuOpen(false)
-    setDesktopMenuOpen(false)
     router.replace("/")
     router.refresh()
   }
-
-
-  useEffect(() => {
-    if (!mobileMenuOpen && !desktopMenuOpen) {
-      return
-    }
-
-    function handlePointerDown(event: MouseEvent) {
-      const target = event.target as Node
-
-      if (mobileMenuOpen && !mobileMenuRef.current?.contains(target)) {
-        setMobileMenuOpen(false)
-      }
-
-      if (desktopMenuOpen && !desktopMenuRef.current?.contains(target)) {
-        setDesktopMenuOpen(false)
-      }
-    }
-
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setMobileMenuOpen(false)
-        setDesktopMenuOpen(false)
-      }
-    }
-
-    document.addEventListener("mousedown", handlePointerDown)
-    document.addEventListener("keydown", handleEscape)
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown)
-      document.removeEventListener("keydown", handleEscape)
-    }
-  }, [desktopMenuOpen, mobileMenuOpen])
 
   if (!user) {
     return (
@@ -117,10 +172,10 @@ export function HeaderUserActions({ user }: HeaderUserActionsProps) {
 
   const vipActive = isVipActive(user)
   const vipLevel = getVipLevel(user)
-
+  const canAccessAdmin = Boolean(user.canAccessAdmin)
+  const userDisplayName = user.nickname ?? user.username
 
   return (
-
     <>
       <div className="flex items-center gap-1 sm:hidden">
         <Link href="/notifications" className="relative">
@@ -137,47 +192,20 @@ export function HeaderUserActions({ user }: HeaderUserActionsProps) {
           <HeaderUnreadBadge count={unreadMessageCount} className="right-0.5 top-0.5 min-h-4 min-w-4" />
         </Link>
 
-        <div ref={mobileMenuRef} className="relative">
-          <button
-            type="button"
-            className="flex h-8 items-center rounded-md px-1.5 transition-colors hover:bg-accent"
-            onClick={() => setMobileMenuOpen((current) => !current)}
-            aria-expanded={mobileMenuOpen}
-            aria-haspopup="menu"
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={<Button variant="ghost" className="h-8 rounded-md px-1.5" aria-label="打开用户菜单" />}
           >
-            <UserAvatar name={user.nickname ?? user.username} avatarPath={user.avatarPath} size="sm" isVip={vipActive} vipLevel={vipLevel} />
-          </button>
-
-          {mobileMenuOpen ? (
-            <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-44 rounded-2xl border border-border bg-background p-2 shadow-2xl">
-              <Link
-                href={`/users/${user.username}`}
-                className="flex items-center rounded-xl px-3 py-2 text-sm transition-colors hover:bg-accent"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                个人主页
-              </Link>
-         
-              <Link href="/settings" className="flex items-center rounded-xl px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => setMobileMenuOpen(false)}>
-                设置
-              </Link>
-
-              <Link href="/vip" className="flex items-center rounded-xl px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => setMobileMenuOpen(false)}>
-                VIP
-              </Link>
-              <button
-                type="button"
-                className="flex w-full items-center rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
-                onClick={async () => {
-                  setMobileMenuOpen(false)
-                  await handleLogout()
-                }}
-              >
-                退出
-              </button>
-            </div>
-          ) : null}
-        </div>
+            <UserAvatar name={userDisplayName} avatarPath={user.avatarPath} size="sm" isVip={vipActive} vipLevel={vipLevel} />
+          </DropdownMenuTrigger>
+          <UserMenuContent
+            user={user}
+            includeVip
+            includeAdminEntry={canAccessAdmin}
+            onLogout={handleLogout}
+            className="w-48"
+          />
+        </DropdownMenu>
       </div>
 
       <div className="hidden items-center gap-1.5 sm:flex">
@@ -197,47 +225,22 @@ export function HeaderUserActions({ user }: HeaderUserActionsProps) {
 
   
 
-        <Link href="/vip">
-          <Button variant="ghost" className="h-8 rounded-md px-3">
-            VIP
-          </Button>
-        </Link>
-
-        <div ref={desktopMenuRef} className="relative">
   
-
-<Button variant="ghost"  type="button" onClick={() => setDesktopMenuOpen((current) => !current)}
-            aria-expanded={desktopMenuOpen}
-            aria-haspopup="menu"  size="icon" className="size-8 rounded-md p-0">
-            <UserAvatar name={user.nickname ?? user.username} avatarPath={user.avatarPath} size="sm" isVip={vipActive} vipLevel={vipLevel} />
-          </Button>
-          {desktopMenuOpen ? (
-            <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-44 rounded-2xl border border-border bg-background p-2 shadow-2xl">
-
-                
-
-
- <Link href={`/users/${user.username}`} className="flex items-center rounded-xl px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => setDesktopMenuOpen(false)}>
-                个人主页
-              </Link>
-
-              <Link href="/settings" className="flex items-center rounded-xl px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => setDesktopMenuOpen(false)}>
-                设置
-              </Link>
-
-              <button
-                type="button"
-                className="flex w-full items-center rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
-                onClick={async () => {
-                  setDesktopMenuOpen(false)
-                  await handleLogout()
-                }}
-              >
-                退出
-              </button>
-            </div>
-          ) : null}
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={<Button variant="ghost" size="icon" className="size-8 rounded-md p-0" aria-label="打开用户菜单" />}
+          >
+            <UserAvatar name={userDisplayName} avatarPath={user.avatarPath} size="sm" isVip={vipActive} vipLevel={vipLevel} />
+          </DropdownMenuTrigger>
+          <UserMenuContent
+            user={user}
+            showIdentity
+            includeVip
+            includeAdminEntry={canAccessAdmin}
+            onLogout={handleLogout}
+            className="w-56"
+          />
+        </DropdownMenu>
       </div>
     </>
   )

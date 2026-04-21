@@ -22,6 +22,12 @@ import {
 } from "@/addons-host/runtime/background-jobs"
 import { normalizeAddonManifest } from "@/addons-host/runtime/manifest"
 import {
+  buildAddonRelationCatalog,
+  collectDependentAddonIssues,
+  collectReverseConflictIssues,
+  validateAddonManifestRelations,
+} from "@/addons-host/runtime/relations"
+import {
   ensureDirectory,
   fileExists,
   getAddonDirectory,
@@ -42,6 +48,7 @@ import { syncAddonRegistryState } from "@/addons-host/management"
 import { deleteAddonConfigValues } from "@/addons-host/runtime/config"
 import { deleteAddonDataStore } from "@/addons-host/runtime/data"
 import { deleteAddonSecretValues } from "@/addons-host/runtime/secrets"
+import type { AddonManifest } from "@/addons-host/types"
 
 interface InstallAddonFromZipInput {
   zipBuffer: Buffer
@@ -200,6 +207,58 @@ function resolveAddonInstallAction(input: {
     : "overwrite"
 }
 
+function pushUniqueIssue(target: string[], message: string) {
+  if (!target.includes(message)) {
+    target.push(message)
+  }
+}
+
+function resolveAddonActivationRelations(input: {
+  manifest: AddonManifest
+  enableAfterInstall: boolean
+  addons: Awaited<ReturnType<typeof loadAddonsRuntimeFresh>>
+}) {
+  const catalog = buildAddonRelationCatalog(
+    input.addons.map((addon) => ({
+      manifest: addon.manifest,
+      enabled: addon.enabled,
+      loadError: addon.loadError,
+    })),
+  )
+  catalog.set(input.manifest.id, {
+    manifest: input.manifest,
+    enabled: input.enableAfterInstall,
+    loadError: null,
+  })
+
+  const relationCheck = validateAddonManifestRelations({
+    manifest: input.manifest,
+    enabled: input.enableAfterInstall,
+    catalog,
+    includeDependencyLoadErrors: true,
+  })
+  const reverseConflictIssues = collectReverseConflictIssues({
+    manifest: input.manifest,
+    catalog,
+  })
+
+  if (input.enableAfterInstall) {
+    for (const issue of reverseConflictIssues) {
+      pushUniqueIssue(relationCheck.blockingIssues, issue)
+    }
+  } else {
+    for (const issue of reverseConflictIssues) {
+      pushUniqueIssue(relationCheck.warnings, issue)
+    }
+  }
+
+  return {
+    blockingIssues: relationCheck.blockingIssues,
+    warnings: relationCheck.warnings,
+    canInstall: relationCheck.blockingIssues.length === 0,
+  }
+}
+
 export async function inspectAddonZip(input: {
   zipBuffer: Buffer
   enableAfterInstall?: boolean
@@ -239,6 +298,11 @@ export async function inspectAddonZip(input: {
     const existingVersion = targetExists
       ? (await readAddonManifestFromDirectory(targetDirectory)).version
       : null
+    const relationState = resolveAddonActivationRelations({
+      manifest,
+      enableAfterInstall: input.enableAfterInstall !== false,
+      addons: await loadAddonsRuntimeFresh(),
+    })
     const installAction = resolveAddonInstallAction({
       targetExists,
       nextVersion: manifest.version,
@@ -259,6 +323,9 @@ export async function inspectAddonZip(input: {
       hasExisting: targetExists,
       requiresReplaceConfirmation: targetExists,
       enableAfterInstall: input.enableAfterInstall !== false,
+      relationBlockingIssues: relationState.blockingIssues,
+      relationWarnings: relationState.warnings,
+      canInstall: relationState.canInstall,
     }
   } finally {
     await removeDirectoryIfExists(extractedWorkingDir)
@@ -295,6 +362,15 @@ export async function installAddonFromZip(input: InstallAddonFromZipInput) {
     const existingVersion = targetExists
       ? (await readAddonManifestFromDirectory(targetDirectory)).version
       : null
+    const enableAfterInstall = input.enableAfterInstall !== false
+    const relationState = resolveAddonActivationRelations({
+      manifest,
+      enableAfterInstall,
+      addons: await loadAddonsRuntimeFresh(),
+    })
+    if (!relationState.canInstall) {
+      throw new Error(relationState.blockingIssues.join("；"))
+    }
     const installAction = resolveAddonInstallAction({
       targetExists,
       nextVersion: manifest.version,
@@ -366,7 +442,6 @@ export async function installAddonFromZip(input: InstallAddonFromZipInput) {
     }
 
     const now = new Date().toISOString()
-    const enableAfterInstall = input.enableAfterInstall !== false
     await upsertAddonRegistryRecord({
       addonId: manifest.id,
       name: manifest.name,
@@ -454,6 +529,20 @@ export async function removeInstalledAddon(addonId: string) {
   const addon = await findLoadedAddonById(addonId)
   if (!addon) {
     throw new Error(`插件不存在：${addonId}`)
+  }
+
+  const dependentAddonIssues = collectDependentAddonIssues({
+    addonId,
+    catalog: buildAddonRelationCatalog(
+      (await loadAddonsRuntimeFresh()).map((runtime) => ({
+        manifest: runtime.manifest,
+        enabled: runtime.enabled,
+        loadError: runtime.loadError,
+      })),
+    ),
+  })
+  if (dependentAddonIssues.length > 0) {
+    throw new Error(dependentAddonIssues.join("；"))
   }
 
   const addonRootDirectory = getAddonsRootDirectory()

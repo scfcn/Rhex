@@ -262,12 +262,12 @@ export const THEME_PRESETS = {
 export const FONT_SIZE_PRESETS = {
   compact: {
     label: "紧凑",
-    size: "14px",
+    size: "12px",
     preview: "A-",
   },
   normal: {
     label: "正常",
-    size: "16px",
+    size: "15px",
     preview: "A",
   },
   relaxed: {

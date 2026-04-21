@@ -10,6 +10,7 @@ interface PostAppendixTimelineProps {
     id: string
     floor: number
     content: string
+    html?: string
     createdAt: string
   }>
   markdownEmojiMap?: MarkdownEmojiItem[]
@@ -41,6 +42,7 @@ export function PostAppendixTimeline({ appendices, markdownEmojiMap }: PostAppen
               <div className="mt-2">
                 <MarkdownContent
                   content={appendix.content}
+                  html={appendix.html}
                   className="text-[14px] leading-7 tracking-[0.015em] text-muted-foreground dark:text-muted-foreground/90"
                   markdownEmojiMap={markdownEmojiMap}
                 />

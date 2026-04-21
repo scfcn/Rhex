@@ -1,6 +1,9 @@
 import { createHash } from "crypto"
-import { mkdir, readFile, writeFile } from "fs/promises"
+import { createReadStream, createWriteStream } from "fs"
+import { mkdir, writeFile } from "fs/promises"
 import path from "path"
+import { Readable } from "stream"
+import { pipeline } from "stream/promises"
 
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
 
@@ -24,9 +27,10 @@ export interface SavedUploadFile {
 }
 
 export interface PreparedUploadFile {
-  buffer: Buffer
+  buffer: Buffer | null
   fileHash: string
   detectedMime: string
+  fileSize: number
 }
 
 export interface SaveUploadedFileOptions {
@@ -158,6 +162,30 @@ function resolveGenericMimeType(file: File) {
   return getUploadMimeType(file.name)
 }
 
+function createNodeReadableFromFile(file: File) {
+  return Readable.fromWeb(file.stream() as never)
+}
+
+async function readFileStreamToBuffer(file: File) {
+  const chunks: Buffer[] = []
+
+  for await (const chunk of createNodeReadableFromFile(file)) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+  }
+
+  return Buffer.concat(chunks)
+}
+
+async function computeFileHash(file: File) {
+  const hash = createHash("sha256")
+
+  for await (const chunk of createNodeReadableFromFile(file)) {
+    hash.update(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+  }
+
+  return hash.digest("hex")
+}
+
 /**
  * 单次读取整文件，复用同一块 Buffer 完成哈希计算、类型检测和后续写盘。
  */
@@ -165,7 +193,7 @@ export async function prepareUploadedFile(file: File, options?: {
   folder?: string
   settings?: WatermarkUploadSettings
 }): Promise<PreparedUploadFile> {
-  const sourceBuffer = Buffer.from(await file.arrayBuffer())
+  const sourceBuffer = await readFileStreamToBuffer(file)
   const detectedMime = detectMimeTypeFromBytes(sourceBuffer.subarray(0, 12)) ?? detectSvgMimeType(sourceBuffer)
 
   if (!detectedMime || !IMAGE_MIME_TYPES.has(detectedMime)) {
@@ -183,6 +211,7 @@ export async function prepareUploadedFile(file: File, options?: {
     buffer,
     fileHash: createHash("sha256").update(buffer).digest("hex"),
     detectedMime,
+    fileSize: buffer.byteLength,
   }
 }
 
@@ -201,31 +230,39 @@ async function saveToLocal(
   const shortHash = preparedFile.fileHash.slice(0, 16)
   const fileName = `${folder}-${shortHash}${ext}`
   const uploadRoot = buildUploadStoragePath(localPath, folder)
+  const destinationPath = path.join(uploadRoot, fileName)
 
   await mkdir(uploadRoot, { recursive: true })
-  await writeFile(path.join(uploadRoot, fileName), preparedFile.buffer)
+
+  if (preparedFile.buffer) {
+    await writeFile(destinationPath, preparedFile.buffer)
+  } else {
+    await pipeline(
+      createNodeReadableFromFile(file),
+      createWriteStream(destinationPath),
+    )
+  }
 
   const resolvedBaseUrl = resolveUploadBaseUrl(baseUrl)
   const urlPath = `${resolvedBaseUrl}/${folder}/${fileName}`.replace(/\\/g, "/")
 
   return {
     fileName,
-    storagePath: path.join(uploadRoot, fileName),
+    storagePath: destinationPath,
     urlPath,
     fileExt: ext,
-    fileSize: preparedFile.buffer.byteLength,
+    fileSize: preparedFile.fileSize,
     mimeType: preparedFile.detectedMime,
     fileHash: preparedFile.fileHash,
   }
 }
 
 export async function prepareBinaryUploadedFile(file: File): Promise<PreparedUploadFile> {
-  const buffer = Buffer.from(await file.arrayBuffer())
-
   return {
-    buffer,
-    fileHash: createHash("sha256").update(buffer).digest("hex"),
+    buffer: null,
+    fileHash: await computeFileHash(file),
     detectedMime: resolveGenericMimeType(file),
+    fileSize: file.size,
   }
 }
 
@@ -300,8 +337,9 @@ async function saveToOss(
   await client.send(new PutObjectCommand({
     Bucket: settings.uploadOssBucket ?? undefined,
     Key: objectKey,
-    Body: preparedFile.buffer,
+    Body: preparedFile.buffer ?? createNodeReadableFromFile(file),
     ContentType: preparedFile.detectedMime,
+    ContentLength: preparedFile.fileSize,
     CacheControl: "public, max-age=31536000, immutable",
   }))
 
@@ -310,7 +348,7 @@ async function saveToOss(
     storagePath: `s3://${settings.uploadOssBucket}/${objectKey}`,
     urlPath: resolveS3PublicUrl(settings, objectKey),
     fileExt: ext,
-    fileSize: preparedFile.buffer.byteLength,
+    fileSize: preparedFile.fileSize,
     mimeType: preparedFile.detectedMime,
     fileHash: preparedFile.fileHash,
   }
@@ -363,6 +401,7 @@ function parseS3StoragePath(storagePath: string) {
 
 async function readStoredUploadFile(params: {
   storagePath: string
+  fileSize?: number | null
   urlPath?: string | null
 }) {
   if (params.storagePath.startsWith("s3://")) {
@@ -378,11 +417,37 @@ async function readStoredUploadFile(params: {
       throw new Error("附件内容不存在")
     }
 
-    const bytes = await result.Body.transformToByteArray()
-    return Buffer.from(bytes)
+    if (typeof result.Body.transformToWebStream === "function") {
+      return {
+        body: result.Body.transformToWebStream(),
+        fileSize: typeof result.ContentLength === "number" ? result.ContentLength : params.fileSize ?? null,
+      }
+    }
+
+    if (result.Body instanceof Readable) {
+      return {
+        body: Readable.toWeb(result.Body) as ReadableStream<Uint8Array>,
+        fileSize: typeof result.ContentLength === "number" ? result.ContentLength : params.fileSize ?? null,
+      }
+    }
+
+    if (result.Body instanceof Blob) {
+      return {
+        body: result.Body.stream(),
+        fileSize: typeof result.ContentLength === "number" ? result.ContentLength : params.fileSize ?? null,
+      }
+    }
+
+    return {
+      body: result.Body as ReadableStream<Uint8Array>,
+      fileSize: typeof result.ContentLength === "number" ? result.ContentLength : params.fileSize ?? null,
+    }
   }
 
-  return readFile(params.storagePath)
+  return {
+    body: Readable.toWeb(createReadStream(params.storagePath)) as ReadableStream<Uint8Array>,
+    fileSize: params.fileSize ?? null,
+  }
 }
 
 function buildContentDisposition(fileName: string) {
@@ -402,16 +467,18 @@ export async function createDownloadResponseFromStoredUpload(params: {
   fileSize?: number | null
   fileName: string
 }) {
-  const fileBuffer = await readStoredUploadFile({
+  const storedFile = await readStoredUploadFile({
     storagePath: params.storagePath,
+    fileSize: params.fileSize,
   })
+  const contentLength = Number.isFinite(params.fileSize)
+    ? params.fileSize
+    : storedFile.fileSize
 
-  const body = new Uint8Array(fileBuffer.buffer, fileBuffer.byteOffset, fileBuffer.byteLength)
-
-  return new Response(body, {
+  return new Response(storedFile.body, {
     headers: {
       "Content-Type": params.mimeType?.trim() || "application/octet-stream",
-      "Content-Length": String(body.byteLength),
+      ...(typeof contentLength === "number" ? { "Content-Length": String(contentLength) } : {}),
       "Content-Disposition": buildContentDisposition(params.fileName),
       "Cache-Control": "private, no-store",
     },

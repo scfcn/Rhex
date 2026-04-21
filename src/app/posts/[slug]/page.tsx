@@ -31,6 +31,7 @@ import { getAiAgentUserId } from "@/lib/ai-agent"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getCurrentUser } from "@/lib/auth"
 import { PinScope } from "@/db/types"
+import { renderAddonPostContentHtml } from "@/lib/addon-post-content-render"
 import { checkBoardPermission, getBoardAccessContextByPostId } from "@/lib/board-access"
 import { getBoards } from "@/lib/boards"
 import { getCommentsByPostId, getUserReplyCountByPost } from "@/lib/comments"
@@ -60,6 +61,31 @@ import { getZones } from "@/lib/zones"
 import { getCanonicalPostPath } from "@/lib/post-links"
 import { canManageBoard, getAvailablePinScopes, isSiteAdmin as isSiteAdminActor, resolveAdminActorFromSessionUser } from "@/lib/moderator-permissions"
 import { AddonSlotRenderer } from "@/addons-host"
+
+function buildUrlSearchParams(
+  input?: Record<string, string | string[] | undefined>,
+) {
+  const searchParams = new URLSearchParams()
+
+  if (!input) {
+    return searchParams
+  }
+
+  for (const [key, value] of Object.entries(input)) {
+    if (typeof value === "string") {
+      searchParams.set(key, value)
+      continue
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        searchParams.append(key, item)
+      }
+    }
+  }
+
+  return searchParams
+}
 
 export async function generateMetadata(props: PageProps<"/posts/[slug]">): Promise<Metadata> {
   const params = await props.params;
@@ -161,6 +187,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
     notFound()
   }
 
+  const postPageSearchParams = buildUrlSearchParams(searchParams)
 
   const userReplyCountPromise = canViewRestrictedPost ? getUserReplyCountByPost(basePost.id, currentUser?.id) : Promise.resolve(0)
   const canViewComments = Boolean(currentUser) || settings.guestCanViewComments
@@ -216,7 +243,16 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
     postAuctionSummaryPromise,
     postOfflineMetaPromise,
     commentResultPromise,
-    getPostSidebarData(basePost.id, basePost.authorUsername ?? basePost.author, settings.postSidebarRelatedTopicsCount, currentUser?.id),
+    getPostSidebarData(
+      basePost.id,
+      basePost.authorUsername ?? basePost.author,
+      settings.postSidebarRelatedTopicsCount,
+      currentUser?.id,
+      {
+        pathname: canonicalPath,
+        searchParams: postPageSearchParams,
+      },
+    ),
     getBoards(),
     getZones(),
   ])
@@ -369,6 +405,34 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
     author: displayPost.author,
     url: canonicalUrl,
   })
+  const [renderedContentBlockHtmlById, renderedAppendices] = await Promise.all([
+    Promise.all(
+      (displayPost.contentBlocks ?? []).map(async (block) => {
+        const shouldRenderHtml = Boolean(block.text && (block.type === "PUBLIC" || block.visible))
+        const html = shouldRenderHtml
+          ? await renderAddonPostContentHtml({
+              content: block.text,
+              markdownEmojiMap: settings.markdownEmojiMap,
+              pathname: canonicalPath,
+              searchParams: postPageSearchParams,
+            })
+          : ""
+
+        return [block.id, html] as const
+      }),
+    ).then((entries) => new Map(entries)),
+    Promise.all(
+      (displayPost.appendices ?? []).map(async (appendix) => ({
+        ...appendix,
+        html: await renderAddonPostContentHtml({
+          content: appendix.content,
+          markdownEmojiMap: settings.markdownEmojiMap,
+          pathname: canonicalPath,
+          searchParams: postPageSearchParams,
+        }),
+      })),
+    ),
+  ])
 
   return (
     <div className="min-h-screen">
@@ -455,7 +519,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                           <AddonSlotRenderer slot="post.body.before" />
                           {(displayPost.contentBlocks ?? []).map((block) => (
                             block.type === "PUBLIC"
-                              ? <MarkdownContent key={block.id} content={block.text} markdownEmojiMap={settings.markdownEmojiMap} expandImagesWhenImageOnly imageOnly={isImageOnlyMarkdown(block.text, settings.markdownEmojiMap)} />
+                              ? <MarkdownContent key={block.id} content={block.text} html={renderedContentBlockHtmlById.get(block.id)} markdownEmojiMap={settings.markdownEmojiMap} expandImagesWhenImageOnly imageOnly={isImageOnlyMarkdown(block.text, settings.markdownEmojiMap)} />
 
                               : (
                                 <RestrictedPostBlock
@@ -464,6 +528,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                                   postId={displayPost.id}
                                   blockId={block.id}
                                   text={block.text}
+                                  html={renderedContentBlockHtmlById.get(block.id)}
                                   visible={block.visible}
                                   currentUserId={currentUser?.id}
                                   pointName={settings.pointName}
@@ -508,7 +573,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                   <PostRewardPoolHighlightBar summary={displayPost.redPacket} attachedTop attachedBottom={hasAppendices} />
 
                   {hasAppendices ? (
-                    <PostAppendixTimeline appendices={displayPost.appendices ?? []} markdownEmojiMap={settings.markdownEmojiMap} />
+                    <PostAppendixTimeline appendices={renderedAppendices} markdownEmojiMap={settings.markdownEmojiMap} />
                   ) : null}
                 </div>
 

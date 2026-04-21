@@ -111,9 +111,11 @@ export function mapListPost(post: ListPostSource, anonymousMaskIdentity: Anonymo
   const publicContent = getPublicPostContentText(post.content)
   const rewardPoolConfig = post.redPacket ? parsePostRewardPoolConfigFromContent(post.content) : null
   const latestReply = post.comments?.[0]
-  const latestReplyAuthorName = post.isAnonymous && latestReply && latestReply.userId === post.author.id && latestReply.useAnonymousIdentity
+  const latestReplyUsesAnonymousIdentity = Boolean(post.isAnonymous && latestReply && latestReply.userId === post.author.id && latestReply.useAnonymousIdentity)
+  const latestReplyAuthorName = latestReplyUsesAnonymousIdentity
     ? (anonymousMaskIdentity?.name ?? anonymousMaskIdentity?.username ?? "匿名用户")
     : (latestReply ? (latestReply.user?.nickname ?? latestReply.user?.username ?? null) : null)
+  const latestReplyAuthorUsername = latestReplyUsesAnonymousIdentity ? null : (latestReply?.user?.username ?? null)
   const latestReplyExcerpt = latestReply?.content ? latestReply.content.slice(0, 42) : null
   const lastRepliedAtRaw = post.lastCommentedAt ?? post.publishedAt ?? post.createdAt
 
@@ -162,6 +164,7 @@ export function mapListPost(post: ListPostSource, anonymousMaskIdentity: Anonymo
     lastRepliedAt: formatRelativeTime(lastRepliedAtRaw),
     lastRepliedAtRaw: lastRepliedAtRaw.toISOString(),
     latestReplyAuthorName,
+    latestReplyAuthorUsername,
     latestReplyExcerpt,
 
     excerpt: post.summary ?? publicContent.slice(0, 120),

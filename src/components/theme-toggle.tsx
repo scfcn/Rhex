@@ -155,11 +155,7 @@ export function ThemeToggle() {
         title={mounted ? `当前${currentMeta.label}，主题 ${currentPresetMeta.label}` : "切换主题"}
       >
         <CurrentIcon className="h-3.5 w-3.5" />
-        <span
-          className="h-2 w-2 rounded-full border border-white/60"
-          style={{ backgroundColor: "hsl(var(--primary))" }}
-          aria-hidden="true"
-        />
+
       </Button>
 
       {menuOpen ? (

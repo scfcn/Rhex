@@ -1459,6 +1459,7 @@ export interface AddonPageChromeOptions {
   footer?: boolean
   leftSidebar?: boolean
   rightSidebar?: boolean
+  pageHeading?: boolean
 }
 
 export interface AddonPageRegistration {

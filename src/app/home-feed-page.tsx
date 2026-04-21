@@ -3,7 +3,6 @@ import { redirect } from "next/navigation"
 import type { ReactNode } from "react"
 
 import { AddonSlotRenderer, AddonSurfaceRenderer } from "@/addons-host"
-import { ForumFeedList } from "@/components/forum/forum-feed-list"
 import { ForumPageShell } from "@/components/forum/forum-page-shell"
 import { HomeSidebarPanels } from "@/components/home/home-sidebar-panels"
 import { InfiniteForumFeed } from "@/components/forum/infinite-forum-feed"
@@ -20,7 +19,7 @@ import { getBoards } from "@/lib/boards"
 import { getLocalDateKey } from "@/lib/date-key"
 import { getFriendLinkListData } from "@/lib/friend-links"
 import { getLatestFeed } from "@/lib/forum-feed"
-import { mapForumFeedItemsToDisplayItems } from "@/lib/forum-feed-display"
+import { buildAddonHookSearchParams, buildHookedFeedDisplayItems } from "@/lib/addon-feed-posts"
 import { buildHomeFeedHref, type HomeFeedSort, parseHomeFeedPage } from "@/lib/home-feed-route"
 import { getHomeSidebarHotTopics, resolveSidebarUser } from "@/lib/home-sidebar"
 import { groupHomeSidebarPanels } from "@/lib/home-sidebar-layout"
@@ -32,6 +31,7 @@ import { getSelfServeAdsAppConfig, getSelfServeAdsPanelData } from "@/lib/self-s
 import { toSelfServeAdConfig } from "@/lib/self-serve-ads.shared"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getZones } from "@/lib/zones"
+import { ForumFeedView } from "@/components/forum/forum-feed-view"
 
 const HOME_FEED_LABELS: Record<HomeFeedSort, string> = {
   latest: "首页",
@@ -137,6 +137,31 @@ export async function HomeFeedPage({
     redirect(buildHomeFeedHref("latest"))
   }
 
+  const homeFeedDisplayItems = sort !== "universe" && postFeedPage
+    ? await (async () => {
+        if (currentPage !== postFeedPage.page) {
+          redirect(buildHomeFeedHref(sort, postFeedPage.page))
+        }
+
+        const currentSort = postSort ?? "latest"
+        const feedPathname = currentSort === "new"
+          ? "/new"
+          : currentSort === "hot"
+            ? "/hot"
+            : currentSort === "following"
+              ? "/following"
+              : "/"
+
+        return buildHookedFeedDisplayItems({
+          items: postFeedPage.items,
+          sort: currentSort,
+          settings,
+          pathname: feedPathname,
+          searchParams: buildAddonHookSearchParams(resolvedSearchParams),
+        })
+      })()
+    : null
+
   const sortBeforeSlot = sort === "new"
     ? "feed.new.before"
     : sort === "hot"
@@ -198,15 +223,10 @@ export async function HomeFeedPage({
                       ) : null}
                     </>
                   ) : null}
-                  {sort !== "universe" && postFeedPage ? (() => {
+                  {sort !== "universe" && postFeedPage && homeFeedDisplayItems ? (() => {
                     const { items: feed, page, totalPages, hasPrevPage, hasNextPage } = postFeedPage
-
-                    if (currentPage !== page) {
-                      redirect(buildHomeFeedHref(sort, page))
-                    }
-
                     const currentSort = postSort ?? "latest"
-                    const feedDisplayItems = mapForumFeedItemsToDisplayItems(feed, currentSort, settings)
+                    const feedDisplayItems = homeFeedDisplayItems
                     const useInfiniteFeed = settings.homeFeedPostListLoadMode === POST_LIST_LOAD_MODE_INFINITE
                     const isFollowingFeed = currentSort === "following"
                     const showPagination = isFollowingFeed ? page > 1 || feed.length > 0 : true
@@ -219,8 +239,8 @@ export async function HomeFeedPage({
                     return (
                       <>
                         {useInfiniteFeed ? (
-                          <InfiniteForumFeed
-                            initialItems={feedDisplayItems}
+                        <InfiniteForumFeed
+                          initialItems={feedDisplayItems}
                             initialPage={page}
                             initialHasNextPage={hasNextPage}
                             currentSort={currentSort}
@@ -229,7 +249,13 @@ export async function HomeFeedPage({
                             postLinkDisplayMode={settings.postLinkDisplayMode}
                           />
                         ) : (
-                          <ForumFeedList items={feed} currentSort={currentSort} showUniverse={showUniverse} listDisplayMode={settings.homeFeedPostListDisplayMode} postLinkDisplayMode={settings.postLinkDisplayMode} />
+                          <ForumFeedView
+                            items={feedDisplayItems}
+                            currentSort={currentSort}
+                            showUniverse={showUniverse}
+                            listDisplayMode={settings.homeFeedPostListDisplayMode}
+                            postLinkDisplayMode={settings.postLinkDisplayMode}
+                          />
                         )}
 
                         {feed.length === 0 ? <div className="mt-4 rounded-md border bg-background p-8 text-sm text-muted-foreground">{emptyStateText}</div> : null}

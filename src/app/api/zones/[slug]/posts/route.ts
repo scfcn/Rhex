@@ -1,7 +1,7 @@
 import { apiError, apiSuccess, createRouteHandler } from "@/lib/api-route"
+import { buildHookedPostStreamDisplayItems } from "@/lib/addon-feed-posts"
 import { getCurrentUser } from "@/lib/auth"
 import { checkBoardPermission } from "@/lib/board-access"
-import { mapSitePostsToDisplayItems } from "@/lib/forum-post-stream-display"
 import { DEFAULT_ALLOWED_POST_TYPES } from "@/lib/post-types"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getZoneBySlug, getZonePosts } from "@/lib/zones"
@@ -59,7 +59,14 @@ export const GET = createRouteHandler(async ({ request, routeContext }) => {
 
   return apiSuccess({
     ...result,
-    items: mapSitePostsToDisplayItems(result.items, settings, ["GLOBAL", "ZONE"]),
+    items: await buildHookedPostStreamDisplayItems({
+      posts: result.items,
+      settings,
+      visiblePinScopes: ["GLOBAL", "ZONE"],
+      pathname: `/zones/${slug}`,
+      request,
+      searchParams: new URL(request.url).searchParams,
+    }),
   })
 }, {
   errorMessage: "获取分区帖子失败",

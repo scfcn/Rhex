@@ -12,6 +12,7 @@ interface RestrictedPostBlockProps {
   postId: string
   blockId: string
   text?: string
+  html?: string
   visible: boolean
   currentUserId?: number
   pointName: string
@@ -23,7 +24,7 @@ interface RestrictedPostBlockProps {
   markdownEmojiMap?: MarkdownEmojiItem[]
 }
 
-function UnlockedContentFrame({ title, content, summary }: { title: string; content: string; summary?: string; markdownEmojiMap?: MarkdownEmojiItem[] }) {
+function UnlockedContentFrame({ title, content, html, summary }: { title: string; content: string; html?: string; summary?: string; markdownEmojiMap?: MarkdownEmojiItem[] }) {
 
   return (
     <div className="rounded-[20px] border border-border bg-secondary/35 p-5">
@@ -31,12 +32,12 @@ function UnlockedContentFrame({ title, content, summary }: { title: string; cont
         <div className="text-sm font-medium text-foreground">{title}</div>
         {summary ? <div className="text-xs text-muted-foreground">{summary}</div> : null}
       </div>
-      <MarkdownContent content={content} />
+      <MarkdownContent content={content} html={html} />
     </div>
   )
 }
 
-export function RestrictedPostBlock({ type, postId, blockId, text, visible, currentUserId, pointName, replyThreshold, price, purchaseCount = 0, userReplyCount = 0, isOwnerOrAdmin = false, markdownEmojiMap }: RestrictedPostBlockProps) {
+export function RestrictedPostBlock({ type, postId, blockId, text, html, visible, currentUserId, pointName, replyThreshold, price, purchaseCount = 0, userReplyCount = 0, isOwnerOrAdmin = false, markdownEmojiMap }: RestrictedPostBlockProps) {
 
   const [scrolling, setScrolling] = useState(false)
 
@@ -50,12 +51,13 @@ export function RestrictedPostBlock({ type, postId, blockId, text, visible, curr
 
   if (visible && text) {
     return (
-      <UnlockedContentFrame
-        title={type === "LOGIN_UNLOCK" ? "登录后可见内容" : type === "REPLY_UNLOCK" ? "回复后已解锁内容" : "购买后已解锁内容"}
-        content={text}
-        summary={type === "PURCHASE_UNLOCK" ? `已有 ${purchaseCount} 人购买` : undefined}
-        markdownEmojiMap={markdownEmojiMap}
-      />
+        <UnlockedContentFrame
+          title={type === "LOGIN_UNLOCK" ? "登录后可见内容" : type === "REPLY_UNLOCK" ? "回复后已解锁内容" : "购买后已解锁内容"}
+          content={text}
+          html={html}
+          summary={type === "PURCHASE_UNLOCK" ? `已有 ${purchaseCount} 人购买` : undefined}
+          markdownEmojiMap={markdownEmojiMap}
+        />
     )
 
   }

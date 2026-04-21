@@ -139,6 +139,40 @@ function PreviewMeta({ label, value }: { label: string; value: string }) {
   )
 }
 
+function PreviewIssuePanel({
+  title,
+  items,
+  tone,
+}: {
+  title: string
+  items: string[]
+  tone: "danger" | "warning"
+}) {
+  if (items.length === 0) {
+    return null
+  }
+
+  const className = tone === "danger"
+    ? "border-destructive/30 bg-destructive/5 text-foreground"
+    : "border-amber-300 bg-amber-50 text-amber-950"
+
+  return (
+    <div className={`rounded-2xl border px-4 py-3 ${className}`}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium">{title}</p>
+        <Badge variant={tone === "danger" ? "destructive" : "outline"}>
+          {items.length} 项
+        </Badge>
+      </div>
+      <div className="mt-3 space-y-2 text-sm leading-6">
+        {items.map((item) => (
+          <p key={`${title}:${item}`}>{item}</p>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function getInstallActionLabel(action: AddonInstallPreviewData["installAction"]) {
   switch (action) {
     case "upgrade":
@@ -477,7 +511,7 @@ export function AddonsHostAdminPage({ initialData }: AddonsHostAdminPageProps) {
 
                 installAddon(false)
               }}
-              disabled={!installPreview || pendingInstallPhase === "install"}
+              disabled={!installPreview || pendingInstallPhase === "install" || !installPreview.canInstall}
             >
               {pendingInstallPhase === "install"
                 ? "安装中..."
@@ -515,6 +549,18 @@ export function AddonsHostAdminPage({ initialData }: AddonsHostAdminPageProps) {
                 <p className="mt-2 text-sm leading-6">{installPreview.description}</p>
               </div>
             ) : null}
+
+            <PreviewIssuePanel
+              title={installPreview.enableAfterInstall ? "当前会阻止安装的问题" : "仅安装模式下的兼容性提醒"}
+              items={installPreview.relationBlockingIssues}
+              tone="danger"
+            />
+
+            <PreviewIssuePanel
+              title="依赖 / 冲突提示"
+              items={installPreview.relationWarnings}
+              tone="warning"
+            />
 
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
@@ -580,7 +626,7 @@ export function AddonsHostAdminPage({ initialData }: AddonsHostAdminPageProps) {
             </Button>
             <Button
               onClick={() => installAddon(true)}
-              disabled={!installPreview || pendingInstallPhase === "install"}
+              disabled={!installPreview || pendingInstallPhase === "install" || !installPreview.canInstall}
             >
               {pendingInstallPhase === "install"
                 ? "安装中..."

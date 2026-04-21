@@ -33,6 +33,7 @@ export interface ForumFeedItem {
   lastRepliedAt: string
   lastRepliedAtRaw: string
   latestReplyAuthorName: string | null
+  latestReplyAuthorUsername: string | null
   latestReplyExcerpt: string | null
   commentCount: number
   viewCount: number
@@ -119,9 +120,11 @@ function mapFeedPost(post: FeedPostRecord | PinnedFeedPostRecord, anonymousMaskI
     authorVipLevel: feedPost.author.vipLevel,
     authorIsVip: Boolean(feedPost.author.vipExpiresAt && new Date(feedPost.author.vipExpiresAt).getTime() > Date.now()),
   }, anonymousMaskIdentity)
-  const latestReplyAuthorName = feedPost.isAnonymous && latestReply?.userId === feedPost.author.id && latestReply?.useAnonymousIdentity
+  const latestReplyUsesAnonymousIdentity = Boolean(feedPost.isAnonymous && latestReply?.userId === feedPost.author.id && latestReply?.useAnonymousIdentity)
+  const latestReplyAuthorName = latestReplyUsesAnonymousIdentity
     ? (anonymousMaskIdentity?.name ?? anonymousMaskIdentity?.username ?? "匿名用户")
     : (latestReply ? latestReply.user.nickname ?? latestReply.user.username : null)
+  const latestReplyAuthorUsername = latestReplyUsesAnonymousIdentity ? null : (latestReply?.user.username ?? null)
 
   return {
     id: feedPost.id,
@@ -143,6 +146,7 @@ function mapFeedPost(post: FeedPostRecord | PinnedFeedPostRecord, anonymousMaskI
     lastRepliedAt: formatRelativeTime(feedPost.lastCommentedAt ?? feedPost.publishedAt ?? feedPost.createdAt),
     lastRepliedAtRaw: (feedPost.lastCommentedAt ?? feedPost.publishedAt ?? feedPost.createdAt).toISOString(),
     latestReplyAuthorName,
+    latestReplyAuthorUsername,
     latestReplyExcerpt: latestReply ? latestReply.content.slice(0, 42) : null,
     commentCount: feedPost.commentCount,
     viewCount: feedPost.viewCount,
