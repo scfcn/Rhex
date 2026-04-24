@@ -54,7 +54,7 @@ export default async function BadgeSystemFaqPage() {
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {categories.length > 0 ? categories.map(([category, count]) => (
-            <div key={category} className="rounded-[20px] bg-secondary/50 p-4">
+            <div key={category} className="rounded-xl bg-secondary/50 p-4">
               <p className="text-xs text-muted-foreground">{category}</p>
               <p className="mt-2 text-2xl font-semibold">{count}</p>
               <p className="mt-1 text-sm text-muted-foreground">当前分类下已启用勋章</p>
@@ -75,7 +75,7 @@ export default async function BadgeSystemFaqPage() {
           ) : (
             <div className="grid gap-4 lg:grid-cols-2">
               {enabledBadges.map((badge) => (
-                <div key={badge.id} className="rounded-[24px] border border-border bg-card p-5">
+                <div key={badge.id} className="rounded-xl border border-border bg-card p-5">
                   <div className="flex items-start gap-4">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-xl" style={{ backgroundColor: `${badge.color}18`, color: badge.color }}>
                       <LevelIcon icon={badge.iconText ?? "🏅"} color={badge.color} className="h-6 w-6 text-[22px]" emojiClassName="text-inherit" svgClassName="[&>svg]:block" />

@@ -209,10 +209,10 @@ export function SearchForm({
           className={externalOptionsInline
             ? (compact
                 ? "mt-2 rounded-2xl border border-border bg-background p-2 shadow-2xl"
-                : "mt-3 rounded-[24px] border border-border bg-background p-3 shadow-soft")
+                : "mt-3 rounded-xl border border-border bg-background p-3 shadow-soft")
             : (compact
                 ? "absolute left-0 right-0 top-[calc(100%+8px)] z-20 rounded-2xl border border-border bg-background p-2 shadow-2xl"
-                : "absolute left-0 right-0 top-[calc(100%+12px)] z-20 rounded-[24px] border border-border bg-background p-3 shadow-soft")}
+                : "absolute left-0 right-0 top-[calc(100%+12px)] z-20 rounded-xl border border-border bg-background p-3 shadow-soft")}
         >
           <div className={compact ? "px-3 pb-2 pt-1 text-xs font-medium text-muted-foreground" : "px-2 pb-3 text-xs font-medium text-muted-foreground"}>
             站内搜索已关闭，请选择外部搜索引擎

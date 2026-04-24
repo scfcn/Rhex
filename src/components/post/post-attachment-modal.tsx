@@ -145,7 +145,7 @@ export function PostAttachmentModal({
         </div>
 
         {attachments.length === 0 ? (
-          <div className="rounded-[20px] border border-dashed border-border bg-card/60 px-4 py-6 text-sm leading-6 text-muted-foreground">
+          <div className="rounded-xl border border-dashed border-border bg-card/60 px-4 py-6 text-sm leading-6 text-muted-foreground">
             当前还没有附件。可以上传站内文件，也可以添加网盘链接和提取码。
           </div>
         ) : null}
@@ -157,7 +157,7 @@ export function PostAttachmentModal({
             const permissionSummary = buildAttachmentPermissionSummary(attachment, pointName)
 
             return (
-            <div key={`${attachment.id ?? "new"}-${attachment.sourceType}-${index}`} className="space-y-4 rounded-[20px] border border-border bg-card p-4">
+            <div key={`${attachment.id ?? "new"}-${attachment.sourceType}-${index}`} className="space-y-4 rounded-xl border border-border bg-card p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -265,7 +265,7 @@ export function PostAttachmentModal({
                         />
                         <p className="text-xs leading-6 text-muted-foreground">设置为 0 表示不需要额外购买；大于 0 时，满足其它条件后还需支付 {pointName} 才能下载。</p>
                       </div>
-                      <label className={attachment.requireReplyUnlock ? "flex min-h-11 cursor-pointer items-start justify-between gap-3 rounded-[20px] border border-foreground bg-accent px-4 py-3" : "flex min-h-11 cursor-pointer items-start justify-between gap-3 rounded-[20px] border border-border bg-card px-4 py-3"}>
+                      <label className={attachment.requireReplyUnlock ? "flex min-h-11 cursor-pointer items-start justify-between gap-3 rounded-xl border border-foreground bg-accent px-4 py-3" : "flex min-h-11 cursor-pointer items-start justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3"}>
                         <div className="space-y-1">
                           <p className="text-sm font-medium">回复后可下载</p>
                           <p className="text-xs leading-5 text-muted-foreground">开启后，用户至少在本帖回复 1 次才能下载该附件。</p>

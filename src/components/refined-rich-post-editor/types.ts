@@ -46,6 +46,7 @@ export interface RefinedRichPostEditorProps {
   uploadFolder?: string
   markdownEmojiMap?: MarkdownEmojiItem[]
   markdownImageUploadEnabled?: boolean
+  shellClassName?: string
 }
 
 export type MediaInsertResult = {

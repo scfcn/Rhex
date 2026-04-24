@@ -18,6 +18,7 @@ import { getCurrentUser } from "@/lib/auth"
 import { checkBoardPermission } from "@/lib/board-access"
 import { getBoardBySlug, getBoardModerators, getBoardPosts, getBoards, isUserFollowingBoard } from "@/lib/boards"
 import { buildAddonHookSearchParams, buildHookedPostStreamDisplayItems } from "@/lib/addon-feed-posts"
+import { DEFAULT_TAXONOMY_POST_SORT, normalizeTaxonomyPostSort, type TaxonomyPostSort } from "@/lib/forum-taxonomy-sort"
 import { getHomeSidebarHotTopics, resolveSidebarUser } from "@/lib/home-sidebar"
 import { POST_LIST_LOAD_MODE_INFINITE } from "@/lib/post-list-load-mode"
 import { DEFAULT_ALLOWED_POST_TYPES, normalizePostTypes } from "@/lib/post-types"
@@ -30,9 +31,31 @@ import { ForumPostStreamView } from "@/components/forum/forum-post-stream-view"
 
 
 
-function buildBoardPageHref(slug: string, page = 1) {
+function buildBoardPageHref(slug: string, page = 1, sort: TaxonomyPostSort = DEFAULT_TAXONOMY_POST_SORT) {
   const normalizedPage = Math.max(1, Math.trunc(page))
-  return normalizedPage <= 1 ? `/boards/${slug}` : `/boards/${slug}?page=${normalizedPage}`
+  const query = new URLSearchParams()
+
+  if (sort !== DEFAULT_TAXONOMY_POST_SORT) {
+    query.set("sort", sort)
+  }
+
+  if (normalizedPage > 1) {
+    query.set("page", String(normalizedPage))
+  }
+
+  const queryString = query.toString()
+  return queryString ? `/boards/${slug}?${queryString}` : `/boards/${slug}`
+}
+
+function buildBoardPostsApiPath(slug: string, sort: TaxonomyPostSort) {
+  const query = new URLSearchParams()
+
+  if (sort !== DEFAULT_TAXONOMY_POST_SORT) {
+    query.set("sort", sort)
+  }
+
+  const queryString = query.toString()
+  return queryString ? `/api/boards/${encodeURIComponent(slug)}/posts?${queryString}` : `/api/boards/${encodeURIComponent(slug)}/posts`
 }
 
 export async function generateStaticParams() {
@@ -98,10 +121,12 @@ export default async function BoardPage(props: PageProps<"/boards/[slug]">) {
   }, "view")
 
   const rawPage = readSearchParam(searchParams?.page)
+  const rawSort = readSearchParam(searchParams?.sort)
   const currentPage = Math.max(1, Number(rawPage ?? "1") || 1)
+  const currentSort = normalizeTaxonomyPostSort(rawSort)
   const [postsPage, boards, zones, hotTopics, announcements, moderators] = await Promise.all([
     permission.allowed
-      ? getBoardPosts(params.slug, currentPage, settings.boardPostPageSize)
+      ? getBoardPosts(params.slug, currentPage, settings.boardPostPageSize, currentSort)
       : Promise.resolve({ items: [], page: 1, pageSize: settings.boardPostPageSize, total: 0, totalPages: 1, hasPrevPage: false, hasNextPage: false }),
     getBoards(),
     getZones(),
@@ -110,13 +135,14 @@ export default async function BoardPage(props: PageProps<"/boards/[slug]">) {
     getBoardModerators(board.id),
   ])
   const { items: posts, page, totalPages, hasPrevPage, hasNextPage } = postsPage
+  const canonicalPage = currentPage !== page ? page : currentPage
 
-  if (rawPage !== undefined && currentPage === 1) {
-    redirect(buildBoardPageHref(params.slug))
-  }
-
-  if (currentPage !== page) {
-    redirect(buildBoardPageHref(params.slug, page))
+  if (
+    currentPage !== page
+    || (rawPage !== undefined && currentPage === 1)
+    || (rawSort !== undefined && currentSort === DEFAULT_TAXONOMY_POST_SORT)
+  ) {
+    redirect(buildBoardPageHref(params.slug, canonicalPage, currentSort))
   }
   const isFollowingBoard = currentUser
     ? await isUserFollowingBoard(currentUser.id, board.id)
@@ -125,11 +151,20 @@ export default async function BoardPage(props: PageProps<"/boards/[slug]">) {
   const postDisplayItems = await buildHookedPostStreamDisplayItems({
     posts,
     settings,
+    sort: currentSort,
     visiblePinScopes: ["GLOBAL", "ZONE", "BOARD"],
     pathname: `/boards/${board.slug}`,
     searchParams: buildAddonHookSearchParams(searchParams),
   })
   const useInfinitePostList = board.postListLoadMode === POST_LIST_LOAD_MODE_INFINITE
+  const emptyStateText = currentSort === "featured" ? "当前节点还没有精华内容。" : "当前节点还没有内容。"
+  const sortLinks = {
+    currentSort,
+    latestHref: buildBoardPageHref(params.slug, 1, "latest"),
+    newHref: buildBoardPageHref(params.slug, 1, "new"),
+    featuredHref: buildBoardPageHref(params.slug, 1, "featured"),
+  }
+  const boardPostsApiPath = buildBoardPostsApiPath(params.slug, currentSort)
 
 
 
@@ -172,7 +207,7 @@ export default async function BoardPage(props: PageProps<"/boards/[slug]">) {
                     <>
                       {useInfinitePostList ? (
                         <InfiniteForumPostStream
-                          apiPath={`/api/boards/${encodeURIComponent(params.slug)}/posts`}
+                          apiPath={boardPostsApiPath}
                           initialItems={postDisplayItems}
                           initialPage={page}
                           initialHasNextPage={hasNextPage}
@@ -180,6 +215,7 @@ export default async function BoardPage(props: PageProps<"/boards/[slug]">) {
                           showBoard={false}
                           showPinnedDivider={page === 1}
                           postLinkDisplayMode={settings.postLinkDisplayMode}
+                          sortLinks={sortLinks}
                         />
                       ) : (
                         <ForumPostStreamView
@@ -188,10 +224,11 @@ export default async function BoardPage(props: PageProps<"/boards/[slug]">) {
                           showBoard={false}
                           showPinnedDivider={page === 1}
                           postLinkDisplayMode={settings.postLinkDisplayMode}
+                          sortLinks={sortLinks}
                         />
                       )}
 
-                      {posts.length === 0 ? <div className="rounded-md border bg-background p-8 text-sm text-muted-foreground">当前节点还没有内容。</div> : null}
+                      {posts.length === 0 ? <div className="rounded-md border bg-background p-8 text-sm text-muted-foreground">{emptyStateText}</div> : null}
 
                       {useInfinitePostList ? null : (
                         <PageNumberPagination
@@ -199,7 +236,7 @@ export default async function BoardPage(props: PageProps<"/boards/[slug]">) {
                           totalPages={totalPages}
                           hasPrevPage={hasPrevPage}
                           hasNextPage={hasNextPage}
-                          buildHref={(targetPage) => buildBoardPageHref(params.slug, targetPage)}
+                          buildHref={(targetPage) => buildBoardPageHref(params.slug, targetPage, currentSort)}
                         />
                       )}
                     </>

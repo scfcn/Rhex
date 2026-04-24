@@ -1,14 +1,14 @@
 "use client"
 
-import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Clock3, Gift, Sparkles, Trophy } from "lucide-react"
+import { ChevronDown, ChevronUp, Clock3, Gift, Sparkles, Trophy } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
 import { UserAvatar } from "@/components/user/user-avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/rbutton"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Modal } from "@/components/ui/modal"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatDateTime, formatNumber, formatRelativeTime } from "@/lib/formatters"
@@ -56,6 +56,13 @@ interface LotteryPanelProps {
     eligible: boolean
     ineligibleReason: string | null
     currentProbability: number | null
+    participantPreviews: Array<{
+      userId: number
+      username: string
+      nickname: string | null
+      avatarPath: string | null
+      joinedAt: string
+    }>
     prizes: Array<{
       id: string
       title: string
@@ -98,7 +105,7 @@ export function BountyPanel({ postId, points, pointName = "积分", isResolved, 
   }, [postId])
 
   return (
-    <div className="rounded-[24px] bg-amber-50/75 p-4 sm:p-5 dark:bg-amber-500/8">
+    <div className="rounded-xl bg-amber-50/75 p-4 sm:p-5 dark:bg-amber-500/8">
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-semibold text-amber-950 dark:text-amber-100">悬赏帖</p>
@@ -116,14 +123,15 @@ export function BountyPanel({ postId, points, pointName = "积分", isResolved, 
 
 export function LotteryPanel({ postId, isOwnerOrAdmin, lottery }: LotteryPanelProps) {
   const router = useRouter()
+  const participantPageSize = 10
   const [message, setMessage] = useState("")
   const [loading, setLoading] = useState(false)
   const [mounted, setMounted] = useState(false)
-  const [detailModal, setDetailModal] = useState<"prizes" | "conditions" | "announcement" | null>(null)
+  const [conditionsOpen, setConditionsOpen] = useState(false)
   const [participantModalOpen, setParticipantModalOpen] = useState(false)
   const [participantLoading, setParticipantLoading] = useState(false)
   const [participantPage, setParticipantPage] = useState(1)
-  const [participantPageCount, setParticipantPageCount] = useState(1)
+  const [participantPageCount, setParticipantPageCount] = useState(Math.max(1, Math.ceil(lottery.participantCount / participantPageSize)))
   const [participantTotal, setParticipantTotal] = useState(lottery.participantCount)
   const [participantItems, setParticipantItems] = useState<Array<{
     id: string
@@ -132,7 +140,14 @@ export function LotteryPanel({ postId, isOwnerOrAdmin, lottery }: LotteryPanelPr
     nickname: string | null
     avatarPath: string | null
     joinedAt: string
-  }>>([])
+  }>>(lottery.participantPreviews.map((participant) => ({
+    id: `${participant.userId}:${participant.joinedAt}`,
+    userId: participant.userId,
+    username: participant.username,
+    nickname: participant.nickname,
+    avatarPath: participant.avatarPath,
+    joinedAt: participant.joinedAt,
+  })))
   const [now, setNow] = useState(() => {
     const renderedAtTime = new Date(lottery.renderedAt).getTime()
     return Number.isFinite(renderedAtTime) ? renderedAtTime : Date.now()
@@ -146,6 +161,7 @@ export function LotteryPanel({ postId, isOwnerOrAdmin, lottery }: LotteryPanelPr
   const isLocked = (Boolean(lottery.lockedAt) || hasReachedEndTime) && !isDrawn
   const isEndedWithoutDraw = hasReachedEndTime && !isDrawn
   const totalPrizeQuantity = lottery.prizes.reduce((sum, prize) => sum + prize.quantity, 0)
+  const conditionCount = lottery.conditionGroups.reduce((sum, group) => sum + group.conditions.length, 0)
   const goalProgress = lottery.participantGoal && lottery.participantGoal > 0
     ? Math.min(100, Math.round((lottery.participantCount / lottery.participantGoal) * 100))
     : null
@@ -162,12 +178,6 @@ export function LotteryPanel({ postId, isOwnerOrAdmin, lottery }: LotteryPanelPr
   })
   const showCountdownStageLabel = (!isDrawn && hasNotStarted && Boolean(lottery.startsAt))
     || (!isDrawn && !isLocked && Boolean(lottery.endsAt))
-  const summaryChips = [
-    `参与 ${formatNumber(lottery.participantCount)} 人`,
-    `中奖名额 ${formatNumber(totalPrizeQuantity)} 份`,
-    lottery.currentProbability !== null ? `理论 ${lottery.currentProbability}%` : null,
-    lottery.triggerMode === "AUTO_PARTICIPANT_COUNT" && lottery.participantGoal ? `目标 ${formatNumber(lottery.participantGoal)} 人` : null,
-  ].filter(Boolean) as string[]
 
   useEffect(() => {
     setMounted(true)
@@ -271,7 +281,7 @@ export function LotteryPanel({ postId, isOwnerOrAdmin, lottery }: LotteryPanelPr
     setParticipantLoading(true)
 
     try {
-      const response = await fetch(`/api/posts/lottery/participants?postId=${encodeURIComponent(postId)}&page=${page}&pageSize=10`, {
+      const response = await fetch(`/api/posts/lottery/participants?postId=${encodeURIComponent(postId)}&page=${page}&pageSize=${participantPageSize}`, {
         method: "GET",
       })
       const result = await response.json()
@@ -314,7 +324,7 @@ export function LotteryPanel({ postId, isOwnerOrAdmin, lottery }: LotteryPanelPr
 
   return (
     <>
-      <Card className="overflow-hidden rounded-[24px]">
+      <Card className="overflow-hidden rounded-xl">
         <CardHeader className="sr-only">
           <CardTitle>抽奖面板</CardTitle>
         </CardHeader>
@@ -353,38 +363,60 @@ export function LotteryPanel({ postId, isOwnerOrAdmin, lottery }: LotteryPanelPr
           </div>
 
           <div className="px-4 py-4 sm:px-5">
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 rounded-full px-3 text-xs"
-                onClick={() => {
-                  setParticipantModalOpen(true)
-                  void loadParticipantPage(1)
-                }}
-              >
-                参与 {formatNumber(lottery.participantCount)} 人
-              </Button>
-              {summaryChips.slice(1).map((item) => (
-                <Badge key={item} variant="outline" className="h-8 rounded-full px-3 text-xs">
-                  {item}
-                </Badge>
-              ))}
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <div className="h-px flex-1 bg-border" />
+              <span>已有 {formatNumber(participantTotal)} 人参与抽奖</span>
+              <div className="h-px flex-1 bg-border" />
             </div>
 
+            {lottery.participantPreviews.length > 0 ? (
+              <div className="mt-4 flex flex-wrap gap-1.5">
+                {lottery.participantPreviews.map((participant) => (
+                  <div
+                    key={`${participant.userId}:${participant.joinedAt}`}
+                    className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-background py-1 pl-1 pr-1"
+                  >
+                    <UserAvatar
+                      name={participant.nickname ?? participant.username}
+                      avatarPath={participant.avatarPath}
+                      size="xs"
+                    />
+                    <span className="max-w-28 truncate text-[11px] font-medium text-foreground sm:max-w-32">
+                      {participant.nickname ?? participant.username}
+                    </span>
+                  </div>
+                ))}
+                {participantTotal > lottery.participantPreviews.length ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-auto rounded-full px-2.5 py-1 text-[11px]"
+                    onClick={() => {
+                      setParticipantModalOpen(true)
+                      void loadParticipantPage(1)
+                    }}
+                  >
+                    查看更多
+                  </Button>
+                ) : null}
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-muted-foreground">当前还没有人参与，欢迎第一个参与抽奖。</p>
+            )}
+
             {!showParticipationMeta ? null : lottery.ineligibleReason ? (
-              <div className="mt-4 rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
                 当前还未满足入池条件：{lottery.ineligibleReason}
               </div>
             ) : lottery.joined ? (
-              <div className="mt-4 rounded-[20px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
+              <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
                 你已进入抽奖池，保持当前资格即可参与开奖。
               </div>
             ) : null}
 
             {!isDrawn && goalProgress !== null ? (
-              <div className="mt-4 rounded-[20px] border border-border bg-card/70 px-4 py-4">
+              <div className="mt-4 rounded-xl border border-border bg-card/70 px-4 py-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-medium text-foreground">自动开奖进度</p>
@@ -398,17 +430,95 @@ export function LotteryPanel({ postId, isOwnerOrAdmin, lottery }: LotteryPanelPr
               </div>
             ) : null}
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" className="rounded-full px-3" onClick={() => setDetailModal("prizes")}>
-                奖项 {lottery.prizes.length}
-              </Button>
-              <Button type="button" variant="outline" size="sm" className="rounded-full px-3" onClick={() => setDetailModal("conditions")}>
-                条件 {lottery.conditionGroups.reduce((sum, group) => sum + group.conditions.length, 0)}
-              </Button>
-              {lottery.announcement ? (
-                <Button type="button" variant="outline" size="sm" className="rounded-full px-3" onClick={() => setDetailModal("announcement")}>
-                  开奖公告
-                </Button>
+            <div className="mt-4 flex flex-col gap-3">
+              <div className="bg-card/65 p-2">
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="flex size-6 items-center justify-center rounded-full border border-border bg-background text-muted-foreground">
+                      <Gift className="h-3.5 w-3.5" />
+                    </span>
+                    <p className="text-xs font-medium text-foreground">奖项</p>
+                  </div>
+                  <Badge variant="outline" className="rounded-full px-2 py-0 text-[10px]">{formatNumber(totalPrizeQuantity)} 份</Badge>
+                </div>
+                <div className="mt-2 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3">
+                  {lottery.prizes.map((prize) => (
+                    <div key={prize.id} className="rounded-[14px] border border-border bg-linear-to-br from-background to-muted/40 px-2.5 py-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-semibold text-foreground">{prize.title}</p>
+                          <p className="mt-0.5 text-[10px] leading-5 text-muted-foreground">
+                            共 {prize.quantity} 名{isDrawn ? ` · 已开奖 ${prize.winnerCount} 名` : ""}
+                          </p>
+                        </div>
+                        <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[10px]">{formatNumber(prize.quantity)}</Badge>
+                      </div>
+                      <p className="mt-1.5 text-[11px] leading-5 text-muted-foreground">{prize.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <Collapsible open={conditionsOpen} onOpenChange={setConditionsOpen}>
+                <div className="rounded-[18px] border border-border bg-card/70 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm font-medium text-foreground">参与条件</p>
+                      <Badge variant="outline" className="rounded-full">{conditionCount}</Badge>
+                    </div>
+                    <CollapsibleTrigger
+                      render={(
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon-sm"
+                          className="rounded-full"
+                          aria-label={conditionsOpen ? "收起参与条件" : "展开参与条件"}
+                          title={conditionsOpen ? "收起参与条件" : "展开参与条件"}
+                        />
+                      )}
+                    >
+                      {conditionsOpen ? <ChevronUp /> : <ChevronDown />}
+                    </CollapsibleTrigger>
+                  </div>
+
+                  <CollapsibleContent>
+                    <div className="mt-3 flex flex-col gap-2">
+                      {lottery.conditionGroups.map((group) => (
+                        <div key={group.key} className="rounded-[16px] border border-border bg-background px-3 py-3">
+                          <p className="text-xs font-medium text-foreground">{group.label}</p>
+                          <ul className="mt-2 flex flex-col gap-2">
+                            {group.conditions.map((condition) => (
+                              <li key={condition.id} className="flex flex-col gap-2 rounded-[14px] border border-border px-3 py-2.5 sm:flex-row sm:items-start sm:justify-between">
+                                <span className="min-w-0 flex-1 text-xs leading-6 text-foreground">{condition.description ?? "未命名条件"}</span>
+                                {condition.matched === true ? (
+                                  <Badge variant="secondary" className="rounded-full">已满足</Badge>
+                                ) : condition.matched === false ? (
+                                  <Badge variant="outline" className="rounded-full">未满足</Badge>
+                                ) : (
+                                  <Badge variant="outline" className="rounded-full">待校验</Badge>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                </div>
+              </Collapsible>
+
+              {isDrawn && lottery.announcement ? (
+                <div className="rounded-[18px] border border-border bg-card/70 p-3">
+                  <div className="flex items-center gap-2">
+                    <Trophy className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm font-medium text-foreground">开奖公告</p>
+                  </div>
+                  <pre className="mt-2 whitespace-pre-wrap text-xs leading-6 text-muted-foreground">
+                    {lottery.announcement}
+                  </pre>
+                </div>
               ) : null}
             </div>
 
@@ -478,118 +588,6 @@ export function LotteryPanel({ postId, isOwnerOrAdmin, lottery }: LotteryPanelPr
         </div>
       </Modal>
 
-      <Modal
-        open={detailModal === "prizes"}
-        onClose={() => setDetailModal(null)}
-        title="奖项详情"
-        description={`共 ${lottery.prizes.length} 个奖项，合计 ${totalPrizeQuantity} 个中奖名额。`}
-        size="lg"
-        footer={(
-          <div className="flex w-full justify-end">
-            <Button type="button" variant="outline" onClick={() => setDetailModal(null)}>
-              关闭
-            </Button>
-          </div>
-        )}
-      >
-        <div className="grid gap-3 sm:grid-cols-2">
-          {lottery.prizes.map((prize) => (
-            <div key={prize.id} className="rounded-[20px] border border-border bg-card/70 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-foreground">{prize.title}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">共 {prize.quantity} 名 · 已开奖 {prize.winnerCount} 名</p>
-                </div>
-                <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-xl", isDrawn ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/14 dark:text-emerald-300" : "bg-violet-100 text-violet-700 dark:bg-violet-500/14 dark:text-violet-300")}>
-                  <Gift />
-                </span>
-              </div>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">{prize.description}</p>
-              {prize.winners.length > 0 ? (
-                <div className="mt-3 rounded-[16px] border border-border bg-background px-3 py-3">
-                  <div className="flex flex-wrap gap-2">
-                    {prize.winners.map((winner) => (
-                      <Link
-                        key={`${winner.userId}-${winner.username}`}
-                        href={`/users/${winner.username}`}
-                        className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-2.5 py-1.5 text-xs text-foreground transition-colors hover:bg-accent/50"
-                      >
-                        <UserAvatar
-                          name={winner.nickname ?? winner.username}
-                          avatarPath={winner.avatarPath}
-                          size="xs"
-                        />
-                        <span className="max-w-24 truncate">{winner.nickname ?? winner.username}</span>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <p className="mt-3 text-xs text-muted-foreground">{isDrawn ? "该奖项暂无中奖者。" : "开奖后将在这里展示中奖名单。"}</p>
-              )}
-            </div>
-          ))}
-        </div>
-      </Modal>
-
-      <Modal
-        open={detailModal === "conditions"}
-        onClose={() => setDetailModal(null)}
-        title="参与条件"
-        description="满足任一参与方案即可入池，方案内条件需全部满足。"
-        size="lg"
-        footer={(
-          <div className="flex w-full justify-end">
-            <Button type="button" variant="outline" onClick={() => setDetailModal(null)}>
-              关闭
-            </Button>
-          </div>
-        )}
-      >
-        <div className="space-y-3">
-          {lottery.conditionGroups.map((group) => (
-            <div key={group.key} className="rounded-[20px] border border-border bg-card/70 p-4">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-muted-foreground" />
-                <p className="text-sm font-medium text-foreground">{group.label}</p>
-              </div>
-              <ul className="mt-3 flex flex-col gap-2">
-                {group.conditions.map((condition) => (
-                  <li key={condition.id} className="flex flex-col gap-2 rounded-[16px] border border-border bg-background px-3 py-3 sm:flex-row sm:items-start sm:justify-between">
-                    <span className="min-w-0 flex-1 text-sm leading-6 text-foreground">{condition.description ?? "未命名条件"}</span>
-                    {condition.matched === true ? (
-                      <Badge variant="secondary" className="rounded-full">已满足</Badge>
-                    ) : condition.matched === false ? (
-                      <Badge variant="outline" className="rounded-full">未满足</Badge>
-                    ) : (
-                      <Badge variant="outline" className="rounded-full">待校验</Badge>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </Modal>
-
-      <Modal
-        open={detailModal === "announcement"}
-        onClose={() => setDetailModal(null)}
-        title="开奖公告"
-        description="开奖结果与领奖说明会在这里展示。"
-        size="lg"
-        footer={(
-          <div className="flex w-full justify-end">
-            <Button type="button" variant="outline" onClick={() => setDetailModal(null)}>
-              关闭
-            </Button>
-          </div>
-        )}
-      >
-        <pre className="rounded-[20px] border border-border bg-card/70 px-4 py-4 text-sm leading-7 whitespace-pre-wrap text-foreground">
-          {lottery.announcement ?? "当前还没有开奖公告。"}
-        </pre>
-      </Modal>
     </>
   )
 }
@@ -686,8 +684,8 @@ export function PollPanel({ postId, totalVotes, hasVoted, expiresAt, options }: 
           <div
             key={option.id}
             className={option.isVoted
-              ? "rounded-[20px] border border-sky-200/80 bg-sky-50 p-3.5 shadow-xs sm:p-4 dark:border-sky-500/20 dark:bg-slate-950/90 dark:shadow-none"
-              : "rounded-[20px] border border-slate-200/80 bg-white p-3.5 shadow-xs sm:p-4 dark:border-white/10 dark:bg-slate-900/75 dark:shadow-none"}
+              ? "rounded-xl border border-sky-200/80 bg-sky-50 p-3.5 shadow-xs sm:p-4 dark:border-sky-500/20 dark:bg-slate-950/90 dark:shadow-none"
+              : "rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs sm:p-4 dark:border-white/10 dark:bg-slate-900/75 dark:shadow-none"}
           >
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 flex-1">

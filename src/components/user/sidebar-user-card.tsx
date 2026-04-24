@@ -3,12 +3,14 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Heart, Plus, Settings, Star, Users, Wallet, X } from "lucide-react"
+import { CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Heart, Plus, RotateCcw, Settings, Star, Users, Wallet, X } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
+import { showConfirm } from "@/components/ui/alert-dialog"
 import { Modal } from "@/components/ui/modal"
 import { LevelBadge } from "@/components/level-badge"
-import { Tooltip } from "@/components/ui/tooltip"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Tooltip, TooltipContent, TooltipRoot, TooltipTrigger } from "@/components/ui/tooltip"
 import { UserAvatar } from "@/components/user/user-avatar"
 import { UserStatusBadge } from "@/components/user/user-status-badge"
 import { VipBadge } from "@/components/vip/vip-badge"
@@ -145,6 +147,55 @@ function buildCalendarDays(monthKey: string) {
   return cells
 }
 
+function CalendarEntryStatusIcon({ isMakeUp }: { isMakeUp: boolean }) {
+  const label = isMakeUp ? "已补签" : "已签到"
+  const Icon = isMakeUp ? RotateCcw : Check
+
+  return (
+    <span
+      aria-label={label}
+      className={cn(
+        "inline-flex size-4 shrink-0 items-center justify-center rounded-full",
+        isMakeUp
+          ? "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200"
+          : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200",
+      )}
+    >
+      <Icon className="h-2.5 w-2.5" />
+    </span>
+  )
+}
+
+function CalendarPendingStatusIcon({
+  type,
+  pointName,
+  makeUpPrice,
+}: {
+  type: "today" | "make-up"
+  pointName: string
+  makeUpPrice: number
+}) {
+  if (type === "today") {
+    return (
+      <span
+        aria-label="今天可签到"
+        className="inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-200"
+      >
+        <span className="size-1.5 rounded-full bg-current" />
+      </span>
+    )
+  }
+
+  return (
+    <span
+      aria-label={`可补签，需 ${formatNumber(makeUpPrice)} ${pointName}`}
+      className="inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200"
+    >
+      <Wallet className="h-2.5 w-2.5" />
+    </span>
+  )
+}
+
 export function SidebarUserCard({ user, createPostHref = "/write", siteName = "知识型兴趣社区", siteDescription = "把时间浪费在你真正热爱的事情上。这里更适合持续浏览、慢慢讨论、围绕兴趣沉淀长期内容。", siteLogoPath, siteIconPath }: { user: SidebarUserCardData | null; createPostHref?: string; siteName?: string; siteDescription?: string; siteLogoPath?: string | null; siteIconPath?: string | null }) {
   const router = useRouter()
   const currentUser = user
@@ -160,6 +211,7 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
   const [calendarLoading, setCalendarLoading] = useState(false)
   const [calendarData, setCalendarData] = useState<CheckInCalendarResponse | null>(null)
   const calendarRequestIdRef = useRef(0)
+  const makeUpConfirmPendingRef = useRef(false)
   const calendarEntries = useMemo(() => new Map((calendarData?.entries ?? []).map((item) => [item.date, item])), [calendarData?.entries])
   const calendarDays = useMemo(() => buildCalendarDays(calendarMonth), [calendarMonth])
   const { points, checkedInToday, currentCheckInStreak, maxCheckInStreak } = checkInState
@@ -255,7 +307,7 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
 
   if (!currentUser) {
     return (
-      <div className="mobile-sidebar-section overflow-hidden rounded-[24px] border border-border bg-card shadow-xs shadow-black/5 dark:shadow-black/30">
+      <div className="mobile-sidebar-section overflow-hidden rounded-xl border border-border bg-card shadow-xs shadow-black/5 dark:shadow-black/30">
         <div className="sidebar-user-card-header p-4">
           <div className="flex items-center gap-3">
             {siteLogoPath ? (
@@ -330,9 +382,29 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
     : "补签不会计入连续签到"
   const todayKey = getLocalDateKey()
   const earliestMakeUpDate = getCheckInMakeUpEarliestDateKey(todayKey, makeUpOldestDayLimit)
+  const hasCalendarDataForMonth = calendarData?.month === calendarMonth
+  const showCalendarSkeleton = calendarLoading && !hasCalendarDataForMonth
   const checkInButtonTooltip = checkedInToday
     ? `今日已完成签到，${checkInRewardDescription}`
     : `点击可获得 ${formatNumber(calendarData?.checkInReward ?? safeUser.checkInReward ?? 0)} ${pointName}，${checkInRewardDescription}`
+
+  function handleOpenCalendar() {
+    if (!hasCalendarDataForMonth) {
+      setCalendarLoading(true)
+    }
+
+    setCalendarOpen(true)
+  }
+
+  function changeCalendarMonth(delta: number) {
+    const nextMonth = getMonthKey(addMonths(new Date(`${calendarMonth}-01T00:00:00`), delta))
+    if (nextMonth === calendarMonth) {
+      return
+    }
+
+    setCalendarLoading(true)
+    setCalendarMonth(nextMonth)
+  }
 
   async function handleCheckIn() {
     if (!safeUser.checkInEnabled || checkedInToday || loading) {
@@ -376,51 +448,68 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
   }
 
   async function handleMakeUp(date: string) {
-    if (loading || !makeUpEnabled) {
+    if (loading || makeUpConfirmPendingRef.current || !makeUpEnabled) {
       return
     }
 
-    setLoading(true)
+    const makeUpPrice = calendarData?.makeUpPrice ?? effectiveMakeUpPrice
+    const reward = calendarData?.checkInReward ?? safeUser.checkInReward ?? 0
+    makeUpConfirmPendingRef.current = true
 
     try {
-      const response = await fetch("/api/check-in", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "make-up", date }),
+      const confirmed = await showConfirm({
+        title: "确认补签",
+        description: `确认补签 ${date} 吗？\n${makeUpPrice > 0 ? `需消耗：${formatNumber(makeUpPrice)} ${pointName}` : "本次补签免费"}\n可获得：${formatNumber(reward)} ${pointName}\n${checkInStreakDescription}`,
+        confirmText: "确认补签",
       })
-      const result = await response.json()
-      if (!response.ok) {
-        toast.error(result.message ?? "补签失败", "补签失败")
+
+      if (!confirmed) {
         return
       }
 
-      const checkedInDate = result.data?.date ?? date
-      const reward = calendarData?.checkInReward ?? safeUser.checkInReward ?? 0
-      const makeUpCost = result.data?.makeUpCost ?? calendarData?.makeUpPrice ?? effectiveMakeUpPrice
+      setLoading(true)
 
-      syncCheckInState({
-        points: result.data?.points ?? points,
-        checkedInToday: checkedInDate === todayKey ? true : checkedInToday,
-        currentCheckInStreak: result.data?.currentStreak ?? currentCheckInStreak,
-        maxCheckInStreak: result.data?.maxStreak ?? maxCheckInStreak,
-      })
-      upsertCalendarEntry({
-        date: checkedInDate,
-        reward,
-        isMakeUp: true,
-        makeUpCost,
-        createdAt: new Date().toISOString(),
-      })
-      toast.success(result.message ?? "补签成功", "补签成功")
-      void loadCalendar(calendarMonth)
+      try {
+        const response = await fetch("/api/check-in", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "make-up", date }),
+        })
+        const result = await response.json()
+        if (!response.ok) {
+          toast.error(result.message ?? "补签失败", "补签失败")
+          return
+        }
+
+        const checkedInDate = result.data?.date ?? date
+        const makeUpCost = result.data?.makeUpCost ?? makeUpPrice
+
+        syncCheckInState({
+          points: result.data?.points ?? points,
+          checkedInToday: checkedInDate === todayKey ? true : checkedInToday,
+          currentCheckInStreak: result.data?.currentStreak ?? currentCheckInStreak,
+          maxCheckInStreak: result.data?.maxStreak ?? maxCheckInStreak,
+        })
+        upsertCalendarEntry({
+          date: checkedInDate,
+          reward,
+          isMakeUp: true,
+          makeUpCost,
+          createdAt: new Date().toISOString(),
+        })
+        toast.success(result.message ?? "补签成功", "补签成功")
+        void loadCalendar(calendarMonth)
+      } finally {
+        setLoading(false)
+      }
     } finally {
-      setLoading(false)
+      makeUpConfirmPendingRef.current = false
     }
   }
 
   return (
     <>
-      <div className="mobile-sidebar-section overflow-hidden rounded-[24px] border border-border bg-card shadow-xs shadow-black/5 dark:shadow-black/30">
+      <div className="mobile-sidebar-section overflow-hidden rounded-xl border border-border bg-card shadow-xs shadow-black/5 dark:shadow-black/30">
         <div className="sidebar-user-card-header p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-start gap-3">
@@ -479,7 +568,7 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
             {safeUser.checkInEnabled ? (
               <Button
                 className={checkedInToday ? "h-9 shrink-0 rounded-lg gap-1.5 px-3 text-xs bg-muted text-muted-foreground hover:bg-muted" : "h-9 shrink-0 rounded-lg gap-1.5 px-3 text-xs"}
-                onClick={() => setCalendarOpen(true)}
+                onClick={handleOpenCalendar}
               >
                 <CalendarDays className="h-4 w-4" />
                 {checkedInToday ? "已签到" : "签到"}
@@ -509,13 +598,13 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
         <div className="space-y-3">
   
 
-          <div className="flex flex-col gap-3 rounded-[20px] border border-border p-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-3 rounded-xl border border-border p-4 md:flex-row md:items-center md:justify-between">
             <div className="flex w-full items-center justify-center gap-2 md:w-auto md:justify-start">
-              <Button type="button" variant="outline" className="h-9 rounded-lg px-3" onClick={() => setCalendarMonth((current) => getMonthKey(addMonths(new Date(`${current}-01T00:00:00`), -1)))}>
+              <Button type="button" variant="outline" className="h-9 rounded-lg px-3" onClick={() => changeCalendarMonth(-1)}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <div className="min-w-[120px] text-center text-sm font-semibold">{getMonthTitle(calendarMonth)}</div>
-              <Button type="button" variant="outline" className="h-9 rounded-lg px-3" onClick={() => setCalendarMonth((current) => getMonthKey(addMonths(new Date(`${current}-01T00:00:00`), 1)))} disabled={calendarMonth >= getMonthKey()}>
+              <Button type="button" variant="outline" className="h-9 rounded-lg px-3" onClick={() => changeCalendarMonth(1)} disabled={calendarMonth >= getMonthKey()}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
@@ -546,37 +635,56 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
             </div>
           </div>
 
-          <div className="rounded-[20px] border border-border p-4">
-            <div className="mb-3 grid grid-cols-7 gap-2 text-center text-xs text-muted-foreground">
+          <div className="rounded-xl border border-border p-3">
+            <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[11px] text-muted-foreground sm:text-xs">
               {['日', '一', '二', '三', '四', '五', '六'].map((label) => (
                 <div key={label}>{label}</div>
               ))}
             </div>
 
-            <div className="grid grid-cols-7 gap-2">
-              {calendarDays.map((cell, index) => {
-                if (!cell.date || !cell.day) {
-                  return <div key={`empty-${index}`} className="aspect-square rounded-xl border border-dashed border-border/60 bg-muted/20 sm:rounded-2xl" />
-                }
+            {showCalendarSkeleton ? (
+              <div className="grid grid-cols-7 gap-1" aria-hidden="true">
+                {calendarDays.map((cell, index) => (
+                  <div
+                    key={cell.date ?? `skeleton-${index}`}
+                    className="aspect-square rounded-lg border border-border bg-background p-1"
+                  >
+                    <div className="flex h-full flex-col items-center justify-center gap-1">
+                      <Skeleton className="h-3.5 w-4 sm:h-4 sm:w-5" />
+                      <Skeleton className="size-4 rounded-full" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-7 gap-1">
+                {calendarDays.map((cell, index) => {
+                  if (!cell.date || !cell.day) {
+                    return <div key={`empty-${index}`} className="aspect-square rounded-lg border border-dashed border-border/60 bg-muted/20" />
+                  }
 
-                const activeDate = cell.date
-                const entry = calendarEntries.get(activeDate)
-                const isToday = activeDate === todayKey
-                const isPast = activeDate < todayKey
-                const withinMakeUpWindow = !earliestMakeUpDate || activeDate >= earliestMakeUpDate
-                const canMakeUp = !entry && isPast && Boolean(currentUser.checkInEnabled) && makeUpEnabled && withinMakeUpWindow
-                const makeUpTooltip = entry || !isPast || !currentUser.checkInEnabled
-                  ? undefined
-                  : !makeUpEnabled
-                    ? "补签功能未开启"
-                    : !withinMakeUpWindow
-                      ? `当前仅允许补签 ${earliestMakeUpDate}（含）之后的历史日期`
-                      : `${activeDate} 可补签，需 ${formatNumber(calendarData?.makeUpPrice ?? effectiveMakeUpPrice)} ${pointName}。${makeUpPriceDescription}`
+                  const activeDate = cell.date
+                  const entry = calendarEntries.get(activeDate)
+                  const isToday = activeDate === todayKey
+                  const isPast = activeDate < todayKey
+                  const withinMakeUpWindow = !earliestMakeUpDate || activeDate >= earliestMakeUpDate
+                  const canMakeUp = !entry && isPast && Boolean(currentUser.checkInEnabled) && makeUpEnabled && withinMakeUpWindow
+                  const cellTooltip = entry
+                    ? `${activeDate} ${entry.isMakeUp ? "已补签" : "已签到"}`
+                    : isToday
+                      ? `${activeDate} 可签到`
+                      : !isPast || !currentUser.checkInEnabled
+                        ? undefined
+                        : !makeUpEnabled
+                          ? "补签功能未开启"
+                          : !withinMakeUpWindow
+                            ? `当前仅允许补签 ${earliestMakeUpDate}（含）之后的历史日期`
+                            : `${activeDate} 可补签，需 ${formatNumber(calendarData?.makeUpPrice ?? effectiveMakeUpPrice)} ${pointName}。${makeUpPriceDescription}`
 
-                return (
-                  <Tooltip key={activeDate} content={makeUpTooltip} disabled={!makeUpTooltip} align="center">
+                  const cellButton = (
                     <button
                       type="button"
+                      aria-label={cellTooltip}
                       disabled={!canMakeUp || loading}
                       onClick={() => {
                         if (canMakeUp) {
@@ -584,48 +692,62 @@ export function SidebarUserCard({ user, createPostHref = "/write", siteName = "�
                         }
                       }}
                       className={cn(
-                        "aspect-square rounded-xl border p-1.5 text-left transition sm:rounded-2xl sm:p-2",
-                        entry ? "border-emerald-200 bg-emerald-50/70 text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100" : "border-border bg-background",
+                        "h-full w-full rounded-lg border p-1 text-center transition",
+                        entry
+                          ? entry.isMakeUp
+                            ? "border-amber-200 bg-amber-50/70 text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100"
+                            : "border-emerald-200 bg-emerald-50/70 text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100"
+                          : "border-border bg-background",
                         canMakeUp ? "hover:border-amber-300 hover:bg-amber-50/60 dark:hover:border-amber-400/30 dark:hover:bg-amber-400/10" : "cursor-default",
                         isToday && !entry ? "border-amber-300 bg-amber-50/70 dark:border-amber-400/30 dark:bg-amber-400/10" : null,
                         !canMakeUp && !entry ? "opacity-80" : null,
                       )}
                     >
-                      <div className="flex h-full flex-col justify-between">
-                        <div className="flex items-start justify-between gap-1">
-                          <span className="text-xs font-semibold sm:text-sm">{cell.day}</span>
-                          {entry ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" /> : null}
-                        </div>
-                        <div className="min-h-4 text-[9px] leading-3 sm:min-h-5 sm:text-[10px] sm:leading-4">
+                      <div className="flex h-full flex-col items-center justify-center gap-1">
+                        <span className="text-xs font-semibold leading-none sm:text-sm">{cell.day}</span>
+                        <div className="flex h-4 items-center justify-center">
                           {entry ? (
-                            <div className="font-medium">
-                              <span className="sm:hidden">{entry.isMakeUp ? "补" : "签"}</span>
-                              <span className="hidden sm:inline">{entry.isMakeUp ? "已补签" : "已签到"}</span>
-                            </div>
+                            <CalendarEntryStatusIcon isMakeUp={entry.isMakeUp} />
                           ) : canMakeUp ? (
-                            <div className="inline-flex items-center gap-0.5 font-medium text-amber-700 dark:text-amber-200 sm:gap-1">
-                              <Wallet className="h-2.5 w-2.5" />
-                              <span className="sm:hidden">补</span>
-                              <span className="hidden sm:inline">补签</span>
-                            </div>
+                            <CalendarPendingStatusIcon
+                              type="make-up"
+                              pointName={pointName}
+                              makeUpPrice={calendarData?.makeUpPrice ?? effectiveMakeUpPrice}
+                            />
                           ) : isToday ? (
-                            <div className="font-medium">
-                              <span className="sm:hidden">今</span>
-                              <span className="hidden sm:inline">可签到</span>
-                            </div>
-                          ) : (
-                            <div className="text-muted-foreground">
-                              <span className="sm:hidden">未</span>
-                              <span className="hidden sm:inline">未签到</span>
-                            </div>
-                          )}
+                            <CalendarPendingStatusIcon
+                              type="today"
+                              pointName={pointName}
+                              makeUpPrice={calendarData?.makeUpPrice ?? effectiveMakeUpPrice}
+                            />
+                          ) : null}
                         </div>
+                        {entry ? <span className="sr-only">{entry.isMakeUp ? "已补签" : "已签到"}</span> : null}
                       </div>
                     </button>
-                  </Tooltip>
-                )
-              })}
-            </div>
+                  )
+
+                  if (!cellTooltip) {
+                    return (
+                      <div key={activeDate} className="aspect-square">
+                        {cellButton}
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <TooltipRoot key={activeDate}>
+                      <TooltipTrigger render={<div className="aspect-square" />}>
+                        {cellButton}
+                      </TooltipTrigger>
+                      <TooltipContent align="center">
+                        {cellTooltip}
+                      </TooltipContent>
+                    </TooltipRoot>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
       </Modal>

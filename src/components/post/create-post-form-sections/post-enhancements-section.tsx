@@ -152,7 +152,7 @@ function RewardPoolSummary({
   postJackpotHitProbability: number
 }) {
   return (
-    <div className="rounded-[20px] border border-border bg-secondary/25 px-4 py-3 text-xs leading-6 text-muted-foreground">
+    <div className="rounded-xl border border-border bg-secondary/25 px-4 py-3 text-xs leading-6 text-muted-foreground">
       {redPacketMode === "JACKPOT" ? (
         <>
           <p>
@@ -337,7 +337,7 @@ export function PostEnhancementsSection({
     <div
       className={cn(
         hasDesktopSummary
-          ? "min-[1240px]:rounded-[24px] min-[1240px]:border min-[1240px]:border-border min-[1240px]:bg-card min-[1240px]:px-4 min-[1240px]:py-3"
+          ? "min-[1240px]:rounded-xl min-[1240px]:border min-[1240px]:border-border min-[1240px]:bg-card min-[1240px]:px-4 min-[1240px]:py-3"
           : "min-[1240px]:border-0 min-[1240px]:bg-transparent min-[1240px]:p-0",
       )}
     >
@@ -539,7 +539,7 @@ export function PostEnhancementsSection({
         ) : null}
 
         <div className="pointer-events-none fixed left-[calc(50%+444px)] top-28 z-30 w-[202px]">
-          <div className="pointer-events-auto space-y-2 rounded-[20px] border border-border bg-background/88 p-2.5 shadow-[0_20px_48px_rgba(0,0,0,0.18)] backdrop-blur-md">
+          <div className="pointer-events-auto space-y-2 rounded-xl border border-border bg-background/88 p-2.5 shadow-[0_20px_48px_rgba(0,0,0,0.18)] backdrop-blur-md">
             <div className="px-1">
               <p className="text-[10px] font-medium tracking-[0.12em] text-muted-foreground">
                 功能区

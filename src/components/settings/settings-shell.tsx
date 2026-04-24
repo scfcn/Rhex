@@ -100,7 +100,7 @@ export function SettingsShell({
         ) : (
           <div className="space-y-4">
             {sidebarTop}
-            <div className="rounded-[28px] border border-border bg-[linear-gradient(160deg,rgba(15,23,42,0.06),rgba(15,23,42,0.02),transparent)] p-5">
+            <div className="rounded-xl border border-border bg-[linear-gradient(160deg,rgba(15,23,42,0.06),rgba(15,23,42,0.02),transparent)] p-5">
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-foreground text-background">
                   <Settings2 className="h-5 w-5" />

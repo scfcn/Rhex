@@ -2,6 +2,7 @@ import { prisma } from "@/db/client"
 import { buildHomeVisiblePostWhere } from "@/db/home-feed-visibility"
 import type { Prisma } from "@/db/types"
 import { pinnedPostOrderBy, postListInclude } from "@/db/queries"
+import type { TaxonomyPostSort } from "@/lib/forum-taxonomy-sort"
 
 const taxonomyPostInclude = {
   board: true,
@@ -201,6 +202,22 @@ function getZonePinnedOrderBy(): Prisma.PostOrderByWithRelationInput[] {
   ]
 }
 
+function getTaxonomyPostOrderBy(sort: TaxonomyPostSort): Prisma.PostOrderByWithRelationInput[] {
+  if (sort === "new") {
+    return [{ createdAt: "desc" }, { id: "desc" }]
+  }
+
+  if (sort === "featured") {
+    return [{ publishedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }]
+  }
+
+  return [{ activityAt: "desc" }, { createdAt: "desc" }, { id: "desc" }]
+}
+
+function buildTaxonomyPostSortWhere(sort: TaxonomyPostSort): Prisma.PostWhereInput {
+  return sort === "featured" ? { isFeatured: true } : {}
+}
+
 export function findGlobalPinnedPosts(options?: { pageSize?: number; homeVisibleOnly?: boolean }) {
   const normalizedPageSize = typeof options?.pageSize === "number" ? Math.min(Math.max(1, options.pageSize), 50) : undefined
 
@@ -233,7 +250,13 @@ export function findZonePinnedPosts(boardIds: string[], pageSize?: number) {
   })
 }
 
-export function findZoneNormalPosts(boardIds: string[], excludedPostIds: string[], page: number, pageSize: number) {
+export function findZoneNormalPosts(
+  boardIds: string[],
+  excludedPostIds: string[],
+  page: number,
+  pageSize: number,
+  sort: TaxonomyPostSort = "latest",
+) {
   const normalizedPageSize = Math.min(Math.max(1, pageSize), 50)
 
   return prisma.post.findMany({
@@ -242,22 +265,28 @@ export function findZoneNormalPosts(boardIds: string[], excludedPostIds: string[
       boardId: {
         in: boardIds,
       },
+      ...buildTaxonomyPostSortWhere(sort),
       id: excludedPostIds.length > 0 ? { notIn: excludedPostIds } : undefined,
     },
     include: taxonomyPostInclude,
-    orderBy: [{ activityAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+    orderBy: getTaxonomyPostOrderBy(sort),
     skip: (page - 1) * normalizedPageSize,
     take: normalizedPageSize,
   })
 }
 
-export function countZoneNormalPosts(boardIds: string[], excludedPostIds: string[] = []) {
+export function countZoneNormalPosts(
+  boardIds: string[],
+  excludedPostIds: string[] = [],
+  sort: TaxonomyPostSort = "latest",
+) {
   return prisma.post.count({
     where: {
       status: "NORMAL",
       boardId: {
         in: boardIds,
       },
+      ...buildTaxonomyPostSortWhere(sort),
       id: excludedPostIds.length > 0 ? { notIn: excludedPostIds } : undefined,
     },
   })
@@ -281,27 +310,39 @@ export function findBoardPinnedPosts(boardId: string, zoneBoardIds: string[], pa
   })
 }
 
-export function findBoardNormalPosts(boardId: string, excludedPostIds: string[], page: number, pageSize: number) {
+export function findBoardNormalPosts(
+  boardId: string,
+  excludedPostIds: string[],
+  page: number,
+  pageSize: number,
+  sort: TaxonomyPostSort = "latest",
+) {
   const normalizedPageSize = Math.min(Math.max(1, pageSize), 50)
 
   return prisma.post.findMany({
     where: {
       status: "NORMAL",
       boardId,
+      ...buildTaxonomyPostSortWhere(sort),
       id: excludedPostIds.length > 0 ? { notIn: excludedPostIds } : undefined,
     },
     include: taxonomyPostInclude,
-    orderBy: [{ activityAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+    orderBy: getTaxonomyPostOrderBy(sort),
     skip: (page - 1) * normalizedPageSize,
     take: normalizedPageSize,
   })
 }
 
-export function countBoardNormalPosts(boardId: string, excludedPostIds: string[] = []) {
+export function countBoardNormalPosts(
+  boardId: string,
+  excludedPostIds: string[] = [],
+  sort: TaxonomyPostSort = "latest",
+) {
   return prisma.post.count({
     where: {
       status: "NORMAL",
       boardId,
+      ...buildTaxonomyPostSortWhere(sort),
       id: excludedPostIds.length > 0 ? { notIn: excludedPostIds } : undefined,
     },
   })

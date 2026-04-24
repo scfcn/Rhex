@@ -528,7 +528,7 @@ export function AdminBadgeManager({ initialBadges, initialLevelDefinitions }: Ad
                       setEditingIndex(index)
                       closeEffectModal()
                     }}
-                    className={editingIndex === index ? "w-full rounded-[22px] border border-foreground bg-accent/60 p-4 text-left" : "w-full rounded-[22px] border border-border bg-background p-4 text-left hover:bg-accent/40"}
+                    className={editingIndex === index ? "w-full rounded-xl border border-foreground bg-accent/60 p-4 text-left" : "w-full rounded-xl border border-border bg-background p-4 text-left hover:bg-accent/40"}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 items-center gap-3">
@@ -621,17 +621,17 @@ export function AdminBadgeManager({ initialBadges, initialLevelDefinitions }: Ad
               </div>
 
               <div className="mt-4 grid gap-3 md:grid-cols-2">
-                <label className="flex items-center gap-3 rounded-[20px] border border-border px-4 py-3 text-sm">
+                <label className="flex items-center gap-3 rounded-xl border border-border px-4 py-3 text-sm">
                   <input type="checkbox" checked={editingBadge.status} onChange={(event) => updateBadge(editingIndex!, { status: event.target.checked })} />
                   启用该勋章
                 </label>
-                <label className="flex items-center gap-3 rounded-[20px] border border-border px-4 py-3 text-sm">
+                <label className="flex items-center gap-3 rounded-xl border border-border px-4 py-3 text-sm">
                   <input type="checkbox" checked={editingBadge.isHidden} onChange={(event) => updateBadge(editingIndex!, { isHidden: event.target.checked })} />
                   未获得时隐藏
                 </label>
               </div>
 
-              <div className="mt-6 rounded-[24px] border border-border p-4">
+              <div className="mt-6 rounded-xl border border-border p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h5 className="text-sm font-semibold">领取条件</h5>
@@ -662,7 +662,7 @@ export function AdminBadgeManager({ initialBadges, initialLevelDefinitions }: Ad
                       </div>
                     ) : undefined
                     return (
-                      <div key={`${rule.id ?? ruleIndex}-${rule.ruleType}`} className="rounded-[22px] border border-border bg-secondary/20 p-4">
+                      <div key={`${rule.id ?? ruleIndex}-${rule.ruleType}`} className="rounded-xl border border-border bg-secondary/20 p-4">
                         <div className="grid gap-3 xl:grid-cols-[180px_120px_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-end">
                           <SelectField
                             label="条件类型"
@@ -729,7 +729,7 @@ export function AdminBadgeManager({ initialBadges, initialLevelDefinitions }: Ad
                 </div>
               </div>
 
-              <div className="mt-6 rounded-[24px] border border-border p-4">
+              <div className="mt-6 rounded-xl border border-border p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h5 className="text-sm font-semibold">佩戴特效</h5>
@@ -744,7 +744,7 @@ export function AdminBadgeManager({ initialBadges, initialLevelDefinitions }: Ad
                 <div className="mt-4 space-y-3">
                   {editingBadge.effects.length === 0 ? <p className="text-sm text-muted-foreground">当前未设置佩戴特效。</p> : null}
                   {editingBadge.effects.map((effect, effectIndex) => (
-                    <div key={`${effect.id ?? effectIndex}-${effect.name}`} className="rounded-[22px] border border-border bg-secondary/20 p-4">
+                    <div key={`${effect.id ?? effectIndex}-${effect.name}`} className="rounded-xl border border-border bg-secondary/20 p-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-3">
@@ -805,7 +805,7 @@ export function AdminBadgeManager({ initialBadges, initialLevelDefinitions }: Ad
         {effectModal ? (
           <div className="space-y-5">
             {functionalEffectSelected ? (
-              <div className="rounded-[20px] border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800">
                 该特效属于功能型特效。用户只要佩戴此勋章，打开首页时就会自动触发一次签到；积分、概率和数值设定都不会参与计算。
               </div>
             ) : null}
@@ -916,7 +916,7 @@ export function AdminBadgeManager({ initialBadges, initialLevelDefinitions }: Ad
               </div>
             ) : null}
 
-            <div className="rounded-[24px] border border-border p-4">
+            <div className="rounded-xl border border-border p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-1.5">

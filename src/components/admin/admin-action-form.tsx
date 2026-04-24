@@ -75,7 +75,7 @@ export function AdminActionForm({
             value={message}
             onChange={(event) => setMessage(event.target.value)}
             placeholder={placeholder}
-            className="min-h-[92px] rounded-[24px] bg-background px-4 py-3"
+            className="min-h-[92px] rounded-xl bg-background px-4 py-3"
           />
         ) : null}
         <div className="flex items-center gap-3">
@@ -121,7 +121,7 @@ export function AdminActionForm({
             value={message}
             onChange={(event) => setMessage(event.target.value)}
             placeholder={placeholder}
-            className="min-h-[120px] rounded-[24px] bg-background px-4 py-3"
+            className="min-h-[120px] rounded-xl bg-background px-4 py-3"
           />
         ) : null}
       </Modal>

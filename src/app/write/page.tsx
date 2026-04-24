@@ -159,11 +159,11 @@ export default async function WritePage(props: PageProps<"/write">) {
             <CardContent className="space-y-4">
               {mode === "edit" ? (
                 !editingPost ? (
-                  <div className="rounded-[24px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">未找到要编辑的帖子。</div>
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">未找到要编辑的帖子。</div>
                 ) : !canEditThisPost ? (
-                  <div className="rounded-[24px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">你无权编辑这篇帖子。</div>
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">你无权编辑这篇帖子。</div>
                 ) : !isStillEditable ? (
-                  <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">该帖子已超过 {settings.postEditableMinutes} 分钟编辑窗口，请回到详情页使用附言追加功能。</div>
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">该帖子已超过 {settings.postEditableMinutes} 分钟编辑窗口，请回到详情页使用附言追加功能。</div>
                 ) : (
                   <CreatePostForm
                     boardOptions={boardOptions}

@@ -51,7 +51,7 @@ export function PointsSettingsSection({ data }: { data: SettingsPageData }) {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          <form action="/settings" className="grid gap-3 rounded-[20px] border border-border bg-secondary/25 p-4 md:grid-cols-[180px_220px_auto_auto] md:items-end">
+          <form action="/settings" className="grid gap-3 rounded-xl border border-border bg-secondary/25 p-4 md:grid-cols-[180px_220px_auto_auto] md:items-end">
             <input type="hidden" name="tab" value="points" />
             {route.mobileView === "detail" ? <input type="hidden" name="mobile" value="detail" /> : null}
             <label className="space-y-2">
@@ -98,7 +98,7 @@ export function PointsSettingsSection({ data }: { data: SettingsPageData }) {
             const effectItems = log.pointEffect?.rules ?? []
 
             return (
-              <div key={log.id} className="rounded-[20px] border border-border px-4 py-4">
+              <div key={log.id} className="rounded-xl border border-border px-4 py-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">

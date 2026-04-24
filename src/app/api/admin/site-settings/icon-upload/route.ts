@@ -3,7 +3,7 @@ import { apiError, apiSuccess, createAdminRouteHandler } from "@/lib/api-route"
 import { logRouteWriteSuccess } from "@/lib/route-metadata"
 import { getSiteSettings } from "@/lib/site-settings"
 import { prepareUploadedFile, saveUploadedFile } from "@/lib/upload"
-import { normalizeUploadExtension } from "@/lib/upload-rules"
+import { isAllowedUploadMimeType, normalizeUploadExtension } from "@/lib/upload-rules"
 
 const ALLOWED_SITE_ICON_EXTENSIONS = ["svg", "png", "jpg", "jpeg", "gif", "webp", "avif"] as const
 const ALLOWED_SITE_ICON_EXTENSION_SET = new Set<string>(ALLOWED_SITE_ICON_EXTENSIONS)
@@ -40,6 +40,11 @@ export const POST = createAdminRouteHandler(async ({ request, adminUser }) => {
   }
 
   const preparedFile = await prepareUploadedFile(file)
+
+  if (!isAllowedUploadMimeType(preparedFile.detectedMime, ALLOWED_SITE_ICON_EXTENSIONS)) {
+    apiError(400, `仅支持上传 ${ALLOWED_SITE_ICON_EXTENSIONS.join(" / ")} 格式的站点图标`)
+  }
+
   const existing = await findExistingUpload(adminUser.id, "icon", preparedFile.fileHash)
 
   if (existing) {

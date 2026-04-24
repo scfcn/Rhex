@@ -23,7 +23,7 @@ export default async function FaqPage() {
     >
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {topicTabs.map((tab) => (
-          <Link key={tab.href} href={tab.href} className="group rounded-[28px] border border-border bg-card p-5 transition-colors hover:bg-accent/40">
+          <Link key={tab.href} href={tab.href} className="group rounded-xl border border-border bg-card p-5 transition-colors hover:bg-accent/40">
             <p className="text-lg font-semibold text-foreground">{tab.label}</p>
             <p className="mt-2 text-sm leading-7 text-muted-foreground">{tab.description}</p>
             <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-foreground">
@@ -84,7 +84,7 @@ export default async function FaqPage() {
               { step: "3", title: "再看帖子热度", description: "适合作者、版主和运营理解帖子为什么会变热。" },
               { step: "4", title: "最后看关注与拉黑", description: "把日常使用里的关系管理和互动边界补齐。" },
             ].map((item) => (
-              <div key={item.step} className="rounded-[22px] bg-secondary/50 p-4">
+              <div key={item.step} className="rounded-xl bg-secondary/50 p-4">
                 <p className="text-xs font-medium text-muted-foreground">步骤 {item.step}</p>
                 <p className="mt-2 font-semibold">{item.title}</p>
                 <p className="mt-2 text-sm leading-7 text-muted-foreground">{item.description}</p>

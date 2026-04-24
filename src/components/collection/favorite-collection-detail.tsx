@@ -224,7 +224,7 @@ export function FavoriteCollectionDetail({
         surface="collection.hero"
         surfaceProps={{ data, isPending }}
         fallback={(
-          <section className="rounded-[22px] border border-border bg-card p-4 sm:p-5">
+          <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -261,7 +261,7 @@ export function FavoriteCollectionDetail({
               reviewSubmission,
             }}
             fallback={(
-              <section className="rounded-[22px] border border-border bg-card p-4 sm:p-5">
+              <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <h2 className="text-base font-semibold">待审核投稿</h2>
@@ -321,7 +321,7 @@ export function FavoriteCollectionDetail({
           removePost,
         }}
         fallback={(
-          <section className="rounded-[22px] border border-border bg-card p-4 sm:p-5">
+          <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold">已收录帖子</h2>

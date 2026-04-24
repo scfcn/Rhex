@@ -8,6 +8,7 @@ import { Kbd } from "@/components/ui/kbd"
 import { Button } from "@/components/ui/rbutton"
 import { toast } from "@/components/ui/toast"
 import type { MarkdownEmojiItem } from "@/lib/markdown-emoji"
+import { cn } from "@/lib/utils"
 
 interface CommentFormProps {
   postId: string
@@ -26,9 +27,10 @@ interface CommentFormProps {
   anonymousIdentityDefaultChecked?: boolean
   anonymousIdentitySwitchVisible?: boolean
   markdownEmojiMap?: MarkdownEmojiItem[]
+  embedded?: boolean
 }
 
-export function CommentForm({ postId, commentId, initialContent = "", mode = "create", editWindowMinutes = 5, parentId, replyToUserName, replyToCommentId, compact = false, onCancel, disabledMessage, commentsVisibleToAuthorOnly = false, anonymousIdentityEnabled = false, anonymousIdentityDefaultChecked = false, anonymousIdentitySwitchVisible = false, markdownEmojiMap }: CommentFormProps) {
+export function CommentForm({ postId, commentId, initialContent = "", mode = "create", editWindowMinutes = 5, parentId, replyToUserName, replyToCommentId, compact = false, onCancel, disabledMessage, commentsVisibleToAuthorOnly = false, anonymousIdentityEnabled = false, anonymousIdentityDefaultChecked = false, anonymousIdentitySwitchVisible = false, markdownEmojiMap, embedded = false }: CommentFormProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -63,6 +65,11 @@ export function CommentForm({ postId, commentId, initialContent = "", mode = "cr
   const helperMessage = commentsVisibleToAuthorOnly
     ? "当前帖子开启了评论仅楼主可见，你的评论仅楼主、管理员和你自己可见。"
     : "可使用 @用户名 提及他人，"
+  const formClassName = compact
+    ? "min-w-0 w-full flex flex-col gap-3 rounded-[18px] border border-border bg-card p-4"
+    : embedded
+      ? "min-w-0 w-full flex flex-col gap-3 pb-4 pt-3"
+      : "min-w-0 w-full flex flex-col gap-4"
 
   function handleSubmitShortcut(event: React.KeyboardEvent<HTMLFormElement>) {
     if (loading || disabledMessage) {
@@ -173,8 +180,8 @@ export function CommentForm({ postId, commentId, initialContent = "", mode = "cr
   }
 
   return (
-    <form onSubmit={handleSubmit} onKeyDown={handleSubmitShortcut} className={compact ? "min-w-0 w-full space-y-3 rounded-[18px] border border-border bg-card p-4" : "min-w-0 w-full space-y-4"}>
-      {disabledMessage ? <div className="rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{disabledMessage}</div> : null}
+    <form onSubmit={handleSubmit} onKeyDown={handleSubmitShortcut} className={formClassName}>
+      {disabledMessage ? <div className={cn("rounded-[16px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800", embedded && "mx-4")}>{disabledMessage}</div> : null}
       <AddonEditor
         context="comment"
         value={content}
@@ -184,8 +191,9 @@ export function CommentForm({ postId, commentId, initialContent = "", mode = "cr
         uploadFolder="comments"
         markdownEmojiMap={markdownEmojiMap}
         placeholder={mode === "edit" ? `修改评论内容…可在 ${editWindowMinutes} 分钟内编辑` : replyToUserName ? `回复 @${replyToUserName}…` : "写下你的回复…支持 @用户名 提及"}
+        shellClassName={embedded ? "rounded-none border-0 bg-transparent shadow-none" : undefined}
       />
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className={cn("flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between", embedded && "px-4")}>
         {message ? (
           <p className="text-sm text-muted-foreground">{message}</p>
         ) : (

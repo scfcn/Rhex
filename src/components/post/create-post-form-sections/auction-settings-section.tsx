@@ -180,7 +180,7 @@ export function AuctionSettingsSection({
             value={auctionWinnerOnlyContent}
             onChange={(event) =>
               onAuctionWinnerOnlyContentChange(event.target.value)}
-            className="min-h-[180px] rounded-[20px] bg-background px-4 py-3"
+            className="min-h-[180px] rounded-xl bg-background px-4 py-3"
             placeholder="这里填写仅赢家可见的内容，例如兑换码、网盘地址、隐藏说明、联系方式。"
             disabled={disabled}
           />

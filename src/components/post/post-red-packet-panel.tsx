@@ -59,7 +59,7 @@ export function PostRedPacketPanel({ postId, pointName, summary }: PostRedPacket
         side="bottom"
         align="end"
         sideOffset={12}
-        className="w-[min(calc(100vw-2rem),380px)] max-h-[min(85vh,calc(100dvh-1.5rem))] gap-0 overflow-y-auto rounded-[28px] border border-border bg-background p-4 shadow-2xl ring-0 sm:p-5"
+        className="w-[min(calc(100vw-2rem),380px)] max-h-[min(85vh,calc(100dvh-1.5rem))] gap-0 overflow-y-auto rounded-xl border border-border bg-background p-4 shadow-2xl ring-0 sm:p-5"
       >
         <div className="flex items-start justify-between gap-3">
           <PopoverHeader className="gap-1">
@@ -74,21 +74,21 @@ export function PostRedPacketPanel({ postId, pointName, summary }: PostRedPacket
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-          <div className="rounded-[20px] bg-secondary/40 px-4 py-3">
+          <div className="rounded-xl bg-secondary/40 px-4 py-3">
             <p className="text-xs text-muted-foreground">{summary.rewardMode === "JACKPOT" ? "初始积分" : "红包总额"}</p>
             <p className="mt-1 font-semibold">{formatNumber(summary.totalPoints)} {pointName}</p>
           </div>
-          <div className="rounded-[20px] bg-secondary/40 px-4 py-3">
+          <div className="rounded-xl bg-secondary/40 px-4 py-3">
             <p className="text-xs text-muted-foreground">{summary.rewardMode === "JACKPOT" ? "当前积分池" : "剩余数量"}</p>
             <p className="mt-1 font-semibold">{summary.rewardMode === "JACKPOT" ? `${formatNumber(summary.remainingPoints)} ${pointName}` : `${summary.remainingCount} / ${formatNumber(summary.remainingPoints)} ${pointName}`}</p>
           </div>
           {summary.rewardMode === "JACKPOT" ? (
-            <div className="col-span-2 rounded-[20px] bg-secondary/40 px-4 py-3">
+            <div className="col-span-2 rounded-xl bg-secondary/40 px-4 py-3">
               <p className="text-xs text-muted-foreground">递增规则</p>
               <p className="mt-1 font-semibold">首回 +{formatNumber(summary.jackpotReplyIncrementPoints ?? 0)}，复回随机小额追加</p>
             </div>
           ) : (
-            <div className="col-span-2 rounded-[20px] bg-secondary/40 px-4 py-3">
+            <div className="col-span-2 rounded-xl bg-secondary/40 px-4 py-3">
               <p className="text-xs text-muted-foreground">金额模式</p>
               <p className="mt-1 font-semibold">{summary.grantMode ? getPostRedPacketGrantModeLabel(summary.grantMode) : "固定红包"}</p>
             </div>
@@ -97,7 +97,7 @@ export function PostRedPacketPanel({ postId, pointName, summary }: PostRedPacket
 
         <div className="mt-5 space-y-3">
           {summary.records.length === 0 ? (
-            <div className="rounded-[20px] border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+            <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
               暂无领取记录
             </div>
           ) : (

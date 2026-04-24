@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { Bold, CircleHelp, Highlighter, ImageIcon, Link2, Maximize2, Minimize2, Quote, SeparatorHorizontal, Smile, Strikethrough, Table2, Underline, Video } from "lucide-react"
+import { Bold, CircleHelp, EyeOff, Highlighter, ImageIcon, Link2, Maximize2, Minimize2, Quote, SeparatorHorizontal, Smile, Strikethrough, Table2, Underline, Video } from "lucide-react"
 
 import { AddonEditorToolbarItemHost } from "@/components/addon-editor-toolbar-item"
 import { EDITOR_LINE_HEIGHT_REM, EDITOR_LINE_NUMBER_GUTTER_WIDTH_CLASS, TOOLBAR_TIPS } from "@/components/refined-rich-post-editor/constants"
@@ -59,7 +59,7 @@ export function EditorHeader({
           </button>
         </div>
       ) : null}
-      <div className="border-b border-border px-5 pt-4">
+      <div className="border-b border-border px-5">
         <div className="flex items-center justify-between gap-4">
           <div className="flex gap-4">
             <button
@@ -350,6 +350,7 @@ type EditorToolbarProps = {
   showTablePanel: boolean
   showLinkPanel: boolean
   showImagePanel: boolean
+  showSpoilerPanel: boolean
   showBase64Dialog: boolean
   fileInputRef: React.RefObject<HTMLInputElement | null>
   mediaButtonRef: React.RefObject<HTMLDivElement | null>
@@ -357,6 +358,7 @@ type EditorToolbarProps = {
   tableButtonRef: React.RefObject<HTMLDivElement | null>
   linkButtonRef: React.RefObject<HTMLDivElement | null>
   imageButtonRef: React.RefObject<HTMLDivElement | null>
+  spoilerButtonRef: React.RefObject<HTMLDivElement | null>
   onToolbarMouseDown: (event: React.MouseEvent<HTMLElement>) => void
   onToolbarSelectMouseDown: () => void
   onToolbarSelectOpenChange: (open: boolean) => void
@@ -370,6 +372,7 @@ type EditorToolbarProps = {
   onListFormat: (value: "unordered" | "unordered-star" | "ordered" | "task") => void
   onToggleLinkPanel: () => void
   onToggleTablePanel: () => void
+  onToggleSpoilerPanel: () => void
   onInsertDivider: () => void
   onAlign: (value: "left" | "center" | "right") => void
   onToggleMediaPanel: () => void
@@ -398,6 +401,7 @@ export function EditorToolbar({
   showTablePanel,
   showLinkPanel,
   showImagePanel,
+  showSpoilerPanel,
   showBase64Dialog,
   fileInputRef,
   mediaButtonRef,
@@ -405,6 +409,7 @@ export function EditorToolbar({
   tableButtonRef,
   linkButtonRef,
   imageButtonRef,
+  spoilerButtonRef,
   onToolbarMouseDown,
   onToolbarSelectMouseDown,
   onToolbarSelectOpenChange,
@@ -418,6 +423,7 @@ export function EditorToolbar({
   onListFormat,
   onToggleLinkPanel,
   onToggleTablePanel,
+  onToggleSpoilerPanel,
   onInsertDivider,
   onAlign,
   onToggleMediaPanel,
@@ -469,6 +475,11 @@ export function EditorToolbar({
         <ToolButton tip={TOOLBAR_TIPS.quote} platform={platform} onMouseDown={onToolbarMouseDown} onClick={onQuote} disabled={disabled}>
           <Quote className="h-4 w-4" />
         </ToolButton>
+        <div className="relative" ref={spoilerButtonRef}>
+          <ToolButton tip={TOOLBAR_TIPS.spoiler} platform={platform} onMouseDown={onToolbarMouseDown} onClick={onToggleSpoilerPanel} disabled={disabled} active={showSpoilerPanel}>
+            <EyeOff className="h-4 w-4" />
+          </ToolButton>
+        </div>
         <ListSelect
           disabled={disabled}
           platform={platform}

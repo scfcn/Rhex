@@ -84,7 +84,7 @@ export function AdminRedeemCodeManager({ initialRedeemCodes }: AdminRedeemCodeMa
       </div>
 
       <form
-        className="rounded-[22px] border border-border bg-card p-4 space-y-4"
+        className="rounded-xl border border-border bg-card p-4 space-y-4"
         onSubmit={(event) => {
           event.preventDefault()
           setFeedback("")
@@ -131,7 +131,7 @@ export function AdminRedeemCodeManager({ initialRedeemCodes }: AdminRedeemCodeMa
         </div>
       </form>
 
-      <div className="overflow-hidden rounded-[22px] border border-border bg-card">
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="grid items-center gap-3 border-b border-border bg-secondary/40 px-4 py-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground lg:grid-cols-[minmax(0,1fr)_90px_180px_160px_180px_minmax(0,1fr)]">
           <span>兑换码</span>
           <span>积分</span>

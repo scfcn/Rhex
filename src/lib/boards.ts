@@ -10,6 +10,7 @@ import { getAnonymousMaskDisplayIdentity } from "@/lib/post-anonymous"
 import { resolvePostListLoadMode, type PostListLoadMode } from "@/lib/post-list-load-mode"
 import { resolvePostListDisplayMode, type PostListDisplayMode } from "@/lib/post-list-display"
 import { dedupeAndMapPinnedPosts, extractPinnedPostIds } from "@/lib/pinned-posts"
+import type { TaxonomyPostSort } from "@/lib/forum-taxonomy-sort"
 import { mapListPost } from "@/lib/post-map"
 import { findActiveBoardsWithZoneAndPostCount, findBoardBySlugWithZoneAndPostCount, findBoardModeratorsByBoardId } from "@/db/board-read-queries"
 import type { SitePostItem } from "@/lib/posts"
@@ -153,7 +154,12 @@ export interface BoardPostPageResult {
   hasNextPage: boolean
 }
 
-export async function getBoardPosts(slug: string, page = 1, pageSize = 30): Promise<BoardPostPageResult> {
+export async function getBoardPosts(
+  slug: string,
+  page = 1,
+  pageSize = 30,
+  sort: TaxonomyPostSort = "latest",
+): Promise<BoardPostPageResult> {
   const board = await getBoardBySlug(slug)
 
   if (!board) {
@@ -171,14 +177,14 @@ export async function getBoardPosts(slug: string, page = 1, pageSize = 30): Prom
   const anonymousMaskIdentity = await getAnonymousMaskDisplayIdentity()
   const zone = board.zoneId ? await findZoneBoardIdsById(board.zoneId) : null
   const zoneBoardIds = zone?.boards.map((item: (typeof zone.boards)[number]) => item.id) ?? [board.id]
-  const pinnedPosts = await findBoardPinnedPosts(board.id, zoneBoardIds)
+  const pinnedPosts = (await findBoardPinnedPosts(board.id, zoneBoardIds)).filter((post) => sort !== "featured" || post.isFeatured)
   const excludedPostIds = extractPinnedPostIds(pinnedPosts)
-  const total = await countBoardNormalPosts(board.id, excludedPostIds)
+  const total = await countBoardNormalPosts(board.id, excludedPostIds, sort)
   const pagination = resolvePagination({ page, pageSize }, total, [pageSize], pageSize)
 
   if (pagination.page === 1) {
     const { pinnedItems, pinnedPostIds } = dedupeAndMapPinnedPosts(pinnedPosts, (post) => mapListPost(post, anonymousMaskIdentity))
-    const normalPosts = await findBoardNormalPosts(board.id, pinnedPostIds, 1, pagination.pageSize)
+    const normalPosts = await findBoardNormalPosts(board.id, pinnedPostIds, 1, pagination.pageSize, sort)
 
     return {
       items: [...pinnedItems, ...normalPosts.map((post) => mapListPost(post, anonymousMaskIdentity))],
@@ -191,7 +197,7 @@ export async function getBoardPosts(slug: string, page = 1, pageSize = 30): Prom
     }
   }
 
-  const normalPosts = await findBoardNormalPosts(board.id, excludedPostIds, pagination.page, pagination.pageSize)
+  const normalPosts = await findBoardNormalPosts(board.id, excludedPostIds, pagination.page, pagination.pageSize, sort)
 
   return {
     items: normalPosts.map((post) => mapListPost(post, anonymousMaskIdentity)),

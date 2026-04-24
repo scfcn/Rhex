@@ -169,7 +169,7 @@ export function PostAdminPanel({
   ]
 
   return (
-    <div className="rounded-[24px] border border-border bg-card p-4">
+    <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold">管理员快捷操作</h3>

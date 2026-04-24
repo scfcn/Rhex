@@ -1,7 +1,9 @@
 import Link from "next/link"
+import { Trophy } from "lucide-react"
 
 import { LevelIcon } from "@/components/level-icon"
 import { Tooltip } from "@/components/ui/tooltip"
+import { cn } from "@/lib/utils"
 
 interface UserProfileBadgeShowcaseItem {
   id: string
@@ -14,66 +16,72 @@ interface UserProfileBadgeShowcaseItem {
 
 interface UserProfileBadgeShowcaseProps {
   badges: UserProfileBadgeShowcaseItem[]
+  className?: string
 }
 
-export function UserProfileBadgeShowcase({ badges }: UserProfileBadgeShowcaseProps) {
-  if (badges.length === 0) {
-    return (
-      <div className="mt-3 rounded-xl border border-dashed  px-3 py-6 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/2">
-        暂无可展示勋章
-      </div>
-    )
-  }
-
+export function UserProfileBadgeShowcase({ badges, className }: UserProfileBadgeShowcaseProps) {
   return (
-    <div className="mt-3 grid grid-cols-3 gap-x-2 gap-y-2.5 sm:gap-x-3 sm:gap-y-3">
-      {badges.map((badge) => (
-        <Tooltip
-          key={badge.id}
-          side="top"
-          content={
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <span
-                  className="inline-flex h-5 w-5 items-center justify-center text-[13px]"
+    <div className={cn("flex flex-col gap-4", className)}>
+      <div className="flex items-center gap-2 text-foreground">
+        <Trophy className="h-4 w-4" />
+        <h2 className="text-[15px] font-semibold">勋章</h2>
+      </div>
+
+      {badges.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/2">
+          暂无可展示勋章
+        </div>
+      ) : (
+        <div className="grid grid-cols-4 gap-x-3 gap-y-4">
+          {badges.map((badge) => (
+            <Tooltip
+              key={badge.id}
+              side="top"
+              content={
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2 text-sm font-semibold">
+                    <span
+                      className="inline-flex size-5 items-center justify-center text-[13px]"
+                      style={{ color: badge.color }}
+                    >
+                      <LevelIcon
+                        icon={badge.iconText}
+                        color={badge.color}
+                        className="size-3.5 text-[14px]"
+                        emojiClassName="text-inherit"
+                        svgClassName="[&>svg]:block"
+                      />
+                    </span>
+                    <span>{badge.name}</span>
+                  </div>
+                  <p className="text-[12px] font-medium leading-5">
+                    {badge.description?.trim() || "该勋章暂未填写介绍。"}
+                  </p>
+                </div>
+              }
+              contentClassName="max-w-[240px]"
+            >
+              <Link href={`/badges/${badge.code}`} className="flex min-w-0 flex-col items-center gap-2 text-center">
+                <div
+                  className="flex size-12 shrink-0 items-center justify-center text-lg transition-transform hover:scale-[1.03]"
                   style={{ color: badge.color }}
                 >
                   <LevelIcon
                     icon={badge.iconText}
                     color={badge.color}
-                    className="h-3.5 w-3.5 text-[14px]"
+                    className="size-7 text-[28px]"
                     emojiClassName="text-inherit"
                     svgClassName="[&>svg]:block"
                   />
-                </span>
-                <span>{badge.name}</span>
-              </div>
-              <p className="text-[12px] font-medium leading-5">
-                {badge.description?.trim() || "该勋章暂未填写介绍。"}
-              </p>
-            </div>
-          }
-          contentClassName="max-w-[240px]"
-        >
-          <Link href={`/badges/${badge.code}`} className="flex min-w-0 items-center gap-1 text-left sm:gap-1.5">
-            <div
-              className="flex h-5 w-5 shrink-0 items-center justify-center text-lg"
-              style={{ color: badge.color }}
-            >
-              <LevelIcon
-                icon={badge.iconText}
-                color={badge.color}
-                className="h-3.5 w-3.5 text-[14px] sm:h-4 sm:w-4 sm:text-[16px]"
-                emojiClassName="text-inherit"
-                svgClassName="[&>svg]:block"
-              />
-            </div>
-            <p className="line-clamp-1 min-w-0 text-[11px] font-semibold leading-4 text-foreground sm:text-[12px] sm:leading-5">
-              {badge.name}
-            </p>
-          </Link>
-        </Tooltip>
-      ))}
+                </div>
+                <p className="line-clamp-2 min-w-0 text-[10px] font-semibold leading-4 text-muted-foreground">
+                  {badge.name}
+                </p>
+              </Link>
+            </Tooltip>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

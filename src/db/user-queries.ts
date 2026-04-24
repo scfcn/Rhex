@@ -5,6 +5,7 @@ import type { TimestampCursorPayload } from "@/lib/cursor-pagination"
 
 export const userProfileSelect = {
   id: true,
+  createdAt: true,
   username: true,
   nickname: true,
   signature: true,
@@ -121,6 +122,8 @@ export function findUserRepliesByUsername(username: string, options: { skip?: nu
           board: {
             select: {
               name: true,
+              slug: true,
+              iconPath: true,
             },
           },
         },

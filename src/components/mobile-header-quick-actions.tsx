@@ -241,7 +241,7 @@ export function MobileHeaderQuickActions({
             <button
               type="button"
               onClick={() => setView("nodes")}
-              className="flex w-full items-center justify-between rounded-[20px] border border-border bg-card px-4 py-3 text-left transition-colors hover:bg-accent/40"
+              className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-left transition-colors hover:bg-accent/40"
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-sm font-medium text-foreground">
@@ -351,7 +351,7 @@ export function MobileHeaderQuickActions({
 
             <div className="max-h-[52vh] space-y-2 overflow-y-auto pr-1">
               {visibleBoards.length === 0 ? (
-                <div className="rounded-[20px] border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+                <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
                   没找到匹配的节点。
                 </div>
               ) : null}
@@ -363,7 +363,7 @@ export function MobileHeaderQuickActions({
                   <Link
                     key={board.id}
                     href={`/boards/${board.slug}`}
-                    className={isActive ? "block rounded-[20px] border border-foreground/15 bg-accent px-4 py-3" : "block rounded-[20px] border border-border bg-card px-4 py-3 transition-colors hover:bg-accent/40"}
+                    className={isActive ? "block rounded-xl border border-foreground/15 bg-accent px-4 py-3" : "block rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:bg-accent/40"}
                     onClick={() => setNavOpen(false)}
                   >
                     <div className="flex items-start justify-between gap-3">

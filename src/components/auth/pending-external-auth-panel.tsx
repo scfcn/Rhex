@@ -76,7 +76,7 @@ export function PendingExternalAuthPanel({ state }: PendingExternalAuthPanelProp
   if (state.kind === "email_bind_required") {
     return (
       <div className="space-y-4">
-        <div className="rounded-[24px] border border-border bg-secondary/40 p-4 text-sm text-muted-foreground">
+        <div className="rounded-xl border border-border bg-secondary/40 p-4 text-sm text-muted-foreground">
           <p>当前 {state.providerLabel} 返回的邮箱 <span className="font-medium text-foreground">{state.conflictEmail}</span> 已命中现有账户。</p>
           <p className="mt-2">请输入该站内账户的用户名/邮箱和密码，完成绑定后即可继续使用 {state.providerLabel} 登录。</p>
         </div>
@@ -111,7 +111,7 @@ export function PendingExternalAuthPanel({ state }: PendingExternalAuthPanelProp
 
   return (
     <div className="space-y-4">
-      <div className="rounded-[24px] border border-border bg-secondary/40 p-4 text-sm text-muted-foreground">
+      <div className="rounded-xl border border-border bg-secondary/40 p-4 text-sm text-muted-foreground">
         <p>{state.providerLabel} 返回的用户名无法直接使用，请为当前账户指定一个站内用户名。</p>
         <p className="mt-2">系统已预生成几组可用候选名，你也可以自行输入符合规范的用户名。</p>
       </div>

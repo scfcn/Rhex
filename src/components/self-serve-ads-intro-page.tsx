@@ -10,7 +10,7 @@ export function SelfServeAdsIntroPage({ AppId }: SelfServeAdsIntroPageProps) {
   void AppId
   return (
     <section className="space-y-6">
-      <div className="rounded-[28px] border border-border bg-card p-6 shadow-xs shadow-black/5 dark:shadow-black/30">
+      <div className="rounded-xl border border-border bg-card p-6 shadow-xs shadow-black/5 dark:shadow-black/30">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold">自助推广广告位</h1>
@@ -20,7 +20,7 @@ export function SelfServeAdsIntroPage({ AppId }: SelfServeAdsIntroPageProps) {
         </div>
       </div>
 
-      <div className="rounded-[24px] border border-dashed border-border bg-card px-5 py-6 text-sm leading-7 text-muted-foreground">
+      <div className="rounded-xl border border-dashed border-border bg-card px-5 py-6 text-sm leading-7 text-muted-foreground">
         请从首页右侧广告位点击“购买”进入对应类型和槽位的购买页面。
       </div>
 

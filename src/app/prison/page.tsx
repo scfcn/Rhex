@@ -253,7 +253,7 @@ export default async function PrisonPage(props: PageProps<"/prison">) {
                     <AddonSlotRenderer slot="prison.content.before" />
                     <AddonSurfaceRenderer surface="prison.content" props={{ activeStatus, users: cardUsers, page, totalPages }}>
                       <>
-                        <section className="rounded-[22px] border border-border/60 bg-background/84 p-3 shadow-[0_12px_28px_hsl(var(--foreground)/0.06)] backdrop-blur-sm sm:p-4">
+                        <section className="rounded-xl border border-border/60 bg-background/84 p-3 shadow-[0_12px_28px_hsl(var(--foreground)/0.06)] backdrop-blur-sm sm:p-4">
                           <div className="flex flex-col gap-3">
                             <div className="flex flex-wrap gap-2">
                               {statusTabs.map((tab) => {
@@ -290,7 +290,7 @@ export default async function PrisonPage(props: PageProps<"/prison">) {
 
                         <section className="flex flex-col gap-4 mt-4">
                           {cardUsers.length === 0 ? (
-                            <div className="rounded-[24px] border border-dashed border-border/70 bg-background/76 px-6 py-14 text-center shadow-[0_14px_40px_hsl(var(--foreground)/0.04)]">
+                            <div className="rounded-xl border border-dashed border-border/70 bg-background/76 px-6 py-14 text-center shadow-[0_14px_40px_hsl(var(--foreground)/0.04)]">
                               <p className="text-base font-medium">当前筛选条件下暂无公开记录</p>
                               <p className="mt-2 text-sm text-muted-foreground">可以切换到其他名单，或稍后再来查看最新治理结果。</p>
                             </div>

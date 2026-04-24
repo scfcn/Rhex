@@ -214,18 +214,18 @@ export function ProfileAccountBindingSettings({ providers, passkey }: ProfileAcc
   return (
     <div className="space-y-5">
       {flash?.type === "error" ? (
-        <div className="rounded-[24px] border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+        <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           {flash.message}
         </div>
       ) : null}
       {flash?.type === "success" ? (
-        <div className="rounded-[24px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
           {flash.message}
         </div>
       ) : null}
 
       {hasProviders ? (
-        <div className="rounded-[24px] bg-card p-5 ">
+        <div className="rounded-xl bg-card p-5 ">
           <div className="flex items-start gap-3 ">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-secondary text-muted-foreground">
               <Link2 className="h-5 w-5" />
@@ -240,7 +240,7 @@ export function ProfileAccountBindingSettings({ providers, passkey }: ProfileAcc
 
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             {providers.map((binding) => (
-              <div key={binding.provider} className="rounded-[22px] bg-background p-4">
+              <div key={binding.provider} className="rounded-xl bg-background p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold">{binding.label}</p>
@@ -303,7 +303,7 @@ export function ProfileAccountBindingSettings({ providers, passkey }: ProfileAcc
       ) : null}
 
       {showPasskeySection ? (
-        <div className="rounded-[24px] bg-card p-5">
+        <div className="rounded-xl bg-card p-5">
           <div className="flex items-start gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-secondary text-muted-foreground">
               <KeyRound className="h-5 w-5" />
@@ -316,7 +316,7 @@ export function ProfileAccountBindingSettings({ providers, passkey }: ProfileAcc
             </div>
           </div>
 
-          <div className="mt-5 rounded-[22px] bg-background p-4">
+          <div className="mt-5 rounded-xl bg-background p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-semibold">Passkey 列表</p>
@@ -372,8 +372,8 @@ export function ProfileAccountBindingSettings({ providers, passkey }: ProfileAcc
       ) : null}
 
       {showEmptyState ? (
-        <div className="rounded-[24px] bg-card p-5">
-          <div className="rounded-[22px] border border-dashed border-border px-4 py-5 text-sm text-muted-foreground">
+        <div className="rounded-xl bg-card p-5">
+          <div className="rounded-xl border border-dashed border-border px-4 py-5 text-sm text-muted-foreground">
             当前站点未开启可管理的登录方式。
           </div>
         </div>

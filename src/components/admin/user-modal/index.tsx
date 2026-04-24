@@ -101,14 +101,14 @@ function AdminUserModalDialog({
       )}
     >
       {data.isLoadingDetail && !data.detail ? (
-        <div className="flex min-h-[420px] items-center justify-center rounded-[24px] border border-dashed border-border bg-secondary/20">
+        <div className="flex min-h-[420px] items-center justify-center rounded-xl border border-dashed border-border bg-secondary/20">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
             <span>加载用户详情中...</span>
           </div>
         </div>
       ) : data.detailError ? (
-        <div className="rounded-[24px] border border-rose-200 bg-rose-50/70 p-5 text-sm text-rose-700 dark:border-rose-900/70 dark:bg-rose-950/30 dark:text-rose-200">
+        <div className="rounded-xl border border-rose-200 bg-rose-50/70 p-5 text-sm text-rose-700 dark:border-rose-900/70 dark:bg-rose-950/30 dark:text-rose-200">
           <p>{data.detailError}</p>
           <Button type="button" variant="outline" className="mt-3 h-8 rounded-full px-3 text-xs" onClick={data.reloadDetail}>
             重试

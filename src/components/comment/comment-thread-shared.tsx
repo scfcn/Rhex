@@ -257,12 +257,22 @@ export async function copyCommentPermalink(commentId: string, floor: number, pos
 }
 
 export function CommentThreadReplyBox({ postId, commentsVisibleToAuthorOnly, anonymousIdentityEnabled, anonymousIdentityDefaultChecked, anonymousIdentitySwitchVisible, markdownEmojiMap, replyTarget, replyHint, isReplyBoxPinned, isReplyBoxFollowing, replyBoxPinnedLayout, replyBoxContainerRef, onDisableReplyBox, onClearReplyTarget }: { postId: string; commentsVisibleToAuthorOnly: boolean; anonymousIdentityEnabled?: boolean; anonymousIdentityDefaultChecked?: boolean; anonymousIdentitySwitchVisible?: boolean; markdownEmojiMap?: MarkdownEmojiItem[]; replyTarget: CommentReplyTarget | null; replyHint: string | null; isReplyBoxPinned: boolean; isReplyBoxFollowing: boolean; replyBoxPinnedLayout: { left: number; width: number }; replyBoxContainerRef: RefObject<HTMLDivElement | null>; onDisableReplyBox: () => void; onClearReplyTarget: () => void }) {
+  const isPinnedLayout = isReplyBoxPinned
+  const isFloatingPinnedLayout = isReplyBoxPinned && isReplyBoxFollowing
+
   return (
     <div id="post-comment-reply-box" data-comment-reply-box="true" data-ignore-reply-shortcut="true" ref={replyBoxContainerRef} className="relative">
-      {isReplyBoxPinned && isReplyBoxFollowing ? <div aria-hidden="true" className="h-88 sm:h-96" /> : null}
-      <div className={cn("rounded-[24px] bg-card", isReplyBoxPinned && isReplyBoxFollowing && "fixed bottom-3 z-50 bg-transparent shadow-[0_-12px_36px_rgba(15,23,42,0.12)]")} style={isReplyBoxPinned && isReplyBoxFollowing ? { left: replyBoxPinnedLayout.left || undefined, width: replyBoxPinnedLayout.width || undefined } : undefined}>
-        {isReplyBoxPinned ? (
-          <div className={cn("flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 text-xs text-muted-foreground", isReplyBoxFollowing ? "bg-card" : "bg-transparent")}>
+      {isFloatingPinnedLayout ? <div aria-hidden="true" className="h-88 sm:h-96" /> : null}
+      <div
+        className={cn(
+          "rounded-xl bg-card",
+          isPinnedLayout && "overflow-hidden rounded-xl border border-border/80 bg-card",
+          isFloatingPinnedLayout && "fixed bottom-3 z-50 bg-card/95 shadow-[0_-18px_48px_rgba(15,23,42,0.16)] backdrop-blur-xl",
+        )}
+        style={isFloatingPinnedLayout ? { left: replyBoxPinnedLayout.left || undefined, width: replyBoxPinnedLayout.width || undefined } : undefined}
+      >
+        {isPinnedLayout ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-background/82 px-4 py-3 text-xs text-muted-foreground backdrop-blur-sm sm:px-5">
             <span className="inline-flex items-center gap-1.5">
               <Keyboard className="h-3.5 w-3.5" />
               按 <kbd className="rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[11px] text-foreground">R</kbd> 或 <kbd className="rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[11px] text-foreground">Esc</kbd> 退出固定
@@ -274,8 +284,8 @@ export function CommentThreadReplyBox({ postId, commentsVisibleToAuthorOnly, ano
           </div>
         ) : null}
         {replyHint ? (
-          <div className={cn("flex items-center justify-between gap-3 rounded-[16px] border border-border bg-secondary/50 px-4 py-3 text-sm text-muted-foreground", isReplyBoxPinned && "border-transparent bg-background/94 backdrop-blur-md")}>
-            <span>{replyHint}</span>
+          <div className={cn("flex items-center justify-between gap-3 px-4 py-3 text-sm text-muted-foreground", isPinnedLayout ? "border-b border-border/70 bg-secondary/35 sm:px-5" : "rounded-[16px] border border-border bg-secondary/50")}>
+            <span className="min-w-0">{replyHint}</span>
             <button type="button" className="text-primary transition-opacity hover:opacity-80" onClick={onClearReplyTarget}>改为普通回复</button>
           </div>
         ) : null}
@@ -290,6 +300,7 @@ export function CommentThreadReplyBox({ postId, commentsVisibleToAuthorOnly, ano
           anonymousIdentityDefaultChecked={anonymousIdentityDefaultChecked}
           anonymousIdentitySwitchVisible={anonymousIdentitySwitchVisible}
           markdownEmojiMap={markdownEmojiMap}
+          embedded={isPinnedLayout}
         />
       </div>
     </div>

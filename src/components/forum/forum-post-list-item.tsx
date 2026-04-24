@@ -4,7 +4,7 @@ import Link from "next/link"
 
 import { LevelIcon } from "@/components/level-icon"
 import { PostListLink } from "@/components/post/post-list-link"
-import { getPostPinTone, getPostTitleClassName, PostAccessBadges, PostRewardPoolIcon } from "@/components/post/post-list-shared"
+import { getPostPinTone, getPostTitleClassName, PostAccessBadges, PostRewardPoolIcon, PostTypeBadge } from "@/components/post/post-list-shared"
 import { TimeTooltip } from "@/components/time-tooltip"
 import { Tooltip } from "@/components/ui/tooltip"
 import { VipNameTooltip } from "@/components/vip/vip-name-tooltip"
@@ -15,9 +15,10 @@ import { MessageCircle, Paperclip } from "lucide-react"
 
 
 import { UserAvatar } from "@/components/user/user-avatar"
+import { UserProfilePreviewCardTrigger } from "@/components/user/user-profile-preview-card-trigger"
 import { UserStatusBadge } from "@/components/user/user-status-badge"
 import { cn } from "@/lib/utils"
-import { getPostPath } from "@/lib/post-links"
+import { getPostCommentPath, getPostPath } from "@/lib/post-links"
 
 interface ForumPostListItemProps {
   item: {
@@ -57,6 +58,7 @@ interface ForumPostListItemProps {
     metaSecondary?: string | null
     latestReplyAuthorName?: string | null
     latestReplyAuthorUsername?: string | null
+    latestReplyCommentId?: string | null
     commentCount: number
     commentAccentColor: string
   }
@@ -77,9 +79,28 @@ export function ForumPostListItem({
   const isRestrictedAuthor = item.authorStatus === "BANNED" || item.authorStatus === "MUTED"
   const pinTone = getPostPinTone(item.pinScope, true)
   const postPath = getPostPath({ id: item.id, slug: item.slug }, { mode: postLinkDisplayMode })
+  const latestReplyPath = item.latestReplyCommentId
+    ? getPostCommentPath(
+        { id: item.id, slug: item.slug },
+        item.latestReplyCommentId,
+        {
+          mode: postLinkDisplayMode,
+          sort: "newest",
+          page: 1,
+          view: "flat",
+          highlight: item.latestReplyCommentId,
+        },
+      )
+    : null
   const secondaryMeta = item.latestReplyAuthorName ? (
     <span className="inline-flex items-center gap-1">
-      <span>最新回复</span>
+      {latestReplyPath ? (
+        <Link href={latestReplyPath} className="hover:underline">
+          最新回复
+        </Link>
+      ) : (
+        <span>最新回复</span>
+      )}
       {item.latestReplyAuthorUsername ? (
         <Link href={`/users/${item.latestReplyAuthorUsername}`} className="hover:underline">
           {item.latestReplyAuthorName}
@@ -98,9 +119,17 @@ export function ForumPostListItem({
       hideDivider ? "border-b-0" : "border-b last:border-b-0",
       " px-1.5 transition-all duration-150 hover:bg-accent hover:shadow-xs sm:px-2.5",
     )}>
-      <Link href={`/users/${item.authorUsername}`} className={cn("shrink-0", isRestrictedAuthor && "grayscale")}>
+      <UserProfilePreviewCardTrigger
+        username={item.authorUsername}
+        displayName={item.authorName}
+        avatarPath={item.authorAvatarPath}
+        isVip={item.authorIsVip}
+        vipLevel={item.authorVipLevel}
+        triggerClassName={cn("shrink-0", isRestrictedAuthor && "grayscale")}
+        align="start"
+      >
         <UserAvatar name={item.authorName} avatarPath={item.authorAvatarPath} size="md" isVip={item.authorIsVip} vipLevel={item.authorVipLevel} />
-      </Link>
+      </UserProfilePreviewCardTrigger>
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
@@ -127,7 +156,7 @@ export function ForumPostListItem({
             <PostAccessBadges minViewLevel={item.minViewLevel} minViewVipLevel={item.minViewVipLevel} compact />
           </div>
 
-          {item.type !== "NORMAL" ? <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground sm:px-2 sm:text-[11px]">{item.typeLabel}</span> : null}
+          <PostTypeBadge type={item.type} label={item.typeLabel} compact />
           {item.pinLabel && pinTone ? <span className={pinTone.badgeClassName}>{item.pinLabel}</span> : null}
           {item.isFeatured ? <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200 sm:px-2 sm:text-[11px]">精华</span> : null}
           <PostListLink href={`${postPath}#comments`} className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-normal transition-colors hover:opacity-90 sm:px-2 sm:text-[11px]" style={{ backgroundColor: `${item.commentAccentColor}14`, color: item.commentAccentColor }}>

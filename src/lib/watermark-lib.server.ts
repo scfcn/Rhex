@@ -1,7 +1,7 @@
 import fs from "fs"
 import path from "path"
 
-import { createCanvas, GlobalFonts, loadImage, type SKRSContext2D } from "@napi-rs/canvas"
+import { createCanvas, GlobalFonts, loadImage, type AvifConfig, type SKRSContext2D } from "@napi-rs/canvas"
 
 import type { ImageWatermarkPosition } from "@/lib/site-settings-app-state"
 import {
@@ -59,6 +59,12 @@ const WATERMARK_FONT_CANDIDATE_PATHS = [
 ]
 const TOKEN_PATTERN = /[\u3400-\u9fff]|[A-Za-z0-9@#&_.:/+\-]+|\s+|./gu
 const JPEG_QUALITY = 92
+const WEBP_QUALITY = 92
+const AVIF_CONFIG: AvifConfig = {
+  quality: 82,
+  alphaQuality: 90,
+  speed: 5,
+}
 
 function resolveWatermarkFontPath() {
   return WATERMARK_FONT_CANDIDATE_PATHS.find((candidatePath) => fs.existsSync(candidatePath)) ?? null
@@ -524,15 +530,24 @@ function renderWatermarkOnContext(ctx: SKRSContext2D, width: number, height: num
   return true
 }
 
-function resolveCanvasOutputFormat(mimeType: "image/jpeg" | "image/png") {
-  return mimeType === "image/jpeg"
-    ? { canvasFormat: "jpeg" as const, quality: JPEG_QUALITY }
-    : { canvasFormat: "png" as const }
+type WatermarkCanvasMimeType = "image/jpeg" | "image/png" | "image/webp" | "image/avif"
+
+function resolveCanvasOutputFormat(mimeType: WatermarkCanvasMimeType) {
+  switch (mimeType) {
+    case "image/jpeg":
+      return { canvasFormat: "jpeg" as const, quality: JPEG_QUALITY }
+    case "image/webp":
+      return { canvasFormat: "webp" as const, quality: WEBP_QUALITY }
+    case "image/avif":
+      return { canvasFormat: "avif" as const, config: AVIF_CONFIG }
+    default:
+      return { canvasFormat: "png" as const }
+  }
 }
 
 export async function applyTextWatermarkToBuffer(params: {
   buffer: Buffer
-  mimeType: "image/jpeg" | "image/png"
+  mimeType: WatermarkCanvasMimeType
   settings: WatermarkRenderableSettings
 }) {
   const image = await loadImage(params.buffer)
@@ -548,11 +563,15 @@ export async function applyTextWatermarkToBuffer(params: {
 
   const output = resolveCanvasOutputFormat(params.mimeType)
 
-  if ("quality" in output) {
-    return canvas.encode("jpeg", output.quality)
+  if (output.canvasFormat === "jpeg" || output.canvasFormat === "webp") {
+    return canvas.encode(output.canvasFormat, output.quality)
   }
 
-  return canvas.encode("png")
+  if (output.canvasFormat === "avif") {
+    return canvas.encode("avif", output.config)
+  }
+
+  return canvas.encode(output.canvasFormat)
 }
 
 export async function createWatermarkPreviewImageBuffer(settings: WatermarkRenderableSettings & {

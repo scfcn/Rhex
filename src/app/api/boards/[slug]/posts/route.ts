@@ -3,6 +3,7 @@ import { buildHookedPostStreamDisplayItems } from "@/lib/addon-feed-posts"
 import { getCurrentUser } from "@/lib/auth"
 import { checkBoardPermission } from "@/lib/board-access"
 import { getBoardBySlug, getBoardPosts } from "@/lib/boards"
+import { normalizeTaxonomyPostSort } from "@/lib/forum-taxonomy-sort"
 import { DEFAULT_ALLOWED_POST_TYPES, normalizePostTypes } from "@/lib/post-types"
 import { getSiteSettings } from "@/lib/site-settings"
 
@@ -15,6 +16,10 @@ interface BoardPostsRouteContext {
 function parsePage(request: Request) {
   const value = Number(new URL(request.url).searchParams.get("page") ?? "1")
   return Number.isFinite(value) ? Math.max(1, Math.trunc(value)) : 1
+}
+
+function parseSort(request: Request) {
+  return normalizeTaxonomyPostSort(new URL(request.url).searchParams.get("sort") ?? undefined)
 }
 
 export const GET = createRouteHandler(async ({ request, routeContext }) => {
@@ -55,13 +60,15 @@ export const GET = createRouteHandler(async ({ request, routeContext }) => {
     apiError(403, permission.message || "当前没有访问权限")
   }
 
-  const result = await getBoardPosts(slug, parsePage(request), settings.boardPostPageSize)
+  const currentSort = parseSort(request)
+  const result = await getBoardPosts(slug, parsePage(request), settings.boardPostPageSize, currentSort)
 
   return apiSuccess({
     ...result,
     items: await buildHookedPostStreamDisplayItems({
       posts: result.items,
       settings,
+      sort: currentSort,
       visiblePinScopes: ["GLOBAL", "ZONE", "BOARD"],
       pathname: `/boards/${slug}`,
       request,

@@ -6,7 +6,7 @@ import { ImageIcon, ImageOff, MessageCircle, type LucideIcon } from "lucide-reac
 
 import { LevelIcon } from "@/components/level-icon"
 import { PostListLink } from "@/components/post/post-list-link"
-import { getPostPinTone, getPostTitleClassName, PostAccessBadges, PostRewardPoolIcon } from "@/components/post/post-list-shared"
+import { getPostPinTone, getPostTitleClassName, PostAccessBadges, PostRewardPoolIcon, PostTypeBadge } from "@/components/post/post-list-shared"
 import { Skeleton } from "@/components/ui/skeleton"
 import { TimeTooltip } from "@/components/time-tooltip"
 import { Tooltip } from "@/components/ui/tooltip"
@@ -173,7 +173,7 @@ export function PostGalleryGrid({ items, showBoard = true, postLinkDisplayMode =
                     {item.commentCount}
                   </PostListLink>
                   {item.isFeatured ? <span className="rounded-full bg-emerald-100 px-2 py-[0.2rem] text-[10px] text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">精华</span> : null}
-                  {item.type && item.type !== "NORMAL" ? <span className="rounded-full bg-secondary px-2 py-[0.2rem] text-[10px] text-muted-foreground">{item.typeLabel}</span> : null}
+                  <PostTypeBadge type={item.type} label={item.typeLabel} compact />
                 </div>
               </div>
             </div>

@@ -19,7 +19,7 @@ export function HelpDocumentPageContent({ items, activeItem }: HelpDocumentPageC
 
   return (
     <div>
-      <section className="overflow-hidden rounded-[24px] border border-border bg-card shadow-xs shadow-black/5 dark:shadow-black/30">
+      <section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs shadow-black/5 dark:shadow-black/30">
         <div className={cn("grid transition-[grid-template-columns] duration-200 ease-out", navOpen && "xl:grid-cols-[240px_minmax(0,1fr)]")}>
           {navOpen ? (
             <aside className="border-b border-border xl:border-b-0 xl:border-r">

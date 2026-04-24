@@ -36,6 +36,7 @@ const ALLOWED_MARKDOWN_HTML_INLINE_TAGS = new Set(["ruby", "rt", "rp", "span"])
 const RUBY_SYNTAX_PATTERN = /\[([^\]\n]+)\](?:\^\(([^)\n]+)\)|\{([^}\n]+)\})/g
 const RUBY_READING_SEPARATORS = [" ", "　", "·", "・", "．", "。", "-"] as const
 const WAVY_SYNTAX_PATTERN = /(^|[^~\\])~([^~\n]+)~(?=[^~]|$)/g
+const SCRATCH_MASK_SYNTAX_PATTERN = /(^|[^!\\])!!([^!\n]+?)!!(?=[^!]|$)/g
 const HTML_CODE_BLOCK_START_PATTERN = /^\s*<(?:!doctype|html|head|body|meta|title|style|script|link)\b/i
 const HTML_CODE_BLOCK_TAG_LINE_PATTERN = /^\s*(?:<!doctype[^>]*>|<!--.*?-->|<\/?[a-zA-Z][\w:-]*(?:\s+[^>]*)?\s*\/?>)\s*$/i
 const HTML_CODE_BLOCK_INLINE_TAG_PATTERN = /^\s*<([a-zA-Z][\w:-]*)(?:\s+[^>]*)?>.*<\/\1>\s*$/i
@@ -154,7 +155,7 @@ function renderMediaToken(token: string) {
   return renderMediaTag(type as "video" | "audio", src)
 }
 
-function parseContainerTitle(info: string, type: CalloutType) {
+function parseContainerTitle(info: string, type: string) {
   const suffix = info.slice(type.length).trim()
   return suffix || ""
 }
@@ -377,6 +378,42 @@ function renderWavySyntax(input: string) {
   return output.join("\n")
 }
 
+function buildScratchMaskHtml(content: string) {
+  const normalized = content.trim()
+  if (!normalized) {
+    return `!!${content}!!`
+  }
+
+  return `<label class="md-scratch-mask inline cursor-pointer align-baseline"><input type="checkbox" class="peer sr-only" aria-label="显示遮罩内容" /><span class="md-scratch-mask-content bg-foreground text-transparent transition-colors select-none peer-checked:bg-transparent peer-checked:text-inherit peer-checked:select-text">${escapeHtml(normalized)}</span></label>`
+}
+
+function renderScratchMaskSyntaxLine(line: string) {
+  return line
+    .split(/(`[^`]*`)/g)
+    .map((segment) => segment.startsWith("`") && segment.endsWith("`")
+      ? segment
+      : segment.replace(SCRATCH_MASK_SYNTAX_PATTERN, (_matched, prefix: string, content: string) => `${prefix}${buildScratchMaskHtml(content)}`))
+    .join("")
+}
+
+function renderScratchMaskSyntax(input: string) {
+  const lines = input.split("\n")
+  const output: string[] = []
+  let inFence = false
+
+  for (const line of lines) {
+    if (/^\s*```/.test(line)) {
+      inFence = !inFence
+      output.push(line)
+      continue
+    }
+
+    output.push(inFence ? line : renderScratchMaskSyntaxLine(line))
+  }
+
+  return output.join("\n")
+}
+
 function sanitizeMarkdownHtmlLine(line: string) {
   return line.replace(/<(\/)?([a-zA-Z][\w-]*)([^>]*)>/g, (raw, closingSlash: string | undefined, rawTagName: string, rawAttributes: string) => {
     const tagName = rawTagName.toLowerCase()
@@ -480,13 +517,25 @@ function createMarkdownRenderer(emojiItems: MarkdownEmojiItem[]) {
         if (token.nesting === 1) {
           const iconSymbol = CALLOUT_ICON_SYMBOLS[calloutType]
           const title = escapeHtml(parseContainerTitle(token.info, calloutType) || getCalloutTypeTitle(calloutType))
-          return `<div class="md-callout md-callout-${calloutType} relative my-6 overflow-hidden rounded-[24px] border px-4 py-4"><div class="md-callout-head"><span class="md-callout-icon" aria-hidden="true">${iconSymbol}</span><div class="md-callout-title">${title}</div></div><div class="md-callout-body">`
+          return `<div class="md-callout md-callout-${calloutType} relative my-6 overflow-hidden rounded-xl border px-4 py-4"><div class="md-callout-head"><span class="md-callout-icon" aria-hidden="true">${iconSymbol}</span><div class="md-callout-title">${title}</div></div><div class="md-callout-body">`
         }
 
         return "</div></div>"
       },
     })
   }
+
+  md.use(markdownItContainer, "spoiler", {
+    render(tokens: Array<{ info: string; nesting: number }>, index: number) {
+      const token = tokens[index]
+      if (token.nesting === 1) {
+        const title = escapeHtml(parseContainerTitle(token.info, "spoiler") || "剧透内容")
+        return `<details class="md-spoiler my-6 overflow-hidden rounded-xl border border-border/80 bg-secondary/20 shadow-xs"><summary class="md-spoiler-summary cursor-pointer select-none px-4 py-3 font-medium text-foreground"><span>${title}</span><span class="ml-2 text-xs font-normal text-muted-foreground">点击展开</span></summary><div class="md-spoiler-body border-t border-border/70 px-4 py-4">`
+      }
+
+      return "</div></details>"
+    },
+  })
 
   md.renderer.rules.heading_open = (tokens: unknown[], index: number, options: unknown, env: unknown, self: { renderToken: (tokens: unknown[], index: number, options: unknown) => string }) => {
     const typedTokens = tokens as MarkdownHeadingToken[]
@@ -565,7 +614,7 @@ export function isImageOnlyMarkdownHtml(html: string) {
 export function renderMarkdown(input: string, emojiItems: MarkdownEmojiItem[]) {
   const markdown = getMarkdownRenderer(emojiItems)
   const normalizedInput = renderWavySyntax(renderRubySyntax(wrapHtmlDocumentBlocks(renderUserLinkTokens(input))))
-  const sanitizedInput = sanitizeMarkdownInlineHtml(normalizedInput)
+  const sanitizedInput = renderScratchMaskSyntax(sanitizeMarkdownInlineHtml(normalizedInput))
   const lines = sanitizedInput.split("\n")
   const htmlChunks: string[] = []
   const markdownBuffer: string[] = []

@@ -59,7 +59,7 @@ export function AdminUserStatusModal({ userId, username, action }: AdminUserStat
           </div>
         }
       >
-        <Textarea value={message} onChange={(event) => setMessage(event.target.value)} placeholder={`填写${actionText}原因（可选）`} className="min-h-[120px] rounded-[24px] bg-background px-4 py-3" />
+        <Textarea value={message} onChange={(event) => setMessage(event.target.value)} placeholder={`填写${actionText}原因（可选）`} className="min-h-[120px] rounded-xl bg-background px-4 py-3" />
       </Modal>
     </>
   )

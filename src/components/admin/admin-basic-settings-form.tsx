@@ -78,7 +78,7 @@ export function AdminBasicSettingsForm({
         })
       }}
     >
-      <div className="rounded-[24px] space-y-4">
+      <div className="rounded-xl space-y-4">
         {INTERNAL_SETTING_TABS[mode].length > 1 && !subTabRouteSection ? (
           <AdminSettingsSubTabs
             items={INTERNAL_SETTING_TABS[mode].map((tab) => ({

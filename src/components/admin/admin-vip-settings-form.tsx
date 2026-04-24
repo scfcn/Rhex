@@ -163,7 +163,7 @@ export function AdminVipSettingsForm({
   return (
     <div className="space-y-4">
       {!tabRouteSection ? (
-        <div className="rounded-[22px] border border-border bg-card p-3">
+        <div className="rounded-xl border border-border bg-card p-3">
           <AdminSettingsSubTabs
             items={VIP_TABS.map((item) => ({
               key: item.key,

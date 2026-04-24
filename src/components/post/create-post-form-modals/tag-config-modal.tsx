@@ -60,7 +60,7 @@ export function TagConfigModal({
     >
       <div className="space-y-5">
         <div className="grid gap-4 lg:grid-cols-2">
-          <div className="space-y-3 rounded-[24px] border border-border bg-card p-4">
+          <div className="space-y-3 rounded-xl border border-border bg-card p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-medium">自动提取</p>
@@ -88,7 +88,7 @@ export function TagConfigModal({
             </div>
           </div>
 
-          <div className="space-y-3 rounded-[24px] border border-border bg-card p-4">
+          <div className="space-y-3 rounded-xl border border-border bg-card p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-medium">最终标签</p>
@@ -140,7 +140,7 @@ export function TagConfigModal({
           </div>
         </div>
 
-        <div className="rounded-[24px] border border-border bg-card p-4">
+        <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-medium">最终提交标签</p>

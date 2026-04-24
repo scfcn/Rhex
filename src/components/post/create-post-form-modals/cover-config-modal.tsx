@@ -54,13 +54,13 @@ export function CoverConfigModal({
           <input value={coverPath} onChange={(event) => onCoverPathChange(event.target.value)} className="h-11 w-full rounded-full border border-border bg-background px-4 text-sm outline-hidden" placeholder="留空则自动使用正文首图，也可以直接填写封面图片地址" />
         </div>
         {coverPath ? (
-          <div className="relative overflow-hidden rounded-[24px] border border-border bg-card">
+          <div className="relative overflow-hidden rounded-xl border border-border bg-card">
             <div className="relative aspect-video w-full">
               <Image src={coverPath} alt="帖子封面预览" fill sizes="(max-width: 1024px) 100vw, 896px" className="object-cover" unoptimized />
             </div>
           </div>
         ) : (
-          <div className="rounded-[24px] border border-dashed border-border bg-card/60 px-4 py-5 text-sm leading-6 text-muted-foreground">
+          <div className="rounded-xl border border-dashed border-border bg-card/60 px-4 py-5 text-sm leading-6 text-muted-foreground">
             当前未手动设置封面图，发布后会自动提取正文中的第一张图片作为封面。
           </div>
         )}

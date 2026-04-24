@@ -114,7 +114,7 @@ export default async function BadgeDetailPage(props: BadgeDetailPageProps) {
               <div className="space-y-6">
                 <AddonSlotRenderer slot="badge.hero.before" />
                 <AddonSurfaceRenderer surface="badge.hero" props={{ badge, badgeRules, settings }}>
-                <section className="rounded-[28px] border border-border bg-card px-5 py-6 shadow-xs sm:px-7 sm:py-8">
+                <section className="rounded-xl border border-border bg-card px-5 py-6 shadow-xs sm:px-7 sm:py-8">
                   <div className="mx-auto max-w-3xl text-center">
                     <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
                       Badge Detail
@@ -290,7 +290,7 @@ function BadgeStatCard({
   valueClassName?: string
 }) {
   return (
-    <div className="rounded-[22px] border border-border bg-background/70 px-4 py-4">
+    <div className="rounded-xl border border-border bg-background/70 px-4 py-4">
       <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
         {label}
       </p>

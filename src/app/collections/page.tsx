@@ -71,7 +71,7 @@ export default async function FavoriteCollectionDirectoryPage(props: {
               <AddonSlotRenderer slot="collections.content.before" />
               <AddonSlotRenderer slot="collections.hero.before" />
               <AddonSurfaceRenderer surface="collections.hero" props={{ data, settings }}>
-                <section className="rounded-[24px] border border-border bg-card p-4 sm:p-5">
+                <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <h1 className="text-xl font-semibold">收藏合集</h1>
@@ -85,7 +85,7 @@ export default async function FavoriteCollectionDirectoryPage(props: {
               </AddonSurfaceRenderer>
               <AddonSlotRenderer slot="collections.hero.after" />
               <AddonSurfaceRenderer surface="collections.content" props={{ data, settings }}>
-                <section className="rounded-[24px] border border-border bg-card p-4 sm:p-5">
+                <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
                   <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     {data.items.length === 0 ? <div className="rounded-[18px] border border-dashed border-border bg-secondary/10 px-4 py-7 text-sm text-muted-foreground">当前没有可展示的合集。</div> : null}
                     {data.items.map((item) => (

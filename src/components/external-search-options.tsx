@@ -47,7 +47,7 @@ export function ExternalSearchOptions({
             rel="noreferrer noopener"
             className={variant === "menu"
               ? "flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors hover:bg-accent"
-              : "flex items-center justify-between gap-3 rounded-[20px] border border-border bg-card px-4 py-3 transition-colors hover:bg-accent/40"}
+              : "flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:bg-accent/40"}
             onClick={onSelect}
           >
             <span className="flex items-center gap-3">

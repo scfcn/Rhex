@@ -57,7 +57,7 @@ export default async function FunsPage() {
                     </CardHeader>
                     <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                       {boards.map((board) => (
-                        <a key={board.id} href={`/boards/${board.slug}`} className="rounded-[24px] border border-border p-5 transition-colors hover:bg-accent">
+                        <a key={board.id} href={`/boards/${board.slug}`} className="rounded-xl border border-border p-5 transition-colors hover:bg-accent">
                           <div className="flex items-center gap-3">
                             <LevelIcon icon={board.icon} className="h-6 w-6 text-2xl" svgClassName="[&>svg]:block" />
                             <div>

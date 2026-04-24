@@ -52,10 +52,10 @@ export default async function PointsSystemFaqPage() {
           <CardTitle>常见获得方式</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-[20px] bg-secondary/40 p-4 text-sm leading-7 text-muted-foreground">每日签到会直接发放奖励，VIP 用户按自己的 VIP 档位拿更高奖励。</div>
-          <div className="rounded-[20px] bg-secondary/40 p-4 text-sm leading-7 text-muted-foreground">邀请注册成功后，邀请人和被邀请人都可以拿到后台配置的注册奖励。</div>
-          <div className="rounded-[20px] bg-secondary/40 p-4 text-sm leading-7 text-muted-foreground">节点和分区可以独立配置“发帖积分”和“回复积分”，既可以奖励，也可以扣除。</div>
-          <div className="rounded-[20px] bg-secondary/40 p-4 text-sm leading-7 text-muted-foreground">帖子被打赏、隐藏内容被购买、红包被触发时，也会产生对应的积分收入。</div>
+          <div className="rounded-xl bg-secondary/40 p-4 text-sm leading-7 text-muted-foreground">每日签到会直接发放奖励，VIP 用户按自己的 VIP 档位拿更高奖励。</div>
+          <div className="rounded-xl bg-secondary/40 p-4 text-sm leading-7 text-muted-foreground">邀请注册成功后，邀请人和被邀请人都可以拿到后台配置的注册奖励。</div>
+          <div className="rounded-xl bg-secondary/40 p-4 text-sm leading-7 text-muted-foreground">节点和分区可以独立配置“发帖积分”和“回复积分”，既可以奖励，也可以扣除。</div>
+          <div className="rounded-xl bg-secondary/40 p-4 text-sm leading-7 text-muted-foreground">帖子被打赏、隐藏内容被购买、红包被触发时，也会产生对应的积分收入。</div>
         </CardContent>
       </Card>
 
@@ -65,7 +65,7 @@ export default async function PointsSystemFaqPage() {
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2">
           {spendItems.map((item) => (
-            <div key={item.label} className="flex items-start justify-between gap-3 rounded-[20px] border border-border px-4 py-4">
+            <div key={item.label} className="flex items-start justify-between gap-3 rounded-xl border border-border px-4 py-4">
               <p className="font-medium">{item.label}</p>
               <p className="text-sm text-muted-foreground">{item.value}</p>
             </div>
@@ -78,9 +78,9 @@ export default async function PointsSystemFaqPage() {
           <CardTitle>和其它系统的关系</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 text-sm leading-7 text-muted-foreground md:grid-cols-3">
-          <div className="rounded-[20px] bg-secondary/40 p-4">和等级不同，{settings.pointName} 更偏即时结算与消费能力；等级更偏长期成长门槛。</div>
-          <div className="rounded-[20px] bg-secondary/40 p-4">{settings.pointName} 会直接影响 VIP 购买、邀请码购买、补签、改昵称和改头像这些付费型功能。</div>
-          <div className="rounded-[20px] bg-secondary/40 p-4">如果想追踪每一笔变化，可以到个人设置里的“{settings.pointName}记录”查看完整明细。</div>
+          <div className="rounded-xl bg-secondary/40 p-4">和等级不同，{settings.pointName} 更偏即时结算与消费能力；等级更偏长期成长门槛。</div>
+          <div className="rounded-xl bg-secondary/40 p-4">{settings.pointName} 会直接影响 VIP 购买、邀请码购买、补签、改昵称和改头像这些付费型功能。</div>
+          <div className="rounded-xl bg-secondary/40 p-4">如果想追踪每一笔变化，可以到个人设置里的“{settings.pointName}记录”查看完整明细。</div>
         </CardContent>
       </Card>
     </FaqPageFrame>

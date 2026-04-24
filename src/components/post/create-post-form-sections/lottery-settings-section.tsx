@@ -155,7 +155,7 @@ export function LotterySettingsSection({
         </div>
       </div>
 
-      <div className="space-y-3 rounded-[20px]">
+      <div className="space-y-3 rounded-xl">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-medium">奖项配置</p>
@@ -177,7 +177,7 @@ export function LotterySettingsSection({
         </div>
       </div>
 
-      <div className="space-y-3 rounded-[20px]">
+      <div className="space-y-3 rounded-xl">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-medium">参与条件</p>

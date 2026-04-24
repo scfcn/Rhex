@@ -46,7 +46,7 @@ export function LogSummaryCard({ section }: { section: AdminUserDetailLogSection
 
 export function LogSectionCard({ section }: { section: AdminUserDetailLogSection }) {
   return (
-    <section className="rounded-[20px] border border-border p-4">
+    <section className="rounded-xl border border-border p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h4 className="text-sm font-semibold">{section.title}</h4>

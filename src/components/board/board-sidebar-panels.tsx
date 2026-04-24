@@ -95,7 +95,7 @@ function BoardModeratorsMenu({ moderators }: { moderators: BoardModeratorItem[] 
       <summary className="flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground [&::-webkit-details-marker]:hidden">
         <Ellipsis className="h-4 w-4" />
       </summary>
-      <div className="absolute right-0 top-full z-20 mt-2 w-72 rounded-[20px] border border-border bg-background p-3 shadow-lg shadow-black/10">
+      <div className="absolute right-0 top-full z-20 mt-2 w-72 rounded-xl border border-border bg-background p-3 shadow-lg shadow-black/10">
         <div className="mb-2 flex items-center justify-between gap-2">
           <p className="text-xs font-medium text-foreground">节点版主</p>
           <p className="text-[11px] text-muted-foreground">{moderators.length} 人</p>
@@ -118,7 +118,7 @@ function BoardModeratorsMenu({ moderators }: { moderators: BoardModeratorItem[] 
 
 function BoardRulesPanel({ board, moderators }: Pick<BoardSidebarPanelsProps, "board" | "moderators">) {
   return (
-    <section className="mobile-sidebar-section rounded-[24px] border border-border bg-card p-4 shadow-xs shadow-black/5 dark:shadow-black/30">
+    <section className="mobile-sidebar-section rounded-xl border border-border bg-card p-4 shadow-xs shadow-black/5 dark:shadow-black/30">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <BookText className="h-4 w-4 text-amber-600" />
@@ -140,7 +140,7 @@ function BoardLinksPanel({ links }: { links: BoardSidebarLinkItem[] }) {
   }
 
   return (
-    <section className="mobile-sidebar-section rounded-[24px] border border-border bg-card p-4 shadow-xs shadow-black/5 dark:shadow-black/30">
+    <section className="mobile-sidebar-section rounded-xl border border-border bg-card p-4 shadow-xs shadow-black/5 dark:shadow-black/30">
       <div className="mb-3 flex items-center gap-2">
         <Link2 className="h-4 w-4 text-sky-600" />
         <h3 className="text-sm font-semibold">节点链接</h3>

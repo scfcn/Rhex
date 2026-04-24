@@ -3,11 +3,13 @@ import { ChevronDown, ChevronRight, Eye } from "lucide-react"
 
 import { AddonSlotRenderer, AddonSurfaceRenderer } from "@/addons-host"
 import { FollowToggleButton } from "@/components/follow-toggle-button"
+import { PostTypeBadge } from "@/components/post/post-list-shared"
 import { LevelIcon } from "@/components/level-icon"
 import { TimeTooltip } from "@/components/time-tooltip"
 import { AiAgentIndicator } from "@/components/user/ai-agent-indicator"
 import { AnonymousUserIndicator } from "@/components/user/anonymous-user-indicator"
 import { UserAvatar } from "@/components/user/user-avatar"
+import { UserProfilePreviewCardTrigger } from "@/components/user/user-profile-preview-card-trigger"
 import {
   UserDisplayedBadges,
   type DisplayedBadgeItem,
@@ -104,11 +106,7 @@ function PostStateBadges({
 
   return (
     <div className="flex flex-wrap items-center gap-1">
-      {type !== "NORMAL" ? (
-        <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground sm:px-2 sm:text-[11px]">
-          {typeLabel}
-        </span>
-      ) : null}
+      <PostTypeBadge type={type} label={typeLabel} compact />
       {isPinned ? (
         <span className="rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] text-orange-700 dark:bg-orange-500/15 dark:text-orange-200 sm:px-2 sm:text-[11px]">
           置顶
@@ -353,7 +351,15 @@ function PostAuthorRowContent({
             props.isRestrictedAuthor && "grayscale",
           )}
         >
-          <Link href={props.authorHref} className="shrink-0">
+          <UserProfilePreviewCardTrigger
+            username={props.post.authorUsername ?? props.post.author}
+            displayName={props.post.author}
+            avatarPath={props.post.authorAvatarPath}
+            isVip={props.post.authorIsVip}
+            vipLevel={props.post.authorVipLevel}
+            triggerClassName="shrink-0"
+            align="start"
+          >
             <UserAvatar
               name={props.post.author}
               avatarPath={props.post.authorAvatarPath}
@@ -361,7 +367,7 @@ function PostAuthorRowContent({
               isVip={props.post.authorIsVip}
               vipLevel={props.post.authorVipLevel}
             />
-          </Link>
+          </UserProfilePreviewCardTrigger>
           <PostAuthorMetaContent {...props} pathname={pathname} />
         </div>
       </AddonSurfaceRenderer>

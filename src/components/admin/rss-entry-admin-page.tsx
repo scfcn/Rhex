@@ -214,7 +214,7 @@ export function RssEntryAdminPage({ initialData }: RssEntryAdminPageProps) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-[24px] border border-border bg-card p-5">
+      <div className="rounded-xl border border-border bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-base font-semibold">RSS 采集数据</h3>
@@ -229,7 +229,7 @@ export function RssEntryAdminPage({ initialData }: RssEntryAdminPageProps) {
         </div>
       </div>
 
-      <form className="grid gap-3 rounded-[22px] border border-border bg-card p-4 xl:grid-cols-[minmax(180px,1.6fr)_170px_120px_100px_auto]">
+      <form className="grid gap-3 rounded-xl border border-border bg-card p-4 xl:grid-cols-[minmax(180px,1.6fr)_170px_120px_100px_auto]">
         <label className="space-y-1">
           <span className="text-[11px] font-medium text-muted-foreground">搜索内容</span>
           <input name="keyword" defaultValue={initialData.filters.keyword} placeholder="标题 / 摘要 / 正文 / 作者 / 链接" className="h-10 w-full rounded-full border border-border bg-background px-4 text-sm outline-hidden" />
@@ -251,7 +251,7 @@ export function RssEntryAdminPage({ initialData }: RssEntryAdminPageProps) {
         <StatCard label="已驳回" value={initialData.summary.rejected} />
       </div>
 
-      <div className="rounded-[22px] border border-border bg-card">
+      <div className="rounded-xl border border-border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 text-sm">

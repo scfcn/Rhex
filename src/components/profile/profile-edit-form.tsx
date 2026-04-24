@@ -510,7 +510,7 @@ export function ProfileEditForm({
 
       {activeSection === "basic" ? (
         <form onSubmit={handleBasicSubmit} className="space-y-5">
-          <div className="rounded-[24px]  bg-card p-5">
+          <div className="rounded-xl  bg-card p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-medium">昵称</p>
@@ -524,7 +524,7 @@ export function ProfileEditForm({
             </div>
           </div>
 
-          <div className="rounded-[24px] bg-card p-5 space-y-4">
+          <div className="rounded-xl bg-card p-5 space-y-4">
             <div>
               <p className="text-sm font-medium">账号名</p>
               <p className="mt-2 rounded-full bg-secondary px-4 py-3 text-sm text-muted-foreground">{username}</p>
@@ -541,7 +541,7 @@ export function ProfileEditForm({
                       key={option.value}
                       type="button"
                       onClick={() => setGender(option.value)}
-                      className={active ? "rounded-[20px] border border-foreground bg-foreground px-4 py-3 text-sm font-medium text-background" : "rounded-[20px] border border-border bg-background px-4 py-3 text-sm text-foreground transition-colors hover:bg-accent/40"}
+                      className={active ? "rounded-xl border border-foreground bg-foreground px-4 py-3 text-sm font-medium text-background" : "rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground transition-colors hover:bg-accent/40"}
                     >
                       {option.label}
                     </button>
@@ -552,7 +552,7 @@ export function ProfileEditForm({
 
             <div className="space-y-2">
               <p className="text-sm font-medium">个人简介</p>
-              <textarea value={bio} onChange={(event) => setBio(event.target.value)} className="min-h-[180px] w-full rounded-[24px] border border-border bg-background px-4 py-3 text-sm outline-hidden" placeholder="介绍一下你自己，最多 200 字" />
+              <textarea value={bio} onChange={(event) => setBio(event.target.value)} className="min-h-[180px] w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-hidden" placeholder="介绍一下你自己，最多 200 字" />
               <p className="text-xs text-muted-foreground">{bio.length}/200</p>
             </div>
 
@@ -578,7 +578,7 @@ export function ProfileEditForm({
       ) : null}
 
       {activeSection === "avatar" ? (
-        <div className="space-y-5 rounded-[24px]  bg-card p-5">
+        <div className="space-y-5 rounded-xl  bg-card p-5">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
               <div className="relative">
@@ -620,7 +620,7 @@ export function ProfileEditForm({
             <AvatarPreviewCard label="中尺寸" size="md" avatarPath={previewUrl || pendingAvatarPath || undefined} name={nickname || username} />
             <AvatarPreviewCard label="小尺寸" size="sm" avatarPath={previewUrl || pendingAvatarPath || undefined} name={nickname || username} />
           </div>
-          <div className="rounded-[20px] border border-dashed border-border bg-background/60 p-4">
+          <div className="rounded-xl border border-dashed border-border bg-background/60 p-4">
             <p className="text-sm font-medium">头像上传说明</p>
             <div className="mt-3 space-y-2 text-xs leading-6 text-muted-foreground">
               {avatarRules.map((rule, index) => (
@@ -644,7 +644,7 @@ export function ProfileEditForm({
       />
 
       {activeSection === "email" ? (
-        <form onSubmit={handleEmailSubmit} className="space-y-5 rounded-[24px] bg-card p-5">
+        <form onSubmit={handleEmailSubmit} className="space-y-5 rounded-xl bg-card p-5">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-secondary text-foreground">
               <Mail className="h-5 w-5" />
@@ -677,7 +677,7 @@ export function ProfileEditForm({
       ) : null}
 
       {activeSection === "password" ? (
-        <div className="rounded-[24px]  bg-card p-5">
+        <div className="rounded-xl  bg-card p-5">
           <div className="mb-5 flex items-start gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-secondary text-foreground">
               <UserRound className="h-5 w-5" />
@@ -698,7 +698,7 @@ export function ProfileEditForm({
       ) : null}
 
       {activeSection === "privacy" ? (
-        <div className="space-y-5 rounded-[24px] bg-card p-5">
+        <div className="space-y-5 rounded-xl bg-card p-5">
           <div>
             <p className="text-sm font-medium">主页隐私</p>
             <p className="mt-1 text-xs text-muted-foreground">分别控制“活动轨迹”和“介绍”在主页上的可见范围，登录公开表示只有登录后才能查看。</p>
@@ -818,7 +818,7 @@ function PrivacyVisibilityCard({
   onChange: (nextVisibility: UserProfileVisibility) => void
 }) {
   return (
-    <div className="rounded-[20px] border border-border bg-background p-4">
+    <div className="rounded-xl border border-border bg-background p-4">
       <div className="space-y-1">
         <p className="text-sm font-medium">{title}</p>
         <p className="text-xs text-muted-foreground">{description}</p>
@@ -863,7 +863,7 @@ function AvatarPreviewCard({
   name: string
 }) {
   return (
-    <div className="rounded-[20px] border border-border bg-background/70 px-4 py-4">
+    <div className="rounded-xl border border-border bg-background/70 px-4 py-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-medium">{label}</p>

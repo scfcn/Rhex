@@ -806,7 +806,7 @@ function SiteImageUploadCard({
   onClear: () => void
 }) {
   return (
-    <div className="space-y-3 rounded-[24px] border border-border p-5">
+    <div className="space-y-3 rounded-xl border border-border p-5">
       <div>
         <h4 className="text-sm font-semibold">{title}</h4>
         <p className="mt-1 text-xs leading-6 text-muted-foreground">{description}</p>

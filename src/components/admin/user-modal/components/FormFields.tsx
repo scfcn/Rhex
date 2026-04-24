@@ -91,7 +91,7 @@ export function TextAreaField({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         rows={rows}
-        className="min-h-[96px] rounded-[20px] bg-background px-3 py-2"
+        className="min-h-[96px] rounded-xl bg-background px-3 py-2"
       />
     </label>
   )

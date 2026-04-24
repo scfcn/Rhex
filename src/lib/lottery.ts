@@ -80,6 +80,13 @@ export interface LotteryViewModel {
   eligible: boolean
   ineligibleReason: string | null
   currentProbability: number | null
+  participantPreviews: Array<{
+    userId: number
+    username: string
+    nickname: string | null
+    avatarPath: string | null
+    joinedAt: string
+  }>
   prizes: Array<{
     id: string
     title: string
@@ -142,8 +149,15 @@ interface LotteryPostRelations extends Post {
   }>
   lotteryParticipants?: Array<{
     userId: number
+    joinedAt: Date
     isEligible: boolean
     ineligibleReason: string | null
+    user: {
+      username: string
+      nickname: string | null
+      avatarPath: string | null
+      status: User["status"]
+    }
   }>
   lotteryWinners?: Array<{ id: string }>
 }
@@ -671,7 +685,8 @@ export function mapLotteryView(post: LotteryPostRelations, currentUserId?: numbe
   }
 
   const participant = post.lotteryParticipants?.find((item) => item.userId === currentUserId)
-  const participantCount = post.lotteryParticipants?.filter((item) => item.isEligible).length ?? 0
+  const eligibleParticipants = (post.lotteryParticipants ?? []).filter((item) => item.isEligible && item.user.status === "ACTIVE")
+  const participantCount = eligibleParticipants.length
   const totalPrizeQuantity = post.lotteryPrizes.reduce((sum, prize) => sum + prize.quantity, 0)
   const canEvaluateCurrentUser = Boolean(currentUserId)
   const hasParticipantRecord = Boolean(participant)
@@ -704,6 +719,16 @@ export function mapLotteryView(post: LotteryPostRelations, currentUserId?: numbe
     eligible: participant?.isEligible ?? false,
     ineligibleReason: participant?.ineligibleReason ?? null,
     currentProbability: participantCount > 0 ? Number(((Math.min(totalPrizeQuantity, participantCount) / participantCount) * 100).toFixed(2)) : null,
+    participantPreviews: eligibleParticipants
+      .sort((left, right) => right.joinedAt.getTime() - left.joinedAt.getTime())
+      .slice(0, 10)
+      .map((item) => ({
+        userId: item.userId,
+        username: item.user.username,
+        nickname: item.user.nickname,
+        avatarPath: item.user.avatarPath ?? null,
+        joinedAt: item.joinedAt.toISOString(),
+      })),
     prizes: post.lotteryPrizes
       .sort((left, right) => left.sortOrder - right.sortOrder)
       .map((prize) => ({

@@ -40,7 +40,7 @@ export default async function AnnouncementDocumentPage({ params }: AnnouncementD
       <main className="mx-auto max-w-[1200px] px-1 py-6">
         <AddonSlotRenderer slot="announcement.page.before" />
         <AddonSurfaceRenderer surface="announcement.page" props={{ item }}>
-        <article className="rounded-[28px] border border-border bg-card p-6">
+        <article className="rounded-xl border border-border bg-card p-6">
           <AddonSlotRenderer slot="announcement.hero.before" />
           <AddonSurfaceRenderer surface="announcement.hero" props={{ item }}>
             <>
@@ -65,7 +65,7 @@ export default async function AnnouncementDocumentPage({ params }: AnnouncementD
 
           <AddonSlotRenderer slot="announcement.content.before" />
           <AddonSurfaceRenderer surface="announcement.content" props={{ item }}>
-            <div className="mt-6 rounded-[22px] border border-border/70 bg-background px-5 py-4">
+            <div className="mt-6 rounded-xl border border-border/70 bg-background px-5 py-4">
               <MarkdownContent content={item.content} emptyText="暂无公告正文" className="markdown-body prose prose-sm max-w-none prose-p:my-3 prose-ul:my-3 prose-ol:my-3 prose-li:my-1" />
             </div>
           </AddonSurfaceRenderer>

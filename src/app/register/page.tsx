@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 
-import { AddonSlotRenderer } from "@/addons-host"
+import { AddonRenderBlock, executeAddonSlot } from "@/addons-host"
 import { AuthPanelNotice, AuthShell } from "@/components/auth/auth-shell"
 import { RegisterForm } from "@/components/auth/register-form"
 import { listAddonExternalAuthEntries } from "@/lib/addon-external-auth-providers"
@@ -21,7 +21,13 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function RegisterPage(props: PageProps<"/register">) {
   const searchParams = await props.searchParams
-  const [user, settings, addonExternalAuthEntries] = await Promise.all([getCurrentUser(), getSiteSettings(), listAddonExternalAuthEntries()])
+  const [user, settings, addonExternalAuthEntries, addonCaptchaBlocks, addonAfterFieldBlocks] = await Promise.all([
+    getCurrentUser(),
+    getSiteSettings(),
+    listAddonExternalAuthEntries(),
+    executeAddonSlot("auth.register.captcha"),
+    executeAddonSlot("auth.register.form.after"),
+  ])
 
   if (user) {
     redirect("/")
@@ -80,10 +86,33 @@ export default async function RegisterPage(props: PageProps<"/register">) {
     >
       <RegisterForm
         settings={settings}
-        addonCaptcha={<AddonSlotRenderer slot="auth.register.captcha" />}
-        addonAfterFields={<AddonSlotRenderer slot="auth.register.form.after" />}
+        addonCaptcha={renderAddonBlocks(addonCaptchaBlocks)}
+        addonAfterFields={renderAddonBlocks(addonAfterFieldBlocks)}
         addonExternalAuthEntries={addonExternalAuthEntries}
       />
     </AuthShell>
+  )
+}
+
+function renderAddonBlocks(blocks: Awaited<ReturnType<typeof executeAddonSlot>>) {
+  if (blocks.length === 0) {
+    return null
+  }
+
+  return (
+    <>
+      {blocks.map((block) => {
+        const blockKey = `${block.addon.manifest.id}:${block.key}`
+
+        return (
+          <AddonRenderBlock
+            key={blockKey}
+            addonId={block.addon.manifest.id}
+            blockKey={blockKey}
+            result={block.result}
+          />
+        )
+      })}
+    </>
   )
 }

@@ -397,7 +397,7 @@ export function GobangPage({ config, initialMatches, initialSummary }: GobangPag
           <div className="gobang-rules-header"><p className="gobang-rules-title">规则说明</p><button type="button" className="gobang-rules-toggle" onClick={() => setRulesCollapsed((value) => !value)} aria-expanded={!rulesCollapsed}>{rulesCollapsed ? "展开" : "收起"}</button></div>
           {!rulesCollapsed ? <div className="gobang-rules-list">{ruleItems.map((rule) => <p key={rule} className="gobang-rule-item">{rule}</p>)}</div> : null}
         </div>
-        <div className="gobang-stage rounded-[28px] bg-linear-to-br from-card via-card to-secondary/20 shadow-[0_18px_48px_hsl(var(--foreground)/0.08)] backdrop-blur-xs md:p-4">
+        <div className="gobang-stage rounded-xl bg-linear-to-br from-card via-card to-secondary/20 shadow-[0_18px_48px_hsl(var(--foreground)/0.08)] backdrop-blur-xs md:p-4">
           <ChessBoard board={currentBoard} disabled={boardDisabled} onDropChess={handleDropChess} lastMove={latestMove} winningLine={winningLine} showNoRegretOverlay={showNoRegret} />
           <div className="gobang-actions mt-3 flex items-center justify-center"><button type="button" className="gobang-easter-egg-button" onClick={triggerNoRegretEasterEgg}>悔棋</button></div>
           <GameControls gameState={gameState} canViewPreviousResult={historyMatches.length > 0} onStartGame={handleStartGame} onViewPreviousResult={() => setShowPreviousResult(true)} />

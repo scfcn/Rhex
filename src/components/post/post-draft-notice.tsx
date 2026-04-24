@@ -37,7 +37,7 @@ const toneStyles = {
 
 const sizeStyles = {
   default: {
-    wrapper: "rounded-[24px] px-5 py-4",
+    wrapper: "rounded-xl px-5 py-4",
     layout: "items-start gap-3",
     icon: "h-5 w-5",
     title: "text-sm",
@@ -48,7 +48,7 @@ const sizeStyles = {
     button: "h-8 rounded-full px-3",
   },
   compact: {
-    wrapper: "min-h-[44px] rounded-[20px] px-4 py-3",
+    wrapper: "min-h-[44px] rounded-xl px-4 py-3",
     layout: "items-center gap-3",
     icon: "h-4 w-4",
     title: "text-sm",

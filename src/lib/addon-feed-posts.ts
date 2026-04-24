@@ -11,6 +11,7 @@ import type { FeedDisplayItem } from "@/lib/forum-feed-display"
 import { getFeedPinLabel } from "@/lib/forum-feed-display"
 import type { PostStreamDisplayItem } from "@/lib/forum-post-stream-display"
 import { getVisiblePinLabel } from "@/lib/forum-post-stream-display"
+import { usePublishedTimeForTaxonomySort, type TaxonomyPostSort } from "@/lib/forum-taxonomy-sort"
 import { resolvePostCoverImage } from "@/lib/post-cover"
 import { resolvePostHeatStyle } from "@/lib/post-heat"
 import { getPostTypeLabel } from "@/lib/post-types"
@@ -142,6 +143,7 @@ export async function buildHookedFeedDisplayItems(input: {
     })
     const latestReplyAuthorName = legacy?.latestReplyAuthorName ?? null
     const latestReplyAuthorUsername = legacy?.latestReplyAuthorUsername ?? null
+    const latestReplyCommentId = legacy?.latestReplyCommentId ?? null
 
     return {
       id: post.id,
@@ -181,6 +183,7 @@ export async function buildHookedFeedDisplayItems(input: {
         : null,
       latestReplyAuthorName,
       latestReplyAuthorUsername,
+      latestReplyCommentId,
       commentCount: post.commentCount,
       commentAccentColor: commentHeat.color,
       coverImage: legacy?.coverImage ?? resolvePostCoverImage(post.content, post.coverPath),
@@ -192,6 +195,7 @@ export async function buildHookedFeedDisplayItems(input: {
 export async function buildHookedPostStreamDisplayItems(input: {
   posts: SitePostItem[]
   settings: FeedHeatSettings
+  sort: TaxonomyPostSort
   visiblePinScopes: Array<"GLOBAL" | "ZONE" | "BOARD">
   pathname?: string
   request?: Request
@@ -211,6 +215,8 @@ export async function buildHookedPostStreamDisplayItems(input: {
     const legacy = legacyPostsById.get(post.id)
     const rewardConfig = parsePostRewardPoolConfigFromContent(post.content)
     const publishedAtRaw = resolveAddonPostDate(post.publishedAt, post.createdAt) ?? post.createdAt
+    const lastRepliedAtRaw = resolveAddonPostDate(post.lastCommentedAt, post.publishedAt ?? post.createdAt) ?? publishedAtRaw
+    const usePublishedTime = usePublishedTimeForTaxonomySort(input.sort)
     const commentHeat = resolvePostHeatStyle({
       views: post.viewCount,
       comments: post.commentCount,
@@ -224,6 +230,7 @@ export async function buildHookedPostStreamDisplayItems(input: {
     })
     const latestReplyAuthorName = legacy?.latestReplyAuthorName ?? null
     const latestReplyAuthorUsername = legacy?.latestReplyAuthorUsername ?? null
+    const latestReplyCommentId = legacy?.latestReplyCommentId ?? null
 
     return {
       id: post.id,
@@ -252,11 +259,16 @@ export async function buildHookedPostStreamDisplayItems(input: {
       authorVipLevel,
       authorNameClassName: getVipNameClass(authorIsVip, authorVipLevel, { emphasize: true }),
       authorDisplayedBadges: legacy?.authorDisplayedBadges,
-      metaPrimary: legacy?.publishedAt ?? formatRelativeTime(publishedAtRaw),
-      metaPrimaryRaw: legacy?.publishedAtRaw ?? publishedAtRaw,
+      metaPrimary: usePublishedTime
+        ? (legacy?.publishedAt ?? formatRelativeTime(publishedAtRaw))
+        : (legacy?.lastRepliedAt ?? formatRelativeTime(lastRepliedAtRaw)),
+      metaPrimaryRaw: usePublishedTime
+        ? (legacy?.publishedAtRaw ?? publishedAtRaw)
+        : (legacy?.lastRepliedAtRaw ?? lastRepliedAtRaw),
       metaSecondary: latestReplyAuthorName ? `最新回复 ${latestReplyAuthorName}` : null,
       latestReplyAuthorName,
       latestReplyAuthorUsername,
+      latestReplyCommentId,
       commentCount: post.commentCount,
       commentAccentColor: commentHeat.color,
     } satisfies PostStreamDisplayItem

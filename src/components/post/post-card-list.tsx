@@ -25,7 +25,7 @@ export function PostCardList({ posts, pointName = "积分", compact = false, sho
         const postPath = getPostPath(post, { mode: postLinkDisplayMode })
 
         return (
-          <div key={post.id} className="rounded-[24px] bg-secondary/60 p-5">
+          <div key={post.id} className="rounded-xl bg-secondary/60 p-5">
             <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <span className="rounded-full bg-background px-3 py-1 text-xs">{post.typeLabel}</span>
               {showBoard ? (

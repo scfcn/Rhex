@@ -67,13 +67,13 @@ export function AdminTippingGiftListEditor({ items, onChange }: AdminTippingGift
       </div>
 
       {items.length === 0 ? (
-        <div className="rounded-[20px] border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+        <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
           暂无礼物，添加后前台才可送礼。
         </div>
       ) : (
         <div className="space-y-3">
           {items.map((item, index) => (
-            <div key={item.id} className="rounded-[20px] border border-border bg-card/70 p-4">
+            <div key={item.id} className="rounded-xl border border-border bg-card/70 p-4">
               <div className="grid gap-4 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_140px_auto]">
                 <div className="space-y-2">
                   <IconPicker

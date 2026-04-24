@@ -115,10 +115,30 @@ export function buildPostDetailInclude(currentUserId?: number) {
           where: {
             OR: [{ isEligible: true }, { userId: currentUserId }],
           },
+          include: {
+            user: {
+              select: {
+                username: true,
+                nickname: true,
+                avatarPath: true,
+                status: true,
+              },
+            },
+          },
         }
       : {
           where: {
             isEligible: true,
+          },
+          include: {
+            user: {
+              select: {
+                username: true,
+                nickname: true,
+                avatarPath: true,
+                status: true,
+              },
+            },
           },
         },
     likes: currentUserId

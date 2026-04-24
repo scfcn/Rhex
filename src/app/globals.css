@@ -531,6 +531,20 @@
     max-width: 20em;
     height: auto;
   }
+  .markdown-body:not(.markdown-body--image-only) p:has(> img:only-child),
+  .markdown-body:not(.markdown-body--image-only) p:has(> a:only-child > img:only-child) {
+    display: inline-flex;
+    max-width: min(100%, 20em);
+    margin: 0.75rem 0.75rem 0.75rem 0;
+    vertical-align: top;
+    line-height: 1;
+  }
+  .markdown-body:not(.markdown-body--image-only) p:has(> img:only-child) > img,
+  .markdown-body:not(.markdown-body--image-only) p:has(> a:only-child > img:only-child) img {
+    display: block;
+    max-width: 100%;
+    margin: 0 !important;
+  }
   .markdown-body.markdown-body--image-only img.my-3,
   .markdown-body.markdown-body--image-only img.my-4 {
     max-width: 100%;

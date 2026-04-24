@@ -32,7 +32,7 @@ export function LevelSettingsSection({ data }: { data: SettingsPageData }) {
               <p className="mt-2 text-sm leading-7 text-muted-foreground">这里会展示你当前等级、成长进度，以及升级到下一等级还差哪些条件。</p>
             </div>
 
-            <div className="rounded-[28px] border border-white/60 bg-white/75 p-5 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/5">
+            <div className="rounded-xl border border-white/60 bg-white/75 p-5 shadow-xs backdrop-blur-sm dark:border-white/10 dark:bg-white/5">
               <LevelBadge
                 level={levelView.currentLevel.level}
                 name={levelView.currentLevel.name}
@@ -87,7 +87,7 @@ export function LevelSettingsSection({ data }: { data: SettingsPageData }) {
               </div>
             </>
           ) : (
-            <div className="rounded-[24px] border border-dashed border-border px-4 py-8 text-center">
+            <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center">
               <Crown className="mx-auto h-8 w-8 text-amber-500" />
               <p className="mt-3 text-base font-semibold">你已经达到当前站点的最高等级</p>
               <p className="mt-2 text-sm text-muted-foreground">后续如果后台新增更高等级，你的成长页会自动展示新的升级目标。</p>
@@ -112,7 +112,7 @@ export function LevelSettingsSection({ data }: { data: SettingsPageData }) {
 
 function QuickLink({ href, title, description }: { href: string; title: string; description: string }) {
   return (
-    <Link href={href} className="rounded-[22px] border border-border bg-card px-5 py-4 transition-colors hover:bg-accent/40">
+    <Link href={href} className="rounded-xl border border-border bg-card px-5 py-4 transition-colors hover:bg-accent/40">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="font-medium">{title}</p>
@@ -145,7 +145,7 @@ function ProgressItem({ title, current, required, remaining, completed }: { titl
   const progress = required > 0 ? Math.min(100, Math.round((current / required) * 100)) : 100
 
   return (
-    <div className="rounded-[24px] border border-border p-4">
+    <div className="rounded-xl border border-border p-4">
       <div className="flex items-center justify-between gap-3">
         <p className="font-medium">{title}</p>
         <span className={completed ? "rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700" : "rounded-full bg-secondary px-3 py-1 text-xs font-medium text-muted-foreground"}>

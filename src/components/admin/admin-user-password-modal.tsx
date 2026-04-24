@@ -114,7 +114,7 @@ export function AdminUserPasswordModal({ userId, username, displayName }: AdminU
             <Textarea
               value={message}
               onChange={(event) => setMessage(event.target.value)}
-              className="min-h-[88px] rounded-[20px] bg-background px-4 py-3"
+              className="min-h-[88px] rounded-xl bg-background px-4 py-3"
               placeholder="记录重置原因、工单号或审核说明"
             />
           </label>

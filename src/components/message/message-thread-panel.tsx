@@ -55,7 +55,7 @@ export function MessageThreadPanel({
   if (!conversation || !recipient) {
     if (loadingConversation) {
       return (
-        <div className="flex min-h-[calc(100vh-164px)] items-center justify-center rounded-[28px] border border-border bg-card px-6 text-center shadow-soft max-sm:min-h-[calc(100dvh-56px)] max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0 max-sm:shadow-none">
+        <div className="flex min-h-[calc(100vh-164px)] items-center justify-center rounded-xl border border-border bg-card px-6 text-center shadow-soft max-sm:min-h-[calc(100dvh-56px)] max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0 max-sm:shadow-none">
           <div>
             {onBack ? (
               <button
@@ -78,7 +78,7 @@ export function MessageThreadPanel({
 
     if (conversationError) {
       return (
-        <div className="flex min-h-[calc(100vh-164px)] items-center justify-center rounded-[28px] border border-dashed border-rose-200/80 bg-card px-6 text-center shadow-soft max-sm:min-h-[calc(100dvh-56px)] max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0 max-sm:shadow-none dark:border-rose-400/20">
+        <div className="flex min-h-[calc(100vh-164px)] items-center justify-center rounded-xl border border-dashed border-rose-200/80 bg-card px-6 text-center shadow-soft max-sm:min-h-[calc(100dvh-56px)] max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0 max-sm:shadow-none dark:border-rose-400/20">
           <div>
             {onBack ? (
               <button
@@ -100,7 +100,7 @@ export function MessageThreadPanel({
     }
 
     return (
-      <div className="flex min-h-[calc(100vh-164px)] items-center justify-center rounded-[28px] border border-dashed border-border bg-card px-6 text-center shadow-soft max-sm:min-h-[calc(100dvh-56px)] max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0 max-sm:shadow-none">
+      <div className="flex min-h-[calc(100vh-164px)] items-center justify-center rounded-xl border border-dashed border-border bg-card px-6 text-center shadow-soft max-sm:min-h-[calc(100dvh-56px)] max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0 max-sm:shadow-none">
         <div>
           <MessageSquareMore className="mx-auto h-10 w-10 text-muted-foreground" />
           <p className="mt-4 text-sm uppercase tracking-[0.28em] text-muted-foreground">Chat Thread</p>
@@ -415,7 +415,7 @@ function MessageThreadPanelContent({
   }
 
   return (
-    <div className="flex max-h-[calc(100vh-164px)] min-h-[calc(100vh-164px)] flex-col overflow-hidden rounded-[28px] border border-border bg-card shadow-soft max-sm:max-h-[calc(100dvh-56px)] max-sm:min-h-[calc(100dvh-56px)] max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0 max-sm:shadow-none">
+    <div className="flex max-h-[calc(100vh-164px)] min-h-[calc(100vh-164px)] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-soft max-sm:max-h-[calc(100dvh-56px)] max-sm:min-h-[calc(100dvh-56px)] max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0 max-sm:shadow-none">
       <div className="flex items-center justify-between gap-4 border-b border-border px-4 py-3 sm:px-5 sm:py-3.5">
         <div className="flex min-w-0 items-center gap-3 sm:gap-4">
           {onBack ? (
@@ -463,7 +463,7 @@ function MessageThreadPanelContent({
         {historyError ? <p className="rounded-[18px] bg-rose-50 px-4 py-3 text-sm text-rose-700">{historyError}</p> : null}
 
         {conversation.messages.length === 0 ? (
-          <div className="flex h-full min-h-[220px] items-center justify-center rounded-[22px] border border-dashed border-border bg-card/80 px-6 text-center dark:bg-secondary/30">
+          <div className="flex h-full min-h-[220px] items-center justify-center rounded-xl border border-dashed border-border bg-card/80 px-6 text-center dark:bg-secondary/30">
             <div>
               <p className="text-sm font-medium">还没有聊天记录</p>
             </div>
@@ -476,7 +476,7 @@ function MessageThreadPanelContent({
             <div className={cn("min-w-0 max-w-[86%] sm:max-w-[76%]", message.isMine ? "items-end" : "items-start")}>
               <div
                 className={cn(
-                  "inline-block max-w-full min-w-0 rounded-[20px] px-3.5 py-2 text-sm leading-6 shadow-xs",
+                  "inline-block max-w-full min-w-0 rounded-xl px-3.5 py-2 text-sm leading-6 shadow-xs",
                   message.isMine
                     ? "rounded-br-md bg-foreground text-background dark:bg-primary dark:text-primary-foreground"
                     : "rounded-bl-md border border-border bg-card text-foreground dark:bg-secondary/70 dark:text-foreground",
@@ -495,7 +495,7 @@ function MessageThreadPanelContent({
         {usingDemoData ? <p className="mb-3 rounded-[18px] bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">当前会话尚未完成数据库接入。</p> : null}
         {error ? <p className="mb-3 rounded-[18px] bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-200">{error}</p> : null}
         {assetUploadPending ? <p className="mb-3 rounded-[18px] bg-secondary px-4 py-3 text-sm text-muted-foreground">{assetUploadLabel}</p> : null}
-        <div className="rounded-[24px] border border-border bg-background px-4 py-3 max-sm:rounded-[20px]">
+        <div className="rounded-xl border border-border bg-background px-4 py-3 max-sm:rounded-xl">
           <textarea
             ref={textareaRef}
             value={draft}

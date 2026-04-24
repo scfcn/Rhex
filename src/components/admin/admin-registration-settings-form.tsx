@@ -54,7 +54,7 @@ function EmailTemplateSection({
   const renderedHtml = renderEmailTemplate(html, previewVariables)
 
   return (
-    <div className="space-y-4 rounded-[20px] border border-border bg-background p-4">
+    <div className="space-y-4 rounded-xl border border-border bg-background p-4">
       <div>
         <h4 className="text-sm font-semibold">{title}</h4>
         <p className="mt-1 text-xs leading-6 text-muted-foreground">{description}</p>
@@ -76,7 +76,7 @@ function EmailTemplateSection({
         <textarea
           value={text}
           onChange={(event) => onTextChange(event.target.value)}
-          className="min-h-[120px] w-full rounded-[20px] border border-border bg-card px-4 py-3 text-sm outline-hidden"
+          className="min-h-[120px] w-full rounded-xl border border-border bg-card px-4 py-3 text-sm outline-hidden"
           placeholder="输入纯文本邮件内容模板"
         />
       </div>
@@ -86,11 +86,11 @@ function EmailTemplateSection({
           <textarea
             value={html}
             onChange={(event) => onHtmlChange(event.target.value)}
-            className="min-h-[200px] w-full rounded-[20px] border border-border bg-card px-4 py-3 font-mono text-xs leading-6 outline-hidden"
+            className="min-h-[200px] w-full rounded-xl border border-border bg-card px-4 py-3 font-mono text-xs leading-6 outline-hidden"
             placeholder="输入 HTML 邮件内容模板"
           />
         </div>
-        <div className="space-y-3 rounded-[20px] border border-border bg-card/60 p-4">
+        <div className="space-y-3 rounded-xl border border-border bg-card/60 p-4">
           <div>
             <p className="text-sm font-medium">模板预览</p>
             <p className="mt-1 text-xs leading-6 text-muted-foreground">使用当前示例变量渲染主题、纯文本和 HTML，用于检查变量替换和版式效果。</p>
@@ -146,7 +146,7 @@ function CaptchaModeField({
 
 function FieldGroup({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="rounded-[20px] border border-border bg-secondary/30 p-4 space-y-3">
+    <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
       <p className="text-sm font-semibold">{title}</p>
       {children}
     </div>
@@ -242,7 +242,7 @@ export function AdminRegistrationSettingsForm({
   return (
     <>
       {activeSubTab === "invite" ? (
-        <div className="rounded-[24px] border border-border p-5 space-y-4">
+        <div className="rounded-xl border border-border p-5 space-y-4">
           <div>
             <h3 className="text-sm font-semibold">注册与邀请码</h3>
             <p className="mt-1 text-xs leading-6 text-muted-foreground">控制注册开关、邀请码策略，以及用户邀请奖励。</p>
@@ -271,7 +271,7 @@ export function AdminRegistrationSettingsForm({
       ) : null}
 
       {activeSubTab === "captcha" ? (
-        <div className="rounded-[24px] border border-border p-5 space-y-4">
+        <div className="rounded-xl border border-border p-5 space-y-4">
           <div>
             <h3 className="text-sm font-semibold">注册防机器人验证码</h3>
             <p className="mt-1 text-xs leading-6 text-muted-foreground">支持关闭、Cloudflare Turnstile、自建图形验证码与 PoW 工作量证明四种模式。</p>
@@ -289,7 +289,7 @@ export function AdminRegistrationSettingsForm({
       {activeSubTab === "invite-codes" ? <AdminInviteCodeManager initialInviteCodes={initialInviteCodes} /> : null}
 
       {activeSubTab === "fields" ? (
-        <div className="rounded-[24px] border border-border p-5 space-y-4">
+        <div className="rounded-xl border border-border p-5 space-y-4">
           <div>
             <h3 className="text-sm font-semibold">注册表单字段</h3>
             <p className="mt-1 text-xs leading-6 text-muted-foreground">邮箱、手机、昵称、性别、邀请人等字段的显示与必填策略。</p>
@@ -329,7 +329,7 @@ export function AdminRegistrationSettingsForm({
       ) : null}
 
       {activeSubTab === "security" ? (
-        <div className="rounded-[24px] border border-border p-5 space-y-4">
+        <div className="rounded-xl border border-border p-5 space-y-4">
           <div>
             <h3 className="text-sm font-semibold">账号安全</h3>
             <p className="mt-1 text-xs leading-6 text-muted-foreground">控制会话 IP 保护、异地登录邮件提醒，以及用户在个人页面修改密码时是否必须完成邮箱验证码验证。</p>
@@ -361,7 +361,7 @@ export function AdminRegistrationSettingsForm({
             </FieldGroup>
           </div>
           {!draft.smtpEnabled ? (
-            <div className="rounded-[20px] border border-dashed border-amber-300 bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-800">
+            <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-800">
               当前尚未启用 SMTP。即使这里开启登录 IP 变化邮件提醒或改密邮箱验证，相关能力仍会自动跳过或提示“邮件能力未配置”；会话 IP 保护开关不受 SMTP 影响。
             </div>
           ) : null}
@@ -369,7 +369,7 @@ export function AdminRegistrationSettingsForm({
       ) : null}
 
       {activeSubTab === "email-templates" ? (
-        <div className="rounded-[24px] border border-border p-5 space-y-5">
+        <div className="rounded-xl border border-border p-5 space-y-5">
           <div>
             <h3 className="text-sm font-semibold">邮件模板编辑</h3>
             <p className="mt-1 text-xs leading-6 text-muted-foreground">编辑注册验证码、找回密码验证码、修改密码验证码、登录安全提醒以及支付成功通知邮件模板。每个模板支持的变量会在对应卡片内单独展示。</p>
@@ -444,7 +444,7 @@ export function AdminRegistrationSettingsForm({
 
       {activeSubTab === "auth" ? (
         <>
-          <div className="rounded-[24px] border border-border p-5 space-y-4">
+          <div className="rounded-xl border border-border p-5 space-y-4">
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-semibold">第三方与 Passkey 登录</h3>
@@ -489,7 +489,7 @@ export function AdminRegistrationSettingsForm({
             <div className="space-y-5 overflow-y-auto p-6 text-sm text-foreground">
               <section className="space-y-3">
                 <h4 className="text-sm font-semibold">GitHub OAuth</h4>
-                <div className="rounded-[20px] border border-border bg-secondary/30 p-4 space-y-2">
+                <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-2">
                   <p><span className="font-medium">Homepage URL：</span><code>{siteOrigin}</code></p>
                   <p><span className="font-medium">Authorization callback URL：</span><code>{siteOrigin}/api/auth/oauth/github/callback</code></p>
                   <p><span className="font-medium">发起登录：</span><code>{siteOrigin}/api/auth/oauth/github/start?mode=login</code></p>
@@ -500,7 +500,7 @@ export function AdminRegistrationSettingsForm({
 
               <section className="space-y-3">
                 <h4 className="text-sm font-semibold">Google OAuth</h4>
-                <div className="rounded-[20px] border border-border bg-secondary/30 p-4 space-y-2">
+                <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-2">
                   <p><span className="font-medium">Authorized JavaScript origins：</span><code>{siteOrigin}</code></p>
                   <p><span className="font-medium">Authorized redirect URIs：</span><code>{siteOrigin}/api/auth/oauth/google/callback</code></p>
                   <p><span className="font-medium">发起登录：</span><code>{siteOrigin}/api/auth/oauth/google/start?mode=login</code></p>
@@ -510,7 +510,7 @@ export function AdminRegistrationSettingsForm({
 
               <section className="space-y-3">
                 <h4 className="text-sm font-semibold">Passkey</h4>
-                <div className="rounded-[20px] border border-border bg-secondary/30 p-4 space-y-2">
+                <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-2">
                   <p><span className="font-medium">Passkey 登录页：</span><code>{siteOrigin}/auth/passkey?mode=login</code></p>
                   <p><span className="font-medium">Passkey 注册页：</span><code>{siteOrigin}/auth/passkey?mode=register</code></p>
                   <p><span className="font-medium">建议 RP ID：</span><code>{resolvedPasskeyRpId}</code></p>
@@ -522,7 +522,7 @@ export function AdminRegistrationSettingsForm({
 
               <section className="space-y-3">
                 <h4 className="text-sm font-semibold">后台填写项</h4>
-                <div className="rounded-[20px] border border-border bg-background p-4">
+                <div className="rounded-xl border border-border bg-background p-4">
                   <pre className="overflow-x-auto text-xs leading-6 text-foreground"><code>{`GitHub Client ID = ${draft.githubClientId || "第三方平台生成后填写"}
 GitHub Client Secret = ${draft.githubClientSecret ? "已填写" : "第三方平台生成后填写"}
 
@@ -541,7 +541,7 @@ Passkey Origin = ${resolvedPasskeyOrigin}`}</code></pre>
       ) : null}
 
       {activeSubTab === "smtp" ? (
-        <div className="rounded-[24px] border border-border p-5 space-y-4">
+        <div className="rounded-xl border border-border p-5 space-y-4">
           <div>
             <h3 className="text-sm font-semibold">SMTP 邮件发送</h3>
             <p className="mt-1 text-xs leading-6 text-muted-foreground">开启后，邮箱验证码会通过真实邮件发送。</p>
@@ -555,7 +555,7 @@ Passkey Origin = ${resolvedPasskeyOrigin}`}</code></pre>
             <TextField label="SMTP 密码 / 授权码" type="password" value={draft.smtpPass} onChange={(value) => updateDraftField("smtpPass", value)} placeholder="请输入密码或授权码" />
             <TextField label="发件人地址" value={draft.smtpFrom} onChange={(value) => updateDraftField("smtpFrom", value)} placeholder="如 Forum <no-reply@example.com>" />
           </div>
-          <div className="rounded-[20px] border border-border bg-secondary/20 p-4">
+          <div className="rounded-xl border border-border bg-secondary/20 p-4">
             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
               <TextField label="测试收件邮箱" value={smtpTestRecipient} onChange={setSmtpTestRecipient} placeholder="输入你要接收测试邮件的邮箱" />
               <Button type="button" variant="outline" disabled={isSendingSmtpTest} onClick={handleSendSmtpTest}>

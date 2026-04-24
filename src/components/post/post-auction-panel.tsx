@@ -2,13 +2,14 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Clock3, Gavel, Info, Lock, Trophy } from "lucide-react"
+import { ChevronDown, ChevronUp, Clock3, Gavel, Info, Lock, Trophy } from "lucide-react"
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
 
 import { UserAvatar } from "@/components/user/user-avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/rbutton"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Input } from "@/components/ui/input"
 import { Modal } from "@/components/ui/modal"
 import { Separator } from "@/components/ui/separator"
@@ -85,6 +86,7 @@ export function PostAuctionPanel({
   const viewerStateLabel = currentUserId
     ? resolveViewerStateLabel(auction, pointName, isSealedBid, timing.hasEnded)
     : null
+  const showWinnerContentSection = Boolean(auction.winnerOnlyContent || auction.winnerOnlyContentPreview || auction.finalPrice)
   const readonlyActionLabel = resolveAuctionReadonlyActionLabel({
     auction,
     currentUserId,
@@ -156,7 +158,7 @@ export function PostAuctionPanel({
 
   return (
     <>
-      <Card className="overflow-hidden rounded-[24px]">
+      <Card className="overflow-hidden rounded-xl">
         <CardHeader className="sr-only">
           <CardTitle>拍卖面板</CardTitle>
         </CardHeader>
@@ -202,7 +204,7 @@ export function PostAuctionPanel({
                   ) : null}
                 </div>
                 {showWinnerSummary ? (
-                  <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[20px] border border-amber-200 bg-amber-50/90 px-3 py-3 text-sm text-amber-950 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-50">
+                  <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-3 text-sm text-amber-950 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-50">
                     <div className="flex min-w-0 items-center gap-2.5">
                       <UserAvatar
                         name={auction.winnerUserName ?? "最终赢家"}
@@ -317,6 +319,15 @@ export function PostAuctionPanel({
                 </p>
               </div>
             </div>
+
+            {showWinnerContentSection ? (
+              <>
+                <Separator className="mt-5" />
+                <div className="pt-4">
+                  <PostAuctionWinnerContent auction={auction} pointName={pointName} embedded />
+                </div>
+              </>
+            ) : null}
           </div>
         </CardContent>
       </Card>
@@ -457,47 +468,89 @@ export function PostAuctionPanel({
 export function PostAuctionWinnerContent({
   auction,
   pointName,
+  embedded = false,
 }: {
   auction: AuctionSummary
   pointName: string
+  embedded?: boolean
 }) {
+  const [open, setOpen] = useState(false)
   const canViewContent = auction.viewerCanViewWinnerContent && Boolean(auction.winnerOnlyContent)
+  const header = (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
+        <Trophy className="h-4 w-4 text-muted-foreground" />
+        <CardTitle className="text-base">赢家专属内容</CardTitle>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {auction.finalPrice ? (
+          <Badge variant="secondary" className="rounded-full">成交价 {formatNumber(auction.finalPrice)} {pointName}</Badge>
+        ) : null}
+        <CollapsibleTrigger
+          render={(
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              className="rounded-full"
+              aria-label={open ? "收起赢家专属内容" : "展开赢家专属内容"}
+              title={open ? "收起赢家专属内容" : "展开赢家专属内容"}
+            />
+          )}
+        >
+          {open ? <ChevronUp /> : <ChevronDown />}
+        </CollapsibleTrigger>
+      </div>
+    </div>
+  )
+  const content = (
+    <div className="flex flex-col gap-4">
+      {canViewContent ? (
+        <div className="flex flex-col gap-3">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
+            当前内容仅卖家、站点管理员和最终赢家可见。你已具备查看权限。
+          </div>
+          <div className="whitespace-pre-wrap rounded-xl border border-border bg-background px-4 py-4 text-sm leading-7 text-foreground">
+            {auction.winnerOnlyContent}
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed border-border bg-card/70 px-4 py-6 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 font-medium text-foreground/85">
+            <Lock className="h-4 w-4" />
+            <span>该内容仅成交赢家可见</span>
+          </div>
+          {auction.winnerOnlyContentPreview ? <p className="mt-2">预告：{auction.winnerOnlyContentPreview}</p> : null}
+          {auction.finalPrice ? <Separator className="my-3" /> : null}
+          {auction.finalPrice ? <p>当前成交价：{formatNumber(auction.finalPrice)} {pointName}</p> : null}
+        </div>
+      )}
+    </div>
+  )
+
+  if (embedded) {
+    return (
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <div className="flex flex-col gap-4">
+          {header}
+          <CollapsibleContent>
+            {content}
+          </CollapsibleContent>
+        </div>
+      </Collapsible>
+    )
+  }
 
   return (
     <Card>
-      <CardHeader className="gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Trophy className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-base">赢家专属内容</CardTitle>
-          </div>
-          {auction.finalPrice ? (
-            <Badge variant="secondary" className="rounded-full">成交价 {formatNumber(auction.finalPrice)} {pointName}</Badge>
-          ) : null}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {canViewContent ? (
-          <div className="space-y-3">
-            <div className="rounded-[20px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
-              当前内容仅卖家、站点管理员和最终赢家可见。你已具备查看权限。
-            </div>
-            <div className="rounded-[20px] border border-border bg-background px-4 py-4 text-sm leading-7 whitespace-pre-wrap text-foreground">
-              {auction.winnerOnlyContent}
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-[20px] border border-dashed border-border bg-card/70 px-4 py-6 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2 font-medium text-foreground/85">
-              <Lock className="h-4 w-4" />
-              <span>该内容仅成交赢家可见</span>
-            </div>
-            {auction.winnerOnlyContentPreview ? <p className="mt-2">预告：{auction.winnerOnlyContentPreview}</p> : null}
-            {auction.finalPrice ? <Separator className="my-3" /> : null}
-            {auction.finalPrice ? <p>当前成交价：{formatNumber(auction.finalPrice)} {pointName}</p> : null}
-          </div>
-        )}
-      </CardContent>
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <CardHeader className="gap-3">
+          {header}
+        </CardHeader>
+        <CollapsibleContent>
+          <CardContent>{content}</CardContent>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   )
 }

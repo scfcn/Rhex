@@ -114,7 +114,7 @@ function ChoiceRow<T extends string>({
   onChange: (value: T) => void
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-[20px] border border-border bg-secondary/20 px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+    <div className="flex flex-col gap-3 rounded-xl border border-border bg-secondary/20 px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
       <div className="flex min-w-0 items-start gap-3">
         <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-background text-muted-foreground">
           <Icon className="h-4 w-4" />
@@ -160,7 +160,7 @@ function PreferenceRow({
   onChange: (checked: boolean) => void
 }) {
   return (
-    <label className="flex cursor-pointer items-start justify-between gap-4 rounded-[20px] border border-border bg-secondary/20 px-4 py-3 transition-colors hover:bg-accent/40">
+    <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-border bg-secondary/20 px-4 py-3 transition-colors hover:bg-accent/40">
       <div className="flex min-w-0 items-start gap-3">
         <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-background text-muted-foreground">
           <Icon className="h-4 w-4" />
@@ -208,7 +208,7 @@ function ActionRow({
   onAction: () => void
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 rounded-[20px] border border-border bg-secondary/20 px-4 py-3">
+    <div className="flex items-start justify-between gap-4 rounded-xl border border-border bg-secondary/20 px-4 py-3">
       <div className="flex min-w-0 items-start gap-3">
         <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-background text-muted-foreground">
           <Icon className="h-4 w-4" />

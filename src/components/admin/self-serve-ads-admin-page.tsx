@@ -212,7 +212,7 @@ export function SelfServeAdsAdminPage({ AppId, config }: SelfServeAdsAdminPagePr
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[24px] border border-border bg-card p-5">
+      <section className="rounded-xl border border-border bg-card p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="text-base font-semibold">自助推广广告位应用后台</h3>
@@ -222,7 +222,7 @@ export function SelfServeAdsAdminPage({ AppId, config }: SelfServeAdsAdminPagePr
         </div>
       </section>
 
-      <section className="rounded-[24px] border border-border bg-card p-5 space-y-4">
+      <section className="rounded-xl border border-border bg-card p-5 space-y-4">
         <h4 className="text-sm font-semibold">布局与定价</h4>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <label className="flex min-h-[44px] items-center justify-between gap-3 rounded-[16px] border border-border bg-background px-4 py-3 text-sm">
@@ -264,7 +264,7 @@ export function SelfServeAdsAdminPage({ AppId, config }: SelfServeAdsAdminPagePr
         </div>
       </section>
 
-      <section className="rounded-[24px] border border-border bg-card p-5 space-y-4">
+      <section className="rounded-xl border border-border bg-card p-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h4 className="text-sm font-semibold">广告订单审核</h4>
@@ -342,7 +342,7 @@ export function SelfServeAdsAdminPage({ AppId, config }: SelfServeAdsAdminPagePr
 
 function PriceBlock({ title, pointName, children }: { title: string; pointName: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-[20px] border border-border p-4">
+    <div className="rounded-xl border border-border p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
         <h5 className="text-sm font-semibold">{title}</h5>
         <span className="text-xs text-muted-foreground">单位：{pointName}</span>

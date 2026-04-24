@@ -1,43 +1,47 @@
 import Link from "next/link"
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
+import { Crown, Flag, MessageCircleMore, ShieldCheck } from "lucide-react"
 
 import { AddonSlotRenderer } from "@/addons-host"
 import { AccessDeniedCard } from "@/components/access-denied-card"
+import { ForumPageShell } from "@/components/forum/forum-page-shell"
 import { PageNumberPagination } from "@/components/page-number-pagination"
 import { AiAgentIndicator } from "@/components/user/ai-agent-indicator"
 import { AnonymousUserIndicator } from "@/components/user/anonymous-user-indicator"
 import { ForumPostStream } from "@/components/forum/forum-post-stream"
-import { LevelBadge } from "@/components/level-badge"
 import { MarkdownContent } from "@/components/markdown-content"
 import { UserProfileBadgeShowcase } from "@/components/user/user-profile-badge-showcase"
 import { ReportDialog } from "@/components/post/report-dialog"
 import { SiteHeader } from "@/components/site-header"
 import { UserPublicCollectionsPanel } from "@/components/user/user-public-collections-panel"
+import { UserActiveBoardsPanel } from "@/components/user/user-active-boards-panel"
 import { UserRecentActivityPanel } from "@/components/user/user-recent-activity-panel"
 import { UserRecentRepliesList } from "@/components/user/user-recent-replies-list"
 import { UserAvatar } from "@/components/user/user-avatar"
+import { UserDisplayedBadges } from "@/components/user/user-displayed-badges"
 import { UserProfileOverviewCard } from "@/components/user/user-profile-overview-card"
+import { UserProfileRadarPanel } from "@/components/user/user-profile-radar-panel"
 import { UserStatusBadge } from "@/components/user/user-status-badge"
 import { UserVerificationBadge } from "@/components/user/user-verification-badge"
+import { VipLevelIcon } from "@/components/vip/vip-level-icon"
+import { formatNumber, serializeDate } from "@/lib/formatters"
 import { canViewUserProfileVisibility } from "@/lib/user-profile-settings"
+import { buildUserProfileRadarData } from "@/lib/user-profile-radar"
 import { VipDisplayName } from "@/components/vip/vip-display-name"
-import { VipBadge } from "@/components/vip/vip-badge"
-import { Button } from "@/components/ui/rbutton"
-import { Card, CardContent } from "@/components/ui/card"
 import { getAiAgentUserId } from "@/lib/ai-agent"
 import { getCurrentUser } from "@/lib/auth"
-import { getGrantedBadgesForUser } from "@/lib/badges"
+import { getBadgeEligibilitySnapshot, getDisplayedBadgesForUser, getGrantedBadgesForUser } from "@/lib/badges"
+import { getBoards } from "@/lib/boards"
 import { getPublicFavoriteCollectionsByUsername } from "@/lib/favorite-collections"
 import { isUserFollowingTarget } from "@/lib/follows"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getUserProfileAccessState } from "@/lib/user-blocks"
 import { cn } from "@/lib/utils"
 import { readSearchParam } from "@/lib/search-params"
-import { getUserProfile, getUserPostsPage, getUserRecentRepliesPage } from "@/lib/users"
+import { getUserActiveBoardsByRecentReplies, getUserProfile, getUserPostsPage, getUserRecentRepliesPage } from "@/lib/users"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
-
-const profileCardClassName = "rounded-2xl border  shadow-xs"
+import { getZones } from "@/lib/zones"
 
 const identityTagClassNames = {
   vip: "rounded-full bg-violet-100 px-3 py-1 text-xs font-medium text-violet-700 dark:bg-violet-400/15 dark:text-violet-200",
@@ -52,6 +56,42 @@ const identityTagClassNames = {
 const userActivityTabKeys = ["introduction", "posts", "collections", "replies"] as const
 
 type UserActivityTabKey = typeof userActivityTabKeys[number]
+const profileNameBadgeClassName = "inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold leading-none backdrop-blur-sm"
+
+function getProfileRoleBadgeConfig(role: "USER" | "MODERATOR" | "ADMIN" | null) {
+  if (role === "ADMIN") {
+    return {
+      label: "管理员",
+      icon: <Crown className="h-3.5 w-3.5" />,
+      className: "border-red-200/80 bg-linear-to-b from-red-50 to-red-100/70 text-red-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] dark:border-red-500/25 dark:from-red-500/18 dark:to-red-500/8 dark:text-red-200 dark:shadow-none",
+    }
+  }
+
+  if (role === "MODERATOR") {
+    return {
+      label: "版主",
+      icon: <ShieldCheck className="h-3.5 w-3.5" />,
+      className: "border-sky-200/80 bg-linear-to-b from-sky-50 to-sky-100/70 text-sky-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] dark:border-sky-500/25 dark:from-sky-500/18 dark:to-sky-500/8 dark:text-sky-200 dark:shadow-none",
+    }
+  }
+
+  return null
+}
+
+function getProfileVipBadgeStyle(level: number) {
+  const colorVariableName = level >= 3
+    ? "--vip-name-color-vip3"
+    : level === 2
+      ? "--vip-name-color-vip2"
+      : "--vip-name-color-vip1"
+
+  return {
+    color: `var(${colorVariableName})`,
+    borderColor: `color-mix(in srgb, var(${colorVariableName}) 36%, transparent)`,
+    background: `linear-gradient(180deg, color-mix(in srgb, var(${colorVariableName}) 16%, white), color-mix(in srgb, var(${colorVariableName}) 10%, transparent))`,
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.65)",
+  }
+}
 
 function parsePageParam(value: string | string[] | undefined) {
   const page = Number(readSearchParam(value))
@@ -124,7 +164,7 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
   const postsPage = parsePageParam(searchParams?.postsPage)
   const repliesPage = parsePageParam(searchParams?.repliesPage)
   const activityTab = resolveUserActivityTab(readSearchParam(searchParams?.tab), { postsPage, repliesPage })
-  const [user, settings, currentUser, aiAgentUserId] = await Promise.all([getUserProfile(params.username), getSiteSettings(), getCurrentUser(), getAiAgentUserId()])
+  const [user, settings, currentUser, aiAgentUserId, boards, zones] = await Promise.all([getUserProfile(params.username), getSiteSettings(), getCurrentUser(), getAiAgentUserId(), getBoards(), getZones()])
 
   if (!user) {
     notFound()
@@ -158,7 +198,7 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
   const canViewIntroduction = canViewUserProfileVisibility(user.introductionVisibility, visibilityContext)
   const introduction = user.introduction.trim()
 
-  const [postsPageData, recentRepliesPageData, publicCollections, badgeItems, isFollowingUser] = await Promise.all([
+  const [postsPageData, recentRepliesPageData, activeBoards, publicCollections, badgeItems, displayedBadgeItems, radarSnapshot, isFollowingUser] = await Promise.all([
     canViewRecentActivity
       ? getUserPostsPage(params.username, { page: postsPage })
       : Promise.resolve({
@@ -185,8 +225,13 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
             hasNextPage: false,
           },
         }),
+    canViewRecentActivity
+      ? getUserActiveBoardsByRecentReplies(params.username)
+      : Promise.resolve([]),
     getPublicFavoriteCollectionsByUsername(params.username, { page: 1 }),
     getGrantedBadgesForUser(user.id),
+    getDisplayedBadgesForUser(user.id),
+    getBadgeEligibilitySnapshot(user.id),
     currentUser && currentUser.id !== user.id && !profileAccess.relation.isBlocked
       ? isUserFollowingTarget({
           userId: currentUser.id,
@@ -204,6 +249,17 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
   const canToggleFollow = (!currentUser || currentUser.id !== user.id) && !profileAccess.relation.isBlocked
   const isAnonymousMaskUser = settings.anonymousPostMaskUserId === user.id
   const isAiAgentUser = aiAgentUserId === user.id
+  const profileRadarData = buildUserProfileRadarData({
+    user,
+    snapshot: radarSnapshot,
+  })
+  const desktopRadarPanel = profileRadarData ? <UserProfileRadarPanel data={profileRadarData} /> : null
+  const mobileRadarPanel = profileRadarData ? <UserProfileRadarPanel data={profileRadarData} className="w-full" /> : null
+  const activeBoardsEmptyText = canViewRecentActivity
+    ? "最近还没有可展示的回复活跃记录。"
+    : user.activityVisibility === "MEMBERS"
+      ? "该用户将最近回复设置为登录后可见。"
+      : "该用户未公开最近回复。"
 
   const vipActive = isVipActive(user)
   const vipLevel = getVipLevel(user)
@@ -211,13 +267,9 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
   const isRestrictedUser = user.status === "BANNED" || user.status === "MUTED"
   const restrictionLabel = user.status === "BANNED" ? "封禁中" : user.status === "MUTED" ? "禁言中" : null
   const restrictionDescription = user.status === "BANNED" ? "该用户当前因封禁处于受限状态" : user.status === "MUTED" ? "该用户当前处于禁言状态" : null
-
-  const statItems = [
-    { label: settings.pointName, value: user.points },
-    { label: "帖子", value: user.postCount },
-    { label: "回复", value: user.commentCount },
-    { label: "获赞", value: user.likeReceivedCount },
-  ]
+  const roleBadge = getProfileRoleBadgeConfig(user.role)
+  const joinedAtText = serializeDate(user.createdAt) ?? user.createdAt
+  const levelMetaText = user.levelName ? `Lv.${user.level} ${user.levelName}` : `Lv.${user.level}`
 
   const identityTags = [
     { label: `@${user.username}`, tone: "plain" as const },
@@ -232,230 +284,277 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
     user.postCount >= 10 ? { label: "活跃创作者", tone: "sky" as const } : null,
   ].filter(Boolean) as Array<{ label: string; tone: "plain" | "vip" | "level" | "orange" | "sky" | "danger" | "warning" }>
 
+  const hasIdentityIcons = Boolean(user.verification || isAnonymousMaskUser || isAiAgentUser || restrictionLabel)
+  const hasDisplayedBadges = displayedBadgeItems.length > 0
+  const identityRow = hasIdentityIcons || hasDisplayedBadges
+    ? (
+      <>
+        {hasIdentityIcons ? (
+          <span className="inline-flex items-center gap-1.5">
+            {user.verification ? <UserVerificationBadge verification={user.verification} appearance="plain" compact className="h-[22px] min-w-[22px]" iconClassName="h-[22px] min-w-[22px] text-[22px]" /> : null}
+            {isAnonymousMaskUser ? <AnonymousUserIndicator /> : null}
+            {isAiAgentUser ? <AiAgentIndicator /> : null}
+            {restrictionLabel ? <UserStatusBadge status={user.status} compact /> : null}
+          </span>
+        ) : null}
+        {hasIdentityIcons && hasDisplayedBadges ? <span className="text-border">|</span> : null}
+        {hasDisplayedBadges ? <UserDisplayedBadges badges={displayedBadgeItems} appearance="plain" spacing="tight" itemClassName="h-[22px]" iconClassName="h-[22px] min-w-[22px] text-[22px]" /> : null}
+      </>
+    )
+    : null
+
   return (
     <div className="min-h-screen  text-foreground dark:bg-[#0f1115]">
       <SiteHeader />
-      <main className={cn("mx-auto max-w-[1200px] px-1 py-6 lg:px-6", isRestrictedUser && "grayscale") }>
+      <div className="mx-auto max-w-[1200px] px-1">
         <AddonSlotRenderer slot="user.page.before" />
-        <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)] xl:items-start">
-          <aside className="space-y-4 xl:sticky  xl:self-start">
-            <AddonSlotRenderer slot="user.sidebar.before" />
-            <Card className={cn("relative", profileCardClassName)}>
-              <CardContent className="p-5">
-                <div className="flex flex-col text-left">
-                  {isRestrictedUser ? <UserStatusBadge status={user.status} compact className="absolute right-4 top-4 shadow-xs" /> : null}
-                  <div className="flex items-start gap-4">
+        <ForumPageShell
+          zones={zones}
+          boards={boards}
+          main={(
+            <main className={cn("mt-6 pb-12", isRestrictedUser && "grayscale")}>
+              <div className="flex flex-col gap-0">
+                <AddonSlotRenderer slot="user.profile.before" />
+                <UserProfileOverviewCard
+                  className="rounded-b-none border-b-0"
+                  avatar={(
                     <UserAvatar
                       name={user.displayName || user.username}
                       avatarPath={user.avatarPath}
-                      size="lg"
+                      size="2xl"
                       isVip={vipActive}
                       vipLevel={vipLevel}
                     />
-                    <div className="min-w-0 flex-1 pt-0.5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <UserVerificationBadge verification={user.verification ?? null} appearance="plain" />
-                        <div className="flex min-w-0 items-center gap-1.5">
-                          <h1 className="min-w-0 truncate text-[22px] font-semibold leading-6 tracking-tight">
-                            <VipDisplayName
-                              name={user.displayName || user.username}
-                              isVip={vipActive}
-                              vipLevel={vipLevel}
-                              emphasize
-                              className="truncate"
-                            />
-                          </h1>
-                          {isAnonymousMaskUser ? <AnonymousUserIndicator /> : null}
-                          {isAiAgentUser ? <AiAgentIndicator /> : null}
-                        </div>
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        {user.role === "ADMIN" ? <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700 dark:bg-red-500/15 dark:text-red-200">管理员</span> : null}
-                        {user.role === "MODERATOR" ? <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700 dark:bg-sky-500/15 dark:text-sky-200">版主</span> : null}
-                        {vipActive ? <VipBadge level={vipLevel} compact /> : null}
-                        {user.levelName && user.levelColor && user.levelIcon ? <LevelBadge level={user.level} name={user.levelName} color={user.levelColor} icon={user.levelIcon} compact /> : null}
-                        {isRestrictedUser ? <UserStatusBadge status={user.status} /> : null}
-                      </div>
-                    </div>
-                  </div>
-                  <p className="mt-4 text-sm leading-7 text-muted-foreground">{user.bio}</p>
-                  {restrictionDescription ? <p className="mt-3 rounded-xl border border-border/70 bg-secondary/60 px-3 py-2 text-xs leading-6 text-muted-foreground">{restrictionDescription}</p> : null}
-                  {canSendMessage ? (
-                    <Link href={`/messages?conversation=user-${user.id}`} className="mt-5 w-full">
-                      <Button className="h-10 w-full rounded-xl">发私信</Button>
-                    </Link>
-                  ) : null}
-                  {currentUser && currentUser.username !== user.username ? (
-                    <div className="mt-3 w-full">
-                      <ReportDialog targetType="USER" targetId={String(user.id)} targetLabel={`@${user.username}`} buttonText="举报用户" buttonClassName="h-10 w-full rounded-xl border border-border text-sm text-muted-foreground hover:text-foreground" />
-                    </div>
-                  ) : null}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className={profileCardClassName}>
-              <CardContent className="p-4">
-                <h2 className="text-sm font-semibold text-foreground">勋章</h2>
-                <UserProfileBadgeShowcase badges={badgeItems} />
-              </CardContent>
-            </Card>
-
-            <Card className={profileCardClassName}>
-              <CardContent className="p-4">
-                <h2 className="text-sm font-semibold text-foreground">身份标签</h2>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {identityTags.map((tag) => (
-                    <span
-                      key={tag.label}
-                      className={identityTagClassNames[tag.tone]}
-                    >
-                      {tag.label}
+                  )}
+                  displayName={(
+                    <h1 className="flex min-w-0 flex-wrap items-center gap-1.5 text-[1rem] font-semibold leading-6 tracking-tight sm:gap-2 sm:text-[clamp(1.22rem,2.1vw,1.6rem)] sm:leading-7">
+                      <span className="min-w-0 max-w-full truncate">
+                        <VipDisplayName
+                          name={user.displayName || user.username}
+                          isVip={vipActive}
+                          vipLevel={vipLevel}
+                          emphasize
+                          className="min-w-0 truncate"
+                        />
+                      </span>
+                      {vipActive ? (
+                        <span className={profileNameBadgeClassName} style={getProfileVipBadgeStyle(vipLevel)}>
+                          <VipLevelIcon
+                            level={vipLevel}
+                            className="size-3.5"
+                            iconClassName="[&>svg]:size-full"
+                            title={`VIP${vipLevel}`}
+                          />
+                          <span>VIP{vipLevel}</span>
+                        </span>
+                      ) : null}
+                      {roleBadge ? (
+                        <span className={cn(profileNameBadgeClassName, roleBadge.className)}>
+                          {roleBadge.icon}
+                          {roleBadge.label}
+                        </span>
+                      ) : null}
+                    </h1>
+                  )}
+                  pointsBadge={(
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium leading-none text-amber-700 dark:bg-amber-500/15 dark:text-amber-200 sm:px-2.5 sm:py-0.75 sm:text-xs">
+                      {formatNumber(user.points)} {settings.pointName}
                     </span>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-            <AddonSlotRenderer slot="user.sidebar.after" />
-          </aside>
-
-          <section className="space-y-4 xl:self-start">
-            <AddonSlotRenderer slot="user.profile.before" />
-            <UserProfileOverviewCard
-              title={(
-                <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-                  <span className="inline-flex min-w-0 items-center gap-1.5">
-                    <VipDisplayName
-                      name={user.displayName}
-                      isVip={vipActive}
-                      vipLevel={vipLevel}
-                      emphasize
-                      className="min-w-0 truncate"
-                    />
-                    {isAnonymousMaskUser ? <AnonymousUserIndicator /> : null}
-                    {isAiAgentUser ? <AiAgentIndicator /> : null}
-                  </span>
-                  <span className="shrink-0 text-foreground">的主页</span>
-                </span>
-              )}
-              status={restrictionLabel ? user.status : null}
-              initialFollowerCount={user.followerCount}
-              stats={statItems}
-              rssHref={`/users/${user.username}/rss.xml`}
-              rssLabel="订阅用户 RSS"
-              followAction={canToggleFollow ? {
-                targetId: user.id,
-                initialFollowed: isFollowingUser,
-                activeLabel: "已关注用户",
-                inactiveLabel: "关注用户",
-              } : null}
-              blockAction={currentUser && currentUser.id !== user.id && !isAnonymousMaskUser ? {
-                targetId: user.id,
-                initialBlocked: profileAccess.relation.hasBlocked,
-                activeLabel: "已拉黑",
-                inactiveLabel: "拉黑用户",
-              } : null}
-            />
-            <AddonSlotRenderer slot="user.profile.after" />
-
-            <AddonSlotRenderer slot="user.activity.before" />
-            <UserRecentActivityPanel
-              description={canViewRecentActivity ? "" : ""}
-              activeTabKey={activityTab}
-              buildTabHref={(tabKey) => buildUserActivityHref(params.username, activityRouteState, { tab: tabKey as UserActivityTabKey })}
-              tabs={[
-                {
-                  key: "introduction",
-                  label: "介绍",
-                  content: !canViewIntroduction ? (
-                    <div className="rounded-xl border border-dashed  px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/2">
-                      {user.introductionVisibility === "MEMBERS" ? "该用户将介绍设置为登录后可见。" : "该用户未公开介绍。"}
-                    </div>
-                  ) : introduction ? (
-                    <div className="rounded-2xl border border-border/70 bg-card px-4 py-4 shadow-xs">
-                      <MarkdownContent
-                        content={introduction}
-                        markdownEmojiMap={settings.markdownEmojiMap}
-                        className="markdown-body prose prose-sm max-w-none prose-p:my-3 prose-ul:my-3 prose-ol:my-3 prose-li:my-1"
-                      />
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-dashed  px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/2">
-                      这个用户还没有填写详细介绍。
-                    </div>
-                  ),
-                },
-                {
-                  key: "posts",
-                  label: "帖子",
-                  count: canViewRecentActivity ? user.postCount : 0,
-                  content: !canViewRecentActivity ? (
-                    <div className="rounded-xl border border-dashed  px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/2">
-                      {user.activityVisibility === "MEMBERS" ? "该用户将最近帖子设置为登录后可见。" : "该用户未公开最近帖子。"}
-                    </div>
-                  ) : postsPageData.items.length === 0 ? (
-                    <div className="rounded-xl border border-dashed  px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/2">
-                      最近还没有发布帖子。
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <ForumPostStream posts={postsPageData.items} compactFirstItem={false} />
-                      {postsPageData.pagination.totalPages > 1 ? (
-                        <PageNumberPagination
-                          page={postsPageData.pagination.page}
-                          totalPages={postsPageData.pagination.totalPages}
-                          hasPrevPage={postsPageData.pagination.hasPrevPage}
-                          hasNextPage={postsPageData.pagination.hasNextPage}
-                          buildHref={(targetPage) => buildUserActivityHref(params.username, activityRouteState, {
-                            tab: "posts",
-                            postsPage: targetPage,
-                          })}
+                  )}
+                  sidePanel={desktopRadarPanel}
+                  mobileSidePanel={mobileRadarPanel}
+                  mobileSidePanelTitle="论坛画像"
+                  mobileSidePanelButtonLabel="查看论坛画像"
+                  identityRow={identityRow}
+                  metaRow={(
+                    <>
+                      <span className="shrink-0">@{user.username}</span>
+                      <span className="hidden size-1 rounded-full bg-border sm:inline-flex" />
+                      <span className="shrink-0">{levelMetaText}</span>
+                      <span className="hidden size-1 rounded-full bg-border sm:inline-flex" />
+                      <span className="shrink-0">{joinedAtText} 加入</span>
+                    </>
+                  )}
+                  bio={user.bio}
+                  avatarActions={(
+                    <>
+                      {canSendMessage ? (
+                        <Link
+                          href={`/messages?conversation=user-${user.id}`}
+                          aria-label="发私信"
+                          title="发私信"
+                          className="inline-flex size-8 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        >
+                          <MessageCircleMore className="h-3.5 w-3.5" />
+                        </Link>
+                      ) : null}
+                      {currentUser && currentUser.username !== user.username ? (
+                        <ReportDialog
+                          targetType="USER"
+                          targetId={String(user.id)}
+                          targetLabel={`@${user.username}`}
+                          buttonText="举报"
+                          icon={<Flag className="h-3.5 w-3.5" />}
+                          buttonClassName="size-8 rounded-full border border-border bg-background p-0 text-muted-foreground hover:bg-accent hover:text-foreground"
                         />
                       ) : null}
-                    </div>
-                  ),
-                },
-                {
-                  key: "collections",
-                  label: "合集",
-                  count: publicCollections.pagination.total,
-                  content: <UserPublicCollectionsPanel username={user.username} initialData={publicCollections} />,
-                },
-                {
-                  key: "replies",
-                  label: "回复",
-                  count: canViewRecentActivity ? recentRepliesPageData.pagination.total : 0,
-                  content: canViewRecentActivity
-                    ? (
-                      <div className="space-y-4">
-                        <UserRecentRepliesList replies={recentRepliesPageData.items} postLinkDisplayMode={settings.postLinkDisplayMode} />
-                        {recentRepliesPageData.pagination.totalPages > 1 ? (
-                          <PageNumberPagination
-                            page={recentRepliesPageData.pagination.page}
-                            totalPages={recentRepliesPageData.pagination.totalPages}
-                            hasPrevPage={recentRepliesPageData.pagination.hasPrevPage}
-                            hasNextPage={recentRepliesPageData.pagination.hasNextPage}
-                            buildHref={(targetPage) => buildUserActivityHref(params.username, activityRouteState, {
-                              tab: "replies",
-                              repliesPage: targetPage,
-                            })}
+                    </>
+                  )}
+                  initialFollowerCount={user.followerCount}
+                  likeCount={user.likeReceivedCount}
+                  rssHref={`/users/${user.username}/rss.xml`}
+                  rssLabel="RSS"
+                  followAction={canToggleFollow ? {
+                    targetId: user.id,
+                    initialFollowed: isFollowingUser,
+                    activeLabel: "取关",
+                    inactiveLabel: "关注",
+                  } : null}
+                  blockAction={currentUser && currentUser.id !== user.id && !isAnonymousMaskUser ? {
+                    targetId: user.id,
+                    initialBlocked: profileAccess.relation.hasBlocked,
+                    activeLabel: "已拉黑",
+                    inactiveLabel: "拉黑",
+                  } : null}
+                  restrictionNotice={restrictionDescription ? <p className="rounded-[18px] border border-border/70 bg-secondary/60 px-3 py-2 text-xs leading-6 text-muted-foreground">{restrictionDescription}</p> : null}
+                />
+                <AddonSlotRenderer slot="user.profile.after" />
+
+                <AddonSlotRenderer slot="user.activity.before" />
+                <UserRecentActivityPanel
+                  className="rounded-t-none"
+                  description={canViewRecentActivity ? "" : ""}
+                  showSummary={false}
+                  activeTabKey={activityTab}
+                  buildTabHref={(tabKey) => buildUserActivityHref(params.username, activityRouteState, { tab: tabKey as UserActivityTabKey })}
+                  tabs={[
+                    {
+                      key: "introduction",
+                      label: "介绍",
+                      content: !canViewIntroduction ? (
+                        <div className="rounded-xl border border-dashed  px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/2">
+                          {user.introductionVisibility === "MEMBERS" ? "该用户将介绍设置为登录后可见。" : "该用户未公开介绍。"}
+                        </div>
+                      ) : introduction ? (
+                        <div className="bg-card px-4 pb-4">
+                          <MarkdownContent
+                            content={introduction}
+                            markdownEmojiMap={settings.markdownEmojiMap}
+                            className="markdown-body prose prose-sm max-w-none prose-p:my-3 prose-ul:my-3 prose-ol:my-3 prose-li:my-1"
                           />
-                        ) : null}
-                      </div>
-                    )
-                    : (
-                      <div className="rounded-xl border border-dashed  px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/2">
-                        {user.activityVisibility === "MEMBERS" ? "该用户将最近回复设置为登录后可见。" : "该用户未公开最近回复。"}
-                      </div>
-                    ),
-                },
-              ]}
-            />
-            <AddonSlotRenderer slot="user.activity.after" />
-          </section>
-        </div>
+                        </div>
+                      ) : (
+                        <div className="rounded-xl border border-dashed  px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/2">
+                          这个用户还没有填写详细介绍。
+                        </div>
+                      ),
+                    },
+                    {
+                      key: "posts",
+                      label: "帖子",
+                      count: canViewRecentActivity ? user.postCount : 0,
+                      content: !canViewRecentActivity ? (
+                        <div className="rounded-xl border border-dashed  px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/2">
+                          {user.activityVisibility === "MEMBERS" ? "该用户将最近帖子设置为登录后可见。" : "该用户未公开最近帖子。"}
+                        </div>
+                      ) : postsPageData.items.length === 0 ? (
+                        <div className="rounded-xl border border-dashed  px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/2">
+                          最近还没有发布帖子。
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <ForumPostStream posts={postsPageData.items} compactFirstItem={false} />
+                          {postsPageData.pagination.totalPages > 1 ? (
+                            <PageNumberPagination
+                              page={postsPageData.pagination.page}
+                              totalPages={postsPageData.pagination.totalPages}
+                              hasPrevPage={postsPageData.pagination.hasPrevPage}
+                              hasNextPage={postsPageData.pagination.hasNextPage}
+                              buildHref={(targetPage) => buildUserActivityHref(params.username, activityRouteState, {
+                                tab: "posts",
+                                postsPage: targetPage,
+                              })}
+                            />
+                          ) : null}
+                        </div>
+                      ),
+                    },
+                    {
+                      key: "collections",
+                      label: "合集",
+                      count: publicCollections.pagination.total,
+                      content: <UserPublicCollectionsPanel username={user.username} initialData={publicCollections} />,
+                    },
+                    {
+                      key: "replies",
+                      label: "回复",
+                      count: canViewRecentActivity ? recentRepliesPageData.pagination.total : 0,
+                      content: canViewRecentActivity
+                        ? (
+                          <div className="space-y-4">
+                            <UserRecentRepliesList replies={recentRepliesPageData.items} postLinkDisplayMode={settings.postLinkDisplayMode} />
+                            {recentRepliesPageData.pagination.totalPages > 1 ? (
+                              <PageNumberPagination
+                                page={recentRepliesPageData.pagination.page}
+                                totalPages={recentRepliesPageData.pagination.totalPages}
+                                hasPrevPage={recentRepliesPageData.pagination.hasPrevPage}
+                                hasNextPage={recentRepliesPageData.pagination.hasNextPage}
+                                buildHref={(targetPage) => buildUserActivityHref(params.username, activityRouteState, {
+                                  tab: "replies",
+                                  repliesPage: targetPage,
+                                })}
+                              />
+                            ) : null}
+                          </div>
+                        )
+                        : (
+                          <div className="rounded-xl border border-dashed  px-4 py-12 text-center text-sm text-muted-foreground dark:border-white/10 dark:bg-white/2">
+                            {user.activityVisibility === "MEMBERS" ? "该用户将最近回复设置为登录后可见。" : "该用户未公开最近回复。"}
+                          </div>
+                        ),
+                    },
+                  ]}
+                />
+                <AddonSlotRenderer slot="user.activity.after" />
+              </div>
+            </main>
+          )}
+          rightSidebar={(
+            <aside className={cn("mt-6 hidden pb-12 lg:block", isRestrictedUser && "grayscale")}>
+              <AddonSlotRenderer slot="user.sidebar.before" />
+              <section className="sticky top-20 overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+                <div className="divide-y divide-border/80">
+                  <div className="p-6">
+                    <UserProfileBadgeShowcase badges={badgeItems} />
+                  </div>
+                  <div className="p-6">
+                    <UserActiveBoardsPanel boards={activeBoards} emptyText={activeBoardsEmptyText} />
+                  </div>
+                  <div className="p-6">
+                    <div className="flex flex-col gap-3">
+                    <div>
+                      <h2 className="text-sm font-semibold text-foreground">身份标签</h2>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {identityTags.map((tag) => (
+                        <span
+                          key={tag.label}
+                          className={identityTagClassNames[tag.tone]}
+                        >
+                          {tag.label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  </div>
+                </div>
+              </section>
+              <AddonSlotRenderer slot="user.sidebar.after" />
+            </aside>
+          )}
+        />
         <AddonSlotRenderer slot="user.page.after" />
-      </main>
+      </div>
     </div>
   )
 }

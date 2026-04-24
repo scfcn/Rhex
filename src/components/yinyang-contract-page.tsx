@@ -211,7 +211,7 @@ export function YinYangContractPage({ initialData, canPlay }: YinYangContractPag
 
       <div className="grid gap-6 xl:grid-cols-[0.95fr_1.35fr]">
         <div className="space-y-3">
-          <Card className="rounded-[24px]">
+          <Card className="rounded-xl">
             <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
               <div>
                 <CardTitle className="text-base">我的概览</CardTitle>
@@ -237,7 +237,7 @@ export function YinYangContractPage({ initialData, canPlay }: YinYangContractPag
         </div>
 
         <div className="space-y-3">
-          <Card className="rounded-[24px]">
+          <Card className="rounded-xl">
             <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
               <div>
                 <CardTitle className="text-base">开放挑战大厅</CardTitle>
@@ -274,7 +274,7 @@ function ChallengeListItem({ challenge, pointName, isMine, onOpen }: {
   onOpen: () => void
 }) {
   return (
-    <button type="button" onClick={onOpen} className="w-full rounded-[20px] border border-border bg-background p-4 text-left transition-colors hover:bg-accent/40">
+    <button type="button" onClick={onOpen} className="w-full rounded-xl border border-border bg-background p-4 text-left transition-colors hover:bg-accent/40">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="font-medium text-foreground">{challenge.question}</div>
@@ -402,7 +402,7 @@ function RecentChallengesModal({ open, challenges, onClose, currentUserId }: { o
               : (challenge.challengerName ?? challenge.creatorName)
 
           return (
-            <div key={challenge.id} className="rounded-[20px] border border-border bg-background p-4">
+            <div key={challenge.id} className="rounded-xl border border-border bg-background p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="font-medium">{challenge.question}</div>
                 <span className="text-xs text-muted-foreground">{formatYinYangChallengeTime(challenge.settledAt ?? challenge.createdAt)}</span>
@@ -539,7 +539,7 @@ function LeaderboardList({ items, getMetric }: { items: YinYangLeaderboardUser[]
 function ModalShell({ title, description, children, onClose, size = "md" }: { title: string; description: string; children: React.ReactNode; onClose: () => void; size?: "md" | "lg" }) {
   return (
     <div className="fixed inset-0 z-65 flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
-      <div className={`w-full rounded-[28px] border border-border bg-background shadow-[0_30px_80px_rgba(15,23,42,0.24)] ${size === "lg" ? "max-w-3xl" : "max-w-xl"}`}>
+      <div className={`w-full rounded-xl border border-border bg-background shadow-[0_30px_80px_rgba(15,23,42,0.24)] ${size === "lg" ? "max-w-3xl" : "max-w-xl"}`}>
         <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
           <div>
             <h3 className="text-lg font-semibold text-foreground">{title}</h3>
@@ -631,7 +631,7 @@ function ResultFxOverlay({ state, onClose }: { state: ResultFxState; onClose: ()
           />
         ))}
       </div>
-      <div className={`relative mx-4 w-full max-w-md rounded-[28px] border px-6 py-7 text-center shadow-[0_28px_80px_rgba(15,23,42,0.28)] ${isWin ? "border-emerald-200/70 bg-linear-to-br from-emerald-50 via-white to-amber-50" : "border-slate-300/70 bg-linear-to-br from-slate-50 via-white to-sky-50"}`}>
+      <div className={`relative mx-4 w-full max-w-md rounded-xl border px-6 py-7 text-center shadow-[0_28px_80px_rgba(15,23,42,0.28)] ${isWin ? "border-emerald-200/70 bg-linear-to-br from-emerald-50 via-white to-amber-50" : "border-slate-300/70 bg-linear-to-br from-slate-50 via-white to-sky-50"}`}>
         <button type="button" className="pointer-events-auto absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background/80 text-sm text-muted-foreground" onClick={onClose}>×</button>
         <div className={`mx-auto flex h-24 w-24 items-center justify-center rounded-full text-5xl shadow-inner ${isWin ? "bg-emerald-100 text-emerald-600 animate-[pulse_1.1s_ease-in-out_infinite]" : "bg-sky-100 text-sky-500 animate-[bounce_1.6s_ease-in-out_infinite]"}`}>{isWin ? "✦" : "☾"}</div>
         <h3 className={`mt-5 text-2xl font-black tracking-tight ${isWin ? "text-emerald-700" : "text-slate-700"}`}>{state.title}</h3>

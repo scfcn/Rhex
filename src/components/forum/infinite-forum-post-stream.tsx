@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
 import { ForumPostStreamView } from "@/components/forum/forum-post-stream-view"
+import type { TaxonomyPostSortLinks } from "@/lib/forum-taxonomy-sort"
 import type { PostStreamDisplayItem } from "@/lib/forum-post-stream-display"
 import type { PostListDisplayMode } from "@/lib/post-list-display"
 
@@ -15,6 +16,7 @@ interface InfiniteForumPostStreamProps {
   showBoard?: boolean
   showPinnedDivider?: boolean
   postLinkDisplayMode?: "SLUG" | "ID"
+  sortLinks?: TaxonomyPostSortLinks
 }
 
 interface PostStreamApiPayload {
@@ -32,6 +34,7 @@ export function InfiniteForumPostStream({
   showBoard = true,
   showPinnedDivider = false,
   postLinkDisplayMode = "SLUG",
+  sortLinks,
 }: InfiniteForumPostStreamProps) {
   const [items, setItems] = useState(initialItems)
   const [page, setPage] = useState(initialPage)
@@ -49,7 +52,10 @@ export function InfiniteForumPostStream({
     setError("")
 
     try {
-      const response = await fetch(`${apiPath}?page=${page + 1}`, {
+      const nextUrl = new URL(apiPath, window.location.origin)
+      nextUrl.searchParams.set("page", String(page + 1))
+
+      const response = await fetch(nextUrl.toString(), {
         credentials: "same-origin",
       })
       const result = await response.json().catch(() => null) as { data?: PostStreamApiPayload; message?: string } | null
@@ -68,6 +74,14 @@ export function InfiniteForumPostStream({
       setIsLoading(false)
     }
   }, [apiPath, hasNextPage, isLoading, page])
+
+  useEffect(() => {
+    setItems(initialItems)
+    setPage(initialPage)
+    setHasNextPage(initialHasNextPage)
+    setIsLoading(false)
+    setError("")
+  }, [apiPath, initialHasNextPage, initialItems, initialPage])
 
   useEffect(() => {
     if (!hasNextPage || !sentinelRef.current) {
@@ -93,6 +107,7 @@ export function InfiniteForumPostStream({
         showBoard={showBoard}
         showPinnedDivider={showPinnedDivider}
         postLinkDisplayMode={postLinkDisplayMode}
+        sortLinks={sortLinks}
       />
       {hasNextPage ? (
         <div className="flex flex-col items-center gap-3 py-4">

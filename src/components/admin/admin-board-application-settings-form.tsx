@@ -13,7 +13,7 @@ export function AdminBoardApplicationSettingsForm({
   }
 
   return (
-    <div className="rounded-[24px] border border-border p-5 space-y-4">
+    <div className="rounded-xl border border-border p-5 space-y-4">
       <div>
         <h3 className="text-sm font-semibold">节点申请</h3>
         <p className="mt-1 text-xs leading-6 text-muted-foreground">

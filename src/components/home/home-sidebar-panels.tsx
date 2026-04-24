@@ -54,7 +54,7 @@ export function HomeSidebarPanels({ user, hotTopics, postLinkDisplayMode = "SLUG
 
       {showAnnouncements ? <HomeAnnouncementPanel announcements={announcements} /> : null}
 
-      <div className="mobile-sidebar-section rounded-[20px] border border-border bg-card p-3 shadow-xs shadow-black/5 dark:shadow-black/30">
+      <div className="mobile-sidebar-section rounded-xl border border-border bg-card p-3 shadow-xs shadow-black/5 dark:shadow-black/30">
         <div className="mb-3 flex items-center gap-1.5">
           <Flame className="h-4 w-4 text-orange-500 dark:text-orange-400" />
           <h3 className="text-sm font-semibold">今日热帖</h3>
@@ -81,7 +81,7 @@ export function HomeSidebarPanels({ user, hotTopics, postLinkDisplayMode = "SLUG
 
       {friendLinksEnabled ? (
 
-        <section className="mobile-sidebar-section rounded-[24px] border border-border bg-card p-4 shadow-xs shadow-black/5 dark:shadow-black/30">
+        <section className="mobile-sidebar-section rounded-xl border border-border bg-card p-4 shadow-xs shadow-black/5 dark:shadow-black/30">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Link2 className="h-5 w-5 text-sky-500" />

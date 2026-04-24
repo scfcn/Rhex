@@ -17,9 +17,13 @@ export type { UserDisplayNameSource } from "@/lib/user-display"
 
 const USER_PROFILE_POSTS_PAGE_SIZE = 10
 const USER_PROFILE_REPLIES_PAGE_SIZE = 6
+const USER_PROFILE_ACTIVE_BOARDS_LIMIT = 5
+const USER_PROFILE_ACTIVE_BOARD_BATCH_SIZE = 20
+const USER_PROFILE_ACTIVE_BOARD_MAX_BATCHES = 10
 
 export interface SiteUserProfile {
   id: number
+  createdAt: string
   username: string
   displayName: string
   role: PublicUserRole
@@ -55,6 +59,14 @@ export interface SiteUserProfile {
   boardCount?: number
 }
 
+export interface UserActiveBoardItem {
+  slug: string
+  name: string
+  iconPath?: string | null
+  lastRepliedAt: string
+  activityCount: number
+}
+
 export async function getUserProfile(username: string): Promise<SiteUserProfile | null> {
   return withRuntimeFallback(async () => {
     const [user, publicPostCount] = await Promise.all([
@@ -72,6 +84,7 @@ export async function getUserProfile(username: string): Promise<SiteUserProfile 
 
     return {
       id: Number(user.id),
+      createdAt: user.createdAt.toISOString(),
       username: user.username,
       displayName: getUserDisplayName(user),
       role: user.role,
@@ -199,6 +212,8 @@ export async function getUserRecentRepliesPage(username: string, input: { page?:
         postTitle: reply.post.title,
         postSlug: reply.post.slug,
         boardName: reply.post.board.name,
+        boardSlug: reply.post.board.slug,
+        boardIcon: reply.post.board.iconPath ?? "💬",
         likeCount: reply.likeCount,
         replyToUsername: reply.replyToUser?.username ?? null,
       })),
@@ -230,6 +245,80 @@ export async function getUserRecentRepliesPage(username: string, input: { page?:
 export async function getUserRecentReplies(username: string, limit = USER_PROFILE_REPLIES_PAGE_SIZE) {
   const page = await getUserRecentRepliesPage(username, { page: 1 })
   return page.items.slice(0, limit)
+}
+
+export async function getUserActiveBoardsByRecentReplies(username: string, limit = USER_PROFILE_ACTIVE_BOARDS_LIMIT): Promise<UserActiveBoardItem[]> {
+  const normalizedLimit = Math.min(USER_PROFILE_ACTIVE_BOARDS_LIMIT, Math.max(0, Math.trunc(limit)))
+
+  if (normalizedLimit === 0) {
+    return []
+  }
+
+  return withRuntimeFallback(async () => {
+    const boardActivityMap = new Map<string, UserActiveBoardItem>()
+    let skip = 0
+
+    for (let batchIndex = 0; batchIndex < USER_PROFILE_ACTIVE_BOARD_MAX_BATCHES; batchIndex += 1) {
+      const replies = await findUserRepliesByUsername(username, {
+        skip,
+        take: USER_PROFILE_ACTIVE_BOARD_BATCH_SIZE,
+      })
+
+      if (replies.length === 0) {
+        break
+      }
+
+      for (const reply of replies) {
+        const board = reply.post.board
+        const existingBoard = boardActivityMap.get(board.slug)
+
+        if (existingBoard) {
+          existingBoard.activityCount += 1
+
+          if (reply.createdAt.toISOString() > existingBoard.lastRepliedAt) {
+            existingBoard.lastRepliedAt = reply.createdAt.toISOString()
+          }
+
+          continue
+        }
+
+        boardActivityMap.set(board.slug, {
+          slug: board.slug,
+          name: board.name,
+          iconPath: board.iconPath,
+          lastRepliedAt: reply.createdAt.toISOString(),
+          activityCount: 1,
+        })
+      }
+
+      if (replies.length < USER_PROFILE_ACTIVE_BOARD_BATCH_SIZE) {
+        break
+      }
+
+      skip += replies.length
+    }
+
+    return [...boardActivityMap.values()]
+      .sort((left, right) => {
+        const activityDifference = right.activityCount - left.activityCount
+
+        if (activityDifference !== 0) {
+          return activityDifference
+        }
+
+        return right.lastRepliedAt.localeCompare(left.lastRepliedAt)
+      })
+      .slice(0, normalizedLimit)
+  }, {
+    area: "users",
+    action: "getUserActiveBoardsByRecentReplies",
+    message: "用户活跃节点加载失败",
+    metadata: {
+      username,
+      limit: normalizedLimit,
+    },
+    fallback: [],
+  })
 }
 
 export async function getUserAccountSettings(userId: number) {

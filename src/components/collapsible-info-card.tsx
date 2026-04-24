@@ -108,7 +108,7 @@ export function CollapsibleInfoCard({
       ) : null}
 
       {open ? (
-        <div className="relative overflow-hidden rounded-[22px] border border-border bg-card shadow-xs shadow-black/5">
+        <div className="relative overflow-hidden rounded-xl border border-border bg-card shadow-xs shadow-black/5">
           <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-primary/10 blur-2xl" />
           <div className="pointer-events-none absolute -bottom-10 left-6 h-20 w-20 rounded-full bg-accent blur-2xl" />
           <div className="absolute bottom-3 right-3 top-3 z-10 flex w-[120px] flex-col items-end justify-between">

@@ -673,7 +673,7 @@ function StructureModalForm({
   return (
     <Modal open={Boolean(modal)} onClose={onClose} size="xl" title={title} description="统一维护分区默认策略与节点覆盖策略。">
       <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="rounded-[24px] border border-border bg-card/40 p-2">
+        <div className="rounded-xl border border-border bg-card/40 p-2">
           <div className="flex flex-wrap gap-2">
             {formTabs.map((tab) => (
               <button

@@ -396,7 +396,7 @@ export function PointsTopupCard({
 
   return (
     <>
-      <div className="rounded-[24px] px-4 py-4 space-y-4">
+      <div className="rounded-xl px-4 py-4 space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="font-medium">{heading}</p>
@@ -447,7 +447,7 @@ export function PointsTopupCard({
             </div>
           </div>
         ) : (
-          <div className="rounded-[20px] border border-dashed border-border bg-card/40 p-4 text-sm text-muted-foreground">
+          <div className="rounded-xl border border-dashed border-border bg-card/40 p-4 text-sm text-muted-foreground">
             当前积分充值已开启，但还没有配置可用支付方式，请联系管理员检查支付通道和路由规则。
           </div>
         )}
@@ -458,7 +458,7 @@ export function PointsTopupCard({
               const totalPoints = item.points + item.bonusPoints
               const bonusText = item.bonusPoints > 0 ? `，赠送 ${formatNumber(item.bonusPoints)} ${pointName}` : ""
               return (
-                <div key={item.id} className="rounded-[20px] border border-border bg-card/70 p-4">
+                <div key={item.id} className="rounded-xl border border-border bg-card/70 p-4">
                   <p className="text-sm font-semibold">{item.title}</p>
                   <p className="mt-2 text-2xl font-semibold">{formatNumber(totalPoints)} <span className="text-sm font-normal text-muted-foreground">{pointName}</span></p>
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -480,7 +480,7 @@ export function PointsTopupCard({
         ) : null}
 
         {customAmountEnabled ? (
-          <div className="rounded-[20px] border border-border bg-card/70 p-4">
+          <div className="rounded-xl border border-border bg-card/70 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold">自定义充值金额</p>
@@ -529,7 +529,7 @@ export function PointsTopupCard({
       >
         {pendingOrder ? (
           <div className="space-y-4">
-            <div className="rounded-[20px] border border-border bg-background px-4 py-4 text-center">
+            <div className="rounded-xl border border-border bg-background px-4 py-4 text-center">
               <p className="text-sm font-medium">{pendingOrder.packageTitle}</p>
               <p className="mt-2 text-xs text-muted-foreground">订单号 {pendingOrder.merchantOrderNo}</p>
               <p className="mt-1 text-xs text-muted-foreground">支付方式 {pendingOrder.paymentMethodLabel}</p>

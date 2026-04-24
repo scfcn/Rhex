@@ -211,7 +211,7 @@ export default async function AdminPage(props: PageProps<"/admin">) {
         {tab === "overview" ? <AdminOverviewDashboard data={dashboardData!} /> : null}
 
         {admin.role === "ADMIN" && tab === "verifications" ? (
-          <div className="rounded-[22px] border border-border bg-card p-3">
+          <div className="rounded-xl border border-border bg-card p-3">
             <AdminPillTabs
               items={[
                 { key: "types", label: "认证类型", href: "/admin?tab=verifications&verificationSubTab=types" },

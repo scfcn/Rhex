@@ -458,12 +458,12 @@ function WatermarkPreview({
   const previewUrl = useDeferredValue(`/api/admin/site-settings/watermark-preview?${previewQuery}`)
 
   return (
-    <div className="space-y-3 rounded-[22px] border border-border bg-card p-4">
+    <div className="space-y-3 rounded-xl border border-border bg-card p-4">
       <div>
         <h4 className="text-sm font-semibold">效果预览</h4>
         <p className="mt-1 text-xs leading-6 text-muted-foreground">预览图由服务端实时生成，字体、换行、阴影和透明度与实际落盘水印完全复用同一套 canvas 渲染逻辑。</p>
       </div>
-      <div className="relative aspect-video overflow-hidden rounded-[24px] border border-border bg-[radial-gradient(circle_at_top_left,#fef3c7,transparent_32%),radial-gradient(circle_at_bottom_right,#bfdbfe,transparent_34%),linear-gradient(135deg,#0f172a,#1e293b_52%,#334155)]">
+      <div className="relative aspect-video overflow-hidden rounded-xl border border-border bg-[radial-gradient(circle_at_top_left,#fef3c7,transparent_32%),radial-gradient(circle_at_bottom_right,#bfdbfe,transparent_34%),linear-gradient(135deg,#0f172a,#1e293b_52%,#334155)]">
         <Image
           alt="水印服务端预览"
           className="object-cover"

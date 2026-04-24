@@ -31,7 +31,7 @@ interface PostDetailRelations {
   pollOptions: Array<PollOption & { votes: PollVote[] }>
   lotteryPrizes: Array<LotteryPrize & { winners: Array<LotteryWinner & { user: Pick<User, "username" | "nickname" | "avatarPath"> }> }>
   lotteryConditions: LotteryCondition[]
-  lotteryParticipants: LotteryParticipant[]
+  lotteryParticipants: Array<LotteryParticipant & { user: Pick<User, "username" | "nickname" | "avatarPath" | "status"> }>
   appendices: PostAppendix[]
   attachments: Array<PostAttachment & {
     upload: {
@@ -100,6 +100,7 @@ export interface SitePostItem {
   lastRepliedAtRaw?: string
   latestReplyAuthorName?: string | null
   latestReplyAuthorUsername?: string | null
+  latestReplyCommentId?: string | null
   latestReplyExcerpt?: string | null
 
   excerpt: string

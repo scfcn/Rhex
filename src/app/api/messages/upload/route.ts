@@ -3,7 +3,7 @@ import { createUploadRecord, findExistingUpload } from "@/db/upload-queries"
 import { buildMessageFileProxyUrl, buildMessageFileToken, buildMessageImageMarkdown, MESSAGE_FILE_UPLOAD_FOLDER, MESSAGE_IMAGE_UPLOAD_FOLDER } from "@/lib/message-media"
 import { logRouteWriteSuccess } from "@/lib/route-metadata"
 import { getSiteSettings } from "@/lib/site-settings"
-import { normalizeUploadExtension } from "@/lib/upload-rules"
+import { isAllowedUploadMimeType, normalizeUploadExtension } from "@/lib/upload-rules"
 import { prepareBinaryUploadedFile, prepareUploadedFile, saveUploadedFile } from "@/lib/upload"
 import { createRequestWriteGuardOptions } from "@/lib/write-guard-policies"
 import { withRequestWriteGuard } from "@/lib/write-guard"
@@ -53,6 +53,10 @@ export const POST = createUserRouteHandler<MessageUploadResponse>(async ({ reque
       folder: MESSAGE_IMAGE_UPLOAD_FOLDER,
       settings,
     })
+
+    if (!isAllowedUploadMimeType(preparedFile.detectedMime, allowedImageExtensions)) {
+      apiError(400, `仅支持上传 ${allowedImageExtensions.join(" / ")} 格式的图片`)
+    }
 
     return withRequestWriteGuard(createRequestWriteGuardOptions("messages-upload", {
       request,

@@ -518,7 +518,7 @@ function VerificationField({
   autoComplete?: string
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-[24px]">
+    <div className="flex flex-col gap-3 rounded-xl">
       <AuthField htmlFor={`${idPrefix}-value`} label={label} required={required} description={description}>
         <InputGroup className="h-11 rounded-2xl bg-background/80">
           <InputGroupAddon>

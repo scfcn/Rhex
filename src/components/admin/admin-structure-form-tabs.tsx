@@ -52,7 +52,7 @@ export function StructureBasicTab({
   updateField,
 }: StructureTabProps) {
   return (
-    <div className="rounded-[24px] border border-border p-5">
+    <div className="rounded-xl border border-border p-5">
       <div className="grid gap-4 md:grid-cols-2">
         <Field label={isBoard ? "节点名称" : "分区名称"} value={form.name} onChange={(value) => updateField("name", value)} placeholder={isBoard ? "如 摄影" : "如 生活方式"} />
         <Field label="标识 slug" value={form.slug} onChange={(value) => updateField("slug", value)} placeholder={isBoard ? "如 camera" : "如 lifestyle"} />
@@ -101,12 +101,12 @@ export function StructureContentTab({
 }: StructureTabProps) {
   return (
     <div className="space-y-5">
-      <div className="rounded-[24px] border border-border p-5">
+      <div className="rounded-xl border border-border p-5">
         <h4 className="text-sm font-semibold">节点描述</h4>
         <TextAreaField label="描述" value={form.description} onChange={(value) => updateField("description", value)} placeholder="填写结构描述，帮助用户理解这个分区或节点的定位" className="mt-4" rows={5} />
       </div>
 
-      <div className="rounded-[24px] border border-border p-5">
+      <div className="rounded-xl border border-border p-5">
         <h4 className="text-sm font-semibold">节点侧栏</h4>
         <div className="mt-4 space-y-2">
           {form.sidebarLinks.length > 0 ? (
@@ -132,7 +132,7 @@ export function StructureContentTab({
         </div>
       </div>
 
-      <div className="rounded-[24px] border border-border p-5">
+      <div className="rounded-xl border border-border p-5">
         <h4 className="text-sm font-semibold">节点规则</h4>
         <div className="mt-4 space-y-2">
           <p className="text-sm font-medium">节点规则 Markdown</p>
@@ -152,7 +152,7 @@ export function StructurePolicyTab({
 }: StructureTabProps) {
   return (
     <div className="space-y-5">
-      <div className="rounded-[24px] border border-border p-5">
+      <div className="rounded-xl border border-border p-5">
         <h4 className="text-sm font-semibold">积分与频率设置</h4>
         {isModeratorBoardEdit ? (
           <p className="mt-2 text-xs leading-6 text-muted-foreground">编辑节点时，这四项只能填写留空、0 或负数；留空表示继续继承分区设置。</p>
@@ -165,7 +165,7 @@ export function StructurePolicyTab({
         </div>
       </div>
 
-      <div className="rounded-[24px] border border-border p-5">
+      <div className="rounded-xl border border-border p-5">
         <h4 className="text-sm font-semibold">支持的帖子类型</h4>
         <div className="mt-4 flex flex-wrap gap-3">
           {postTypeOptions.map((item) => (
@@ -176,7 +176,7 @@ export function StructurePolicyTab({
         </div>
       </div>
 
-      <div className="rounded-[24px] border border-border p-5">
+      <div className="rounded-xl border border-border p-5">
         <h4 className="text-sm font-semibold">帖子列表</h4>
         <div className="mt-4 grid gap-4 md:grid-cols-3">
           <div className="space-y-2">
@@ -207,7 +207,7 @@ export function StructurePolicyTab({
       </div>
 
       {isBoard && !isModeratorBoardEdit ? (
-        <div className="rounded-[24px] border border-border p-5">
+        <div className="rounded-xl border border-border p-5">
           <h4 className="text-sm font-semibold">管理策略</h4>
           <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <Toggle label="版主可提取节点金库" checked={form.moderatorsCanWithdrawTreasury} onChange={(value) => updateField("moderatorsCanWithdrawTreasury", value)} />
@@ -225,7 +225,7 @@ export function StructureAccessTab({
 }: StructureTabProps) {
   return (
     <div className="space-y-5">
-      <div className="rounded-[24px] border border-border p-5">
+      <div className="rounded-xl border border-border p-5">
         <h4 className="text-sm font-semibold">浏览 / 发帖 / 回复权限</h4>
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <Field label="浏览最低积分" help={getStructureAccessFieldHelp({ field: "minViewPoints", isBoard })} value={form.minViewPoints} onChange={(value) => updateField("minViewPoints", value)} placeholder={isBoard ? "留空继承分区" : "默认 0"} />
@@ -240,7 +240,7 @@ export function StructureAccessTab({
         </div>
       </div>
 
-      <div className="rounded-[24px] border border-border p-5">
+      <div className="rounded-xl border border-border p-5">
         <h4 className="text-sm font-semibold">审核策略</h4>
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Toggle label="开启发帖审核" checked={form.requirePostReview} onChange={(value) => updateField("requirePostReview", value)} />

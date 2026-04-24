@@ -155,8 +155,8 @@ export function BadgeCenter({ badges, isLoggedIn }: BadgeCenterProps) {
         {isLoggedIn ? <p className="mt-4 text-xs text-muted-foreground">当前已佩戴 {displayedCount} / {MAX_DISPLAYED_BADGES} 个勋章。</p> : null}
       </div>
 
-      {!isLoggedIn ? <div className="rounded-[24px] border border-dashed border-border bg-card p-6 text-sm text-muted-foreground">登录后可以查看自己哪些勋章已达成，并手动领取。</div> : null}
-      {feedback ? <div className="rounded-[20px] border border-border bg-card px-4 py-3 text-sm text-muted-foreground">{feedback}</div> : null}
+      {!isLoggedIn ? <div className="rounded-xl border border-dashed border-border bg-card p-6 text-sm text-muted-foreground">登录后可以查看自己哪些勋章已达成，并手动领取。</div> : null}
+      {feedback ? <div className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground">{feedback}</div> : null}
 
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         {filteredItems.map((badge) => {
@@ -178,7 +178,7 @@ export function BadgeCenter({ badges, isLoggedIn }: BadgeCenterProps) {
             : `已领取，可佩戴到用户名右侧，最多 ${MAX_DISPLAYED_BADGES} 个。`
 
           return (
-            <div key={badge.id} className="flex h-full flex-col overflow-hidden rounded-[24px] border border-border bg-card shadow-soft">
+            <div key={badge.id} className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card shadow-soft">
               <div className="p-4" style={{ background: `linear-gradient(135deg, ${badge.color}22 0%, transparent 100%)` }}>
                 <div className="flex items-start justify-between gap-2.5">
                   <Link href={`/badges/${badge.code}`} className="flex min-w-0 items-center gap-2.5">

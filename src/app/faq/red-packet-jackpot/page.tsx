@@ -80,7 +80,7 @@ export default async function RedPacketJackpotFaqPage() {
           </CardHeader>
           <CardContent className="grid gap-3">
             {redPacketRules.map((item) => (
-              <div key={item} className="rounded-[20px] bg-secondary/40 p-4 text-sm leading-7 text-muted-foreground">
+              <div key={item} className="rounded-xl bg-secondary/40 p-4 text-sm leading-7 text-muted-foreground">
                 {item}
               </div>
             ))}
@@ -93,7 +93,7 @@ export default async function RedPacketJackpotFaqPage() {
           </CardHeader>
           <CardContent className="grid gap-3">
             {jackpotRules.map((item) => (
-              <div key={item} className="rounded-[20px] bg-secondary/40 p-4 text-sm leading-7 text-muted-foreground">
+              <div key={item} className="rounded-xl bg-secondary/40 p-4 text-sm leading-7 text-muted-foreground">
                 {item}
               </div>
             ))}
@@ -106,15 +106,15 @@ export default async function RedPacketJackpotFaqPage() {
           <CardTitle>当前站点关键数值</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-[20px] border border-border px-4 py-4">
+          <div className="rounded-xl border border-border px-4 py-4">
             <p className="text-xs text-muted-foreground">红包单次上限</p>
             <p className="mt-2 font-semibold">{settings.postRedPacketMaxPoints} {settings.pointName}</p>
           </div>
-          <div className="rounded-[20px] border border-border px-4 py-4">
+          <div className="rounded-xl border border-border px-4 py-4">
             <p className="text-xs text-muted-foreground">每日红包上限</p>
             <p className="mt-2 font-semibold">{settings.postRedPacketDailyLimit} {settings.pointName}</p>
           </div>
-          <div className="rounded-[20px] border border-border px-4 py-4">
+          <div className="rounded-xl border border-border px-4 py-4">
             <p className="text-xs text-muted-foreground">聚宝盆初始范围</p>
             <p className="mt-2 font-semibold">{settings.postJackpotMinInitialPoints} - {settings.postJackpotMaxInitialPoints} {settings.pointName}</p>
           </div>
@@ -128,7 +128,7 @@ export default async function RedPacketJackpotFaqPage() {
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3">
           {auditItems.map((item) => (
-            <div key={item} className="rounded-[20px] bg-secondary/40 p-4 text-sm leading-7 text-muted-foreground">
+            <div key={item} className="rounded-xl bg-secondary/40 p-4 text-sm leading-7 text-muted-foreground">
               {item}
             </div>
           ))}

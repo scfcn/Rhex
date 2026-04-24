@@ -4,6 +4,7 @@ import React from "react"
 import { Table2 } from "lucide-react"
 
 import { Modal } from "@/components/ui/modal"
+import { Button } from "@/components/ui/button"
 import { EmojiPicker } from "@/components/emoji-picker"
 import { FloatingEditorPanel } from "@/components/refined-rich-post-editor/floating-panels"
 import type { FloatingPanelPosition, UploadSummary } from "@/components/refined-rich-post-editor/types"
@@ -335,6 +336,78 @@ export function TableInsertPanel({
         >
           取消
         </button>
+      </div>
+    </FloatingEditorPanel>
+  )
+}
+
+type SpoilerInsertPanelProps = FloatingPanelBaseProps & {
+  onClose: () => void
+  onInsertSpoiler: () => void
+  onInsertScratchMask: () => void
+  onItemMouseDown: (event: React.MouseEvent<HTMLElement>) => void
+}
+
+export function SpoilerInsertPanel({
+  open,
+  isClient,
+  disabled,
+  anchorRef,
+  position,
+  ready,
+  panelRef,
+  onClose,
+  onInsertSpoiler,
+  onInsertScratchMask,
+  onItemMouseDown,
+}: SpoilerInsertPanelProps) {
+  return (
+    <FloatingEditorPanel
+      open={open}
+      isClient={isClient}
+      disabled={disabled}
+      anchorRef={anchorRef}
+      position={position}
+      ready={ready}
+      panelRef={panelRef}
+      className={`${FLOATING_EDITOR_PANEL_CLASSNAME} p-3`}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          onClose()
+        }
+      }}
+    >
+      <div className="mb-2 flex flex-col gap-1">
+        <div className="text-sm font-medium text-foreground">插入剧透</div>
+        <p className="text-xs leading-5 text-muted-foreground">选择折叠剧透块，或原位点击显示的遮罩内容。</p>
+      </div>
+      <div className="flex flex-col gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          className="h-auto flex-col items-start gap-1 rounded-xl px-3 py-3 text-left"
+          onMouseDown={onItemMouseDown}
+          onClick={() => {
+            onInsertSpoiler()
+            onClose()
+          }}
+        >
+          <span>可折叠剧透</span>
+          <span className="text-xs font-normal text-muted-foreground">插入 `:::spoiler 标题 ... :::` 结构。</span>
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-auto flex-col items-start gap-1 rounded-xl px-3 py-3 text-left"
+          onMouseDown={onItemMouseDown}
+          onClick={() => {
+            onInsertScratchMask()
+            onClose()
+          }}
+        >
+          <span>点击遮罩</span>
+          <span className="text-xs font-normal text-muted-foreground">插入 `!!内容!!`，默认遮住文字，点击后原位显示。</span>
+        </Button>
       </div>
     </FloatingEditorPanel>
   )

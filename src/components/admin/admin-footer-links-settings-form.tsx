@@ -79,7 +79,7 @@ export function AdminFooterLinksSettingsForm({ initialLinks }: AdminFooterLinksS
           <Button type="button" variant="outline" onClick={addLink} className="rounded-full">新增链接</Button>
         </div>
 
-        <div className="rounded-[20px] bg-muted/40 p-4">
+        <div className="rounded-xl bg-muted/40 p-4">
           <p className="text-xs font-medium text-foreground">预览</p>
           <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
             {normalizedPreview.length > 0 ? normalizedPreview.map((item) => (

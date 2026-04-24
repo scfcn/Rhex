@@ -53,7 +53,7 @@ export default async function VerificationSystemFaqPage() {
           ) : (
             <div className="grid gap-4 lg:grid-cols-2">
               {types.map((type) => (
-                <div key={type.id} className="rounded-[24px] border border-border bg-card p-5">
+                <div key={type.id} className="rounded-xl border border-border bg-card p-5">
                   <div className="flex items-start gap-4">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-xl" style={{ backgroundColor: `${type.color}18`, color: type.color }}>
                       <LevelIcon icon={type.iconText} color={type.color} className="h-6 w-6 text-[22px]" emojiClassName="text-inherit" svgClassName="[&>svg]:block" />
@@ -83,10 +83,10 @@ export default async function VerificationSystemFaqPage() {
           <CardTitle>申请和审核流程</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 text-sm leading-7 text-muted-foreground">
-          <div className="rounded-[20px] bg-secondary/40 p-4">1. 进入账号认证中心，选择一个已启用的认证类型。</div>
-          <div className="rounded-[20px] bg-secondary/40 p-4">2. 按当前认证类型要求填写文本、链接、数字或说明字段后提交申请。</div>
-          <div className="rounded-[20px] bg-secondary/40 p-4">3. 后台审核中时，前台会显示“审核中”状态，不能重复提交同一项。</div>
-          <div className="rounded-[20px] bg-secondary/40 p-4">4. 审核通过后立即绑定；被驳回时是否允许重提，取决于该认证类型配置。</div>
+          <div className="rounded-xl bg-secondary/40 p-4">1. 进入账号认证中心，选择一个已启用的认证类型。</div>
+          <div className="rounded-xl bg-secondary/40 p-4">2. 按当前认证类型要求填写文本、链接、数字或说明字段后提交申请。</div>
+          <div className="rounded-xl bg-secondary/40 p-4">3. 后台审核中时，前台会显示“审核中”状态，不能重复提交同一项。</div>
+          <div className="rounded-xl bg-secondary/40 p-4">4. 审核通过后立即绑定；被驳回时是否允许重提，取决于该认证类型配置。</div>
         </CardContent>
       </Card>
 
@@ -107,9 +107,9 @@ export default async function VerificationSystemFaqPage() {
           <CardTitle>几个关键边界</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm leading-7 text-muted-foreground">
-          <div className="rounded-[20px] border border-border px-4 py-4">同一账号如果已经通过了某个认证，不能再直接申请其它认证，除非先解除当前认证绑定。</div>
-          <div className="rounded-[20px] border border-border px-4 py-4">如果某个认证类型配置了表单字段，前台会按字段生成申请表，而不是只填一段自由说明。</div>
-          <div className="rounded-[20px] border border-border px-4 py-4">认证通过后，显示逻辑会跟随账号走，不是只在某篇帖子里临时生效。</div>
+          <div className="rounded-xl border border-border px-4 py-4">同一账号如果已经通过了某个认证，不能再直接申请其它认证，除非先解除当前认证绑定。</div>
+          <div className="rounded-xl border border-border px-4 py-4">如果某个认证类型配置了表单字段，前台会按字段生成申请表，而不是只填一段自由说明。</div>
+          <div className="rounded-xl border border-border px-4 py-4">认证通过后，显示逻辑会跟随账号走，不是只在某篇帖子里临时生效。</div>
         </CardContent>
       </Card>
     </FaqPageFrame>
@@ -118,7 +118,7 @@ export default async function VerificationSystemFaqPage() {
 
 function StatusCard({ icon, title, description }: { icon: ReactNode; title: string; description: string }) {
   return (
-    <div className="rounded-[20px] border border-border p-4">
+    <div className="rounded-xl border border-border p-4">
       <div className="flex items-center gap-2">
         {icon}
         <p className="font-semibold">{title}</p>

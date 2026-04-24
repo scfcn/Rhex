@@ -131,7 +131,7 @@ function CustomThemeModalContent({
       )}
     >
       <div className="space-y-4">
-        <div className="rounded-[20px] border border-border bg-secondary/20 px-4 py-3 text-sm text-muted-foreground">
+        <div className="rounded-xl border border-border bg-secondary/20 px-4 py-3 text-sm text-muted-foreground">
           <p>说明 1：这里只影响当前浏览器，不会同步到账号或服务器。</p>
           <p className="mt-1">说明 2：浅色模式和深色模式分别配置，跟随系统时会自动切换对应方案。</p>
           <p className="mt-1">说明 3：字体与字号只在启用自定义主题时生效，普通主题仍走右上角字号预设。</p>
@@ -260,7 +260,7 @@ function ThemeModeCard({
   onChange: (mode: "light" | "dark", field: keyof CustomThemeConfig["light"], value: string) => void
 }) {
   return (
-    <section className="min-w-0 space-y-4 rounded-[22px] border border-border bg-card p-4">
+    <section className="min-w-0 space-y-4 rounded-xl border border-border bg-card p-4">
       <div>
         <p className="text-sm font-semibold">{title}</p>
         <p className="mt-1 text-xs leading-6 text-muted-foreground">建议先从主色和背景开始调，再微调卡片、交互底色和边框。</p>

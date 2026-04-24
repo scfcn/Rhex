@@ -49,14 +49,14 @@ export function YinYangContractAdminPage({ AppId, config }: YinYangContractAdmin
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[24px] border border-border bg-card p-5">
+      <section className="rounded-xl border border-border bg-card p-5">
         <div className="space-y-1">
           <h3 className="text-base font-semibold">阴阳契应用后台</h3>
           <p className="text-sm text-muted-foreground">应用标识：{AppId}。统一管理税率、彩头范围与每日挑战次数。</p>
         </div>
       </section>
 
-      <section className="rounded-[24px] border border-border bg-card p-5 space-y-4">
+      <section className="rounded-xl border border-border bg-card p-5 space-y-4">
         <h4 className="text-sm font-semibold">基础配置</h4>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Field label="前台入口名称" value={entryLabel} onChange={setEntryLabel} />

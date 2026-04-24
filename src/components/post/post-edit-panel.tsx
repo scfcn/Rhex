@@ -148,7 +148,7 @@ export function PostEditPanel({
 
   return (
     <>
-      <div className="rounded-[24px] border border-border bg-card p-5">
+      <div className="rounded-xl border border-border bg-card p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-1">
             <h3 className="text-base font-semibold">作者操作</h3>
@@ -211,7 +211,7 @@ export function PostEditPanel({
               value={appendText}
               onChange={(event) => setAppendText(event.target.value)}
               placeholder="写下新的进展、修正、结论或补充说明…"
-              className="min-h-[220px] rounded-[20px] bg-card px-4 py-3 text-sm"
+              className="min-h-[220px] rounded-xl bg-card px-4 py-3 text-sm"
               disabled={!canAppendNow || loading}
             />
           </div>
@@ -244,7 +244,7 @@ export function PostEditPanel({
               value={offlineReason}
               onChange={(event) => setOfflineReason(event.target.value)}
               placeholder="例如：内容已过期，暂时下线整理。"
-              className="min-h-[140px] rounded-[20px] bg-card px-4 py-3 text-sm"
+              className="min-h-[140px] rounded-xl bg-card px-4 py-3 text-sm"
               disabled={offlineLoading}
             />
           </div>

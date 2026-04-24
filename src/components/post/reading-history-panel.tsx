@@ -81,10 +81,10 @@ export function ReadingHistoryPanel({
   }, [limit, showOnlyToday, snapshot, todayKey])
 
   const cardClassName = variant === "sidebar"
-    ? "mobile-sidebar-section rounded-[20px] border border-border bg-card p-3 shadow-xs shadow-black/5 dark:shadow-black/30"
+    ? "mobile-sidebar-section rounded-xl border border-border bg-card p-3 shadow-xs shadow-black/5 dark:shadow-black/30"
     : variant === "feed"
-      ? "rounded-[24px] border border-border bg-card p-4 shadow-xs shadow-black/5 dark:shadow-black/30"
-      : "rounded-[28px] border border-border bg-card p-4 shadow-xs shadow-black/5 dark:shadow-black/30 sm:p-5"
+      ? "rounded-xl border border-border bg-card p-4 shadow-xs shadow-black/5 dark:shadow-black/30"
+      : "rounded-xl border border-border bg-card p-4 shadow-xs shadow-black/5 dark:shadow-black/30 sm:p-5"
 
   if (requireLoggedIn && !isLoggedIn) {
     return null

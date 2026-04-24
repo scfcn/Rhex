@@ -61,7 +61,7 @@ export function AdminInviteCodeManager({ initialInviteCodes }: AdminInviteCodeMa
         <Stat title="人工生成" value={summary.manual} />
       </div>
 
-      <div className="rounded-[22px] border border-border bg-card p-4 space-y-4">
+      <div className="rounded-xl border border-border bg-card p-4 space-y-4">
         <div>
           <h3 className="text-sm font-semibold">邀请码批量生成</h3>
         </div>
@@ -75,7 +75,7 @@ export function AdminInviteCodeManager({ initialInviteCodes }: AdminInviteCodeMa
         {feedback ? <p className="text-sm text-muted-foreground">{feedback}</p> : null}
       </div>
 
-      <div className="overflow-hidden rounded-[22px] border border-border bg-card">
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="grid items-center gap-3 border-b border-border bg-secondary/40 px-4 py-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground lg:grid-cols-[minmax(0,1.2fr)_140px_180px_minmax(0,1fr)]">
           <span>邀请码</span>
           <span>创建人</span>

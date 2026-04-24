@@ -16,6 +16,7 @@ import {
   ImageInsertPanel,
   LinkInsertPanel,
   MediaInsertPanel,
+  SpoilerInsertPanel,
   TableInsertPanel,
 } from "@/components/refined-rich-post-editor/editor-panels"
 import { EditorBody, EditorHeader, EditorToolbar } from "@/components/refined-rich-post-editor/editor-surface"
@@ -32,6 +33,7 @@ import { useEditorViewState } from "@/components/refined-rich-post-editor/use-ed
 import { useMarkdownEmojiMap, useMarkdownImageUploadEnabled } from "@/components/site-settings-provider"
 import { useImageUpload } from "@/hooks/use-image-upload"
 import { getClientPlatform } from "@/lib/client-platform"
+import { cn } from "@/lib/utils"
 import {
   insertSelection,
   setHeadingLevel,
@@ -73,6 +75,7 @@ export function RefinedRichPostEditor({
   uploadFolder = "posts",
   markdownEmojiMap: externalMarkdownEmojiMap,
   markdownImageUploadEnabled: externalMarkdownImageUploadEnabled,
+  shellClassName,
   context = "generic",
 }: RefinedRichPostEditorProps & {
   context?: AddonEditorTarget
@@ -197,6 +200,7 @@ export function RefinedRichPostEditor({
     toggleHighlight: commands.toolbarActions.highlight,
     formatCode: commands.toolbarActions.codeFormat,
     toggleQuote: commands.toolbarActions.quote,
+    insertSpoiler: commands.toolbarActions.insertSpoiler,
     formatList: commands.toolbarActions.listFormat,
     insertDivider: commands.toolbarActions.insertDivider,
     align: commands.toolbarActions.align,
@@ -205,7 +209,14 @@ export function RefinedRichPostEditor({
   const editorShell = (
     <div className={viewState.isFullscreen ? "fixed inset-0 z-[120] bg-black/45 p-4 md:p-6" : ""}>
       <div className={viewState.isFullscreen ? "flex h-full w-full items-center justify-center" : ""}>
-        <div className={viewState.isFullscreen ? "flex h-full max-h-[96vh] w-full max-w-6xl flex-col overflow-x-hidden overflow-y-visible rounded-[28px] border border-border bg-background shadow-2xl" : "overflow-x-hidden overflow-y-visible rounded-[22px] border border-border bg-card shadow-xs"}>
+        <div
+          className={cn(
+            viewState.isFullscreen
+              ? "flex h-full max-h-[96vh] w-full max-w-6xl flex-col overflow-x-hidden overflow-y-visible rounded-xl border border-border bg-background shadow-2xl"
+              : "overflow-x-hidden overflow-y-visible rounded-xl border border-border bg-card shadow-xs",
+            !viewState.isFullscreen && shellClassName,
+          )}
+        >
           <EditorHeader
             activeTab={viewState.activeTab}
             disabled={disabled}
@@ -258,6 +269,7 @@ export function RefinedRichPostEditor({
               showTablePanel={panels.tablePanel.open}
               showLinkPanel={panels.linkPanel.open}
               showImagePanel={panels.imagePanel.open}
+              showSpoilerPanel={panels.spoilerPanel.open}
               showBase64Dialog={panels.base64Dialog.open}
               fileInputRef={fileInputRef}
               mediaButtonRef={panels.mediaPanel.buttonRef}
@@ -265,6 +277,7 @@ export function RefinedRichPostEditor({
               tableButtonRef={panels.tablePanel.buttonRef}
               linkButtonRef={panels.linkPanel.buttonRef}
               imageButtonRef={panels.imagePanel.buttonRef}
+              spoilerButtonRef={panels.spoilerPanel.buttonRef}
               onToolbarMouseDown={commands.handleToolbarMouseDown}
               onToolbarSelectMouseDown={commands.handleToolbarSelectMouseDown}
               onToolbarSelectOpenChange={commands.handleToolbarSelectOpenChange}
@@ -278,6 +291,7 @@ export function RefinedRichPostEditor({
               onListFormat={commands.toolbarActions.listFormat}
               onToggleLinkPanel={panels.linkPanel.toggle}
               onToggleTablePanel={panels.tablePanel.toggle}
+              onToggleSpoilerPanel={panels.spoilerPanel.toggle}
               onInsertDivider={commands.toolbarActions.insertDivider}
               onAlign={commands.toolbarActions.align}
               onToggleMediaPanel={panels.mediaPanel.toggle}
@@ -367,6 +381,19 @@ export function RefinedRichPostEditor({
         panelRef={panels.tablePanel.panelRef}
         onClose={panels.tablePanel.close}
         onSelect={commands.handleInsertTable}
+      />
+      <SpoilerInsertPanel
+        open={panels.spoilerPanel.open}
+        isClient={isClient}
+        disabled={disabled}
+        anchorRef={panels.spoilerPanel.buttonRef}
+        position={panels.spoilerPanel.position}
+        ready={panels.spoilerPanel.ready}
+        panelRef={panels.spoilerPanel.panelRef}
+        onClose={panels.spoilerPanel.close}
+        onInsertSpoiler={commands.toolbarActions.insertSpoiler}
+        onInsertScratchMask={commands.toolbarActions.insertScratchMask}
+        onItemMouseDown={commands.handleToolbarMouseDown}
       />
       <EmojiInsertPanel
         open={panels.emojiPanel.open}

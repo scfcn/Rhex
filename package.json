@@ -1,10 +1,11 @@
 {
   "name": "rhex",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "test": "tsx --test test/*.test.ts",
     "start": "next start",
     "start:prod": "cross-env NODE_ENV=production next build && cross-env NODE_ENV=production next start",
     "setup": "tsx scripts/setup.ts",

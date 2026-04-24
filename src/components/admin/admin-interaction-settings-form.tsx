@@ -62,7 +62,7 @@ function InfoTextField(props: {
 
 function FieldGroup({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="rounded-[20px] border border-border bg-secondary/30 p-4 space-y-3">
+    <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
       <p className="text-sm font-semibold">{title}</p>
       {children}
     </div>
@@ -133,7 +133,7 @@ export function AdminInteractionSettingsForm({
   return (
     <>
       {activeSubTab === "comments" ? (
-        <div className="rounded-[24px] border border-border p-5 space-y-4">
+        <div className="rounded-xl border border-border p-5 space-y-4">
           <div>
             <h3 className="text-sm font-semibold">评论展示</h3>
             <p className="mt-1 text-xs leading-6 text-muted-foreground">控制评论区可见性、楼中楼默认展开数量，以及帖子详情页的评论分页容量。</p>
@@ -148,7 +148,7 @@ export function AdminInteractionSettingsForm({
       ) : null}
 
       {activeSubTab === "content-limits" ? (
-        <div className="rounded-[24px] border border-border p-5 space-y-4">
+        <div className="rounded-xl border border-border p-5 space-y-4">
           <div>
             <h3 className="text-sm font-semibold">发帖、回复与编辑限制</h3>
             <p className="mt-1 text-xs leading-6 text-muted-foreground">分别控制标题、正文、回复的字数范围，以及帖子和评论的可编辑时长，服务端会按这里的值做校验。</p>
@@ -168,7 +168,7 @@ export function AdminInteractionSettingsForm({
       ) : null}
 
       {activeSubTab === "anonymous-post" ? (
-        <div className="rounded-[24px] border border-border p-5 space-y-4">
+        <div className="rounded-xl border border-border p-5 space-y-4">
           <div>
             <h3 className="text-sm font-semibold">匿名发帖</h3>
             <p className="mt-1 text-xs leading-6 text-muted-foreground">控制匿名发帖开关、扣费、每日次数，以及匿名帖下回复时是否允许切换身份。</p>
@@ -186,7 +186,7 @@ export function AdminInteractionSettingsForm({
       ) : null}
 
       {activeSubTab === "tipping" ? (
-        <div className="rounded-[24px] border border-border p-5 space-y-4">
+        <div className="rounded-xl border border-border p-5 space-y-4">
           <div>
             <h3 className="text-sm font-semibold">帖子打赏与送礼</h3>
             <p className="mt-1 text-xs leading-6 text-muted-foreground">控制帖子打赏开关、次数限制、裸积分档位、礼物配置，以及打赏送礼税。</p>
@@ -211,7 +211,7 @@ export function AdminInteractionSettingsForm({
       ) : null}
 
       {activeSubTab === "gates" ? (
-        <div className="rounded-[24px] border border-border p-5 space-y-4">
+        <div className="rounded-xl border border-border p-5 space-y-4">
           <div>
             <h3 className="text-sm font-semibold">发布门槛</h3>
             <p className="mt-1 text-xs leading-6 text-muted-foreground">按发帖和回复分别控制邮箱验证与注册时长门槛。后续新的互动验证规则也会继续挂在这一层扩展，不需要再改主设置表。</p>
@@ -231,7 +231,7 @@ export function AdminInteractionSettingsForm({
       ) : null}
 
       {activeSubTab === "reward-pool" ? (
-        <div className="rounded-[24px] border border-border p-5 space-y-4">
+        <div className="rounded-xl border border-border p-5 space-y-4">
           <div>
             <h3 className="text-sm font-semibold">帖子红包与聚宝盆</h3>
             <p className="mt-1 text-xs leading-6 text-muted-foreground">红包用于一次性预存发放；聚宝盆用于回复后给积分池注入积分，并按概率抽中奖励。</p>
@@ -256,7 +256,7 @@ export function AdminInteractionSettingsForm({
       ) : null}
 
       {activeSubTab === "heat" ? (
-        <div className="rounded-[24px] border border-border p-5 space-y-4">
+        <div className="rounded-xl border border-border p-5 space-y-4">
           <div>
             <h3 className="text-sm font-semibold">帖子热度颜色算法</h3>
             <p className="mt-1 text-xs leading-6 text-muted-foreground">统一配置热度分数计算权重、首页热门近活跃窗口与颜色阶段。</p>
@@ -277,7 +277,7 @@ export function AdminInteractionSettingsForm({
             <p className="text-sm font-medium">9 段颜色色板</p>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {draft.heatStageColors.map((color, index) => (
-                <div key={`heat-color-${index}`} className="rounded-[20px] border border-border bg-secondary/30 p-3">
+                <div key={`heat-color-${index}`} className="rounded-xl border border-border bg-secondary/30 p-3">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-medium text-foreground">第 {index + 1} 档颜色</p>
@@ -302,7 +302,7 @@ export function AdminInteractionSettingsForm({
       ) : null}
 
       {activeSubTab === "preview" ? (
-        <div className="rounded-[24px] border border-border p-5 space-y-4">
+        <div className="rounded-xl border border-border p-5 space-y-4">
           <div>
             <h3 className="text-sm font-semibold">热度预览面板</h3>
             <p className="mt-1 text-xs leading-6 text-muted-foreground">调整参数后，实时预览热度分数与颜色表现。</p>
@@ -315,12 +315,12 @@ export function AdminInteractionSettingsForm({
             <TextField label="打赏积分" value={draft.previewTipPoints} onChange={(value) => updateDraftField("previewTipPoints", value)} placeholder="如 160" />
           </div>
           <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
-            <div className="rounded-[20px] border border-border bg-card px-4 py-4">
+            <div className="rounded-xl border border-border bg-card px-4 py-4">
               <p className="text-xs text-muted-foreground">热度分数</p>
               <p className="mt-2 text-3xl font-semibold">{previewScore}</p>
               <p className="mt-2 text-xs text-muted-foreground">当前落在第 {previewHeat.stageIndex + 1} 档颜色</p>
             </div>
-            <div className="rounded-[20px] border border-border bg-card px-4 py-4">
+            <div className="rounded-xl border border-border bg-card px-4 py-4">
               <p className="text-xs text-muted-foreground">回复数按钮预览</p>
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <span className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium" style={{ backgroundColor: `${previewHeat.color}14`, color: previewHeat.color }}>

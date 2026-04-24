@@ -15,6 +15,7 @@ import { getCurrentUser } from "@/lib/auth"
 import { checkBoardPermission } from "@/lib/board-access"
 import { getBoards } from "@/lib/boards"
 import { buildAddonHookSearchParams, buildHookedPostStreamDisplayItems } from "@/lib/addon-feed-posts"
+import { DEFAULT_TAXONOMY_POST_SORT, normalizeTaxonomyPostSort, type TaxonomyPostSort } from "@/lib/forum-taxonomy-sort"
 import { getHomeSidebarHotTopics, resolveSidebarUser } from "@/lib/home-sidebar"
 
 import { DEFAULT_ALLOWED_POST_TYPES } from "@/lib/post-types"
@@ -27,9 +28,31 @@ import { RssSubscribeButton } from "@/components/rss/rss-subscribe-button"
 import { ForumPostStreamView } from "@/components/forum/forum-post-stream-view"
 
 
-function buildZonePageHref(slug: string, page = 1) {
+function buildZonePageHref(slug: string, page = 1, sort: TaxonomyPostSort = DEFAULT_TAXONOMY_POST_SORT) {
   const normalizedPage = Math.max(1, Math.trunc(page))
-  return normalizedPage <= 1 ? `/zones/${slug}` : `/zones/${slug}?page=${normalizedPage}`
+  const query = new URLSearchParams()
+
+  if (sort !== DEFAULT_TAXONOMY_POST_SORT) {
+    query.set("sort", sort)
+  }
+
+  if (normalizedPage > 1) {
+    query.set("page", String(normalizedPage))
+  }
+
+  const queryString = query.toString()
+  return queryString ? `/zones/${slug}?${queryString}` : `/zones/${slug}`
+}
+
+function buildZonePostsApiPath(slug: string, sort: TaxonomyPostSort) {
+  const query = new URLSearchParams()
+
+  if (sort !== DEFAULT_TAXONOMY_POST_SORT) {
+    query.set("sort", sort)
+  }
+
+  const queryString = query.toString()
+  return queryString ? `/api/zones/${encodeURIComponent(slug)}/posts?${queryString}` : `/api/zones/${encodeURIComponent(slug)}/posts`
 }
 
 export async function generateStaticParams() {
@@ -88,11 +111,13 @@ export default async function ZonePage(props: PageProps<"/zones/[slug]">) {
   }, "view")
 
   const rawPage = readSearchParam(searchParams?.page)
+  const rawSort = readSearchParam(searchParams?.sort)
   const currentPage = Math.max(1, Number(rawPage ?? "1") || 1)
+  const currentSort = normalizeTaxonomyPostSort(rawSort)
   const [zoneBoards, postsPage, allBoards, allZones, hotTopics, announcements] = await Promise.all([
     getZoneBoards(params.slug),
     permission.allowed
-      ? getZonePosts(params.slug, currentPage, settings.zonePostPageSize)
+      ? getZonePosts(params.slug, currentPage, settings.zonePostPageSize, currentSort)
       : Promise.resolve({ items: [], page: 1, pageSize: settings.zonePostPageSize, total: 0, totalPages: 1, hasPrevPage: false, hasNextPage: false }),
     getBoards(),
     getZones(),
@@ -100,23 +125,33 @@ export default async function ZonePage(props: PageProps<"/zones/[slug]">) {
     getHomeAnnouncements(3),
   ])
   const { items: posts, page, totalPages, hasPrevPage, hasNextPage } = postsPage
+  const canonicalPage = currentPage !== page ? page : currentPage
 
-  if (rawPage !== undefined && currentPage === 1) {
-    redirect(buildZonePageHref(params.slug))
-  }
-
-  if (currentPage !== page) {
-    redirect(buildZonePageHref(params.slug, page))
+  if (
+    currentPage !== page
+    || (rawPage !== undefined && currentPage === 1)
+    || (rawSort !== undefined && currentSort === DEFAULT_TAXONOMY_POST_SORT)
+  ) {
+    redirect(buildZonePageHref(params.slug, canonicalPage, currentSort))
   }
   const sidebarUser = await resolveSidebarUser(currentUser, settings)
   const postDisplayItems = await buildHookedPostStreamDisplayItems({
     posts,
     settings,
+    sort: currentSort,
     visiblePinScopes: ["GLOBAL", "ZONE"],
     pathname: `/zones/${zone.slug}`,
     searchParams: buildAddonHookSearchParams(searchParams),
   })
   const useInfinitePostList = zone.postListLoadMode === POST_LIST_LOAD_MODE_INFINITE
+  const emptyStateText = currentSort === "featured" ? "当前分区下还没有精华内容。" : "当前分区下还没有公开内容。"
+  const sortLinks = {
+    currentSort,
+    latestHref: buildZonePageHref(params.slug, 1, "latest"),
+    newHref: buildZonePageHref(params.slug, 1, "new"),
+    featuredHref: buildZonePageHref(params.slug, 1, "featured"),
+  }
+  const zonePostsApiPath = buildZonePostsApiPath(params.slug, currentSort)
 
 
 
@@ -168,13 +203,14 @@ export default async function ZonePage(props: PageProps<"/zones/[slug]">) {
 
                   {useInfinitePostList ? (
                     <InfiniteForumPostStream
-                      apiPath={`/api/zones/${encodeURIComponent(params.slug)}/posts`}
+                      apiPath={zonePostsApiPath}
                       initialItems={postDisplayItems}
                       initialPage={page}
                       initialHasNextPage={hasNextPage}
                       listDisplayMode={zone.postListDisplayMode}
                       showPinnedDivider={page === 1}
                       postLinkDisplayMode={settings.postLinkDisplayMode}
+                      sortLinks={sortLinks}
                     />
                   ) : (
                     <ForumPostStreamView
@@ -182,10 +218,11 @@ export default async function ZonePage(props: PageProps<"/zones/[slug]">) {
                       listDisplayMode={zone.postListDisplayMode}
                       showPinnedDivider={page === 1}
                       postLinkDisplayMode={settings.postLinkDisplayMode}
+                      sortLinks={sortLinks}
                     />
                   )}
 
-                  {posts.length === 0 ? <div className="rounded-md border bg-background p-8 text-sm text-muted-foreground">当前分区下还没有公开内容。</div> : null}
+                  {posts.length === 0 ? <div className="rounded-md border bg-background p-8 text-sm text-muted-foreground">{emptyStateText}</div> : null}
 
                   {useInfinitePostList ? null : (
                     <PageNumberPagination
@@ -193,7 +230,7 @@ export default async function ZonePage(props: PageProps<"/zones/[slug]">) {
                       totalPages={totalPages}
                       hasPrevPage={hasPrevPage}
                       hasNextPage={hasNextPage}
-                      buildHref={(targetPage) => buildZonePageHref(params.slug, targetPage)}
+                      buildHref={(targetPage) => buildZonePageHref(params.slug, targetPage, currentSort)}
                     />
                   )}
                 </>

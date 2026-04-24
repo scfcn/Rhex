@@ -114,33 +114,33 @@ export function TopupResultPage({ merchantOrderNo, pointName, initialStatus }: T
 
   return (
     <div className="space-y-6">
-      <section className={`rounded-[28px] border p-6 ${succeeded ? "border-emerald-200 bg-emerald-50/70" : failed ? "border-rose-200 bg-rose-50/70" : "border-border bg-card"}`}>
+      <section className={`rounded-xl border p-6 ${succeeded ? "border-emerald-200 bg-emerald-50/70" : failed ? "border-rose-200 bg-rose-50/70" : "border-border bg-card"}`}>
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold">{title}</h1>
           <p className="text-sm leading-7 text-muted-foreground">{description}</p>
         </div>
 
         <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-[20px] border border-border/70 bg-background/80 p-4">
+          <div className="rounded-xl border border-border/70 bg-background/80 p-4">
             <p className="text-xs text-muted-foreground">支付单号</p>
             <p className="mt-2 break-all text-sm font-semibold">{status.merchantOrderNo}</p>
           </div>
-          <div className="rounded-[20px] border border-border/70 bg-background/80 p-4">
+          <div className="rounded-xl border border-border/70 bg-background/80 p-4">
             <p className="text-xs text-muted-foreground">支付金额</p>
             <p className="mt-2 text-sm font-semibold">{formatAmountFen(status.amountFen, status.currency)}</p>
           </div>
-          <div className="rounded-[20px] border border-border/70 bg-background/80 p-4">
+          <div className="rounded-xl border border-border/70 bg-background/80 p-4">
             <p className="text-xs text-muted-foreground">支付状态</p>
             <p className="mt-2 text-sm font-semibold">{status.status}</p>
           </div>
-          <div className="rounded-[20px] border border-border/70 bg-background/80 p-4">
+          <div className="rounded-xl border border-border/70 bg-background/80 p-4">
             <p className="text-xs text-muted-foreground">履约状态</p>
             <p className="mt-2 text-sm font-semibold">{status.fulfillmentStatus}</p>
           </div>
         </div>
 
         {status.topup ? (
-          <div className="mt-4 rounded-[20px] border border-border/70 bg-background/80 p-4">
+          <div className="mt-4 rounded-xl border border-border/70 bg-background/80 p-4">
             <p className="text-sm font-semibold">{status.topup.title}</p>
             <p className="mt-2 text-sm text-muted-foreground">
               基础 {formatNumber(status.topup.points)} {pointName}

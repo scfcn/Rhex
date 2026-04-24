@@ -87,7 +87,7 @@ export function VipActionPanel({ vipMonthlyPrice, vipQuarterlyPrice, vipYearlyPr
 
   return (
     <div className="mt-6">
-      <div className="rounded-[24px] border border-border p-5">
+      <div className="rounded-xl border border-border p-5">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <h3 className="text-sm font-semibold">购买 / 续费 VIP（{pointName}支付）</h3>
           <p className="text-sm text-muted-foreground">当前{pointName}：{formatNumber(userPoints)}{vipActive ? "，当前已是 VIP，可继续续期。" : "，可直接购买开通 VIP。"}</p>

@@ -592,7 +592,7 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[24px] border border-border bg-card p-5">
+      <section className="rounded-xl border border-border bg-card p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="text-base font-semibold">RSS 抓取中心</h3>
@@ -615,7 +615,7 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
         </div>
       </section>
 
-      <section className="space-y-4 rounded-[24px] border border-border bg-card p-5">
+      <section className="space-y-4 rounded-xl border border-border bg-card p-5">
         <div>
           <h4 className="text-sm font-semibold">调度与安全配置</h4>
           <p className="mt-1 text-sm text-muted-foreground">控制并发、重试、超时、抓取体积上限，以及首页宇宙栏目展示策略。RSS 的下一次执行由每个源按自己的抓取间隔独立挂起，运行态连接和队列消费状态统一在 Worker 中心查看。</p>
@@ -664,7 +664,7 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
         </div>
       </section>
 
-      <section className="rounded-[24px] border border-border bg-card p-5">
+      <section className="rounded-xl border border-border bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h4 className="text-sm font-semibold">新增 RSS 任务</h4>
@@ -674,7 +674,7 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
         </div>
       </section>
 
-      <section className="space-y-4 rounded-[24px] border border-border bg-card p-5">
+      <section className="space-y-4 rounded-xl border border-border bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h4 className="text-sm font-semibold">任务列表</h4>
@@ -742,7 +742,7 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
-        <div className="rounded-[24px] border border-border bg-card p-5">
+        <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h4 className="text-sm font-semibold">全局最近执行</h4>
@@ -767,7 +767,7 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
           </div>
         </div>
 
-        <div className="rounded-[24px] border border-border bg-card p-5">
+        <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h4 className="text-sm font-semibold">Redis 短期日志</h4>

@@ -1,7 +1,8 @@
 import { PostListLink } from "@/components/post/post-list-link"
-import { formatDateTime } from "@/lib/formatters"
+import { formatMonthDayTime, parseBusinessDateTime, serializeDate, serializeDateTime } from "@/lib/formatters"
 import { getPostCommentPath } from "@/lib/post-links"
 import type { PostLinkDisplayMode } from "@/lib/site-settings"
+import { cn } from "@/lib/utils"
 
 interface UserRecentReplyItem {
   id: string | number
@@ -34,9 +35,11 @@ export function UserRecentRepliesList({
     )
   }
 
+  const referenceDate = new Date()
+
   return (
-    <div className="space-y-2.5">
-      {replies.map((reply) => {
+    <div className="flex flex-col">
+      {replies.map((reply, index) => {
         const commentPath = getPostCommentPath(
           { id: String(reply.postId), slug: reply.postSlug, title: reply.postTitle },
           String(reply.id),
@@ -44,23 +47,88 @@ export function UserRecentRepliesList({
         )
 
         return (
-          <div key={reply.id} className="rounded-[18px] border border-border/80 bg-card px-3.5 py-2.5 transition-colors hover:bg-accent/30">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
-              <div className="flex min-w-0 flex-wrap items-baseline gap-x-1 gap-y-0.5 text-[13px] leading-5">
-                <span className="text-muted-foreground">评论于</span>
-                <PostListLink href={commentPath} visitedPath={commentPath} dimWhenRead className="line-clamp-1 font-semibold text-foreground">
-                  {reply.postTitle}
-                </PostListLink>
-              </div>
-              <div className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5 text-[11px] text-muted-foreground">
-                {reply.replyToUsername ? <span>回复 @{reply.replyToUsername}</span> : <span>发表评论</span>}
-                <span>{formatDateTime(reply.createdAt)}</span>
-              </div>
+          <article
+            key={reply.id}
+            className={cn(
+              "flex flex-col gap-2 px-4 py-3.5 transition-colors hover:bg-accent/20 sm:px-5 sm:py-4",
+              index > 0 && "border-t border-border/70",
+            )}
+          >
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-5 text-muted-foreground sm:text-xs">
+              <span className="shrink-0">{formatReplyActivityTime(reply.createdAt, referenceDate)}</span>
+              <span className="shrink-0">评论帖子</span>
+              <PostListLink
+                href={commentPath}
+                visitedPath={commentPath}
+                dimWhenRead
+                className="inline-block max-w-full truncate font-semibold text-foreground underline decoration-foreground/30 underline-offset-3 transition-colors hover:text-foreground/70"
+              >
+                {reply.postTitle}
+              </PostListLink>
+              {reply.replyToUsername ? <span className="shrink-0">回复 @{reply.replyToUsername}</span> : null}
             </div>
-            <p className="mt-1.5 line-clamp-2 text-[13px] leading-5 text-muted-foreground">{reply.content}</p>
-          </div>
+            <p className="line-clamp-3 break-words text-[13px] leading-6 text-foreground sm:text-sm sm:leading-6">
+              {reply.content}
+            </p>
+          </article>
         )
       })}
     </div>
   )
+}
+
+function formatReplyActivityTime(value: string, referenceDate: Date) {
+  const date = parseBusinessDateTime(value) ?? new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  const dayDifference = getBusinessDayDifference(date, referenceDate)
+  if (dayDifference === null || dayDifference < 0) {
+    return formatMonthDayTime(date)
+  }
+
+  if (dayDifference === 0) {
+    const diffMinutes = Math.floor((referenceDate.getTime() - date.getTime()) / (60 * 1000))
+
+    if (diffMinutes <= 0) {
+      return "刚刚"
+    }
+
+    if (diffMinutes < 60) {
+      return `${diffMinutes} 分钟前`
+    }
+
+    return `${Math.floor(diffMinutes / 60)} 小时前`
+  }
+
+  if (dayDifference === 1) {
+    const preciseDateTime = serializeDateTime(date)
+    return preciseDateTime ? `昨天 ${preciseDateTime.slice(11, 16)}` : "昨天"
+  }
+
+  if (dayDifference < 7) {
+    return `${dayDifference} 天前`
+  }
+
+  return formatMonthDayTime(date)
+}
+
+function getBusinessDayDifference(startDate: Date, endDate: Date) {
+  const startDayKey = serializeDate(startDate)
+  const endDayKey = serializeDate(endDate)
+
+  if (!startDayKey || !endDayKey) {
+    return null
+  }
+
+  const startDay = parseBusinessDateTime(`${startDayKey} 00:00:00`)
+  const endDay = parseBusinessDateTime(`${endDayKey} 00:00:00`)
+
+  if (!startDay || !endDay) {
+    return null
+  }
+
+  return Math.round((endDay.getTime() - startDay.getTime()) / (24 * 60 * 60 * 1000))
 }

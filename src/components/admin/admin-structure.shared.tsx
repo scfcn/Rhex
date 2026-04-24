@@ -257,7 +257,7 @@ export function TextAreaField({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         rows={rows}
-        className="rounded-[24px] bg-background px-4 py-3"
+        className="rounded-xl bg-background px-4 py-3"
       />
     </div>
   )

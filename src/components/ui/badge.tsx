@@ -12,6 +12,14 @@ const badgeVariants = cva(
         default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
         secondary:
           "bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80",
+        auction:
+          "bg-amber-100 text-amber-700 [a]:hover:bg-amber-100/80 dark:bg-amber-500/15 dark:text-amber-200",
+        lottery:
+          "bg-rose-100 text-rose-700 [a]:hover:bg-rose-100/80 dark:bg-rose-500/15 dark:text-rose-200",
+        poll:
+          "bg-sky-100 text-sky-700 [a]:hover:bg-sky-100/80 dark:bg-sky-500/15 dark:text-sky-200",
+        bounty:
+          "bg-emerald-100 text-emerald-700 [a]:hover:bg-emerald-100/80 dark:bg-emerald-500/15 dark:text-emerald-200",
         destructive:
           "bg-destructive/10 text-destructive focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:focus-visible:ring-destructive/40 [a]:hover:bg-destructive/20",
         outline:

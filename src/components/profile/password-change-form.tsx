@@ -137,7 +137,7 @@ export function PasswordChangeForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className={embedded ? "space-y-4" : "space-y-4 rounded-[24px] border border-border bg-card p-5"}>
+    <form onSubmit={handleSubmit} className={embedded ? "space-y-4" : "space-y-4 rounded-xl border border-border bg-card p-5"}>
       {requireEmailVerification ? (
         <div className="space-y-3">
           <div>

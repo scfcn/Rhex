@@ -31,7 +31,7 @@ export function PermissionsTab({
 
   return (
     <div className="flex flex-col gap-4">
-      <section className="rounded-[20px] border border-border p-4">
+      <section className="rounded-xl border border-border p-4">
         <div className="flex flex-col gap-1">
           <h4 className="text-sm font-semibold">权限身份</h4>
           <p className="text-xs text-muted-foreground">提权、降权和版主管辖范围配置集中在这里。</p>
@@ -79,7 +79,7 @@ export function PermissionsTab({
       </section>
 
       {isModerator && moderatorScopeOptions ? (
-        <section className="rounded-[20px] border border-border p-4">
+        <section className="rounded-xl border border-border p-4">
           <div className="flex flex-col gap-1">
             <h4 className="text-sm font-semibold">版主管辖范围</h4>
             <p className="text-xs text-muted-foreground">分区授权自动覆盖分区下全部节点；“可改设置”控制结构编辑，“可提金库”控制节点金库提取权限。</p>
@@ -116,7 +116,7 @@ export function PermissionsTab({
           </div>
         </section>
       ) : (
-        <section className="rounded-[20px] border border-dashed border-border bg-secondary/20 p-4 text-sm text-muted-foreground">
+        <section className="rounded-xl border border-dashed border-border bg-secondary/20 p-4 text-sm text-muted-foreground">
           当前用户不是版主，无需配置版主管辖范围。
         </section>
       )}

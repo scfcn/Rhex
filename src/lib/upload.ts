@@ -11,7 +11,7 @@ import { getServerSiteSettings } from "@/lib/site-settings"
 import { resolveUploadBaseUrl } from "@/lib/upload-path"
 import { normalizeUploadProvider } from "@/lib/upload-provider"
 import { buildUploadStoragePath } from "@/lib/upload-path"
-import { getUploadMimeType } from "@/lib/upload-rules"
+import { getPrimaryUploadExtensionForMimeType, getUploadMimeType } from "@/lib/upload-rules"
 import { applyTextWatermarkToBuffer } from "@/lib/watermark-lib.server"
 import { saveWithAddonUploadProvider } from "@/lib/addon-upload-providers"
 import type { AddonUploadActor } from "@/addons-host/upload-types"
@@ -64,7 +64,8 @@ const IMAGE_MIME_TYPES = new Set([
   "image/avif",
   "image/svg+xml",
 ])
-const WATERMARK_SUPPORTED_MIME_TYPES = new Set(["image/jpeg", "image/png"])
+type WatermarkSupportedMimeType = "image/jpeg" | "image/png" | "image/webp" | "image/avif"
+const WATERMARK_SUPPORTED_MIME_TYPES = new Set<WatermarkSupportedMimeType>(["image/jpeg", "image/png", "image/webp", "image/avif"])
 const WATERMARK_APPLICABLE_FOLDERS = new Set(["posts", "comments", "post-covers"])
 
 /**
@@ -117,8 +118,22 @@ function shouldApplyImageWatermark(params: {
     && params.settings.imageWatermarkText.trim()
     && params.folder
     && WATERMARK_APPLICABLE_FOLDERS.has(params.folder)
-    && WATERMARK_SUPPORTED_MIME_TYPES.has(params.detectedMime),
+    && isWatermarkSupportedMimeType(params.detectedMime),
   )
+}
+
+function isWatermarkSupportedMimeType(mimeType: string): mimeType is WatermarkSupportedMimeType {
+  return WATERMARK_SUPPORTED_MIME_TYPES.has(mimeType as WatermarkSupportedMimeType)
+}
+
+function resolveStoredFileExtension(fileName: string, mimeType: string) {
+  const canonicalExtension = getPrimaryUploadExtensionForMimeType(mimeType)
+
+  if (canonicalExtension) {
+    return `.${canonicalExtension}`
+  }
+
+  return path.extname(fileName) || ".bin"
 }
 
 async function applyImageWatermarkToBuffer(params: {
@@ -132,9 +147,13 @@ async function applyImageWatermarkToBuffer(params: {
   }
 
   try {
+    if (!isWatermarkSupportedMimeType(params.detectedMime)) {
+      return params.buffer
+    }
+
     return await applyTextWatermarkToBuffer({
       buffer: params.buffer,
-      mimeType: params.detectedMime === "image/jpeg" ? "image/jpeg" : "image/png",
+      mimeType: params.detectedMime,
       settings: {
         color: params.settings!.imageWatermarkColor,
         fontSize: params.settings!.imageWatermarkFontSize,
@@ -226,7 +245,7 @@ async function saveToLocal(
   localPath: string,
   baseUrl: string | null | undefined,
 ): Promise<SavedUploadFile> {
-  const ext = path.extname(file.name) || ".bin"
+  const ext = resolveStoredFileExtension(file.name, preparedFile.detectedMime)
   const shortHash = preparedFile.fileHash.slice(0, 16)
   const fileName = `${folder}-${shortHash}${ext}`
   const uploadRoot = buildUploadStoragePath(localPath, folder)
@@ -328,7 +347,7 @@ async function saveToOss(
   folder: string,
   settings: UploadSettings,
 ): Promise<SavedUploadFile> {
-  const ext = path.extname(file.name) || ".bin"
+  const ext = resolveStoredFileExtension(file.name, preparedFile.detectedMime)
   const shortHash = preparedFile.fileHash.slice(0, 16)
   const fileName = `${folder}-${shortHash}${ext}`
   const objectKey = resolveS3ObjectKey(folder, fileName)

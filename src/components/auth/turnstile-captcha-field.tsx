@@ -29,7 +29,7 @@ export function TurnstileCaptchaField({ siteKey, onTokenChange }: TurnstileCaptc
   }, [onTokenChange, scriptReady, siteKey])
 
   return (
-    <div className="space-y-2 rounded-[24px]">
+    <div className="space-y-2 rounded-xl">
       <Script
         src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
         strategy="afterInteractive"

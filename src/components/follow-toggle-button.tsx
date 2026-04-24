@@ -21,7 +21,7 @@ export function FollowToggleButton({
   targetType,
   targetId,
   initialFollowed,
-  activeLabel = "已关注",
+  activeLabel = "取关",
   inactiveLabel = "关注",
   showLabel = false,
   onFollowStateChange,

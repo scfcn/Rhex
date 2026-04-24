@@ -138,7 +138,7 @@ export function ReportDialog({ targetType, targetId, targetLabel, buttonText = "
               value={reasonDetail}
               onChange={(event) => setReasonDetail(event.target.value)}
               placeholder="可补充时间、上下文或其它判断依据，帮助管理员更快处理。"
-              className="min-h-[140px] rounded-[24px] bg-background px-4 py-3 text-sm"
+              className="min-h-[140px] rounded-xl bg-background px-4 py-3 text-sm"
             />
           </label>
         </div>

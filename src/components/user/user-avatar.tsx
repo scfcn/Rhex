@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils"
 interface UserAvatarProps {
   name: string
   avatarPath?: string | null
-  size?: "xs" | "sm" | "md" | "lg"
+  size?: "xs" | "sm" | "md" | "lg" | "xl" | "2xl"
   isVip?: boolean
   vipLevel?: number | null
 }
@@ -21,6 +21,8 @@ const sizeClasses = {
   sm: "size-9",
   md: "size-11",
   lg: "size-16",
+  xl: "size-20",
+  "2xl": "size-28",
 }
 
 const fallbackSizeClasses = {
@@ -28,6 +30,8 @@ const fallbackSizeClasses = {
   sm: "text-xs",
   md: "text-sm",
   lg: "text-lg",
+  xl: "text-xl",
+  "2xl": "text-2xl",
 }
 
 function AvatarImage({
@@ -56,7 +60,7 @@ function AvatarImage({
         src={avatarUrl}
         alt={name}
         fill
-        sizes={size === "lg" ? "64px" : size === "md" ? "44px" : size === "sm" ? "36px" : "32px"}
+        sizes={size === "2xl" ? "112px" : size === "xl" ? "80px" : size === "lg" ? "64px" : size === "md" ? "44px" : size === "sm" ? "36px" : "32px"}
         className={cn(
           "object-cover transition-[transform,opacity] duration-300 ease-out group-hover/avatar:scale-[1.06]",
           imageLoaded ? "opacity-100" : "opacity-0",
@@ -89,7 +93,7 @@ export function UserAvatar({ name, avatarPath, size = "md", isVip = false, vipLe
 
   return (
     <div className={cn("group/avatar relative aspect-square shrink-0", sizeClasses[size])}>
-      <div className="relative h-full w-full overflow-hidden rounded-2xl border border-border bg-card transition-[transform,box-shadow,border-color] duration-200 ease-out group-hover/avatar:-translate-y-0.5 group-hover/avatar:border-foreground/15 group-hover/avatar:shadow-[0_10px_24px_rgba(15,23,42,0.12)] dark:group-hover/avatar:shadow-[0_10px_28px_rgba(0,0,0,0.32)]" style={{ backgroundColor: colors.background, color: colors.foreground }}>
+      <div className="relative h-full w-full overflow-hidden rounded-xl border border-border bg-card transition-[transform,box-shadow,border-color] duration-200 ease-out group-hover/avatar:-translate-y-0.5 group-hover/avatar:border-foreground/15 group-hover/avatar:shadow-[0_10px_24px_rgba(15,23,42,0.12)] dark:group-hover/avatar:shadow-[0_10px_28px_rgba(0,0,0,0.32)]" style={{ backgroundColor: colors.background, color: colors.foreground }}>
         {showTextFallback ? (
           <div className={cn("flex h-full w-full items-center justify-center font-semibold tracking-wide transition-transform duration-300 ease-out group-hover/avatar:scale-[1.03]", fallbackSizeClasses[size])}>
             {fallback}

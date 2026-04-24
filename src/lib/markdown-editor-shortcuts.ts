@@ -379,6 +379,18 @@ export function buildInlineHighlightMarkdown(selectedText: string) {
   return isBlankSelection(selectedText) ? "==高亮内容==" : `==${selectedText}==`
 }
 
+export function buildSpoilerMarkdown(selectedText: string) {
+  const normalized = selectedText.trim()
+  const body = normalized || "这里填写需要折叠显示的内容"
+  return `:::spoiler 剧透提示\n${body}\n:::`
+}
+
+export function buildScratchMaskMarkdown(selectedText: string) {
+  const normalized = selectedText.trim()
+  const body = normalized || "这里填写需要点击显示的内容"
+  return `!!${body}!!`
+}
+
 export function buildCodeBlockMarkdown(selectedText: string) {
   const normalized = selectedText.trimEnd()
   const body = normalized || "// 在这里输入代码"

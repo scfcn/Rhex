@@ -71,6 +71,7 @@ export interface AddonEditorToolbarApi {
   toggleHighlight: () => void
   formatCode: (value: "inline-code" | "code-block") => void
   toggleQuote: () => void
+  insertSpoiler: () => void
   formatList: (value: "unordered" | "unordered-star" | "ordered" | "task") => void
   insertDivider: () => void
   align: (value: "left" | "center" | "right") => void

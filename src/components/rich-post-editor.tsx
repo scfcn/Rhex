@@ -182,7 +182,7 @@ export function RichPostEditor({ value, onChange, placeholder, minHeight = 260 }
   }, [applyEditorUpdate, value])
 
   return (
-    <div className="space-y-3 rounded-[24px] border border-border bg-card p-4">
+    <div className="space-y-3 rounded-xl border border-border bg-card p-4">
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" variant="outline" onMouseDown={handleToolbarMouseDown} onClick={() => applyWrap("**", "**")}>加粗</Button>
 
@@ -242,7 +242,7 @@ export function RichPostEditor({ value, onChange, placeholder, minHeight = 260 }
         value={value}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={handleTextareaKeyDown}
-        className="w-full min-w-0 rounded-[18px] border border-border bg-background px-3 py-3 text-sm leading-7 outline-hidden sm:rounded-[20px] sm:px-4"
+        className="w-full min-w-0 rounded-[18px] border border-border bg-background px-3 py-3 text-sm leading-7 outline-hidden sm:rounded-xl sm:px-4"
 
         style={{ minHeight }}
         placeholder={placeholder}

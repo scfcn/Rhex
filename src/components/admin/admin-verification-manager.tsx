@@ -347,7 +347,7 @@ export function AdminVerificationManager({ initialTypes, initialApplications, mo
                     key={item.id ?? `${item.slug}-${index}`}
                     type="button"
                     onClick={() => setEditingIndex(index)}
-                    className={editingIndex === index ? "w-full rounded-[22px] border border-foreground bg-accent/60 p-4 text-left" : "w-full rounded-[22px] border border-border bg-background p-4 text-left transition-colors hover:bg-accent/40"}
+                    className={editingIndex === index ? "w-full rounded-xl border border-foreground bg-accent/60 p-4 text-left" : "w-full rounded-xl border border-border bg-background p-4 text-left transition-colors hover:bg-accent/40"}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 items-center gap-3">
@@ -408,9 +408,9 @@ export function AdminVerificationManager({ initialTypes, initialApplications, mo
 
         <section className="space-y-6">
           {showTypeManagement ? (!editingType ? (
-            <div className="rounded-[28px] border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">请选择左侧认证类型，或新建一项认证开始配置。</div>
+            <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">请选择左侧认证类型，或新建一项认证开始配置。</div>
           ) : (
-            <div className="rounded-[28px] border border-border bg-card p-5 shadow-soft">
+            <div className="rounded-xl border border-border bg-card p-5 shadow-soft">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h4 className="text-base font-semibold">认证编辑</h4>
@@ -453,7 +453,7 @@ export function AdminVerificationManager({ initialTypes, initialApplications, mo
                 <CheckItem checked={editingType.allowResubmitAfterReject} onChange={(checked) => updateType(editingIndex!, { allowResubmitAfterReject: checked })} label="驳回后允许重提" />
               </div>
 
-              <div className="mt-6 rounded-[24px] border border-border p-4">
+              <div className="mt-6 rounded-xl border border-border p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h5 className="text-sm font-semibold">申请表单字段</h5>
@@ -468,7 +468,7 @@ export function AdminVerificationManager({ initialTypes, initialApplications, mo
                 <div className="mt-4 space-y-3">
                   {editingType.formFields.length === 0 ? <p className="text-sm text-muted-foreground">当前未配置字段，前台将退回到单一“申请说明”文本框。</p> : null}
                   {editingType.formFields.map((field, fieldIndex) => (
-                    <div key={field.id} className="rounded-[22px] border border-border bg-secondary/20 p-4">
+                    <div key={field.id} className="rounded-xl border border-border bg-secondary/20 p-4">
                       <div className="grid gap-3 xl:grid-cols-[1fr_180px_1fr_1fr_auto] xl:items-end">
                         <Field label="字段名称" value={field.label} onChange={(value) => updateField(editingIndex!, fieldIndex, { label: value })} placeholder="如 真实姓名" />
                         <SelectField label="字段类型" value={field.type} options={FIELD_TYPE_OPTIONS} onChange={(value) => updateField(editingIndex!, fieldIndex, { type: value as AdminVerificationFieldItem["type"] })} />
@@ -489,7 +489,7 @@ export function AdminVerificationManager({ initialTypes, initialApplications, mo
           )) : null}
 
           {showReviewCenter ? (
-            <div className="rounded-[28px] border border-border bg-card p-5 shadow-soft">
+            <div className="rounded-xl border border-border bg-card p-5 shadow-soft">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h4 className="text-base font-semibold">认证审核</h4>
@@ -503,7 +503,7 @@ export function AdminVerificationManager({ initialTypes, initialApplications, mo
                 {pendingApplications.map((item) => {
                   const formEntries = parseApplicationFormResponse(item.formResponseJson)
                   return (
-                    <div key={item.id} className="rounded-[22px] border border-border bg-background p-4">
+                    <div key={item.id} className="rounded-xl border border-border bg-background p-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="space-y-2">
                           <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -623,7 +623,7 @@ function SelectField({ label, value, options, onChange }: { label: string; value
 
 function CheckItem({ checked, onChange, label }: { checked: boolean; onChange: (checked: boolean) => void; label: string }) {
   return (
-    <Button type="button" variant={checked ? "default" : "outline"} className={cn("h-11 w-full justify-start rounded-[20px] px-4 text-sm", checked ? "" : "text-muted-foreground")} onClick={() => onChange(!checked)}>
+    <Button type="button" variant={checked ? "default" : "outline"} className={cn("h-11 w-full justify-start rounded-xl px-4 text-sm", checked ? "" : "text-muted-foreground")} onClick={() => onChange(!checked)}>
       {label}
     </Button>
   )

@@ -13,7 +13,7 @@ export function ProfileTab({
 }) {
   return (
     <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
-      <section className="rounded-[20px] border border-border p-4">
+      <section className="rounded-xl border border-border p-4">
         <div className="flex flex-col gap-1">
           <h4 className="text-sm font-semibold">基础资料</h4>
           <p className="text-xs text-muted-foreground">运营可直接维护昵称、邮箱、手机号、简介与介绍。</p>
@@ -41,7 +41,7 @@ export function ProfileTab({
         </Button>
       </section>
 
-      <section className="rounded-[20px] border border-border p-4">
+      <section className="rounded-xl border border-border p-4">
         <div className="flex flex-col gap-1">
           <h4 className="text-sm font-semibold">管理员备注</h4>
           <p className="text-xs text-muted-foreground">备注会写入后台操作日志，方便交接班和工单追溯。</p>

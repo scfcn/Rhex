@@ -16,6 +16,7 @@ import { TimeTooltip } from "@/components/time-tooltip"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { UserAvatar } from "@/components/user/user-avatar"
 import { UserDisplayedBadges } from "@/components/user/user-displayed-badges"
+import { UserProfilePreviewCardTrigger } from "@/components/user/user-profile-preview-card-trigger"
 import { UserStatusBadge } from "@/components/user/user-status-badge"
 import { UserVerificationBadge } from "@/components/user/user-verification-badge"
 import { VipNameTooltip } from "@/components/vip/vip-name-tooltip"
@@ -294,9 +295,14 @@ function CommentAuthorRowContent({
       }}
       fallback={(
         <div className="flex min-w-0 flex-1 items-start gap-2.5">
-          <Link
-            href={authorHref}
-            className={cn("shrink-0", shouldDimRestrictedAuthor && "grayscale")}
+          <UserProfilePreviewCardTrigger
+            username={entry.authorUsername}
+            displayName={entry.author}
+            avatarPath={entry.authorAvatarPath}
+            isVip={entry.authorIsVip}
+            vipLevel={entry.authorVipLevel}
+            triggerClassName={cn("shrink-0", shouldDimRestrictedAuthor && "grayscale")}
+            align="start"
           >
             <UserAvatar
               name={entry.author}
@@ -305,7 +311,7 @@ function CommentAuthorRowContent({
               isVip={entry.authorIsVip}
               vipLevel={entry.authorVipLevel}
             />
-          </Link>
+          </UserProfilePreviewCardTrigger>
           <div
             className={cn(
               "min-w-0 flex-1",
@@ -460,7 +466,7 @@ export function CommentThreadReplyItem({
           authorNameClassName={replyAuthorNameClassName}
           isRestrictedAuthor={isRestrictedReplyAuthor}
           shouldDimRestrictedAuthor={shouldDimRestrictedReplyAuthor}
-          showVerification={false}
+          showVerification
           showEditButton={canEditCurrentReply && !isHiddenReplyForViewer}
           editButtonLabel={getEditButtonLabel(reply)}
           onToggleEdit={() => editingCommentId === reply.id ? onStopEdit() : onStartEdit(reply.id)}
@@ -514,6 +520,8 @@ export function CommentThreadReplyItem({
               <div className={cn("flex w-full items-center gap-2 text-[11px] text-muted-foreground", editingCommentId === reply.id && "border-t border-border/50 pt-2")}>
                 <CommentLikeButton commentId={reply.id} initialCount={reply.likes} initialLiked={reply.viewerLiked} />
                 {replyRewardBadges ? <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">{replyRewardBadges}</div> : <div className="min-w-0 flex-1" />}
+
+                
                 <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
                   {!hideFloatingActionButtons && replyActions.length > 0 ? (
                     <CommentAdminActionMenu
@@ -633,7 +641,7 @@ export function CommentThreadCommentItem({
       id={`comment-${comment.id}`}
       className={cn(
         index === 0 ? "group relative scroll-mt-20 py-4 sm:scroll-mt-24" : "group relative scroll-mt-20 border-t border-border/70 py-4 sm:scroll-mt-24",
-        isHighlighted && "rounded-[20px] bg-amber-50/70 ring-2 ring-amber-300/70 ring-offset-2 ring-offset-background dark:bg-amber-500/10 dark:ring-amber-400/40",
+        isHighlighted && "rounded-xl bg-amber-50/70 ring-2 ring-amber-300/70 ring-offset-2 ring-offset-background dark:bg-amber-500/10 dark:ring-amber-400/40",
       )}
     >
       <div className="text-sm text-muted-foreground">

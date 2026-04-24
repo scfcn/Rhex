@@ -81,7 +81,7 @@ export function AdminMarkdownEmojiSettingsForm({ initialItems }: AdminMarkdownEm
           <Button type="button" variant="outline" className="rounded-full" onClick={() => setItems((current) => [...current, { shortcode: `emoji_${current.length + 1}`, label: "新表情", icon: "😀" }])}>新增表情</Button>
           <Button type="button" variant="ghost" className="rounded-full" onClick={() => setItems(DEFAULT_MARKDOWN_EMOJI_ITEMS)}>恢复默认</Button>
         </div>
-        <div className="rounded-[20px] border border-dashed border-border bg-card/40 p-4 space-y-2">
+        <div className="rounded-xl border border-dashed border-border bg-card/40 p-4 space-y-2">
           <p className="text-sm font-medium">使用方式预览</p>
           <div className="flex flex-wrap gap-2">
             {items.map((item) => (

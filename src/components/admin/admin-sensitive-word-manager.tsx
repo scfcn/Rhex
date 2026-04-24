@@ -179,7 +179,7 @@ export function AdminSensitiveWordManager({ data }: AdminSensitiveWordManagerPro
                 onChange={(event) => setWordInput(event.target.value)}
                 placeholder="输入敏感词、短语或正则表达式，支持批量粘贴，一行一个"
                 rows={6}
-                className="min-h-[132px] rounded-[20px] bg-background px-4 py-3"
+                className="min-h-[132px] rounded-xl bg-background px-4 py-3"
               />
               <p className="text-xs text-muted-foreground">当前待新增 {formatNumber(batchCount)} 条规则，重复词会自动跳过。</p>
             </div>

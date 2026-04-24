@@ -2,7 +2,7 @@ import { apiError, apiSuccess, createUserRouteHandler } from "@/lib/api-route"
 import { logRouteWriteSuccess } from "@/lib/route-metadata"
 import { getSiteSettings } from "@/lib/site-settings"
 import { prepareUploadedFile, saveUploadedFile } from "@/lib/upload"
-import { normalizeUploadExtension, normalizeUploadFolder } from "@/lib/upload-rules"
+import { isAllowedUploadMimeType, normalizeUploadExtension, normalizeUploadFolder } from "@/lib/upload-rules"
 import { createRequestWriteGuardOptions } from "@/lib/write-guard-policies"
 import { withRequestWriteGuard } from "@/lib/write-guard"
 import { createUploadRecord, findExistingUpload } from "@/db/upload-queries"
@@ -32,7 +32,7 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     apiError(400, `仅支持上传 ${allowedExtensions.join(" / ")} 格式的图片`)
   }
 
-  if (!file.type.startsWith("image/")) {
+  if (file.type && !file.type.startsWith("image/")) {
     apiError(400, "仅允许上传图片文件")
   }
 
@@ -44,6 +44,10 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     folder,
     settings,
   })
+
+  if (!isAllowedUploadMimeType(preparedFile.detectedMime, allowedExtensions)) {
+    apiError(400, `仅支持上传 ${allowedExtensions.join(" / ")} 格式的图片`)
+  }
 
   return withRequestWriteGuard(createRequestWriteGuardOptions("upload-file", {
     request,

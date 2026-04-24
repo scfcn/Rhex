@@ -98,7 +98,7 @@ export function FriendLinkApplicationDialog({ announcement, disabled = false, bu
           </div>
         )}
       >
-        <section className="rounded-[24px] border border-border bg-card p-4 sm:p-5">
+        <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
           <p className="text-sm font-medium">友情链接公告</p>
           <p className="mt-2 whitespace-pre-line text-sm leading-7 text-muted-foreground">{announcement}</p>
         </section>
@@ -112,7 +112,7 @@ export function FriendLinkApplicationDialog({ announcement, disabled = false, bu
         </Field>
 
         <Field label="LOGO URL" hint="仅支持填写图片 URL，例如：https://example.com/logo.png">
-          <div className="space-y-3 rounded-[24px] border border-dashed border-border bg-card/60 p-4">
+          <div className="space-y-3 rounded-xl border border-dashed border-border bg-card/60 p-4">
             <input value={form.logoPath} onChange={(event) => updateField("logoPath", event.target.value)} className="h-11 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-hidden" placeholder="请输入 LOGO 图片 URL" />
             {form.logoPath ? (
               <div className="relative h-16 w-32 overflow-hidden rounded-xl border border-border bg-white p-2">

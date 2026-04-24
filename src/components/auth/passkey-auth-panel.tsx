@@ -120,7 +120,7 @@ export function PasskeyAuthPanel({ mode }: PasskeyAuthPanelProps) {
 
   if (!supported) {
     return (
-      <div className="rounded-[24px] border border-border bg-secondary/40 p-4 text-sm text-muted-foreground">
+      <div className="rounded-xl border border-border bg-secondary/40 p-4 text-sm text-muted-foreground">
         当前浏览器不支持 WebAuthn / Passkey，请更换现代浏览器或改用账号密码、GitHub、Google 登录。
       </div>
     )
@@ -129,7 +129,7 @@ export function PasskeyAuthPanel({ mode }: PasskeyAuthPanelProps) {
   if (mode === "login") {
     return (
       <div className="space-y-4">
-        <div className="rounded-[24px] border border-border bg-secondary/40 p-4 text-sm text-muted-foreground">
+        <div className="rounded-xl border border-border bg-secondary/40 p-4 text-sm text-muted-foreground">
           如果你已经绑定过 Passkey，可直接点击下方按钮完成登录，无需输入用户名和密码。
         </div>
         <Button className="w-full" disabled={loading} onClick={handleLogin}>
@@ -141,7 +141,7 @@ export function PasskeyAuthPanel({ mode }: PasskeyAuthPanelProps) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-[24px] border border-border bg-secondary/40 p-4 text-sm text-muted-foreground">
+      <div className="rounded-xl border border-border bg-secondary/40 p-4 text-sm text-muted-foreground">
         首次使用 Passkey 创建账户时，需要先给出一个期望用户名；如果邮箱命中现有账户，系统会要求你绑定已有账户。
       </div>
 

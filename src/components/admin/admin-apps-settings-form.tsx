@@ -129,7 +129,7 @@ export function AdminAppsSettingsForm({ initialLinks, initialIconName }: AdminAp
           <Button type="button" variant="outline" onClick={addLink} className="rounded-full">新增应用</Button>
         </div>
 
-        <div className="rounded-[20px] bg-muted/40 p-4">
+        <div className="rounded-xl bg-muted/40 p-4">
           <p className="text-xs font-medium text-foreground">菜单预览</p>
           <div className="mt-3 grid gap-2 md:grid-cols-2">
             {normalizedPreview.length > 0 ? normalizedPreview.map((item) => (

@@ -147,7 +147,7 @@ export default async function TermsPage() {
               <div className="space-y-6">
           <AddonSlotRenderer slot="terms.hero.before" />
           <AddonSurfaceRenderer surface="terms.hero" props={{ settings }}>
-          <section className="rounded-[28px] border border-border bg-card px-5 py-6 shadow-xs sm:px-7 sm:py-8">
+          <section className="rounded-xl border border-border bg-card px-5 py-6 shadow-xs sm:px-7 sm:py-8">
             <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
               <div className="max-w-3xl">
                 <div className="inline-flex items-center rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
@@ -185,7 +185,7 @@ export default async function TermsPage() {
             })}
           </section>
 
-          <section className="rounded-[24px] border border-border bg-card p-4 shadow-xs">
+          <section className="rounded-xl border border-border bg-card p-4 shadow-xs">
             <div className="flex flex-wrap gap-2.5">
               {sections.map((section) => (
                 <a key={section.id} href={`#${section.id}`} className="inline-flex items-center gap-2 rounded-full border border-transparent bg-transparent px-3.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-border/70 hover:bg-accent hover:text-foreground">
@@ -248,7 +248,7 @@ export default async function TermsPage() {
                 <p className="mt-3 text-sm leading-7 text-muted-foreground">
                   若你继续注册、登录、浏览、发帖、评论、上传资料、参与互动或使用站内成长体系，即表示你接受当前公开展示的协议条款及其后续更新版本。
                 </p>
-                <div className="mt-4 rounded-[22px] border border-dashed border-border bg-background px-4 py-4 text-sm leading-7 text-muted-foreground">
+                <div className="mt-4 rounded-xl border border-dashed border-border bg-background px-4 py-4 text-sm leading-7 text-muted-foreground">
                   如果你不同意本协议的任何部分，请停止继续使用相关服务与功能。
                 </div>
               </CardContent>

@@ -27,7 +27,7 @@ interface RestrictedPostBlockProps {
 function UnlockedContentFrame({ title, content, html, summary }: { title: string; content: string; html?: string; summary?: string; markdownEmojiMap?: MarkdownEmojiItem[] }) {
 
   return (
-    <div className="rounded-[20px] border border-border bg-secondary/35 p-5">
+    <div className="rounded-xl border border-border bg-secondary/35 p-5">
       <div className="mb-3 space-y-1">
         <div className="text-sm font-medium text-foreground">{title}</div>
         {summary ? <div className="text-xs text-muted-foreground">{summary}</div> : null}
@@ -64,7 +64,7 @@ export function RestrictedPostBlock({ type, postId, blockId, text, html, visible
 
   if (type === "AUTHOR_ONLY") {
     return (
-      <div className="rounded-[20px] border border-dashed border-amber-300 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+      <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50 px-5 py-4 text-sm text-amber-800">
         这部分内容仅发帖人和管理员可见。
       </div>
     )
@@ -72,7 +72,7 @@ export function RestrictedPostBlock({ type, postId, blockId, text, html, visible
 
   if (type === "REPLY_UNLOCK") {
     return (
-      <div className="space-y-4 rounded-[20px] border border-dashed border-sky-300 bg-sky-50 px-5 py-4 text-sm text-sky-900">
+      <div className="space-y-4 rounded-xl border border-dashed border-sky-300 bg-sky-50 px-5 py-4 text-sm text-sky-900">
         <div className="space-y-1">
           <p className="font-medium">回复后可见内容</p>
           <p>{isOwnerOrAdmin ? "你是楼主或管理员，可直接查看该内容。" : `当前需要在本帖回复满 ${replyThreshold ?? 1} 次后解锁，你已回复 ${userReplyCount} 次。`}</p>
@@ -89,7 +89,7 @@ export function RestrictedPostBlock({ type, postId, blockId, text, html, visible
 
   if (type === "LOGIN_UNLOCK") {
     return (
-      <div className="space-y-4 rounded-[20px] border border-dashed border-violet-300 bg-violet-50 px-5 py-4 text-sm text-violet-900">
+      <div className="space-y-4 rounded-xl border border-dashed border-violet-300 bg-violet-50 px-5 py-4 text-sm text-violet-900">
         <div className="space-y-1">
           <p className="font-medium">登录后可见内容</p>
           <p>{isOwnerOrAdmin ? "你是楼主或管理员，可直接查看该内容。" : "这部分内容仅登录用户可查看。"}</p>
@@ -100,7 +100,7 @@ export function RestrictedPostBlock({ type, postId, blockId, text, html, visible
   }
 
   return (
-    <div className="space-y-4 rounded-[20px] border border-dashed border-emerald-300 bg-emerald-50 px-5 py-4 text-sm text-emerald-900">
+    <div className="space-y-4 rounded-xl border border-dashed border-emerald-300 bg-emerald-50 px-5 py-4 text-sm text-emerald-900">
       <div className="space-y-1">
         <p className="font-medium">购买后可见内容</p>
         <p>这部分内容需要单独购买后查看。</p>

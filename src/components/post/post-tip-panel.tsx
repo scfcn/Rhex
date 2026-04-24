@@ -503,7 +503,7 @@ export function PostTipPanel({
           side="bottom"
           align="end"
           sideOffset={8}
-          className="w-fit max-w-[calc(100vw-1rem)] gap-0 overflow-x-hidden overflow-y-auto rounded-[22px] border border-border bg-background p-2.5 shadow-2xl ring-0 sm:max-w-[calc(100vw-2rem)]"
+          className="w-fit max-w-[calc(100vw-1rem)] gap-0 overflow-x-hidden overflow-y-auto rounded-xl border border-border bg-background p-2.5 shadow-2xl ring-0 sm:max-w-[calc(100vw-2rem)]"
           style={{ maxHeight: "min(85vh, calc(100dvh - 1.5rem))" }}
         >
           <div className="flex flex-wrap items-start gap-1.5 sm:flex-nowrap">

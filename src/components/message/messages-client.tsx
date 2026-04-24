@@ -714,7 +714,7 @@ export function MessagesClient({
   ) : !data ? null : (
     <>
       {headerContent}
-      {pageError ? <p className="mb-4 rounded-[20px] border border-rose-200/70 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-200">{pageError}</p> : null}
+      {pageError ? <p className="mb-4 rounded-xl border border-rose-200/70 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-200">{pageError}</p> : null}
       <div className="grid items-start gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
         <div className="space-y-4">
           {sidebarContent}

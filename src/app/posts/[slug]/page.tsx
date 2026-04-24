@@ -12,7 +12,7 @@ import { ForumPageShell } from "@/components/forum/forum-page-shell"
 import { MarkdownContent } from "@/components/markdown-content"
 import { PostAppendixTimeline } from "@/components/post/post-appendix-timeline"
 import { PostAttachmentList } from "@/components/post/post-attachment-list"
-import { PostAuctionPanel, PostAuctionWinnerContent } from "@/components/post/post-auction-panel"
+import { PostAuctionPanel } from "@/components/post/post-auction-panel"
 import { PostBodyCopyMenu } from "@/components/post/post-body-copy-menu"
 import { PostDetailHeader } from "@/components/post/post-detail-header"
 
@@ -449,7 +449,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
           main={(
             <article className="mt-6 mb-4 space-y-6">
             {displayPost.status === "PENDING" ? (
-              <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
                 当前帖子处于<strong>待审核</strong>状态，仅作者和管理员可查看。{displayPost.reviewNote ? `审核备注：${displayPost.reviewNote}` : "管理员审核通过后才会对其他用户可见。"}
               </div>
             ) : null}
@@ -457,7 +457,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
             {shouldRenderOfflineNotice ? (
               <Card>
                 <CardContent className="p-8">
-                  <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-5 py-6 text-center text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-6 text-center text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200">
                     当前帖子已被<strong>下线</strong>。
                   </div>
                 </CardContent>
@@ -509,10 +509,6 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                             acceptedAnswerAuthor={displayPost.bounty.acceptedAnswerAuthor}
                           />
                         ) : null}
-                        {displayPost.lottery ? <LotteryPanel postId={displayPost.id} lottery={displayPost.lottery} isOwnerOrAdmin={isOwnerOrManager} /> : null}
-                        {displayPost.auction ? <PostAuctionPanel postId={displayPost.id} auction={displayPost.auction} pointName={settings.pointName} currentUserId={currentUser?.id} /> : null}
-
-
                       </div>
 
                         <div className="mt-8 space-y-5 text-[15px] leading-8 text-foreground/90 dark:text-foreground/85">
@@ -545,8 +541,13 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
 
                        {displayPost.poll ? <PollPanel postId={displayPost.id} totalVotes={displayPost.poll.totalVotes} hasVoted={displayPost.poll.hasVoted} expiresAt={displayPost.poll.expiresAt} options={displayPost.poll.options} /> : null}
                         {displayAttachments.length > 0 ? <PostAttachmentList attachments={displayAttachments} pointName={settings.pointName} /> : null}
-                        {displayPost.auction ? <PostAuctionWinnerContent auction={displayPost.auction} pointName={settings.pointName} /> : null}
                         <AddonSlotRenderer slot="post.body.after" />
+                        {displayPost.lottery || displayPost.auction ? (
+                          <div className="space-y-4">
+                            {displayPost.lottery ? <LotteryPanel postId={displayPost.id} lottery={displayPost.lottery} isOwnerOrAdmin={isOwnerOrManager} /> : null}
+                            {displayPost.auction ? <PostAuctionPanel postId={displayPost.id} auction={displayPost.auction} pointName={settings.pointName} currentUserId={currentUser?.id} /> : null}
+                          </div>
+                        ) : null}
 
                         </div>
 

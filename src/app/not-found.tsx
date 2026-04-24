@@ -38,19 +38,19 @@ export default async function GlobalNotFoundPage() {
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-border bg-background/80 p-5 shadow-xs">
+            <div className="rounded-xl border border-border bg-background/80 p-5 shadow-xs">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent text-foreground">
                 <Compass className="h-7 w-7" />
               </div>
               <h2 className="mt-5 text-lg font-semibold">你可以试试这些方向</h2>
               <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-                <div className="rounded-[20px] border border-border px-4 py-3">
+                <div className="rounded-xl border border-border px-4 py-3">
                   检查地址是否输入正确，尤其是路径、大小写和参数部分。
                 </div>
-                <div className="rounded-[20px] border border-border px-4 py-3">
+                <div className="rounded-xl border border-border px-4 py-3">
                   从首页、搜索页或帮助中心重新进入，通常能更快找到目标内容。
                 </div>
-                <div className="rounded-[20px] border border-border px-4 py-3">
+                <div className="rounded-xl border border-border px-4 py-3">
                   如果这是站内旧链接，也可能是内容已下线或页面入口已调整。
                 </div>
               </div>

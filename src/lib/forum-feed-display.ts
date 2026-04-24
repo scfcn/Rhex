@@ -33,6 +33,7 @@ export interface FeedDisplayItem {
   metaSecondary?: string | null
   latestReplyAuthorName?: string | null
   latestReplyAuthorUsername?: string | null
+  latestReplyCommentId?: string | null
   commentCount: number
   commentAccentColor: string
   coverImage?: string | null
@@ -98,6 +99,7 @@ export function mapForumFeedItemsToDisplayItems(
         : null,
       latestReplyAuthorName: item.latestReplyAuthorName ?? null,
       latestReplyAuthorUsername: item.latestReplyAuthorUsername ?? null,
+      latestReplyCommentId: item.latestReplyCommentId ?? null,
       commentCount: item.commentCount,
       commentAccentColor: commentHeat.color,
       coverImage: item.coverImage,

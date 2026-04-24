@@ -33,7 +33,7 @@ export function SettingsSidebarNav({
   const currentTab = searchParams.get("tab") ?? items[0]?.key ?? "profile"
 
   return (
-    <nav className={cn("rounded-[24px] border border-border bg-card p-2.5 shadow-soft", className)}>
+    <nav className={cn("rounded-xl border border-border bg-card p-2.5 shadow-soft", className)}>
       <div className="mb-2 px-2.5 pt-1.5">
         <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">{title}</p>
       </div>
@@ -51,7 +51,7 @@ export function SettingsSidebarNav({
                 router.push(buildHref ? buildHref(item) : `/settings?tab=${item.key}`)
               }}
               className={cn(
-                "flex w-full items-center justify-between gap-3 rounded-[22px] px-4 py-3 text-left transition-colors",
+                "flex w-full items-center justify-between gap-3 rounded-xl px-4 py-3 text-left transition-colors",
                 active
                   ? "bg-foreground text-background shadow-xs"
                   : "text-foreground hover:bg-accent/60",

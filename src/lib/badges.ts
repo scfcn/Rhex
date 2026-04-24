@@ -57,6 +57,16 @@ export interface BadgeEffectRuleItem {
   updatedAt: string
 }
 
+export interface DisplayedUserBadgeItem {
+  id: string
+  code: string
+  name: string
+  description?: string | null
+  color: string
+  iconText?: string | null
+  displayOrder: number
+}
+
 export interface BadgeEligibilitySnapshot {
   userId: number
   points: number
@@ -440,6 +450,31 @@ export async function getGrantedBadgesForUser(userId: number): Promise<BadgeItem
       })),
       effects: effectMap.get(badge.id) ?? [],
       grantedUserCount: badge._count.users,
+    }))
+}
+
+export async function getDisplayedBadgesForUser(userId: number): Promise<DisplayedUserBadgeItem[]> {
+  const records = await findGrantedBadgesForUserRecord(userId)
+
+  return records
+    .filter((record) => record.isDisplayed && record.badge.status)
+    .sort((left, right) => {
+      const orderDifference = left.displayOrder - right.displayOrder
+
+      if (orderDifference !== 0) {
+        return orderDifference
+      }
+
+      return right.grantedAt.getTime() - left.grantedAt.getTime()
+    })
+    .map((record) => ({
+      id: record.badge.id,
+      code: record.badge.code,
+      name: record.badge.name,
+      description: record.badge.description,
+      color: record.badge.color,
+      iconText: record.badge.iconText,
+      displayOrder: record.displayOrder,
     }))
 }
 

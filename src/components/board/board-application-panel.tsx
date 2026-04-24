@@ -164,7 +164,7 @@ export function BoardApplicationPanel({ pointName, currentUser, zones, items, pe
 
   return (
     <>
-      <section className="rounded-[28px] border border-border bg-card p-5 sm:p-6">
+      <section className="rounded-xl border border-border bg-card p-5 sm:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-3xl">
             <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
@@ -221,7 +221,7 @@ export function BoardApplicationPanel({ pointName, currentUser, zones, items, pe
           />
         </div>
 
-        <div className="mt-6 rounded-[24px] border border-border bg-background/70 p-4 sm:p-5">
+        <div className="mt-6 rounded-xl border border-border bg-background/70 p-4 sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h3 className="text-base font-semibold">我的申请记录</h3>
@@ -231,7 +231,7 @@ export function BoardApplicationPanel({ pointName, currentUser, zones, items, pe
 
           <div className="mt-4 space-y-3">
             {items.map((item) => (
-              <article key={item.id} className="rounded-[22px] border border-border bg-card px-4 py-4">
+              <article key={item.id} className="rounded-xl border border-border bg-card px-4 py-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -273,7 +273,7 @@ export function BoardApplicationPanel({ pointName, currentUser, zones, items, pe
               </article>
             ))}
             {items.length === 0 ? (
-              <div className="rounded-[22px] border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
+              <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
                 你还没有提交过节点申请。
               </div>
             ) : null}
@@ -324,11 +324,11 @@ export function BoardApplicationPanel({ pointName, currentUser, zones, items, pe
         </Field>
 
         <Field label="节点描述" hint="简要说明这个节点讨论什么，方便管理员判断定位。">
-          <textarea value={form.description} onChange={(event) => updateField("description", event.target.value)} className="min-h-[110px] w-full rounded-[20px] border border-border bg-background px-4 py-3 text-sm outline-hidden" placeholder="补充节点定位、适合发布的内容类型和预期用途" maxLength={3000} />
+          <textarea value={form.description} onChange={(event) => updateField("description", event.target.value)} className="min-h-[110px] w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-hidden" placeholder="补充节点定位、适合发布的内容类型和预期用途" maxLength={3000} />
         </Field>
 
         <Field label="申请理由" hint="说明为什么要建这个节点，以及你准备如何维护它。">
-          <textarea value={form.reason} onChange={(event) => updateField("reason", event.target.value)} className="min-h-[120px] w-full rounded-[20px] border border-border bg-background px-4 py-3 text-sm outline-hidden" placeholder="例如已有稳定内容来源，愿意负责节点规则维护和日常整理" maxLength={2000} />
+          <textarea value={form.reason} onChange={(event) => updateField("reason", event.target.value)} className="min-h-[120px] w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-hidden" placeholder="例如已有稳定内容来源，愿意负责节点规则维护和日常整理" maxLength={2000} />
         </Field>
       </FormModal>
     </>
@@ -347,7 +347,7 @@ function Field({ label, hint, children }: { label: string; hint: string; childre
 
 function InfoCard({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
   return (
-    <div className="rounded-[22px] border border-border bg-background/70 p-4">
+    <div className="rounded-xl border border-border bg-background/70 p-4">
       <div className="flex items-center gap-2 text-sm font-semibold">
         {icon}
         {title}

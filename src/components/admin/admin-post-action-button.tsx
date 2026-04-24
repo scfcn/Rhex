@@ -130,7 +130,7 @@ export function AdminPostActionButton({
             value={message}
             onChange={(event) => setMessage(event.target.value)}
             placeholder={placeholder}
-            className="min-h-[120px] rounded-[24px] bg-background px-4 py-3"
+            className="min-h-[120px] rounded-xl bg-background px-4 py-3"
           />
         ) : null}
       </Modal>

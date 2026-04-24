@@ -149,19 +149,19 @@ export function VerificationCenter({ types, approvedVerification }: Verification
             <p className="mt-2 text-sm leading-7 text-muted-foreground">在这里提交个人认证、商家认证或其它认证资料，后台审核通过后会在你的帖子和评论作者名前显示认证图标。</p>
           </div>
           {approvedVerification ? (
-            <div className="rounded-[24px] border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
               当前已通过：<span className="font-medium">{approvedVerification.name}</span>
               {approvedVerification.customDescription ? <span className="ml-1 text-emerald-600/90 dark:text-emerald-200/90">· {approvedVerification.customDescription}</span> : null}
             </div>
           ) : (
-            <div className="rounded-[24px] border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">当前尚未通过任何认证</div>
+            <div className="rounded-xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">当前尚未通过任何认证</div>
           )}
         </div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
         <section className="space-y-4">
-          <div className="rounded-[24px] border border-border bg-card p-4">
+          <div className="rounded-xl border border-border bg-card p-4">
             <div className="flex items-center justify-between">
               <h4 className="text-base font-semibold">可申请认证</h4>
               <span className="text-sm text-muted-foreground">共 {types.length} 项</span>
@@ -187,7 +187,7 @@ export function VerificationCenter({ types, approvedVerification }: Verification
                       setFormValues({})
                       setFeedback("")
                     }}
-                    className={isApprovedItem ? "w-full rounded-[22px] border border-emerald-300 bg-emerald-50/70 p-4 text-left dark:border-emerald-500/30 dark:bg-emerald-500/10" : isActiveItem ? "w-full rounded-[22px] border border-foreground bg-accent/60 p-4 text-left" : isDisabledItem ? "w-full rounded-[22px] border border-border bg-background/60 p-4 text-left opacity-55" : "w-full rounded-[22px] border border-border bg-background p-4 text-left hover:bg-accent/40"}
+                    className={isApprovedItem ? "w-full rounded-xl border border-emerald-300 bg-emerald-50/70 p-4 text-left dark:border-emerald-500/30 dark:bg-emerald-500/10" : isActiveItem ? "w-full rounded-xl border border-foreground bg-accent/60 p-4 text-left" : isDisabledItem ? "w-full rounded-xl border border-border bg-background/60 p-4 text-left opacity-55" : "w-full rounded-xl border border-border bg-background p-4 text-left hover:bg-accent/40"}
                   >
                     <div className="flex items-start gap-3">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-xl" style={{ backgroundColor: `${item.color}18`, color: item.color }}>
@@ -212,11 +212,11 @@ export function VerificationCenter({ types, approvedVerification }: Verification
 
         <section className="space-y-6">
           {!selectedType ? (
-            <div className="rounded-[28px] border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">当前没有可申请的认证类型，请等待管理员配置。</div>
+            <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">当前没有可申请的认证类型，请等待管理员配置。</div>
           ) : (
-            <div className="rounded-[28px] border border-border bg-card p-5 shadow-soft">
+            <div className="rounded-xl border border-border bg-card p-5 shadow-soft">
               <div className="flex flex-wrap items-center gap-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-[22px] text-2xl" style={{ backgroundColor: `${selectedType.color}18`, color: selectedType.color }}>
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl text-2xl" style={{ backgroundColor: `${selectedType.color}18`, color: selectedType.color }}>
                   <LevelIcon icon={selectedType.iconText} color={selectedType.color} className="h-7 w-7 text-[28px]" emojiClassName="text-inherit" svgClassName="[&>svg]:block" />
                 </div>
                 <div>
@@ -226,7 +226,7 @@ export function VerificationCenter({ types, approvedVerification }: Verification
               </div>
 
               {currentApplication ? (
-                <div className="mt-5 rounded-[22px] border border-border bg-secondary/20 p-4 text-sm">
+                <div className="mt-5 rounded-xl border border-border bg-secondary/20 p-4 text-sm">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="font-medium">当前申请状态：{renderStatusLabel(currentApplication.status)}</div>
                     <div className="text-xs text-muted-foreground">提交于 {formatDateTime(currentApplication.submittedAt)}</div>
@@ -254,7 +254,7 @@ export function VerificationCenter({ types, approvedVerification }: Verification
 
               {currentApplication?.status === "APPROVED" ? (
                 <div className="mt-5 space-y-3">
-                  <div className="rounded-[22px] border border-emerald-200 bg-emerald-50/70 px-4 py-4 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-4 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
                     你已通过当前认证，申请表单已隐藏。若你希望改绑为其它认证，可先手动解除当前认证绑定。
                   </div>
                   <div className="flex justify-end">
@@ -277,7 +277,7 @@ export function VerificationCenter({ types, approvedVerification }: Verification
                               onChange={(event) => updateFieldValue(field.id, event.target.value)}
                               rows={5}
                               placeholder={field.placeholder}
-                              className="min-h-[120px] w-full rounded-[22px] border border-border bg-background px-4 py-3 text-sm leading-7 outline-hidden transition-colors focus:border-foreground/30"
+                              className="min-h-[120px] w-full rounded-xl border border-border bg-background px-4 py-3 text-sm leading-7 outline-hidden transition-colors focus:border-foreground/30"
                             />
                           ) : (
                             <input
@@ -300,7 +300,7 @@ export function VerificationCenter({ types, approvedVerification }: Verification
                         onChange={(event) => setContent(event.target.value)}
                         rows={8}
                         placeholder={`请填写 ${selectedType.name} 的身份说明、资质链接、联系方式等审核材料`}
-                        className="min-h-[180px] w-full rounded-[22px] border border-border bg-background px-4 py-3 text-sm leading-7 outline-hidden transition-colors focus:border-foreground/30"
+                        className="min-h-[180px] w-full rounded-xl border border-border bg-background px-4 py-3 text-sm leading-7 outline-hidden transition-colors focus:border-foreground/30"
                       />
                     </label>
                   )}

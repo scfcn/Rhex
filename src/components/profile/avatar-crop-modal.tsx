@@ -170,7 +170,7 @@ export function AvatarCropModal({
     >
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_320px]">
         <div className="space-y-3">
-          <div className="relative h-[360px] overflow-hidden rounded-[24px] border border-border bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.16),transparent_42%),linear-gradient(135deg,rgba(15,23,42,0.03),rgba(15,23,42,0.08))]">
+          <div className="relative h-[360px] overflow-hidden rounded-xl border border-border bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.16),transparent_42%),linear-gradient(135deg,rgba(15,23,42,0.03),rgba(15,23,42,0.08))]">
             <Cropper
               image={imageSrc}
               crop={crop}
@@ -193,7 +193,7 @@ export function AvatarCropModal({
               objectFit="contain"
             />
           </div>
-          <div className="rounded-[20px] border border-border bg-card/70 p-4">
+          <div className="rounded-xl border border-border bg-card/70 p-4">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm font-medium">缩放</p>
@@ -215,7 +215,7 @@ export function AvatarCropModal({
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-[24px] border border-border bg-card p-4">
+          <div className="rounded-xl border border-border bg-card p-4">
             <p className="text-sm font-medium">裁剪结果预览</p>
             <p className="mt-1 text-xs text-muted-foreground">上传保存前，先看一下三种尺寸下的显示效果。</p>
             <div className="mt-4 space-y-4">
@@ -225,7 +225,7 @@ export function AvatarCropModal({
             </div>
           </div>
 
-          <div className="rounded-[20px] border border-dashed border-border bg-background/70 p-4 text-xs leading-6 text-muted-foreground">
+          <div className="rounded-xl border border-dashed border-border bg-background/70 p-4 text-xs leading-6 text-muted-foreground">
             <p>1. 头像会按你当前裁剪结果导出为正方形图片。</p>
             <p>2. 建议把主体放在圆形框中央，避免小尺寸下边缘被裁掉。</p>
             <p>3. 点击“裁剪并上传”后，仍需回到资料页点击“保存头像”才会正式写入个人资料。</p>

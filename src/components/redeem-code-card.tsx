@@ -27,7 +27,7 @@ export function RedeemCodeCard({ pointName, currentPoints, helpLinkEnabled = fal
 
 
   return (
-    <div className="rounded-[24px] border border-border bg-card p-5">
+    <div className="rounded-xl border border-border bg-card p-5">
       <div className="space-y-1">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-base font-semibold">兑换码兑换</h3>
@@ -44,7 +44,7 @@ export function RedeemCodeCard({ pointName, currentPoints, helpLinkEnabled = fal
         </div>
         <p className="text-sm text-muted-foreground">输入兑换码即可领取 {pointName}。兑换成功后请刷新当前页面查看最新余额与明细。</p>
       </div>
-      <div className="mt-4 rounded-[20px] bg-secondary/40 p-4 text-sm text-muted-foreground">
+      <div className="mt-4 rounded-xl bg-secondary/40 p-4 text-sm text-muted-foreground">
         当前账户余额：<span className="font-semibold text-foreground">{formatNumber(currentPoints)}</span> {pointName}
       </div>
       <form

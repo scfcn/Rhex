@@ -1,10 +1,33 @@
 "use client"
 
 import Image from "next/image"
+import { Coins, Gavel, Gift, Vote, type LucideIcon } from "lucide-react"
 
+import { Badge } from "@/components/ui/badge"
 import { Tooltip } from "@/components/ui/tooltip"
 import type { PostRewardPoolMode } from "@/lib/post-reward-pool-config"
 import { cn } from "@/lib/utils"
+
+type PostTypeBadgeVariant = "auction" | "lottery" | "poll" | "bounty"
+
+const postTypeBadgeMap = {
+  AUCTION: {
+    icon: Gavel,
+    variant: "auction",
+  },
+  LOTTERY: {
+    icon: Gift,
+    variant: "lottery",
+  },
+  POLL: {
+    icon: Vote,
+    variant: "poll",
+  },
+  BOUNTY: {
+    icon: Coins,
+    variant: "bounty",
+  },
+} satisfies Record<string, { icon: LucideIcon; variant: PostTypeBadgeVariant }>
 
 export function getPostPinTone(pinScope?: string | null, compact = false) {
   const badgeSizeClassName = compact
@@ -49,6 +72,57 @@ export function getPostTitleClassName(options: { isFeatured?: boolean; pinScope?
   }
 
   return `${lineClampClassName} ${sizeClassName} font-medium text-foreground transition-colors hover:text-primary`
+}
+
+export function PostTypeBadge({
+  type,
+  label,
+  compact = false,
+  className,
+}: {
+  type?: string | null
+  label?: string | null
+  compact?: boolean
+  className?: string
+}) {
+  if (!type || type === "NORMAL" || !label) {
+    return null
+  }
+
+  const config = type in postTypeBadgeMap
+    ? postTypeBadgeMap[type as keyof typeof postTypeBadgeMap]
+    : null
+
+  if (!config) {
+    return (
+      <Badge
+        variant="secondary"
+        className={cn(
+          "rounded-full text-muted-foreground",
+          compact ? "px-1.5 text-[10px] sm:px-2 sm:text-[11px]" : "px-2 sm:px-2.5",
+          className,
+        )}
+      >
+        {label}
+      </Badge>
+    )
+  }
+
+  const Icon = config.icon
+
+  return (
+    <Badge
+      variant={config.variant}
+      className={cn(
+        "rounded-full",
+        compact ? "px-1.5 text-[10px] sm:px-2 sm:text-[11px]" : "px-2 sm:px-2.5",
+        className,
+      )}
+    >
+      <Icon data-icon="inline-start" />
+      {label}
+    </Badge>
+  )
 }
 
 export function PostRewardPoolIcon({

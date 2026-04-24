@@ -36,7 +36,7 @@ export default function SocialSystemFaqPage() {
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {followTargets.map((item) => (
-            <div key={item.title} className="rounded-[20px] bg-secondary/40 p-4">
+            <div key={item.title} className="rounded-xl bg-secondary/40 p-4">
               <p className="font-semibold">{item.title}</p>
               <p className="mt-2 text-sm leading-7 text-muted-foreground">{item.description}</p>
             </div>
@@ -50,7 +50,7 @@ export default function SocialSystemFaqPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           {blockEffects.map((effect) => (
-            <div key={effect} className="rounded-[20px] border border-border px-4 py-4 text-sm leading-7 text-muted-foreground">
+            <div key={effect} className="rounded-xl border border-border px-4 py-4 text-sm leading-7 text-muted-foreground">
               {effect}
             </div>
           ))}
@@ -62,9 +62,9 @@ export default function SocialSystemFaqPage() {
           <CardTitle>一个最常见的场景</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 text-sm leading-7 text-muted-foreground md:grid-cols-3">
-          <div className="rounded-[20px] bg-secondary/40 p-4">用户 A 拉黑用户 B 后，B 不能访问 A 的主页。</div>
-          <div className="rounded-[20px] bg-secondary/40 p-4">A 和 B 的评论会在对方视角里被过滤掉，不再继续显示。</div>
-          <div className="rounded-[20px] bg-secondary/40 p-4">后续双方也不能再互相关注、发私信，或继续在对方帖子下互动。</div>
+          <div className="rounded-xl bg-secondary/40 p-4">用户 A 拉黑用户 B 后，B 不能访问 A 的主页。</div>
+          <div className="rounded-xl bg-secondary/40 p-4">A 和 B 的评论会在对方视角里被过滤掉，不再继续显示。</div>
+          <div className="rounded-xl bg-secondary/40 p-4">后续双方也不能再互相关注、发私信，或继续在对方帖子下互动。</div>
         </CardContent>
       </Card>
     </FaqPageFrame>

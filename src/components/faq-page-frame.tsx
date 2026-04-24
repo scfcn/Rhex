@@ -32,7 +32,7 @@ export function FaqPageFrame({ currentPath, children }: FaqPageFrameProps) {
           <AddonSurfaceRenderer surface="faq.tabs" props={{ currentPath }}>
             <div className="sticky top-20 z-10 pb-1">
               <div className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                <div className="inline-flex min-w-max gap-2 rounded-[24px] border border-border bg-card p-2 shadow-xs md:flex md:min-w-0 md:flex-wrap">
+                <div className="inline-flex min-w-max gap-2 rounded-xl border border-border bg-card p-2 shadow-xs md:flex md:min-w-0 md:flex-wrap">
                   {FAQ_TABS.map((tab) => (
                     <Link key={tab.href} href={tab.href} className={tabClassName(currentPath === tab.href)}>
                       {tab.label}

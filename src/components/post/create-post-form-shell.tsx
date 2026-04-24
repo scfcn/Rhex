@@ -218,7 +218,7 @@ export function CreatePostFormShell({
       </div>
 
       {!canPostInBoard ? (
-        <div className="rounded-[20px] border border-border bg-card/70 px-4 py-3">
+        <div className="rounded-xl border border-border bg-card/70 px-4 py-3">
           <button
             type="button"
             className="flex w-full items-center justify-between gap-3 text-left"
@@ -255,7 +255,7 @@ export function CreatePostFormShell({
       ) : null}
 
       {!canPostInBoard ? (
-        <div className="rounded-[20px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           当前不满足该节点发帖权限，请提升{pointName}、等级、VIP 等级或开通 VIP 后再试。
         </div>
       ) : null}

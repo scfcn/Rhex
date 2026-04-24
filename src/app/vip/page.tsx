@@ -110,7 +110,7 @@ export default async function VipPage() {
               <p className="mt-5 max-w-2xl text-sm leading-7 text-white/80">VIP 体系用于控制部分节点、帖子和回复权限，同时也在前台通过紫色昵称与徽章进行身份展示。使用{settings.pointName}购买 / 续费 VIP。</p>
 
               {user ? (
-                <div className="mt-6 rounded-[24px] bg-white/10 p-5">
+                <div className="mt-6 rounded-xl bg-white/10 p-5">
                   <div className="flex items-center gap-3">
                     <span className="text-sm text-white/70">你的当前状态</span>
                     {vipActive ? <VipBadge level={currentLevel} /> : null}
@@ -140,15 +140,15 @@ export default async function VipPage() {
               <CardTitle>当前权益</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-sm leading-7 text-muted-foreground">
-              <div className="flex gap-3 rounded-[24px] border border-border px-4 py-4 dark:bg-secondary/20">
+              <div className="flex gap-3 rounded-xl border border-border px-4 py-4 dark:bg-secondary/20">
                 <ShieldCheck className="mt-1 h-5 w-5 text-emerald-600 dark:text-emerald-300" />
                 <p>访问 VIP 专属节点、帖子与回复区域，获得更完整的社区内容访问权限。</p>
               </div>
-              <div className="flex gap-3 rounded-[24px] border border-border px-4 py-4 dark:bg-secondary/20">
+              <div className="flex gap-3 rounded-xl border border-border px-4 py-4 dark:bg-secondary/20">
                 <ShieldCheck className="mt-1 h-5 w-5 text-violet-600 dark:text-violet-300" />
                 <p>前台昵称高亮显示，并展示对应 VIP 徽章，方便在讨论区快速识别身份。</p>
               </div>
-              <div className="flex gap-3 rounded-[24px] border border-border px-4 py-4 dark:bg-secondary/20">
+              <div className="flex gap-3 rounded-xl border border-border px-4 py-4 dark:bg-secondary/20">
                 <ShieldCheck className="mt-1 h-5 w-5 text-fuchsia-600 dark:text-fuchsia-300" />
                 <p>可按月卡、季卡、年卡套餐持续续费，维持当前 VIP 身份与对应权限。</p>
               </div>

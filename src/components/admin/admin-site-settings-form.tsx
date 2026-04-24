@@ -93,7 +93,7 @@ export function AdminSiteSettingsForm({ initialSettings }: AdminSiteSettingsForm
       <TextField label="站点 Slogan" value={siteSlogan} onChange={(value) => updateDraftField("siteSlogan", value)} placeholder="如 Waste your time on things you love" />
       <div className="space-y-2">
         <p className="text-sm font-medium">站点描述</p>
-        <textarea value={siteDescription} onChange={(event) => updateDraftField("siteDescription", event.target.value)} className="min-h-[140px] w-full rounded-[24px] border border-border bg-background px-4 py-3 text-sm outline-hidden" />
+        <textarea value={siteDescription} onChange={(event) => updateDraftField("siteDescription", event.target.value)} className="min-h-[140px] w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-hidden" />
       </div>
       <SiteLogoUploadCard
         value={siteLogoPath}
@@ -102,7 +102,7 @@ export function AdminSiteSettingsForm({ initialSettings }: AdminSiteSettingsForm
         onUpload={uploadSiteLogo}
         onClear={() => updateDraftField("siteLogoPath", "")}
       />
-      <div className="rounded-[24px] border border-border p-5 space-y-5">
+      <div className="rounded-xl border border-border p-5 space-y-5">
         <div>
           <h3 className="text-sm font-semibold">VIP 套餐价格</h3>
           <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -124,7 +124,7 @@ export function AdminSiteSettingsForm({ initialSettings }: AdminSiteSettingsForm
       </div>
 
 
-      <div className="rounded-[24px] border border-border p-5 space-y-4">
+      <div className="rounded-xl border border-border p-5 space-y-4">
         <h3 className="text-sm font-semibold">上传存储设置</h3>
         <div className="space-y-2">
           <p className="text-sm font-medium">存储策略</p>

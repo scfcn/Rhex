@@ -87,7 +87,7 @@ export function SelfServeAdsPurchasePage({ slotType, slotIndex, pointName, price
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[28px] border border-border bg-card p-6 shadow-xs shadow-black/5 dark:shadow-black/30">
+      <section className="rounded-xl border border-border bg-card p-6 shadow-xs shadow-black/5 dark:shadow-black/30">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold">购买{slotType === "IMAGE" ? "图片" : "文字"}广告位</h1>
@@ -98,12 +98,12 @@ export function SelfServeAdsPurchasePage({ slotType, slotIndex, pointName, price
       </section>
 
       {successMessage ? (
-        <section className="rounded-[20px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+        <section className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
           {successMessage}
         </section>
       ) : null}
 
-      <section className="space-y-4 rounded-[24px] border border-border bg-card p-5">
+      <section className="space-y-4 rounded-xl border border-border bg-card p-5">
         <Field label="广告链接" hint="必须以 http:// 或 https:// 开头，最多 500 个字符。" error={submitAttempted ? validation.errors.linkUrl : undefined} meta={`${linkLength}/500`}>
           <input value={form.linkUrl} maxLength={500} onChange={(event) => updateForm("linkUrl", event.target.value)} className={getInputClassName(Boolean(submitAttempted && validation.errors.linkUrl))} placeholder="https://example.com" aria-invalid={Boolean(submitAttempted && validation.errors.linkUrl)} />
         </Field>

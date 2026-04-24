@@ -10,7 +10,7 @@ export async function generateMetadata() {
 
 function Metric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-[20px] border border-border bg-card px-4 py-4">
+    <div className="rounded-xl border border-border bg-card px-4 py-4">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-2 text-xl font-semibold">{value}</p>
     </div>
@@ -41,7 +41,7 @@ export default async function PostHeatFaqPage() {
           <CardTitle>算法公式</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-[20px] bg-secondary/40 px-4 py-4 text-sm leading-7">
+          <div className="rounded-xl bg-secondary/40 px-4 py-4 text-sm leading-7">
             热度分数 = 浏览数 × 浏览权重 + 回复数 × 回复权重 + 点赞数 × 点赞权重 + 打赏次数 × 打赏次数权重 + 打赏积分 × 打赏积分权重
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -77,12 +77,12 @@ export default async function PostHeatFaqPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[220px_minmax(0,1fr)]">
-            <div className="rounded-[20px] border border-border bg-card px-4 py-4">
+            <div className="rounded-xl border border-border bg-card px-4 py-4">
               <p className="text-xs text-muted-foreground">示例热度分数</p>
               <p className="mt-2 text-3xl font-semibold">{score}</p>
               <p className="mt-2 text-xs text-muted-foreground">落在第 {preview.stageIndex + 1} 档</p>
             </div>
-            <div className="rounded-[20px] border border-border bg-card px-4 py-4">
+            <div className="rounded-xl border border-border bg-card px-4 py-4">
               <p className="text-xs text-muted-foreground">回复数按钮效果</p>
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <span className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium" style={{ backgroundColor: `${preview.color}14`, color: preview.color }}>
@@ -92,7 +92,7 @@ export default async function PostHeatFaqPage() {
               </div>
             </div>
           </div>
-          <div className="rounded-[20px] bg-secondary/40 px-4 py-4 text-sm leading-7 text-muted-foreground">
+          <div className="rounded-xl bg-secondary/40 px-4 py-4 text-sm leading-7 text-muted-foreground">
             示例输入：浏览 {sampleInput.views}、回复 {sampleInput.comments}、点赞 {sampleInput.likes}、打赏次数 {sampleInput.tipCount}、打赏积分 {sampleInput.tipPoints}
           </div>
         </CardContent>

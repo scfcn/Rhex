@@ -19,9 +19,11 @@ interface UserDisplayedBadgesProps {
   compact?: boolean
   appearance?: "outlined" | "plain"
   spacing?: "default" | "tight"
+  itemClassName?: string
+  iconClassName?: string
 }
 
-export function UserDisplayedBadges({ badges = [], compact = false, appearance = "outlined", spacing = "default" }: UserDisplayedBadgesProps) {
+export function UserDisplayedBadges({ badges = [], compact = false, appearance = "outlined", spacing = "default", itemClassName, iconClassName }: UserDisplayedBadgesProps) {
   if (badges.length === 0) {
     return null
   }
@@ -37,6 +39,7 @@ export function UserDisplayedBadges({ badges = [], compact = false, appearance =
                 "inline-flex items-center justify-center text-center",
                 appearance === "outlined" ? "rounded-full border" : "rounded-none border-none bg-transparent",
                 compact ? "h-5 text-[10px]" : "h-6 text-xs",
+                itemClassName,
               )}
               aria-label={badge.name}
               style={appearance === "outlined"
@@ -49,7 +52,7 @@ export function UserDisplayedBadges({ badges = [], compact = false, appearance =
                     color: badge.color,
                   }}
             >
-              <LevelIcon icon={badge.iconText} color={badge.color} className={compact ? "h-3 w-3 text-[12px]" : "h-3.5 w-3.5 text-[14px]"} emojiClassName="text-inherit" svgClassName="[&>svg]:block" />
+              <LevelIcon icon={badge.iconText} color={badge.color} className={cn(compact ? "h-3 min-w-3 text-[12px]" : "h-3.5 min-w-3.5 text-[14px]", iconClassName)} emojiClassName="text-inherit" svgClassName="[&>svg]:block" />
             </Link>
           ) : (
             <span
@@ -57,6 +60,7 @@ export function UserDisplayedBadges({ badges = [], compact = false, appearance =
                 "inline-flex items-center justify-center text-center",
                 appearance === "outlined" ? "rounded-full border" : "rounded-none border-none bg-transparent",
                 compact ? "h-5 text-[10px]" : "h-6 text-xs",
+                itemClassName,
               )}
               aria-label={badge.name}
               style={appearance === "outlined"
@@ -69,7 +73,7 @@ export function UserDisplayedBadges({ badges = [], compact = false, appearance =
                     color: badge.color,
                   }}
             >
-              <LevelIcon icon={badge.iconText} color={badge.color} className={compact ? "h-3 w-3 text-[12px]" : "h-3.5 w-3.5 text-[14px]"} emojiClassName="text-inherit" svgClassName="[&>svg]:block" />
+              <LevelIcon icon={badge.iconText} color={badge.color} className={cn(compact ? "h-3 min-w-3 text-[12px]" : "h-3.5 min-w-3.5 text-[14px]", iconClassName)} emojiClassName="text-inherit" svgClassName="[&>svg]:block" />
             </span>
           )}
         </Tooltip>

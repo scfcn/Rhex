@@ -91,9 +91,9 @@ export default async function LevelSystemFaqPage() {
           <CardTitle>等级的实际用途</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 text-sm leading-7 text-muted-foreground md:grid-cols-3">
-          <div className="rounded-[20px] bg-secondary/40 p-4">节点、分区和帖子可以单独配置最低等级门槛，未达到时将无法浏览或发帖。</div>
-          <div className="rounded-[20px] bg-secondary/40 p-4">勋章系统可以直接把“等级”作为领取规则之一，成长和身份会互相联动。</div>
-          <div className="rounded-[20px] bg-secondary/40 p-4">等级在用户资料、评论区和系统展示中都会出现，是社区长期活跃度的核心标识。</div>
+          <div className="rounded-xl bg-secondary/40 p-4">节点、分区和帖子可以单独配置最低等级门槛，未达到时将无法浏览或发帖。</div>
+          <div className="rounded-xl bg-secondary/40 p-4">勋章系统可以直接把“等级”作为领取规则之一，成长和身份会互相联动。</div>
+          <div className="rounded-xl bg-secondary/40 p-4">等级在用户资料、评论区和系统展示中都会出现，是社区长期活跃度的核心标识。</div>
         </CardContent>
       </Card>
     </FaqPageFrame>

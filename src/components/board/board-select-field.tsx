@@ -141,7 +141,7 @@ export function BoardSelectField({
                         type="button"
                         onClick={() => handleSelect(item.value)}
                         className={cn(
-                          "flex w-full items-center justify-between gap-3 rounded-[20px] border px-4 py-3 text-left transition-colors",
+                          "flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors",
                           active ? "border-foreground/20 bg-accent" : "border-border bg-card hover:bg-accent/50",
                         )}
                       >
@@ -163,7 +163,7 @@ export function BoardSelectField({
                 </div>
               </section>
             )) : (
-              <div className="rounded-[24px] border border-dashed border-border bg-card/50 px-4 py-8 text-center text-sm text-muted-foreground">
+              <div className="rounded-xl border border-dashed border-border bg-card/50 px-4 py-8 text-center text-sm text-muted-foreground">
                 没有找到匹配的节点，请换个关键词试试。
               </div>
             )}

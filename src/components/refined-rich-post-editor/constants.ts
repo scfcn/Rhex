@@ -32,6 +32,7 @@ export const TOOLBAR_TIPS = {
     description: "支持行内代码和代码块。",
   },
   quote: { label: "引用", shortcuts: { windows: ["Ctrl+Shift+Q"], mac: ["Cmd+Shift+Q"], default: ["Ctrl+Shift+Q"] } },
+  spoiler: { label: "剧透", description: "插入可折叠剧透或点击后显示的遮罩内容。" },
   list: {
     label: "列表格式",
     shortcuts: {

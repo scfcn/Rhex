@@ -34,6 +34,7 @@ export interface ForumFeedItem {
   lastRepliedAtRaw: string
   latestReplyAuthorName: string | null
   latestReplyAuthorUsername: string | null
+  latestReplyCommentId: string | null
   latestReplyExcerpt: string | null
   commentCount: number
   viewCount: number
@@ -99,7 +100,7 @@ type FeedPost = {
     vipLevel: number | null
     vipExpiresAt: Date | string | null
   }
-  comments?: Array<{ content: string; userId?: number; useAnonymousIdentity?: boolean; user: { username: string; nickname: string | null } }>
+  comments?: Array<{ id: string; content: string; userId?: number; useAnonymousIdentity?: boolean; user: { username: string; nickname: string | null } }>
   redPacket: { id: string } | null
   _count?: {
     attachments?: number
@@ -125,6 +126,7 @@ function mapFeedPost(post: FeedPostRecord | PinnedFeedPostRecord, anonymousMaskI
     ? (anonymousMaskIdentity?.name ?? anonymousMaskIdentity?.username ?? "匿名用户")
     : (latestReply ? latestReply.user.nickname ?? latestReply.user.username : null)
   const latestReplyAuthorUsername = latestReplyUsesAnonymousIdentity ? null : (latestReply?.user.username ?? null)
+  const latestReplyCommentId = latestReply?.id ?? null
 
   return {
     id: feedPost.id,
@@ -147,6 +149,7 @@ function mapFeedPost(post: FeedPostRecord | PinnedFeedPostRecord, anonymousMaskI
     lastRepliedAtRaw: (feedPost.lastCommentedAt ?? feedPost.publishedAt ?? feedPost.createdAt).toISOString(),
     latestReplyAuthorName,
     latestReplyAuthorUsername,
+    latestReplyCommentId,
     latestReplyExcerpt: latestReply ? latestReply.content.slice(0, 42) : null,
     commentCount: feedPost.commentCount,
     viewCount: feedPost.viewCount,

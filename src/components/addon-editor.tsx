@@ -29,6 +29,7 @@ export function AddonEditor({
   uploadFolder = "posts",
   markdownEmojiMap,
   markdownImageUploadEnabled,
+  shellClassName,
 }: AddonEditorProps) {
   const provider = usePreferredAddonEditorProvider(context)
   const resolvedMarkdownEmojiMap = useMarkdownEmojiMap(markdownEmojiMap)
@@ -45,6 +46,7 @@ export function AddonEditor({
     uploadFolder,
     markdownEmojiMap: resolvedMarkdownEmojiMap,
     markdownImageUploadEnabled: resolvedMarkdownImageUploadEnabled,
+    shellClassName,
   } satisfies RefinedRichPostEditorProps
 
   const fallback = <RefinedRichPostEditor {...resolvedEditorProps} context={context} />

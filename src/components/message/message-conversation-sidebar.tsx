@@ -44,7 +44,7 @@ export function MessageConversationSidebar({
   return (
     <div
       className={cn(
-        "flex h-full max-h-[calc(100vh-164px)] min-h-[calc(100vh-164px)] flex-col overflow-hidden rounded-[24px] border border-border bg-card shadow-soft",
+        "flex h-full max-h-[calc(100vh-164px)] min-h-[calc(100vh-164px)] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-soft",
         "max-sm:min-h-[calc(100dvh-56px)] max-sm:max-h-[calc(100dvh-56px)] max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0 max-sm:shadow-none",
         mobileHidden ? "hidden xl:flex" : "flex",
       )}
@@ -81,7 +81,7 @@ export function MessageConversationSidebar({
             <div
               key={conversation.id}
               className={cn(
-                "group flex items-center gap-3 rounded-[20px] border px-3.5 py-3 transition-colors",
+                "group flex items-center gap-3 rounded-xl border px-3.5 py-3 transition-colors",
                 active
                   ? "border-foreground/15 bg-secondary/60"
                   : hasUnread

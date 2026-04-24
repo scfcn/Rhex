@@ -15,7 +15,7 @@ export function FriendLinkSection({ links }: FriendLinkSectionProps) {
   }
 
   return (
-    <section className="mt-6 rounded-[24px] border border-border bg-card p-5 shadow-xs shadow-black/5 dark:shadow-black/30">
+    <section className="mt-6 rounded-xl border border-border bg-card p-5 shadow-xs shadow-black/5 dark:shadow-black/30">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Link2 className="h-5 w-5 text-sky-500" />

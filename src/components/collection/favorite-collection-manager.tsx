@@ -190,12 +190,12 @@ export function FavoriteCollectionManager({ initialData }: { initialData: Favori
   }
 
   if (!initialData) {
-    return <div className="rounded-[24px] border border-border bg-card p-6 text-sm text-muted-foreground">合集数据暂时无法加载，请稍后刷新重试。</div>
+    return <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">合集数据暂时无法加载，请稍后刷新重试。</div>
   }
 
   return (
     <div className="space-y-6">
-      <div className="rounded-[24px] border border-border bg-card p-5">
+      <div className="rounded-xl border border-border bg-card p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h3 className="text-base font-semibold">我的合集</h3>
@@ -207,7 +207,7 @@ export function FavoriteCollectionManager({ initialData }: { initialData: Favori
         </div>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-          <div className="rounded-[22px] border border-border bg-secondary/10 p-4">
+          <div className="rounded-xl border border-border bg-secondary/10 p-4">
             <h4 className="text-sm font-semibold">{editingId ? "编辑合集" : "新建合集"}</h4>
             <div className="mt-4 space-y-3">
               <label className="block space-y-2 text-sm">
@@ -216,7 +216,7 @@ export function FavoriteCollectionManager({ initialData }: { initialData: Favori
               </label>
               <label className="block space-y-2 text-sm">
                 <span className="font-medium">合集说明</span>
-                <textarea value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} className="min-h-[100px] w-full rounded-[20px] border border-border bg-background px-4 py-3 text-sm outline-hidden transition-colors focus:border-foreground/30" placeholder="可选，说明收录标准或合集用途。" />
+                <textarea value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} className="min-h-[100px] w-full rounded-xl border border-border bg-background px-4 py-3 text-sm outline-hidden transition-colors focus:border-foreground/30" placeholder="可选，说明收录标准或合集用途。" />
               </label>
               <label className="block space-y-2 text-sm">
                 <span className="font-medium">可见性</span>
@@ -247,9 +247,9 @@ export function FavoriteCollectionManager({ initialData }: { initialData: Favori
 
           <div className="space-y-3">
             {data.collections.length === 0 ? (
-              <div className="rounded-[22px] border border-dashed border-border bg-card px-4 py-6 text-sm text-muted-foreground">你还没有创建任何合集。创建后，收藏帖子时就能直接加入这些合集。</div>
+              <div className="rounded-xl border border-dashed border-border bg-card px-4 py-6 text-sm text-muted-foreground">你还没有创建任何合集。创建后，收藏帖子时就能直接加入这些合集。</div>
             ) : data.collections.map((item) => (
-              <div key={item.id} className="rounded-[20px] border border-border bg-card px-4 py-3">
+              <div key={item.id} className="rounded-xl border border-border bg-card px-4 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">

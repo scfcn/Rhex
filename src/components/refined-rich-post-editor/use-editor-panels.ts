@@ -16,7 +16,7 @@ type UseEditorPanelsOptions = {
   clearUploadResults: () => void
 }
 
-type FloatingPanelKey = "media" | "emoji" | "table" | "link" | "image"
+type FloatingPanelKey = "media" | "emoji" | "table" | "link" | "image" | "spoiler"
 
 type OpenPanelsState = {
   media: boolean
@@ -24,6 +24,7 @@ type OpenPanelsState = {
   table: boolean
   link: boolean
   image: boolean
+  spoiler: boolean
   help: boolean
   base64: boolean
 }
@@ -43,6 +44,7 @@ const CLOSED_FLOATING_PANELS = {
   table: false,
   link: false,
   image: false,
+  spoiler: false,
 }
 
 const DEFAULT_OPEN_PANELS: OpenPanelsState = {
@@ -76,12 +78,14 @@ export function useEditorPanels({
   const [tablePanelPosition, setTablePanelPosition, tablePanelReady, setTablePanelReady, tablePanelRef] = useFloatingPanel()
   const [linkPanelPosition, setLinkPanelPosition, linkPanelReady, setLinkPanelReady, linkPanelRef] = useFloatingPanel()
   const [imagePanelPosition, setImagePanelPosition, imagePanelReady, setImagePanelReady, imagePanelRef] = useFloatingPanel()
+  const [spoilerPanelPosition, setSpoilerPanelPosition, spoilerPanelReady, setSpoilerPanelReady, spoilerPanelRef] = useFloatingPanel()
 
   const mediaButtonRef = useRef<HTMLDivElement | null>(null)
   const emojiButtonRef = useRef<HTMLDivElement | null>(null)
   const tableButtonRef = useRef<HTMLDivElement | null>(null)
   const linkButtonRef = useRef<HTMLDivElement | null>(null)
   const imageButtonRef = useRef<HTMLDivElement | null>(null)
+  const spoilerButtonRef = useRef<HTMLDivElement | null>(null)
 
   const setPanelDraftValue = useCallback(<Key extends keyof PanelDraftState>(key: Key, nextValue: PanelDraftState[Key]) => {
     setPanelDraft((current) => (
@@ -96,7 +100,7 @@ export function useEditorPanels({
 
   const closeTransientPanels = useCallback(() => {
     setOpenPanels((current) => (
-      current.media || current.emoji || current.table || current.link || current.image
+      current.media || current.emoji || current.table || current.link || current.image || current.spoiler
         ? {
             ...current,
             ...CLOSED_FLOATING_PANELS,
@@ -145,6 +149,10 @@ export function useEditorPanels({
           }
         : current
     ))
+  }, [])
+
+  const closeSpoilerPanel = useCallback(() => {
+    setOpenPanels((current) => ({ ...current, spoiler: false }))
   }, [])
 
   const toggleFloatingPanel = useCallback((key: FloatingPanelKey, nextOpen: boolean) => {
@@ -200,6 +208,10 @@ export function useEditorPanels({
 
     toggleFloatingPanel("image", nextOpen)
   }, [markdownImageUploadEnabled, openPanels.image, selectionRef, toggleFloatingPanel, value])
+
+  const toggleSpoilerPanel = useCallback(() => {
+    toggleFloatingPanel("spoiler", !openPanels.spoiler)
+  }, [openPanels.spoiler, toggleFloatingPanel])
 
   const openBase64Dialog = useCallback(() => {
     closeTransientPanels()
@@ -339,6 +351,7 @@ export function useEditorPanels({
     syncFloatingPanel(openPanels.table, tableButtonRef.current, 292, tablePanelRef, setTablePanelPosition, setTablePanelReady)
     syncFloatingPanel(openPanels.link, linkButtonRef.current, 320, linkPanelRef, setLinkPanelPosition, setLinkPanelReady)
     syncFloatingPanel(openPanels.image, imageButtonRef.current, 320, imagePanelRef, setImagePanelPosition, setImagePanelReady)
+    syncFloatingPanel(openPanels.spoiler, spoilerButtonRef.current, 300, spoilerPanelRef, setSpoilerPanelPosition, setSpoilerPanelReady)
   }, [
     emojiPanelRef,
     imagePanelRef,
@@ -348,6 +361,7 @@ export function useEditorPanels({
     openPanels.image,
     openPanels.link,
     openPanels.media,
+    openPanels.spoiler,
     openPanels.table,
     setEmojiPanelPosition,
     setEmojiPanelReady,
@@ -357,14 +371,17 @@ export function useEditorPanels({
     setLinkPanelReady,
     setMediaPanelPosition,
     setMediaPanelReady,
+    setSpoilerPanelPosition,
+    setSpoilerPanelReady,
     setTablePanelPosition,
     setTablePanelReady,
     syncFloatingPanel,
+    spoilerPanelRef,
     tablePanelRef,
   ])
 
   useLayoutEffect(() => {
-    if (!openPanels.media && !openPanels.emoji && !openPanels.table && !openPanels.link && !openPanels.image) {
+    if (!openPanels.media && !openPanels.emoji && !openPanels.table && !openPanels.link && !openPanels.image && !openPanels.spoiler) {
       return
     }
 
@@ -376,10 +393,10 @@ export function useEditorPanels({
     return () => {
       window.cancelAnimationFrame(frameId)
     }
-  }, [openPanels.emoji, openPanels.image, openPanels.link, openPanels.media, openPanels.table, syncFloatingPanels])
+  }, [openPanels.emoji, openPanels.image, openPanels.link, openPanels.media, openPanels.spoiler, openPanels.table, syncFloatingPanels])
 
   useEffect(() => {
-    if (!openPanels.media && !openPanels.emoji && !openPanels.table && !openPanels.link && !openPanels.image) {
+    if (!openPanels.media && !openPanels.emoji && !openPanels.table && !openPanels.link && !openPanels.image && !openPanels.spoiler) {
       return
     }
 
@@ -405,6 +422,10 @@ export function useEditorPanels({
       if (openPanels.image && !imageButtonRef.current?.contains(target) && !imagePanelRef.current?.contains(target)) {
         closeImagePanel()
       }
+
+      if (openPanels.spoiler && !spoilerButtonRef.current?.contains(target) && !spoilerPanelRef.current?.contains(target)) {
+        closeSpoilerPanel()
+      }
     }
 
     function handleViewportChange() {
@@ -424,6 +445,7 @@ export function useEditorPanels({
     closeImagePanel,
     closeLinkPanel,
     closeMediaPanel,
+    closeSpoilerPanel,
     closeTablePanel,
     emojiPanelRef,
     imagePanelRef,
@@ -433,7 +455,9 @@ export function useEditorPanels({
     openPanels.image,
     openPanels.link,
     openPanels.media,
+    openPanels.spoiler,
     openPanels.table,
+    spoilerPanelRef,
     syncFloatingPanels,
     tablePanelRef,
   ])
@@ -520,6 +544,15 @@ export function useEditorPanels({
       openPanel: () => toggleFloatingPanel("image", true),
       toggle: toggleImagePanel,
       close: closeImagePanel,
+    },
+    spoilerPanel: {
+      open: openPanels.spoiler,
+      position: spoilerPanelPosition,
+      ready: spoilerPanelReady,
+      panelRef: spoilerPanelRef,
+      buttonRef: spoilerButtonRef,
+      toggle: toggleSpoilerPanel,
+      close: closeSpoilerPanel,
     },
   }
 }

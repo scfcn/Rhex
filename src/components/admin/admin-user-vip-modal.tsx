@@ -99,7 +99,7 @@ export function AdminUserVipModal({ userId, username, vipLevel = 1, vipExpiresAt
           </div>
           <div className="space-y-2">
             <p className="text-sm font-medium">操作备注</p>
-            <Textarea value={message} onChange={(event) => setMessage(event.target.value)} className="min-h-[88px] rounded-[20px] bg-background px-4 py-3" placeholder="记录发放原因、套餐来源或工单编号" />
+            <Textarea value={message} onChange={(event) => setMessage(event.target.value)} className="min-h-[88px] rounded-xl bg-background px-4 py-3" placeholder="记录发放原因、套餐来源或工单编号" />
           </div>
         </div>
       </Modal>

@@ -51,7 +51,7 @@ export function PostSidebarPanels({
       <AddonSlotRenderer slot="post.sidebar.top" />
       <SidebarUserCard user={currentUser} siteName={siteName} siteDescription={siteDescription} siteLogoPath={siteLogoPath} siteIconPath={siteIconPath} />
 
-      <div className="mobile-sidebar-section rounded-[24px] border border-border bg-card p-4 shadow-xs shadow-black/5 dark:shadow-black/30">
+      <div className="mobile-sidebar-section rounded-xl border border-border bg-card p-4 shadow-xs shadow-black/5 dark:shadow-black/30">
         <div className="mb-4 border-b border-border/80 pb-4">
           <h3 className="mb-3 font-semibold">相关主题</h3>
           <div className="space-y-3">

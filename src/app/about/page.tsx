@@ -90,7 +90,7 @@ export default async function AboutPage() {
             <>
           <AddonSlotRenderer slot="about.hero.before" />
           <AddonSurfaceRenderer surface="about.hero" props={{ settings }}>
-            <section className="rounded-[28px] border border-border bg-card px-5 py-6 shadow-xs sm:px-7 sm:py-8">
+            <section className="rounded-xl border border-border bg-card px-5 py-6 shadow-xs sm:px-7 sm:py-8">
             <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
               <div className="max-w-3xl">
                 <div className="inline-flex items-center rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground">

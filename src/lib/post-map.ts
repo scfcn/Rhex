@@ -100,6 +100,7 @@ interface ListPostSource {
   board: ListPostBoard
   author: ListPostAuthor
   comments?: Array<{
+    id?: string
     userId?: number | string | null
     useAnonymousIdentity?: boolean | null
     content?: string
@@ -116,6 +117,7 @@ export function mapListPost(post: ListPostSource, anonymousMaskIdentity: Anonymo
     ? (anonymousMaskIdentity?.name ?? anonymousMaskIdentity?.username ?? "匿名用户")
     : (latestReply ? (latestReply.user?.nickname ?? latestReply.user?.username ?? null) : null)
   const latestReplyAuthorUsername = latestReplyUsesAnonymousIdentity ? null : (latestReply?.user?.username ?? null)
+  const latestReplyCommentId = latestReply?.id ?? null
   const latestReplyExcerpt = latestReply?.content ? latestReply.content.slice(0, 42) : null
   const lastRepliedAtRaw = post.lastCommentedAt ?? post.publishedAt ?? post.createdAt
 
@@ -165,6 +167,7 @@ export function mapListPost(post: ListPostSource, anonymousMaskIdentity: Anonymo
     lastRepliedAtRaw: lastRepliedAtRaw.toISOString(),
     latestReplyAuthorName,
     latestReplyAuthorUsername,
+    latestReplyCommentId,
     latestReplyExcerpt,
 
     excerpt: post.summary ?? publicContent.slice(0, 120),
@@ -209,6 +212,7 @@ export function mapListPost(post: ListPostSource, anonymousMaskIdentity: Anonymo
           eligible: false,
           ineligibleReason: null,
           currentProbability: null,
+          participantPreviews: [],
           prizes: [],
           conditionGroups: [],
         }

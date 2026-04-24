@@ -337,7 +337,7 @@ export function RssUniversePageClient({
       {availableSourceIds.length > 0 ? (
         <div className="fixed bottom-4 right-4 z-50 flex items-end justify-end sm:bottom-5 sm:right-5">
           {panelOpen ? (
-            <div className="fixed inset-x-3 bottom-20 z-50 overflow-hidden rounded-[22px] border border-border bg-background shadow-[0_24px_64px_rgba(15,23,42,0.18)] sm:absolute sm:inset-x-auto sm:bottom-[calc(100%+0.75rem)] sm:right-0 sm:w-[min(30rem,calc(100vw-2.5rem))] lg:w-136">
+            <div className="fixed inset-x-3 bottom-20 z-50 overflow-hidden rounded-xl border border-border bg-background shadow-[0_24px_64px_rgba(15,23,42,0.18)] sm:absolute sm:inset-x-auto sm:bottom-[calc(100%+0.75rem)] sm:right-0 sm:w-[min(30rem,calc(100vw-2.5rem))] lg:w-136">
               <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3.5">
                 <div>
                   <div className="flex items-center gap-2 text-sm font-semibold text-foreground">

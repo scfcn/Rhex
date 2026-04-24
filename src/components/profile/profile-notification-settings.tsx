@@ -85,7 +85,7 @@ export function ProfileNotificationSettings({
 
   return (
     <form onSubmit={handleSave} className="space-y-5">
-      <div className="rounded-[24px] bg-card p-5 space-y-5">
+      <div className="rounded-xl bg-card p-5 space-y-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium">站外通知</p>
@@ -116,7 +116,7 @@ export function ProfileNotificationSettings({
           </p>
         </div>
 
-        <div className="rounded-[20px] border border-dashed border-border bg-background/60 p-4 text-xs leading-6 text-muted-foreground">
+        <div className="rounded-xl border border-dashed border-border bg-background/60 p-4 text-xs leading-6 text-muted-foreground">
           <p>测试按钮不会保存设置，只会向当前输入的 URL 发送一条模拟系统通知。</p>
           <p className="mt-1">保存后，后续所有系统通知都会按你的开关状态自动同步到该地址。</p>
         </div>

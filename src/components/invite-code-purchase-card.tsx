@@ -132,7 +132,7 @@ export function InviteCodePurchaseCard({ enabled, price, priceDescription, point
 
   return (
     <>
-      <div className="space-y-3 rounded-[24px] border border-border px-4 py-4">
+      <div className="space-y-3 rounded-xl border border-border px-4 py-4">
         <div>
           <p className="font-medium">购买邀请码</p>
           <p className="mt-1 text-sm text-muted-foreground">每个邀请码售价 {formatNumber(price)} {pointName}，购买后可分享给好友注册使用。</p>

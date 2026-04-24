@@ -42,7 +42,7 @@ export function ActionsTab({
   return (
     <div className="flex flex-col gap-4">
       <div className="grid gap-4 xl:grid-cols-2">
-        <section className="rounded-[20px] border border-border p-4">
+        <section className="rounded-xl border border-border p-4">
           <div className="flex flex-col gap-1">
             <h4 className="text-sm font-semibold">账号状态</h4>
             <p className="text-xs text-muted-foreground">禁言、恢复、拉黑等状态操作集中在这里，备注会进入后台日志。</p>
@@ -90,7 +90,7 @@ export function ActionsTab({
           </div>
         </section>
 
-        <section className="rounded-[20px] border border-border p-4">
+        <section className="rounded-xl border border-border p-4">
           <div className="flex flex-col gap-1">
             <h4 className="text-sm font-semibold">重置密码</h4>
             <p className="text-xs text-muted-foreground">用于人工核验后的账号找回或安全处置。</p>
@@ -108,7 +108,7 @@ export function ActionsTab({
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <section className="rounded-[20px] border border-border p-4">
+        <section className="rounded-xl border border-border p-4">
           <div className="flex flex-col gap-1">
             <h4 className="text-sm font-semibold">积分校正</h4>
             <p className="text-xs text-muted-foreground">支持手动修正积分，并记录发放或扣减原因。</p>
@@ -123,7 +123,7 @@ export function ActionsTab({
           </div>
         </section>
 
-        <section className="rounded-[20px] border border-border p-4">
+        <section className="rounded-xl border border-border p-4">
           <div className="flex flex-col gap-1">
             <h4 className="text-sm font-semibold">VIP 配置</h4>
             <p className="text-xs text-muted-foreground">支持人工开通、续期或修正 VIP 到期时间。</p>
@@ -150,7 +150,7 @@ export function ActionsTab({
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <section className="rounded-[20px] border border-border p-4">
+        <section className="rounded-xl border border-border p-4">
           <div className="flex flex-col gap-1">
             <h4 className="text-sm font-semibold">手动颁发勋章</h4>
             <p className="text-xs text-muted-foreground">可按用户当前持有情况筛掉重复勋章，并在发放后发通知。</p>
@@ -189,7 +189,7 @@ export function ActionsTab({
           </div>
         </section>
 
-        <section className="rounded-[20px] border border-border p-4">
+        <section className="rounded-xl border border-border p-4">
           <div className="flex flex-col gap-1">
             <h4 className="text-sm font-semibold">手动发送通知</h4>
             <p className="text-xs text-muted-foreground">用于人工补发说明、活动通知或申诉处理结果通知。</p>

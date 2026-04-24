@@ -34,6 +34,59 @@ interface AddonClientErrorBoundaryState {
   errorMessage: string | null
 }
 
+function scheduleAddonCleanup({
+  cleanup,
+  container,
+  shouldClearContainer,
+  moduleUrl,
+}: {
+  cleanup: (() => void | Promise<void>) | null
+  container: HTMLElement | null
+  shouldClearContainer: boolean
+  moduleUrl: string
+}) {
+  window.setTimeout(() => {
+    const clearContainer = () => {
+      if (shouldClearContainer && container) {
+        container.innerHTML = ""
+      }
+    }
+
+    if (!cleanup) {
+      clearContainer()
+      return
+    }
+
+    void Promise.resolve(cleanup())
+      .catch((error) => {
+        console.error("[addons-host] failed to cleanup addon client module", moduleUrl, error)
+      })
+      .finally(clearContainer)
+  }, 0)
+}
+
+function resolveAddonCleanup({
+  mounted,
+  loaded,
+  container,
+  sdk,
+}: {
+  mounted: void | (() => void | Promise<void>)
+  loaded: AddonClientModule
+  container: HTMLElement
+  sdk: AddonClientSdk
+}) {
+  if (typeof mounted === "function") {
+    return mounted
+  }
+
+  if (typeof loaded.unmount === "function") {
+    return () => loaded.unmount?.(container, sdk)
+  }
+
+  return null
+}
+
 class AddonClientErrorBoundary extends React.Component<
   { fallback?: React.ReactNode; moduleUrl: string; children: React.ReactNode },
   AddonClientErrorBoundaryState
@@ -82,6 +135,7 @@ class AddonClientErrorBoundary extends React.Component<
 export function AddonClientIsland({ moduleUrl, props, fallback = null }: AddonClientIslandProps) {
   const containerRef = React.useRef<HTMLDivElement | null>(null)
   const serializedProps = React.useMemo(() => JSON.stringify(props ?? {}), [props])
+  const mountHostKey = React.useMemo(() => `${moduleUrl}:${serializedProps}`, [moduleUrl, serializedProps])
   const stableProps = React.useMemo(
     () => JSON.parse(serializedProps) as Record<string, unknown>,
     [serializedProps]
@@ -145,17 +199,16 @@ export function AddonClientIsland({ moduleUrl, props, fallback = null }: AddonCl
 
         const mounted = await mount(container, stableProps, sdk)
         if (disposed) {
-          if (typeof mounted === "function") {
-            await mounted()
-          }
+          scheduleAddonCleanup({
+            cleanup: resolveAddonCleanup({ mounted, loaded, container, sdk }),
+            container,
+            shouldClearContainer,
+            moduleUrl,
+          })
           return
         }
 
-        if (typeof mounted === "function") {
-          cleanup = mounted
-        } else if (typeof loaded.unmount === "function") {
-          cleanup = () => loaded.unmount?.(container, sdk)
-        }
+        cleanup = resolveAddonCleanup({ mounted, loaded, container, sdk })
         setReady(true)
       } catch (error) {
         console.error("[addons-host] failed to mount addon client module", moduleUrl, error)
@@ -165,13 +218,12 @@ export function AddonClientIsland({ moduleUrl, props, fallback = null }: AddonCl
 
     return () => {
       disposed = true
-      setReady(false)
-      if (cleanup) {
-        void cleanup()
-      }
-      if (shouldClearContainer && container) {
-        container.innerHTML = ""
-      }
+      scheduleAddonCleanup({
+        cleanup,
+        container,
+        shouldClearContainer,
+        moduleUrl,
+      })
     }
   }, [moduleUrl, sdk, stableProps])
 
@@ -184,6 +236,7 @@ export function AddonClientIsland({ moduleUrl, props, fallback = null }: AddonCl
         </AddonClientErrorBoundary>
       ) : (
         <div
+          key={mountHostKey}
           ref={containerRef}
           data-addon-client-module={moduleUrl}
           hidden={!ready && Boolean(fallback)}

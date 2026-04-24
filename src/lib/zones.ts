@@ -3,6 +3,7 @@ import { unstable_cache } from "next/cache"
 import { resolvePagination } from "@/db/helpers"
 import { countZoneNormalPosts, findAllZonesWithBoards, findGlobalPinnedPosts, findZoneBoardIdsBySlug, findZoneBoardListBySlug, findZoneNormalPosts, findZonePinnedPosts, findZoneWithBoardsBySlug } from "@/db/taxonomy-queries"
 import { dedupeAndMapPinnedPosts, extractPinnedPostIds } from "@/lib/pinned-posts"
+import type { TaxonomyPostSort } from "@/lib/forum-taxonomy-sort"
 import { getAnonymousMaskDisplayIdentity } from "@/lib/post-anonymous"
 import { mapListPost } from "@/lib/post-map"
 import { normalizePostListLoadMode, type PostListLoadMode } from "@/lib/post-list-load-mode"
@@ -122,7 +123,12 @@ export interface ZonePostPageResult {
   hasNextPage: boolean
 }
 
-export async function getZonePosts(slug: string, page = 1, pageSize = 10): Promise<ZonePostPageResult> {
+export async function getZonePosts(
+  slug: string,
+  page = 1,
+  pageSize = 10,
+  sort: TaxonomyPostSort = "latest",
+): Promise<ZonePostPageResult> {
   const zone = await findZoneBoardIdsBySlug(slug)
 
   if (!zone || zone.boards.length === 0) {
@@ -143,14 +149,14 @@ export async function getZonePosts(slug: string, page = 1, pageSize = 10): Promi
     findGlobalPinnedPosts(),
     findZonePinnedPosts(boardIds),
   ])
-  const pinnedPosts = [...globalPinnedPosts, ...zonePinnedPosts]
+  const pinnedPosts = [...globalPinnedPosts, ...zonePinnedPosts].filter((post) => sort !== "featured" || post.isFeatured)
   const excludedPostIds = extractPinnedPostIds(pinnedPosts)
-  const total = await countZoneNormalPosts(boardIds, excludedPostIds)
+  const total = await countZoneNormalPosts(boardIds, excludedPostIds, sort)
   const pagination = resolvePagination({ page, pageSize }, total, [pageSize], pageSize)
 
   if (pagination.page === 1) {
     const { pinnedItems, pinnedPostIds } = dedupeAndMapPinnedPosts(pinnedPosts, (post) => mapListPost(post, anonymousMaskIdentity))
-    const normalPosts = await findZoneNormalPosts(boardIds, pinnedPostIds, 1, pagination.pageSize)
+    const normalPosts = await findZoneNormalPosts(boardIds, pinnedPostIds, 1, pagination.pageSize, sort)
 
     return {
       items: [...pinnedItems, ...normalPosts.map((post) => mapListPost(post, anonymousMaskIdentity))],
@@ -163,7 +169,7 @@ export async function getZonePosts(slug: string, page = 1, pageSize = 10): Promi
     }
   }
 
-  const normalPosts = await findZoneNormalPosts(boardIds, excludedPostIds, pagination.page, pagination.pageSize)
+  const normalPosts = await findZoneNormalPosts(boardIds, excludedPostIds, pagination.page, pagination.pageSize, sort)
 
   return {
     items: normalPosts.map((post) => mapListPost(post, anonymousMaskIdentity)),

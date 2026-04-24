@@ -7,7 +7,7 @@ import { LogSectionCard, LogSummaryCard } from "@/components/admin/user-modal/co
 export function ActivityTab({ detail }: { detail: AdminUserDetailResult | null }) {
   if (!detail) {
     return (
-      <div className="rounded-[20px] border border-dashed border-border bg-secondary/20 px-4 py-10 text-sm text-muted-foreground">
+      <div className="rounded-xl border border-dashed border-border bg-secondary/20 px-4 py-10 text-sm text-muted-foreground">
         暂无活动详情，稍后重试。
       </div>
     )

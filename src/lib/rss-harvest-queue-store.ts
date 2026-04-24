@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 
 import { findRssSourceById, type RssSourceAdminRecord } from "@/db/rss-harvest-queries"
 import type { RssTriggerType } from "@/db/types"
-import { connectRedisClient, createRedisKey, getRedis } from "@/lib/redis"
+import { connectRedisClient, createRedisKey, getRedis, hasRedisUrl } from "@/lib/redis"
 
 type RssQueueStatusValue = "PENDING" | "PROCESSING" | "SUCCEEDED" | "FAILED" | "CANCELLED"
 
@@ -115,6 +115,16 @@ type RedisQueueConnection = ReturnType<typeof getRedis>
 type RedisQueueContext = {
   redis?: RedisQueueConnection
 }
+type GlobalRssQueueStore = {
+  __bbsInMemoryRssQueueStore?: Map<string, RssQueueRecord>
+}
+
+const globalForRssQueueStore = globalThis as typeof globalThis & GlobalRssQueueStore
+
+function getInMemoryRssQueueStore() {
+  globalForRssQueueStore.__bbsInMemoryRssQueueStore ??= new Map()
+  return globalForRssQueueStore.__bbsInMemoryRssQueueStore
+}
 
 function getSourceQueueIndexKey(sourceId: string) {
   return createRedisKey("rss-harvest", "queue", "source", sourceId)
@@ -185,6 +195,18 @@ function serializeRecord(record: RssQueueRecord) {
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
   })
+}
+
+function cloneRecord(record: RssQueueRecord) {
+  return {
+    ...record,
+    scheduledAt: new Date(record.scheduledAt),
+    leaseExpiresAt: record.leaseExpiresAt ? new Date(record.leaseExpiresAt) : null,
+    startedAt: record.startedAt ? new Date(record.startedAt) : null,
+    finishedAt: record.finishedAt ? new Date(record.finishedAt) : null,
+    createdAt: new Date(record.createdAt),
+    updatedAt: new Date(record.updatedAt),
+  } satisfies RssQueueRecord
 }
 
 function parseRecord(value: string | null | undefined) {
@@ -303,7 +325,18 @@ async function pruneRedisQueue(nowMs = Date.now(), context?: RedisQueueContext) 
 }
 
 async function pruneQueueStore(context?: RedisQueueContext) {
-  await pruneRedisQueue(Date.now(), context)
+  if (hasRedisUrl()) {
+    await pruneRedisQueue(Date.now(), context)
+    return
+  }
+
+  const store = getInMemoryRssQueueStore()
+  const nowMs = Date.now()
+  for (const [id, record] of store.entries()) {
+    if (shouldPruneRecord(record, nowMs)) {
+      store.delete(id)
+    }
+  }
 }
 
 async function readRedisRecordsByIds(ids: string[], context?: RedisQueueContext) {
@@ -340,6 +373,11 @@ async function readRedisSortedIds(
 
 async function readQueueRecord(id: string, context?: RedisQueueContext) {
   await pruneQueueStore(context)
+  if (!hasRedisUrl()) {
+    const record = getInMemoryRssQueueStore().get(id)
+    return record ? cloneRecord(record) : null
+  }
+
   return withRedisQueueConnection("rss-harvest:queue-read-one", context, async (redis) => {
     const value = await redis.hget(RSS_QUEUE_ITEMS_KEY, id)
     return parseRecord(value)
@@ -347,6 +385,11 @@ async function readQueueRecord(id: string, context?: RedisQueueContext) {
 }
 
 async function persistQueueRecord(record: RssQueueRecord, context?: RedisQueueContext) {
+  if (!hasRedisUrl()) {
+    getInMemoryRssQueueStore().set(record.id, cloneRecord(record))
+    return
+  }
+
   await withRedisQueueConnection("rss-harvest:queue-write", context, async (redis) => {
     const score = record.createdAt.getTime()
     const multi = redis.multi()
@@ -391,6 +434,35 @@ async function claimPendingRedisQueueRecord(id: string, input: {
 
     return typeof nextValue === "string" ? parseRecord(nextValue) : null
   })
+}
+
+async function claimPendingInMemoryQueueRecord(id: string, input: {
+  workerId: string
+  startedAt: Date
+}) {
+  const current = getInMemoryRssQueueStore().get(id)
+  if (!current || current.status !== "PENDING") {
+    return null
+  }
+
+  const nextRecord = applyPatch(current, {
+    backgroundJobId: null,
+    status: "PROCESSING",
+    startedAt: input.startedAt,
+    attemptCount: current.attemptCount + 1,
+    workerId: input.workerId,
+    leaseExpiresAt: null,
+    updatedAt: input.startedAt,
+  })
+  await persistQueueRecord(nextRecord)
+  return cloneRecord(nextRecord)
+}
+
+function listInMemoryQueueItems(filter?: (record: RssQueueRecord) => boolean) {
+  return [...getInMemoryRssQueueStore().values()]
+    .filter((record) => filter ? filter(record) : true)
+    .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+    .map(cloneRecord)
 }
 
 async function resolveQueueWithSource(record: RssQueueRecord | null) {
@@ -461,10 +533,22 @@ export async function claimPendingRssQueueRecord(id: string, input: {
   startedAt: Date
 }) {
   await pruneQueueStore()
+  if (!hasRedisUrl()) {
+    return claimPendingInMemoryQueueRecord(id, input)
+  }
+
   return claimPendingRedisQueueRecord(id, input)
 }
 
 export async function countRssQueueSummary() {
+  if (!hasRedisUrl()) {
+    const items = listInMemoryQueueItems()
+    const pending = items.filter((item) => item.status === "PENDING").length
+    const processing = items.filter((item) => item.status === "PROCESSING").length
+    const failed = items.filter((item) => item.status === "FAILED").length
+    return [pending, processing, failed] as const
+  }
+
   return withRedisQueueConnection("rss-harvest:queue-summary", undefined, async (redis) => {
     await pruneQueueStore({ redis })
     await ensureStatusIndexesBackfilled(redis)
@@ -513,6 +597,14 @@ export async function clearRssQueueHistoryBySource(sourceId: string) {
     return { count: 0 }
   }
 
+  if (!hasRedisUrl()) {
+    const store = getInMemoryRssQueueStore()
+    for (const item of finishedItems) {
+      store.delete(item.id)
+    }
+    return { count: finishedItems.length }
+  }
+
   await withRedisQueueConnection("rss-harvest:queue-clear-source", undefined, async (redis) => {
     const multi = redis.multi()
     for (const item of finishedItems) {
@@ -530,6 +622,10 @@ export async function clearRssQueueHistoryBySource(sourceId: string) {
 }
 
 export async function countRssQueueItemsBySource(sourceId: string) {
+  if (!hasRedisUrl()) {
+    return listInMemoryQueueItems((item) => item.sourceId === sourceId).length
+  }
+
   return withRedisQueueConnection("rss-harvest:queue-count-source", undefined, async (redis) => {
     await pruneQueueStore({ redis })
     return Number(await redis.zcard(getSourceQueueIndexKey(sourceId)).catch(() => 0))
@@ -541,6 +637,10 @@ export async function listRssQueueItemsBySource(sourceId: string, limit = 20) {
 }
 
 export async function listRssQueueItemsPageBySource(sourceId: string, skip: number, take: number) {
+  if (!hasRedisUrl()) {
+    return listInMemoryQueueItems((item) => item.sourceId === sourceId).slice(skip, skip + take)
+  }
+
   return withRedisQueueConnection("rss-harvest:queue-list-source", undefined, async (redis) => {
     await pruneQueueStore({ redis })
     const ids = await readRedisSortedIds(getSourceQueueIndexKey(sourceId), {
@@ -565,6 +665,11 @@ function sortExecutionRecordsDesc(left: RssQueueRecord, right: RssQueueRecord) {
 }
 
 async function listAllQueueItems() {
+  if (!hasRedisUrl()) {
+    await pruneQueueStore()
+    return listInMemoryQueueItems()
+  }
+
   return withRedisQueueConnection("rss-harvest:queue-list-all", undefined, async (redis) => {
     await pruneQueueStore({ redis })
     const ids = await readRedisSortedIds(RSS_QUEUE_INDEX_KEY, {
@@ -578,6 +683,11 @@ async function listAllQueueItems() {
 }
 
 async function listAllQueueItemsBySource(sourceId: string) {
+  if (!hasRedisUrl()) {
+    await pruneQueueStore()
+    return listInMemoryQueueItems((item) => item.sourceId === sourceId)
+  }
+
   return withRedisQueueConnection("rss-harvest:queue-list-all-source", undefined, async (redis) => {
     await pruneQueueStore({ redis })
     const ids = await readRedisSortedIds(getSourceQueueIndexKey(sourceId), {
@@ -623,6 +733,14 @@ export async function clearRssQueueHistory() {
 
   if (finishedItems.length === 0) {
     return { count: 0 }
+  }
+
+  if (!hasRedisUrl()) {
+    const store = getInMemoryRssQueueStore()
+    for (const item of finishedItems) {
+      store.delete(item.id)
+    }
+    return { count: finishedItems.length }
   }
 
   await withRedisQueueConnection("rss-harvest:queue-clear-all", undefined, async (redis) => {

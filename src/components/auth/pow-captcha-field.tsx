@@ -213,7 +213,7 @@ export function PowCaptchaField({ scope, onTokenChange, onNonceChange, onLoadErr
   }, [stopMining])
 
   return (
-    <div className="space-y-2 rounded-[24px]">
+    <div className="space-y-2 rounded-xl">
       <p className="text-sm font-medium">验证码</p>
       <div className="rounded-[18px] ">
         <div className="flex flex-wrap items-center gap-3">

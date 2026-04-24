@@ -3,7 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { Ellipsis } from "lucide-react"
+import { GitBranch, List } from "lucide-react"
 
 import { CommentThreadCommentItem, CommentThreadReplyItem } from "@/components/comment/comment-thread-items"
 import { CommentThreadReplyBox } from "@/components/comment/comment-thread-shared"
@@ -75,14 +75,12 @@ export function CommentThread({ threadId, comments, flatComments = [], postId, p
   const [replyTarget, setReplyTarget] = useState<CommentReplyTarget | null>(null)
   const [showOnlyAuthorComments, setShowOnlyAuthorComments] = useState(false)
   const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null)
-  const [isViewMenuOpen, setIsViewMenuOpen] = useState(false)
   const [isReplyBoxPinned, setIsReplyBoxPinned] = useState(false)
   const [isReplyBoxFollowing, setIsReplyBoxFollowing] = useState(false)
   const [replyBoxPinnedLayout, setReplyBoxPinnedLayout] = useState({ left: 0, width: 0 })
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const replyBoxContainerRef = useRef<HTMLDivElement | null>(null)
   const replyBoxFollowRafRef = useRef<number | null>(null)
-  const viewMenuRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     setLocalComments(comments)
@@ -175,32 +173,6 @@ export function CommentThread({ threadId, comments, flatComments = [], postId, p
       window.clearTimeout(timeoutId)
     }
   }, [highlightedCommentId])
-
-  useEffect(() => {
-    if (!isViewMenuOpen) {
-      return
-    }
-
-    function handlePointerDown(event: MouseEvent) {
-      if (!viewMenuRef.current?.contains(event.target as Node)) {
-        setIsViewMenuOpen(false)
-      }
-    }
-
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setIsViewMenuOpen(false)
-      }
-    }
-
-    window.addEventListener("mousedown", handlePointerDown)
-    window.addEventListener("keydown", handleEscape)
-
-    return () => {
-      window.removeEventListener("mousedown", handlePointerDown)
-      window.removeEventListener("keydown", handleEscape)
-    }
-  }, [isViewMenuOpen])
 
   const updateReplyBoxPinnedLayout = useCallback(() => {
     const element = replyBoxContainerRef.current
@@ -664,7 +636,6 @@ export function CommentThread({ threadId, comments, flatComments = [], postId, p
 
   function changeDisplayMode(nextView: "tree" | "flat") {
     updateBrowsingPreferences({ commentThreadDisplayMode: nextView })
-    setIsViewMenuOpen(false)
     router.replace(buildCommentHref({ page: 1, view: nextView }))
   }
 
@@ -688,6 +659,10 @@ export function CommentThread({ threadId, comments, flatComments = [], postId, p
   }
 
   const hideFloatingActionButtons = editingCommentId !== null
+  const nextDisplayMode = currentDisplayMode === "tree" ? "flat" : "tree"
+  const currentDisplayModeLabel = currentDisplayMode === "tree" ? "树形" : "平铺"
+  const nextDisplayModeLabel = nextDisplayMode === "tree" ? "树形" : "平铺"
+  const DisplayModeIcon = currentDisplayMode === "tree" ? GitBranch : List
 
   return (
     <div className="space-y-3">
@@ -705,40 +680,21 @@ export function CommentThread({ threadId, comments, flatComments = [], postId, p
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Link href={buildCommentHref({ sort: "oldest", page: 1 })} className={currentSort === "oldest" ? "rounded-full bg-foreground px-2.5 py-1 text-[11px] text-background" : "rounded-full bg-secondary px-2.5 py-1 text-[11px] text-muted-foreground"}>最早</Link>
           <Link href={buildCommentHref({ sort: "newest", page: 1 })} className={currentSort === "newest" ? "rounded-full bg-foreground px-2.5 py-1 text-[11px] text-background" : "rounded-full bg-secondary px-2.5 py-1 text-[11px] text-muted-foreground"}>最新</Link>
-          <div ref={viewMenuRef} className="relative">
-            {isViewMenuOpen ? (
-              <div className="absolute right-0 top-10 z-20 min-w-[112px] rounded-2xl border border-border bg-background/95 p-1.5 shadow-xs backdrop-blur-xs">
-                <button
-                  type="button"
-                  onClick={() => changeDisplayMode("tree")}
-                  className={currentDisplayMode === "tree" ? "flex w-full rounded-xl bg-accent px-3 py-2 text-left text-[12px] font-medium text-foreground" : "flex w-full rounded-xl px-3 py-2 text-left text-[12px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"}
-                >
-                  树形
-                </button>
-                <button
-                  type="button"
-                  onClick={() => changeDisplayMode("flat")}
-                  className={currentDisplayMode === "flat" ? "flex w-full rounded-xl bg-accent px-3 py-2 text-left text-[12px] font-medium text-foreground" : "flex w-full rounded-xl px-3 py-2 text-left text-[12px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"}
-                >
-                  平铺
-                </button>
-              </div>
-            ) : null}
-            <button
-              type="button"
-              aria-label="评论视图"
-              title="评论视图"
-              onClick={() => setIsViewMenuOpen((current) => !current)}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              <Ellipsis className="h-4 w-4" />
-            </button>
-          </div>
+          <button
+            type="button"
+            aria-label={`当前评论视图：${currentDisplayModeLabel}，点击切换到${nextDisplayModeLabel}`}
+            title={`当前${currentDisplayModeLabel}，点击切换到${nextDisplayModeLabel}`}
+            onClick={() => changeDisplayMode(nextDisplayMode)}
+            className="inline-flex h-8 items-center gap-1.5 rounded-full bg-secondary px-3 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <DisplayModeIcon className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>{currentDisplayModeLabel}</span>
+          </button>
         </div>
       </div>
 
       {showOnlyAuthorComments && (currentDisplayMode === "flat" ? filteredFlatComments.length === 0 : filteredComments.length === 0) ? (
-        <div className="rounded-[20px] border border-dashed border-border bg-card px-4 py-6 text-sm text-muted-foreground">
+        <div className="rounded-xl border border-dashed border-border bg-card px-4 py-6 text-sm text-muted-foreground">
           当前页暂无楼主评论
         </div>
       ) : null}

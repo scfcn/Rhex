@@ -41,7 +41,7 @@ export default async function FaqRssGuidePage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {globalFeeds.map((feed) => (
-              <div key={feed.path} className="rounded-[20px] border border-border bg-secondary/30 p-4">
+              <div key={feed.path} className="rounded-xl border border-border bg-secondary/30 p-4">
                 <p className="font-semibold text-foreground">{feed.label}</p>
                 <p className="mt-2 break-all font-mono text-xs text-foreground">{buildAbsoluteUrl(origin, feed.path)}</p>
                 <p className="mt-2 text-sm leading-7 text-muted-foreground">{feed.description}</p>
@@ -77,7 +77,7 @@ export default async function FaqRssGuidePage() {
                 description: "适合订阅某个用户公开发布的最新帖子。",
               },
             ].map((item) => (
-              <div key={item.label} className="rounded-[20px] border border-border bg-card p-4">
+              <div key={item.label} className="rounded-xl border border-border bg-card p-4">
                 <p className="font-semibold text-foreground">{item.label}</p>
                 <p className="mt-2 break-all font-mono text-xs text-foreground">{item.rule}</p>
                 <p className="mt-2 text-sm leading-7 text-muted-foreground">{item.description}</p>
