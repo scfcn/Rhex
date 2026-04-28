@@ -3,20 +3,19 @@ import "dotenv/config"
 import { ensureBackgroundJobRuntimeReady } from "../src/lib/background-jobs"
 import { acquireRedisLease, type RedisLease } from "../src/lib/redis-lease"
 import { createRedisKey, hasRedisUrl } from "../src/lib/redis"
+import { acquireLeaseWithRetry, renewLeaseWithRecovery } from "../src/lib/worker-singleton"
 
 const WORKER_SINGLETON_LEASE_KEY = createRedisKey("worker", "singleton")
 const WORKER_SINGLETON_LEASE_TTL_MS = 30_000
 const WORKER_SINGLETON_LEASE_RENEW_INTERVAL_MS = 10_000
+const WORKER_SINGLETON_LEASE_ACQUIRE_RETRY_DELAY_MS = 1_000
+const WORKER_SINGLETON_LEASE_RECOVERY_WAIT_MS = 10_000
+const WORKER_SINGLETON_LEASE_RECOVERY_RETRY_DELAY_MS = 500
 
 let singletonLease: RedisLease | null = null
 let leaseRenewTimer: ReturnType<typeof setInterval> | null = null
+let leaseRenewInFlight = false
 let shuttingDown = false
-
-function sleep(ms: number) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms)
-  })
-}
 
 async function releaseSingletonLease() {
   if (leaseRenewTimer) {
@@ -49,40 +48,50 @@ function startLeaseRenewLoop() {
   }
 
   leaseRenewTimer = setInterval(async () => {
-    if (!singletonLease) {
+    if (!singletonLease || leaseRenewInFlight) {
       return
     }
 
+    leaseRenewInFlight = true
+
     try {
-      const renewed = await singletonLease.renew(WORKER_SINGLETON_LEASE_TTL_MS)
-      if (!renewed) {
-        console.error("[worker] singleton lease lost, exiting...")
+      const activeLease = singletonLease
+      const nextLease = await renewLeaseWithRecovery({
+        lease: activeLease,
+        ttlMs: WORKER_SINGLETON_LEASE_TTL_MS,
+        recoveryMaxWaitMs: WORKER_SINGLETON_LEASE_RECOVERY_WAIT_MS,
+        recoveryRetryDelayMs: WORKER_SINGLETON_LEASE_RECOVERY_RETRY_DELAY_MS,
+        acquireLease: () => acquireWorkerSingletonLease(WORKER_SINGLETON_LEASE_RECOVERY_WAIT_MS),
+      })
+
+      if (!nextLease) {
+        console.error("[worker] singleton lease lost and could not be reacquired, exiting...")
         await releaseSingletonLease()
         process.exit(1)
+        return
+      }
+
+      if (nextLease !== activeLease) {
+        singletonLease = nextLease
+        console.warn("[worker] singleton lease recovered after transient loss")
       }
     } catch (error) {
       console.error("[worker] singleton lease renew failed", error)
+    } finally {
+      leaseRenewInFlight = false
     }
   }, WORKER_SINGLETON_LEASE_RENEW_INTERVAL_MS)
 }
 
-async function acquireWorkerSingletonLease() {
-  const startedAt = Date.now()
-
-  while (Date.now() - startedAt < WORKER_SINGLETON_LEASE_TTL_MS + 2_000) {
-    const lease = await acquireRedisLease({
+async function acquireWorkerSingletonLease(maxWaitMs = WORKER_SINGLETON_LEASE_TTL_MS + 2_000) {
+  return acquireLeaseWithRetry({
+    maxWaitMs,
+    retryDelayMs: WORKER_SINGLETON_LEASE_ACQUIRE_RETRY_DELAY_MS,
+    acquireLease: () => acquireRedisLease({
       key: WORKER_SINGLETON_LEASE_KEY,
       ttlMs: WORKER_SINGLETON_LEASE_TTL_MS,
-    })
-
-    if (lease) {
-      return lease
-    }
-
-    await sleep(1_000)
-  }
-
-  return null
+    }),
+  })
 }
 
 async function main() {
