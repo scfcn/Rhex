@@ -61,6 +61,34 @@ export const adminPostActionHandlers: Record<string, AdminActionDefinition> = {
     await writeAdminActionLog(context, adminPostActionHandlers["post.hide"].metadata)
     return { message: "帖子已下线" }
   }),
+  "post.delete": defineAdminAction({ targetType: "POST", revalidatePaths: ["/", "/admin"], buildDetail: () => "管理员删除帖子" }, async (context) => {
+    const post = await ensureCanManagePost(context.actor, context.targetId)
+    const reason = context.message || "管理员删除帖子"
+    const previousStatus = post.status as AddonReadablePostStatus
+    await executeAddonActionHook("post.delete.before", {
+      postId: context.targetId,
+      editorId: String(context.adminUserId),
+      reason,
+    }, {
+      throwOnError: true,
+    })
+    await updatePostStatus(context.targetId, PostStatus.DELETED, reason)
+    revalidateHomeSidebarStatsCache()
+    expireTaxonomyCacheImmediately()
+    await executeAddonActionHook("post.delete.after", {
+      postId: context.targetId,
+      editorId: String(context.adminUserId),
+      reason,
+    })
+    await executeAddonActionHook("post.status.changed.after", {
+      postId: context.targetId,
+      editorId: String(context.adminUserId),
+      previousStatus,
+      nextStatus: "DELETED",
+    })
+    await writeAdminActionLog(context, adminPostActionHandlers["post.delete"].metadata)
+    return { message: "帖子已删除" }
+  }),
   "post.show": defineAdminAction({ targetType: "POST", revalidatePaths: ["/", "/admin"], buildDetail: () => "管理员上线帖子" }, async (context) => {
     const post = await ensureCanManagePost(context.actor, context.targetId)
     const previousStatus = post.status as AddonReadablePostStatus

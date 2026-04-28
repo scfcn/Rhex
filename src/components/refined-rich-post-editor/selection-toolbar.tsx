@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { Bold, Code2, Highlighter, Quote, Strikethrough, Underline } from "lucide-react"
+import { Bold, Code2, Highlighter, ImageIcon, Quote, Strikethrough, Underline } from "lucide-react"
 
 import { TOOLBAR_TIPS } from "@/components/refined-rich-post-editor/constants"
 import { ToolButton } from "@/components/refined-rich-post-editor/toolbar-controls"
@@ -24,6 +24,7 @@ type FloatingSelectionToolbarProps = {
   onStrike: () => void
   onHighlight: () => void
   onInlineCode: () => void
+  onImageLink: () => void
   onQuote: () => void
 }
 
@@ -167,6 +168,7 @@ export function FloatingSelectionToolbar({
   onStrike,
   onHighlight,
   onInlineCode,
+  onImageLink,
   onQuote,
 }: FloatingSelectionToolbarProps) {
   const selection = React.useSyncExternalStore(
@@ -306,6 +308,9 @@ export function FloatingSelectionToolbar({
       </ToolButton>
       <ToolButton tip={TOOLBAR_TIPS.code} platform={platform} onMouseDown={onMouseDown} onClick={onInlineCode}>
         <Code2 className="h-4 w-4" />
+      </ToolButton>
+      <ToolButton tip={TOOLBAR_TIPS.imageFromSelection} platform={platform} onMouseDown={onMouseDown} onClick={onImageLink}>
+        <ImageIcon className="h-4 w-4" />
       </ToolButton>
       <ToolButton tip={TOOLBAR_TIPS.quote} platform={platform} onMouseDown={onMouseDown} onClick={onQuote}>
         <Quote className="h-4 w-4" />

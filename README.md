@@ -300,7 +300,7 @@ git clone https://github.com/lovedevpanda/Rhex.git
 cd Rhex
 cp .env.docker.example .env
 # 编辑 .env
-docker compose up -d
+docker compose up -d --build
 ```
 
 仓库已提供 `Dockerfile`、`docker-compose.yml`、`.dockerignore` 和 `.env.docker.example`。
@@ -339,10 +339,10 @@ cp .env.docker.example .env
 #### 2. 启动服务
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
-首次启动时，Compose 会自动先执行初始化，再启动站点和 worker。
+首次启动时，建议显式加上 `--build`，确保 Compose 直接使用本地 `Dockerfile` 构建镜像，而不是先尝试拉取 `rhex-app:local`。初始化完成后会继续启动站点和 worker。
 
 #### 3. 访问站点
 

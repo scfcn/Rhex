@@ -11,6 +11,7 @@ import { MessageConversationSidebar } from "@/components/message/message-convers
 import { MessageThreadPanel, type LocalMessageSentPayload } from "@/components/message/message-thread-panel"
 import { Button } from "@/components/ui/rbutton"
 import { summarizeMessagePreview } from "@/lib/message-media"
+import { isSiteChatConversationId, SITE_CHAT_SUBTITLE } from "@/lib/site-chat"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type {
   MessageBubbleItem,
@@ -40,6 +41,7 @@ interface MessagesClientProps {
 }
 
 interface LiveConversationPatch {
+  kind?: MessageConversationListItem["kind"]
   title?: string
   subtitle?: string
   preview?: string
@@ -353,7 +355,7 @@ export function MessagesClient({
           [conversationKey]: {
             ...previousConversation,
             id: conversationKey,
-            subtitle: "实时会话",
+            subtitle: previousConversation.kind === "SITE_CHAT" ? SITE_CHAT_SUBTITLE : "实时会话",
             updatedAt: message.createdAt,
             messages: mergeMessages(previousConversation.messages, [message]),
           },
@@ -373,8 +375,9 @@ export function MessagesClient({
       ...current,
       [conversationKey]: {
         ...current[conversationKey],
+        kind: sourceConversation.kind,
         title: sourceConversation.title,
-        subtitle: "实时会话",
+        subtitle: sourceConversation.kind === "SITE_CHAT" ? SITE_CHAT_SUBTITLE : "实时会话",
         preview: summarizeMessagePreview(message.body),
         updatedAt: message.createdAt,
         unreadCount: 0,
@@ -509,7 +512,11 @@ export function MessagesClient({
           ...current,
           [payload.conversationId]: {
             ...current[payload.conversationId],
-            subtitle: activeConversationIdRef.current === payload.conversationId ? "实时会话" : "最近互动",
+            subtitle: activeConversationIdRef.current === payload.conversationId
+              ? (isSiteChatConversationId(payload.conversationId) ? SITE_CHAT_SUBTITLE : "实时会话")
+              : isSiteChatConversationId(payload.conversationId)
+                ? SITE_CHAT_SUBTITLE
+                : "最近互动",
             unreadCount: 0,
           },
         }))
@@ -550,6 +557,7 @@ export function MessagesClient({
       const existingConversation = latestData?.conversations.find((conversation) => conversation.id === conversationIdFromEvent)
       const isActiveConversation = conversationIdFromEvent === activeConversation
       const fallbackParticipant = existingConversation?.participants.find((participant) => !participant.isCurrentUser) ?? existingConversation?.participants[0]
+      const isSiteChatConversation = isSiteChatConversationId(conversationIdFromEvent) || existingConversation?.kind === "SITE_CHAT"
 
       promoteConversation(conversationIdFromEvent)
       setLiveConversationPatches((current) => {
@@ -561,8 +569,15 @@ export function MessagesClient({
         return {
           ...current,
           [conversationIdFromEvent]: {
+            kind: existingConversation?.kind ?? currentPatch?.kind,
             title: existingConversation?.title ?? payload.senderDisplayName ?? currentPatch?.title,
-            subtitle: isActiveConversation ? "实时会话" : nextUnreadCount > 0 ? `未读 ${nextUnreadCount} 条` : "最近互动",
+            subtitle: isActiveConversation
+              ? (isSiteChatConversation ? SITE_CHAT_SUBTITLE : "实时会话")
+              : nextUnreadCount > 0
+                ? `未读 ${nextUnreadCount} 条`
+                : isSiteChatConversation
+                  ? SITE_CHAT_SUBTITLE
+                  : "最近互动",
             preview: payload.content ? summarizeMessagePreview(payload.content) : (existingConversation?.preview ?? currentPatch?.preview),
             updatedAt: payload.createdAtLabel ?? existingConversation?.updatedAt ?? currentPatch?.updatedAt,
             unreadCount: nextUnreadCount,
@@ -799,6 +814,7 @@ function buildMessageCenterView(initialData: MessageCenterData | null, activeCon
 
     conversationsById.set(conversationId, {
       id: conversationId,
+      kind: patch.kind ?? "DIRECT",
       title: patch.title ?? patch.participants[0].displayName,
       subtitle: patch.subtitle ?? "新消息",
       preview: patch.preview ?? "收到一条新消息",
@@ -826,7 +842,7 @@ function buildMessageCenterView(initialData: MessageCenterData | null, activeCon
         ...(livePatch?.preview ? { preview: livePatch.preview } : {}),
         ...(livePatch?.updatedAt ? { updatedAt: livePatch.updatedAt } : {}),
         ...(typeof livePatch?.unreadCount === "number" ? { unreadCount: livePatch.unreadCount } : {}),
-        ...(conversation.id === activeConversationId ? { subtitle: "实时会话", unreadCount: 0 } : {}),
+        ...(conversation.id === activeConversationId ? { subtitle: conversation.kind === "SITE_CHAT" ? SITE_CHAT_SUBTITLE : "实时会话", unreadCount: 0 } : {}),
         ...(latestRuntimeMessage
           ? {
               preview: latestRuntimeMessage.body,
@@ -859,7 +875,7 @@ function buildMessageCenterView(initialData: MessageCenterData | null, activeCon
     conversations,
     activeConversation: {
       ...activeConversation,
-      subtitle: livePatch?.subtitle ?? (messages.length > 0 ? "实时会话" : activeConversation.subtitle),
+      subtitle: livePatch?.subtitle ?? (messages.length > 0 ? activeConversation.kind === "SITE_CHAT" ? SITE_CHAT_SUBTITLE : "实时会话" : activeConversation.subtitle),
       updatedAt: livePatch?.updatedAt ?? messages.at(-1)?.createdAt ?? activeConversation.updatedAt,
       messages,
       hasMoreHistory: patches.historyHasMoreByConversation[resolvedActiveConversationId] ?? activeConversation.hasMoreHistory,

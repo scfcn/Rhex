@@ -59,7 +59,10 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     filename: file.name,
     mime: file.type,
     size: file.size,
-  }, hookCtx)
+  }, {
+    ...hookCtx,
+    throwOnError: true,
+  })
 
   return withRequestWriteGuard(createRequestWriteGuardOptions("attachments-upload", {
     request,

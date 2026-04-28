@@ -26,9 +26,13 @@ interface AdminVipSettingsFormProps {
     redeemCodeHelpUrl: string
     checkInEnabled: boolean
     checkInReward: number
+    checkInRewardText: string
     checkInVip1Reward: number
+    checkInVip1RewardText: string
     checkInVip2Reward: number
+    checkInVip2RewardText: string
     checkInVip3Reward: number
+    checkInVip3RewardText: string
     checkInMakeUpEnabled: boolean
     checkInMakeUpCardPrice: number
     checkInVip1MakeUpCardPrice: number
@@ -103,6 +107,10 @@ export function AdminVipSettingsForm({
   tabRouteSection,
   initialRedeemCodes = [],
 }: AdminVipSettingsFormProps) {
+  const normalizedCheckInRewardText = initialSettings.checkInRewardText ?? String(initialSettings.checkInReward ?? 0)
+  const normalizedCheckInVip1RewardText = initialSettings.checkInVip1RewardText ?? String(initialSettings.checkInVip1Reward ?? initialSettings.checkInReward ?? 0)
+  const normalizedCheckInVip2RewardText = initialSettings.checkInVip2RewardText ?? String(initialSettings.checkInVip2Reward ?? initialSettings.checkInReward ?? 0)
+  const normalizedCheckInVip3RewardText = initialSettings.checkInVip3RewardText ?? String(initialSettings.checkInVip3Reward ?? initialSettings.checkInReward ?? 0)
   const initialVipNameColors = normalizeVipNameColors(initialSettings.vipNameColors)
   const router = useRouter()
   const [activeTab, setActiveTab] = useState(() => resolveVipTab(initialSubTab))
@@ -111,10 +119,10 @@ export function AdminVipSettingsForm({
   const [redeemCodeHelpTitle, setRedeemCodeHelpTitle] = useState(initialSettings.redeemCodeHelpTitle)
   const [redeemCodeHelpUrl, setRedeemCodeHelpUrl] = useState(initialSettings.redeemCodeHelpUrl)
   const [checkInEnabled, setCheckInEnabled] = useState(initialSettings.checkInEnabled)
-  const [checkInReward, setCheckInReward] = useState(String(initialSettings.checkInReward))
-  const [checkInVip1Reward, setCheckInVip1Reward] = useState(String(initialSettings.checkInVip1Reward))
-  const [checkInVip2Reward, setCheckInVip2Reward] = useState(String(initialSettings.checkInVip2Reward))
-  const [checkInVip3Reward, setCheckInVip3Reward] = useState(String(initialSettings.checkInVip3Reward))
+  const [checkInReward, setCheckInReward] = useState(normalizedCheckInRewardText)
+  const [checkInVip1Reward, setCheckInVip1Reward] = useState(normalizedCheckInVip1RewardText)
+  const [checkInVip2Reward, setCheckInVip2Reward] = useState(normalizedCheckInVip2RewardText)
+  const [checkInVip3Reward, setCheckInVip3Reward] = useState(normalizedCheckInVip3RewardText)
   const [checkInMakeUpEnabled, setCheckInMakeUpEnabled] = useState(initialSettings.checkInMakeUpEnabled ?? true)
   const [checkInMakeUpCardPrice, setCheckInMakeUpCardPrice] = useState(String(initialSettings.checkInMakeUpCardPrice))
   const [checkInVip1MakeUpCardPrice, setCheckInVip1MakeUpCardPrice] = useState(String(initialSettings.checkInVip1MakeUpCardPrice))
@@ -192,10 +200,10 @@ export function AdminVipSettingsForm({
                 redeemCodeHelpTitle,
                 redeemCodeHelpUrl,
                 checkInEnabled,
-                checkInReward: Number(checkInReward),
-                checkInVip1Reward: Number(checkInVip1Reward),
-                checkInVip2Reward: Number(checkInVip2Reward),
-                checkInVip3Reward: Number(checkInVip3Reward),
+                checkInReward,
+                checkInVip1Reward,
+                checkInVip2Reward,
+                checkInVip3Reward,
                 checkInMakeUpEnabled,
                 checkInMakeUpCardPrice: Number(checkInMakeUpCardPrice),
                 checkInVipMakeUpCardPrice: Number(checkInVip1MakeUpCardPrice),
@@ -245,7 +253,7 @@ export function AdminVipSettingsForm({
         >
           <SettingsSection
             title="积分基础配置"
-            description="统一配置积分名称、签到奖励、补签开关、补签范围与修改昵称扣费规则。0 是免费；补签最旧历史限制填 0 表示不限制。"
+            description="统一配置积分名称、签到奖励、补签开关、补签范围与修改昵称扣费规则。签到奖励支持填固定值 `5` 或随机区间 `5-10`；0 是免费；补签最旧历史限制填 0 表示不限制。"
           >
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <SettingsInputField label="积分名称" value={pointName} onChange={setPointName} placeholder="如 积分 / 金币 / 钻石" />
@@ -280,10 +288,10 @@ export function AdminVipSettingsForm({
               <SettingsInputField label="VIP3 改头像积分" value={avatarChangeVip3PointCost} onChange={setAvatarChangeVip3PointCost} placeholder="0 表示免费" />
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <SettingsInputField label="普通用户签到奖励" value={checkInReward} onChange={setCheckInReward} placeholder="如 5" />
-              <SettingsInputField label="VIP1 签到奖励" value={checkInVip1Reward} onChange={setCheckInVip1Reward} placeholder="如 8" />
-              <SettingsInputField label="VIP2 签到奖励" value={checkInVip2Reward} onChange={setCheckInVip2Reward} placeholder="如 10" />
-              <SettingsInputField label="VIP3 签到奖励" value={checkInVip3Reward} onChange={setCheckInVip3Reward} placeholder="如 12" />
+              <SettingsInputField label="普通用户签到奖励" value={checkInReward} onChange={setCheckInReward} placeholder="如 5 或 5-10" />
+              <SettingsInputField label="VIP1 签到奖励" value={checkInVip1Reward} onChange={setCheckInVip1Reward} placeholder="如 8 或 8-12" />
+              <SettingsInputField label="VIP2 签到奖励" value={checkInVip2Reward} onChange={setCheckInVip2Reward} placeholder="如 10 或 10-15" />
+              <SettingsInputField label="VIP3 签到奖励" value={checkInVip3Reward} onChange={setCheckInVip3Reward} placeholder="如 12 或 12-18" />
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <SettingsInputField label="普通用户补签价格" value={checkInMakeUpCardPrice} onChange={setCheckInMakeUpCardPrice} placeholder="如 20" />

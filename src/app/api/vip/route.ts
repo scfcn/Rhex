@@ -16,12 +16,16 @@ function addDays(date: Date, days: number) {
 export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   const body = await readJsonBody(request)
   const action = requireStringField(body, "action", "不支持的 VIP 操作")
+  const requestId = typeof body.requestId === "string" && body.requestId.trim()
+    ? body.requestId.trim()
+    : crypto.randomUUID()
 
   return withRequestWriteGuard(createRequestWriteGuardOptions("vip-action", {
     request,
     userId: currentUser.id,
     input: {
       action,
+      requestId,
     },
   }), async () => {
     const dbUser = await getCurrentUserRecord()

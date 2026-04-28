@@ -10,8 +10,8 @@ export async function generateMetadata() {
 export default async function PointsSystemFaqPage() {
   const settings = await getSiteSettings()
   const spendItems = [
-    { label: "普通签到奖励", value: `${settings.checkInReward} ${settings.pointName}` },
-    { label: "VIP1 / VIP2 / VIP3 签到", value: `${settings.checkInVip1Reward} / ${settings.checkInVip2Reward} / ${settings.checkInVip3Reward}` },
+    { label: "普通签到奖励", value: `${settings.checkInRewardText} ${settings.pointName}` },
+    { label: "VIP1 / VIP2 / VIP3 签到", value: `${settings.checkInVip1RewardText} / ${settings.checkInVip2RewardText} / ${settings.checkInVip3RewardText} ${settings.pointName}` },
     { label: "普通 / VIP1 / VIP2 / VIP3 补签", value: `${settings.checkInMakeUpCardPrice} / ${settings.checkInVip1MakeUpCardPrice} / ${settings.checkInVip2MakeUpCardPrice} / ${settings.checkInVip3MakeUpCardPrice}` },
     { label: "普通 / VIP1 / VIP2 / VIP3 改昵称", value: `${settings.nicknameChangePointCost} / ${settings.nicknameChangeVip1PointCost} / ${settings.nicknameChangeVip2PointCost} / ${settings.nicknameChangeVip3PointCost}` },
     { label: "普通 / VIP1 / VIP2 / VIP3 改头像", value: `${settings.avatarChangePointCost} / ${settings.avatarChangeVip1PointCost} / ${settings.avatarChangeVip2PointCost} / ${settings.avatarChangeVip3PointCost}` },

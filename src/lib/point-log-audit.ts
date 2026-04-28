@@ -1,5 +1,6 @@
 import type { Prisma, RelatedType } from "@/db/types"
 
+import { formatNumber } from "@/lib/formatters"
 import { normalizePointLogEventType, POINT_LOG_EVENT_TYPES, type PointLogEventDataInput, type PointLogEventDataValue, type PointLogEventType } from "@/lib/point-log-events"
 
 export type PointLogChangeType = "INCREASE" | "DECREASE"
@@ -281,6 +282,26 @@ export function resolvePointLogAuditPresentation(reason: string, eventData?: Poi
     pointEffect: metadata?.effect ?? null,
     pointTax: metadata?.tax ?? null,
   }
+}
+
+export function formatPointEffectAdjustmentValue(value: number) {
+  if (value > 0) {
+    return `+${formatNumber(value)}`
+  }
+
+  if (value < 0) {
+    return `-${formatNumber(Math.abs(value))}`
+  }
+
+  return formatNumber(value)
+}
+
+export function buildPointEffectSummaryText(effect: PointLogEffectMetadata | null | undefined) {
+  if (!effect) {
+    return null
+  }
+
+  return `勋章特效：原始 ${formatPointEffectAdjustmentValue(effect.baseValue)} -> 特效后 ${formatPointEffectAdjustmentValue(effect.finalValue)}`
 }
 
 export function normalizeAuditedPointLogEntry(entry: PointLogAuditEntry) {

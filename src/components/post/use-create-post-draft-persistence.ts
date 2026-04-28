@@ -4,9 +4,13 @@ import { useEffect, useEffectEvent, useRef, useState } from "react"
 
 import {
   clearPostDraftFromStorage,
+  deletePostDraftSnapshotFromStorage,
+  hasMeaningfulPostDraftContent,
   loadPostDraftFromStorage,
+  listPostDraftSnapshotsFromStorage,
   savePostDraftToStorage,
   type LocalPostDraft,
+  type StoredLocalPostDraftEntry,
 } from "@/lib/post-draft"
 import { toast } from "@/components/ui/toast"
 import { normalizeDraftData } from "@/components/post/create-post-form.shared"
@@ -26,6 +30,41 @@ interface UseCreatePostDraftPersistenceOptions {
   setDraft: React.Dispatch<React.SetStateAction<LocalPostDraft>>
 }
 
+interface StoredDraftStateSnapshot {
+  draftBoxEntries: StoredLocalPostDraftEntry[]
+  lastSavedDraftAt: string | null
+  pendingDraftToRestore: StoredLocalPostDraftEntry | null
+}
+
+function getStoredDraftStateSnapshot({
+  storageMode,
+  postId,
+  showPending = false,
+  activeDraftId,
+  draft,
+  initialDraftData,
+}: {
+  storageMode: "create" | "edit"
+  postId?: string
+  showPending?: boolean
+  activeDraftId: string | null
+  draft: LocalPostDraft
+  initialDraftData: LocalPostDraft
+}): StoredDraftStateSnapshot {
+  const drafts = listPostDraftSnapshotsFromStorage(storageMode, postId)
+
+  return {
+    draftBoxEntries: drafts,
+    lastSavedDraftAt: drafts[0]?.updatedAt ?? null,
+    pendingDraftToRestore:
+      showPending
+      && !activeDraftId
+      && !hasMeaningfulPostDraftContent(draft, initialDraftData)
+        ? loadPostDraftFromStorage(storageMode, postId)
+        : null,
+  }
+}
+
 export function useCreatePostDraftPersistence({
   draft,
   initialDraftData,
@@ -37,47 +76,95 @@ export function useCreatePostDraftPersistence({
   setDraft,
 }: UseCreatePostDraftPersistenceOptions) {
   const [pendingDraftToRestore, setPendingDraftToRestore] =
-    useState<LocalPostDraft | null>(null)
-  const [pendingDraftUpdatedAt, setPendingDraftUpdatedAt] = useState<string | null>(null)
+    useState<StoredLocalPostDraftEntry | null>(null)
+  const [draftBoxEntries, setDraftBoxEntries] = useState<StoredLocalPostDraftEntry[]>([])
   const [draftRestored, setDraftRestored] = useState(false)
   const [lastSavedDraftAt, setLastSavedDraftAt] = useState<string | null>(null)
-  const hasPromptedDraftRef = useRef(false)
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null)
+  const hasHydratedDraftsRef = useRef(false)
+
+  function syncStoredDraftState({
+    showPending = false,
+    activeDraftId: nextActiveDraftId = activeDraftId,
+    draft: nextDraft = draft,
+    initialDraftData: nextInitialDraftData = initialDraftData,
+  }: {
+    showPending?: boolean
+    activeDraftId?: string | null
+    draft?: LocalPostDraft
+    initialDraftData?: LocalPostDraft
+  } = {}) {
+    const snapshot = getStoredDraftStateSnapshot({
+      storageMode,
+      postId,
+      showPending,
+      activeDraftId: nextActiveDraftId,
+      draft: nextDraft,
+      initialDraftData: nextInitialDraftData,
+    })
+
+    setLastSavedDraftAt(snapshot.lastSavedDraftAt)
+    setDraftBoxEntries(snapshot.draftBoxEntries)
+    setPendingDraftToRestore(snapshot.pendingDraftToRestore)
+  }
+
+  const syncStoredDraftStateEffect = useEffectEvent(
+    (showPending = false, nextActiveDraftId: string | null = activeDraftId) => {
+      syncStoredDraftState({
+        showPending,
+        activeDraftId: nextActiveDraftId,
+      })
+    },
+  )
 
   useEffect(() => {
-    if (typeof window === "undefined" || hasPromptedDraftRef.current) {
+    if (typeof window === "undefined" || hasHydratedDraftsRef.current) {
       return
     }
 
-    const storedDraft = loadPostDraftFromStorage(storageMode, postId)
-    if (!storedDraft) {
-      hasPromptedDraftRef.current = true
-      return
-    }
-
-    hasPromptedDraftRef.current = true
+    hasHydratedDraftsRef.current = true
     const timer = window.setTimeout(() => {
-      setLastSavedDraftAt(storedDraft.updatedAt)
-      setPendingDraftToRestore(storedDraft.data)
-      setPendingDraftUpdatedAt(storedDraft.updatedAt)
+      syncStoredDraftStateEffect(true)
     }, 0)
 
     return () => window.clearTimeout(timer)
   }, [postId, storageMode])
 
   useEffect(() => {
-    if (typeof window === "undefined" || !hasPromptedDraftRef.current) {
+    if (typeof window === "undefined" || !hasHydratedDraftsRef.current) {
       return
     }
 
     const timer = window.setTimeout(() => {
-      const payload = savePostDraftToStorage(storageMode, draft, initialDraftData, postId)
-      setLastSavedDraftAt(payload?.updatedAt ?? null)
+      const result = savePostDraftToStorage(
+        storageMode,
+        draft,
+        initialDraftData,
+        postId,
+        {
+          draftId: activeDraftId ?? undefined,
+          source: "autosave",
+        },
+      )
+
+      if (!result) {
+        if (activeDraftId) {
+          setActiveDraftId(null)
+        }
+        syncStoredDraftStateEffect(true, null)
+        return
+      }
+
+      setActiveDraftId(result.entry.id)
+      setLastSavedDraftAt(result.entry.updatedAt)
+      setDraftBoxEntries(result.drafts)
+      setPendingDraftToRestore(null)
     }, 800)
 
     return () => window.clearTimeout(timer)
-  }, [draft, initialDraftData, postId, storageMode])
+  }, [activeDraftId, draft, initialDraftData, postId, storageMode])
 
-  function restoreDraft(nextDraft: LocalPostDraft) {
+  function restoreDraft(nextDraft: LocalPostDraft, draftId: string) {
     const normalizedDraft = normalizeDraftData(
       nextDraft,
       pointName,
@@ -102,32 +189,48 @@ export function useCreatePostDraftPersistence({
           || restoredRewardPoolOptions.postJackpotEnabled),
     })
     setDraftRestored(true)
+    setActiveDraftId(draftId)
     setPendingDraftToRestore(null)
-    setPendingDraftUpdatedAt(null)
     toast.info("已恢复你上次未提交的本地草稿", "草稿已恢复")
   }
 
   function handleRestorePendingDraft() {
     if (pendingDraftToRestore) {
-      restoreDraft(pendingDraftToRestore)
+      restoreDraft(pendingDraftToRestore.data, pendingDraftToRestore.id)
     }
   }
 
   function handleManualDraftSave() {
-    const payload = savePostDraftToStorage(storageMode, draft, initialDraftData, postId)
+    const result = savePostDraftToStorage(
+      storageMode,
+      draft,
+      initialDraftData,
+      postId,
+      {
+        draftId: activeDraftId ?? undefined,
+        source: "manual",
+      },
+    )
 
-    if (!payload) {
-      setLastSavedDraftAt(null)
+    if (!result) {
+      if (activeDraftId) {
+        setActiveDraftId(null)
+      }
       setDraftRestored(false)
-      setPendingDraftUpdatedAt(null)
+      syncStoredDraftState({
+        showPending: true,
+        activeDraftId: null,
+      })
       toast.info("请先输入标题、正文或其他有效配置后再保存草稿", "未保存草稿")
       return
     }
 
-    setLastSavedDraftAt(payload.updatedAt)
+    setActiveDraftId(result.entry.id)
+    setLastSavedDraftAt(result.entry.updatedAt)
+    setDraftBoxEntries(result.drafts)
     setDraftRestored(false)
-    setPendingDraftUpdatedAt(null)
-    toast.success("当前内容已保存到本地，下次进入可恢复", "草稿已保存")
+    setPendingDraftToRestore(null)
+    toast.success("当前内容已同步到草稿箱，后续自动保存会继续更新这份草稿", "草稿已保存")
   }
 
   const handleManualDraftSaveEffect = useEffectEvent(() => {
@@ -159,21 +262,70 @@ export function useCreatePostDraftPersistence({
   }, [])
 
   function handleClearDraft() {
-    clearPostDraftFromStorage(storageMode, postId)
-    setLastSavedDraftAt(null)
+    const targetDraftId = activeDraftId ?? pendingDraftToRestore?.id
+
+    if (!targetDraftId) {
+      clearPostDraftFromStorage(storageMode, postId)
+      setDraftRestored(false)
+      setActiveDraftId(null)
+      syncStoredDraftState({
+        activeDraftId: null,
+      })
+      toast.info("当前页面的草稿箱已清空", "草稿箱已清空")
+      return
+    }
+
+    deletePostDraftSnapshotFromStorage(storageMode, targetDraftId, postId)
+    const nextActiveDraftId = activeDraftId === targetDraftId ? null : activeDraftId
     setDraftRestored(false)
-    setPendingDraftToRestore(null)
-    setPendingDraftUpdatedAt(null)
-    toast.info("当前页面对应的本地草稿已删除", "草稿已清除")
+    setActiveDraftId(nextActiveDraftId)
+    syncStoredDraftState({
+      showPending: true,
+      activeDraftId: nextActiveDraftId,
+    })
+    toast.info("当前草稿已从草稿箱删除", "草稿已删除")
+  }
+
+  function handleRestoreDraftFromBox(draftId: string) {
+    const targetDraft = draftBoxEntries.find((item) => item.id === draftId)
+    if (targetDraft) {
+      restoreDraft(targetDraft.data, draftId)
+    }
+  }
+
+  function handleDeleteDraftFromBox(draftId: string) {
+    deletePostDraftSnapshotFromStorage(storageMode, draftId, postId)
+    const nextActiveDraftId = activeDraftId === draftId ? null : activeDraftId
+    setDraftRestored(false)
+    setActiveDraftId(nextActiveDraftId)
+    syncStoredDraftState({
+      showPending: true,
+      activeDraftId: nextActiveDraftId,
+    })
+    toast.info("所选草稿已从草稿箱删除", "草稿已删除")
+  }
+
+  function handleSubmitSuccess() {
+    if (activeDraftId) {
+      deletePostDraftSnapshotFromStorage(storageMode, activeDraftId, postId)
+    }
+    setDraftRestored(false)
+    setActiveDraftId(null)
+    syncStoredDraftState({
+      activeDraftId: null,
+    })
   }
 
   return {
     pendingDraftToRestore,
-    pendingDraftUpdatedAt,
+    draftBoxEntries,
     draftRestored,
     lastSavedDraftAt,
     handleRestorePendingDraft,
     handleManualDraftSave,
     handleClearDraft,
+    handleRestoreDraftFromBox,
+    handleDeleteDraftFromBox,
+    handleSubmitSuccess,
   }
 }

@@ -1,4 +1,4 @@
-import { revalidateTag } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
 
 import { findSiteSettingsRecordForUpdate } from "@/db/site-settings-write-queries"
 
@@ -22,5 +22,6 @@ export function expireSiteSettingsCacheImmediately() {
 
 export function finalizeSiteSettingsUpdate(result: SiteSettingsSectionUpdateResult) {
   revalidateSiteSettingsCache()
+  revalidatePath("/", "layout")
   return result
 }

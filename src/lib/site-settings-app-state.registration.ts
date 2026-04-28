@@ -4,6 +4,11 @@ import {
 } from "@/lib/email-template-settings"
 import { parseEmailWhitelistDomains } from "@/lib/email"
 import {
+  normalizeCheckInRewardRange,
+  type CheckInRewardRange,
+} from "@/lib/check-in-reward"
+import { parseNonNegativeSafeInteger } from "@/lib/shared/safe-integer"
+import {
   isRecord,
   normalizeNonNegativeInteger,
   readSiteSettingsState,
@@ -33,31 +38,63 @@ export function resolveCheckInRewardSettings(options: {
   normalReward: number
 }): CheckInRewardSettings {
   const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const checkInRewardRanges = isRecord(siteSettingsState.checkInRewardRanges)
+    ? siteSettingsState.checkInRewardRanges
+    : {}
   const checkInRewards = isRecord(siteSettingsState.checkInRewards)
     ? siteSettingsState.checkInRewards
     : {}
-  const normal = normalizeNonNegativeInteger(options.normalReward, 0)
+  const normalFallback = normalizeCheckInRewardRange({
+    min: normalizeNonNegativeInteger(options.normalReward, 0),
+    max: normalizeNonNegativeInteger(options.normalReward, 0),
+  })
+  const normal = normalizeCheckInRewardRange(
+    isRecord(checkInRewardRanges.normal) ? checkInRewardRanges.normal as Partial<CheckInRewardRange> : null,
+    normalFallback,
+  )
+  const legacyVip1Reward = parseNonNegativeSafeInteger(checkInRewards.vip1)
+  const legacyVip2Reward = parseNonNegativeSafeInteger(checkInRewards.vip2)
+  const legacyVip3Reward = parseNonNegativeSafeInteger(checkInRewards.vip3)
 
   return {
     normal,
-    vip1: normalizeNonNegativeInteger(checkInRewards.vip1, normal),
-    vip2: normalizeNonNegativeInteger(checkInRewards.vip2, normal),
-    vip3: normalizeNonNegativeInteger(checkInRewards.vip3, normal),
+    vip1: normalizeCheckInRewardRange(
+      isRecord(checkInRewardRanges.vip1) ? checkInRewardRanges.vip1 as Partial<CheckInRewardRange> : null,
+      legacyVip1Reward === null ? normal : { min: legacyVip1Reward, max: legacyVip1Reward },
+    ),
+    vip2: normalizeCheckInRewardRange(
+      isRecord(checkInRewardRanges.vip2) ? checkInRewardRanges.vip2 as Partial<CheckInRewardRange> : null,
+      legacyVip2Reward === null ? normal : { min: legacyVip2Reward, max: legacyVip2Reward },
+    ),
+    vip3: normalizeCheckInRewardRange(
+      isRecord(checkInRewardRanges.vip3) ? checkInRewardRanges.vip3 as Partial<CheckInRewardRange> : null,
+      legacyVip3Reward === null ? normal : { min: legacyVip3Reward, max: legacyVip3Reward },
+    ),
   }
 }
 
 export function mergeCheckInRewardSettings(
   appStateJson: string | null | undefined,
-  input: Pick<CheckInRewardSettings, "vip1" | "vip2" | "vip3">,
+  input: CheckInRewardSettings,
 ) {
   const siteSettingsState = readSiteSettingsState(appStateJson)
+  const normal = normalizeCheckInRewardRange(input.normal)
+  const vip1 = normalizeCheckInRewardRange(input.vip1, normal)
+  const vip2 = normalizeCheckInRewardRange(input.vip2, normal)
+  const vip3 = normalizeCheckInRewardRange(input.vip3, normal)
 
   return writeSiteSettingsState(appStateJson, {
     ...siteSettingsState,
     checkInRewards: {
-      vip1: normalizeNonNegativeInteger(input.vip1, 0),
-      vip2: normalizeNonNegativeInteger(input.vip2, 0),
-      vip3: normalizeNonNegativeInteger(input.vip3, 0),
+      vip1: vip1.min,
+      vip2: vip2.min,
+      vip3: vip3.min,
+    },
+    checkInRewardRanges: {
+      normal,
+      vip1,
+      vip2,
+      vip3,
     },
   })
 }

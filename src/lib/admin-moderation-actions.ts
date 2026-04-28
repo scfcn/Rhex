@@ -7,6 +7,7 @@ import {
   updateBoardVisibilityState,
 } from "@/db/admin-moderation-queries"
 
+import { executeAddonActionHook } from "@/addons-host/runtime/hooks"
 import { apiError } from "@/lib/api-route"
 import { defineAdminAction, writeAdminActionLog, type AdminActionDefinition } from "@/lib/admin-action-types"
 import { revalidateHomeSidebarStatsCache } from "@/lib/home-sidebar-stats"
@@ -42,6 +43,48 @@ export const adminModerationActionHandlers: Record<string, AdminActionDefinition
     await writeAdminActionLog(context, adminModerationActionHandlers["comment.hide"].metadata)
     return {
       message: "评论已下线",
+      revalidatePaths: [`/posts/${comment.post.slug}`, `/boards/${comment.post.board.slug}`, "/admin", "/notifications", "/"],
+    }
+  }),
+  "comment.delete": defineAdminAction({ targetType: "COMMENT", revalidatePaths: ["/", "/admin"], buildDetail: () => "管理员删除评论" }, async (context) => {
+    const comment = await ensureCanManageComment(context.actor, context.targetId)
+    const reason = context.message || "管理员删除评论"
+    await executeAddonActionHook("comment.delete.before", {
+      commentId: context.targetId,
+      editorId: String(context.adminUserId),
+      reason,
+    }, {
+      throwOnError: true,
+    })
+    await updateCommentModerationState(context.targetId, {
+      status: CommentStatus.DELETED,
+      reviewNote: reason,
+      reviewedById: context.adminUserId,
+      reviewedAt: new Date(),
+    })
+    revalidateHomeSidebarStatsCache()
+
+    if (comment.userId !== context.adminUserId) {
+      await createSystemNotification({
+        userId: comment.userId,
+        senderId: context.adminUserId,
+        relatedType: "COMMENT",
+        relatedId: comment.id,
+        title: "评论已被删除",
+        content: `你在《${comment.post.title}》下的评论已被管理员删除。${context.message ? ` 处理说明：${context.message}` : ""}`,
+      }).catch((error) => {
+        console.warn("[admin-moderation-actions] failed to notify comment delete", error)
+      })
+    }
+
+    await executeAddonActionHook("comment.delete.after", {
+      commentId: context.targetId,
+      editorId: String(context.adminUserId),
+      reason,
+    })
+    await writeAdminActionLog(context, adminModerationActionHandlers["comment.delete"].metadata)
+    return {
+      message: "评论已删除",
       revalidatePaths: [`/posts/${comment.post.slug}`, `/boards/${comment.post.board.slug}`, "/admin", "/notifications", "/"],
     }
   }),

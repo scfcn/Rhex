@@ -1,6 +1,7 @@
 import "server-only"
 import { getAvatarUrl } from "./avatar"
 import { executeAddonWaterfallHook } from "@/addons-host/runtime/hooks"
+import { normalizeHookedAvatarPath } from "@/lib/user-presentation"
 
 /**
  * 异步版：叠加 `user.avatar.url.value` waterfall hook，支持插件替换/代理头像 URL。
@@ -11,7 +12,6 @@ export async function getAvatarUrlWithAddons(
   avatarPath: string | null | undefined,
   name: string,
 ): Promise<string> {
-  const base = getAvatarUrl(avatarPath, name)
-  const { value } = await executeAddonWaterfallHook("user.avatar.url.value", base)
-  return value
+  const { value } = await executeAddonWaterfallHook("user.avatar.url.value", avatarPath?.trim() ?? "")
+  return getAvatarUrl(normalizeHookedAvatarPath(value), name)
 }

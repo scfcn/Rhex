@@ -12,6 +12,27 @@ export function countUserPointLogs(userId: number, where?: Prisma.PointLogWhereI
   })
 }
 
+export function listUserPointLogsInRange(params: {
+  userId: number
+  start: Date
+  end: Date
+  order?: "asc" | "desc"
+}) {
+  return prisma.pointLog.findMany({
+    where: {
+      userId: params.userId,
+      createdAt: {
+        gte: params.start,
+        lt: params.end,
+      },
+    },
+    orderBy: [
+      { createdAt: params.order ?? "asc" },
+      { id: params.order ?? "asc" },
+    ],
+  })
+}
+
 function buildPointLogCursorWhere(
   userId: number,
   cursor: TimestampCursorPayload,

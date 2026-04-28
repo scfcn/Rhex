@@ -25,6 +25,7 @@ import { decodeTimestampCursor, encodeTimestampCursor } from "@/lib/cursor-pagin
 import { getAnonymousMaskDisplayIdentity } from "@/lib/post-anonymous"
 import { mapListPost } from "@/lib/post-map"
 import { normalizePositiveInteger } from "@/lib/shared/normalizers"
+import { applyHookedUserPresentationToSitePosts } from "@/lib/user-presentation-server"
 import { getUserDisplayName } from "@/lib/users"
 
 interface CursorPageResultBase {
@@ -175,7 +176,9 @@ export async function getUserPosts(userId: number, options: { pageSize?: number;
     ])
 
     return {
-      items: posts.map((post) => mapListPost(post, anonymousMaskIdentity)),
+      items: await applyHookedUserPresentationToSitePosts(
+        posts.map((post) => mapListPost(post, anonymousMaskIdentity)),
+      ),
       ...createCursorPageResult(total, pageSize, {
         hasPrevPage,
         hasNextPage,
@@ -210,7 +213,9 @@ export async function getUserFavoritePosts(userId: number, options: { pageSize?:
     ])
 
     return {
-      items: favorites.map((favorite) => mapListPost(favorite.post, anonymousMaskIdentity)),
+      items: await applyHookedUserPresentationToSitePosts(
+        favorites.map((favorite) => mapListPost(favorite.post, anonymousMaskIdentity)),
+      ),
       ...createCursorPageResult(total, pageSize, {
         hasPrevPage,
         hasNextPage,
@@ -287,7 +292,9 @@ export async function getUserLikedPosts(userId: number, options: { pageSize?: nu
     ])
 
     return {
-      items: likes.flatMap((like) => (like.post ? [mapListPost(like.post, anonymousMaskIdentity)] : [])),
+      items: await applyHookedUserPresentationToSitePosts(
+        likes.flatMap((like) => (like.post ? [mapListPost(like.post, anonymousMaskIdentity)] : [])),
+      ),
       ...createCursorPageResult(total, pageSize, {
         hasPrevPage,
         hasNextPage,
@@ -490,7 +497,9 @@ export async function getUserPostFollows(userId: number, options: { pageSize?: n
     ])
 
     return {
-      items: follows.map((follow) => mapListPost(follow.post, anonymousMaskIdentity)),
+      items: await applyHookedUserPresentationToSitePosts(
+        follows.map((follow) => mapListPost(follow.post, anonymousMaskIdentity)),
+      ),
       ...createCursorPageResult(total, pageSize, {
         hasPrevPage,
         hasNextPage,

@@ -6,6 +6,7 @@ import { dedupeAndMapPinnedPosts, extractPinnedPostIds } from "@/lib/pinned-post
 import type { TaxonomyPostSort } from "@/lib/forum-taxonomy-sort"
 import { getAnonymousMaskDisplayIdentity } from "@/lib/post-anonymous"
 import { mapListPost } from "@/lib/post-map"
+import { applyHookedUserPresentationToSitePosts } from "@/lib/user-presentation-server"
 import { normalizePostListLoadMode, type PostListLoadMode } from "@/lib/post-list-load-mode"
 import { normalizePostListDisplayMode, type PostListDisplayMode } from "@/lib/post-list-display"
 import { TAXONOMY_CACHE_TAGS } from "@/lib/taxonomy-cache"
@@ -157,9 +158,13 @@ export async function getZonePosts(
   if (pagination.page === 1) {
     const { pinnedItems, pinnedPostIds } = dedupeAndMapPinnedPosts(pinnedPosts, (post) => mapListPost(post, anonymousMaskIdentity))
     const normalPosts = await findZoneNormalPosts(boardIds, pinnedPostIds, 1, pagination.pageSize, sort)
+    const items = await applyHookedUserPresentationToSitePosts([
+      ...pinnedItems,
+      ...normalPosts.map((post) => mapListPost(post, anonymousMaskIdentity)),
+    ])
 
     return {
-      items: [...pinnedItems, ...normalPosts.map((post) => mapListPost(post, anonymousMaskIdentity))],
+      items,
       page: pagination.page,
       pageSize: pagination.pageSize,
       total: pagination.total,
@@ -170,9 +175,12 @@ export async function getZonePosts(
   }
 
   const normalPosts = await findZoneNormalPosts(boardIds, excludedPostIds, pagination.page, pagination.pageSize, sort)
+  const items = await applyHookedUserPresentationToSitePosts(
+    normalPosts.map((post) => mapListPost(post, anonymousMaskIdentity)),
+  )
 
   return {
-    items: normalPosts.map((post) => mapListPost(post, anonymousMaskIdentity)),
+    items,
     page: pagination.page,
     pageSize: pagination.pageSize,
     total: pagination.total,

@@ -5,6 +5,7 @@ import { logError } from "@/lib/logger"
 import { summarizeMessagePreview } from "@/lib/message-media"
 import { sendDirectMessage } from "@/lib/messages"
 import { logRouteWriteSuccess } from "@/lib/route-metadata"
+import { isSiteChatConversationId } from "@/lib/site-chat"
 import { enqueueUserNotificationDeliveries } from "@/lib/user-notification-delivery"
 import { getUserDisplayName } from "@/lib/user-display"
 import { revalidateUserSurfaceCache } from "@/lib/user-surface"
@@ -14,7 +15,8 @@ import { createRequestWriteGuardOptions, createWriteGuardOptions } from "@/lib/w
 type MessageExecutionActor = Pick<CurrentUserRecord, "id" | "username" | "nickname" | "avatarPath" | "status">
 
 interface ExecuteDirectMessageSendInput {
-  recipientId: number
+  recipientId?: number
+  conversationId?: string
   body: string
 }
 
@@ -79,10 +81,14 @@ export async function executeDirectMessageSend(
   const requestUrl = new URL(options.request.url)
 
   return runMessageWriteGuard(input, options.sender.id, options.request, async () => {
+    const normalizedConversationId = input.conversationId?.trim()
+    const recipientId = input.recipientId
+
     await executeAddonActionHook("message.send.before", {
       senderId: options.sender.id,
       senderUsername: options.sender.username,
-      recipientId: input.recipientId,
+      recipientId: recipientId ?? 0,
+      conversationId: normalizedConversationId,
       body: input.body,
     }, {
       request: options.request,
@@ -91,12 +97,20 @@ export async function executeDirectMessageSend(
       throwOnError: true,
     })
 
-    const data = await sendDirectMessage(options.sender.id, input.recipientId, input.body)
+    const data = isSiteChatConversationId(normalizedConversationId)
+      ? await sendDirectMessage(options.sender.id, undefined, input.body, {
+          conversationId: normalizedConversationId,
+        })
+      : typeof recipientId === "number"
+        ? await sendDirectMessage(options.sender.id, recipientId, input.body)
+        : (() => {
+            throw new Error("缺少接收方信息")
+          })()
 
     await executeAddonActionHook("message.send.after", {
       senderId: options.sender.id,
       senderUsername: options.sender.username,
-      recipientId: input.recipientId,
+      recipientId: recipientId ?? 0,
       messageId: data.id,
       conversationId: data.conversationId,
       body: data.content,
@@ -109,39 +123,47 @@ export async function executeDirectMessageSend(
     })
 
     revalidateUserSurfaceCache(options.sender.id)
-    revalidateUserSurfaceCache(input.recipientId)
+    if ("participantUserIds" in data && Array.isArray(data.participantUserIds)) {
+      for (const participantUserId of data.participantUserIds) {
+        revalidateUserSurfaceCache(participantUserId)
+      }
+    } else if (!isSiteChatConversationId(normalizedConversationId) && typeof recipientId === "number") {
+      revalidateUserSurfaceCache(recipientId)
+    }
 
-    void enqueueUserNotificationDeliveries({
-      userId: input.recipientId,
-      event: {
-        type: "privateMessage",
-        message: {
-          id: data.id,
-          conversationId: data.conversationId,
-          content: data.content,
-          preview: summarizeMessagePreview(data.content),
-          createdAt: data.occurredAt,
-          inboxPath: `/messages?conversation=${encodeURIComponent(data.conversationId)}`,
+    if (!isSiteChatConversationId(normalizedConversationId) && typeof recipientId === "number") {
+      void enqueueUserNotificationDeliveries({
+        userId: recipientId,
+        event: {
+          type: "privateMessage",
+          message: {
+            id: data.id,
+            conversationId: data.conversationId,
+            content: data.content,
+            preview: summarizeMessagePreview(data.content),
+            createdAt: data.occurredAt,
+            inboxPath: `/messages?conversation=${encodeURIComponent(data.conversationId)}`,
+          },
+          sender: {
+            id: options.sender.id,
+            username: options.sender.username,
+            displayName: getUserDisplayName(options.sender, options.sender.username),
+            avatarPath: options.sender.avatarPath ?? null,
+          },
         },
-        sender: {
-          id: options.sender.id,
-          username: options.sender.username,
-          displayName: getUserDisplayName(options.sender, options.sender.username),
-          avatarPath: options.sender.avatarPath ?? null,
-        },
-      },
-    }).catch((error) => {
-      logError({
-        scope: "user-notification-delivery",
-        action: "enqueue-private-message",
-        userId: options.sender.id,
-        targetId: data.id,
-        metadata: {
-          recipientId: input.recipientId,
-          conversationId: data.conversationId,
-        },
-      }, error)
-    })
+      }).catch((error) => {
+        logError({
+          scope: "user-notification-delivery",
+          action: "enqueue-private-message",
+          userId: options.sender.id,
+          targetId: data.id,
+          metadata: {
+            recipientId,
+            conversationId: data.conversationId,
+          },
+        }, error)
+      })
+    }
 
     if (options.log) {
       logRouteWriteSuccess({
@@ -149,11 +171,12 @@ export async function executeDirectMessageSend(
         action: options.log.action,
       }, {
         userId: options.sender.id,
-        targetId: String(input.recipientId),
+        targetId: normalizedConversationId || String(recipientId),
         extra: {
           conversationId: data.conversationId,
           messageId: data.id,
           contentAdjusted: data.contentAdjusted,
+          conversationKind: normalizedConversationId ? "SITE_CHAT" : "DIRECT",
           ...(options.log.extra ?? {}),
         },
       })

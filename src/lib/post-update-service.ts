@@ -2,6 +2,9 @@ import { findPostUpdateContext, runPostUpdateTransaction } from "@/db/post-updat
 import { findPostAttachmentsByPostId } from "@/db/post-attachment-queries"
 
 import { apiError } from "@/lib/api-route"
+import { verifyCreatePostCaptchaWithAddonProviders } from "@/lib/addon-captcha-providers"
+import { readAddonFormFieldsFromBody } from "@/lib/addon-form-fields"
+import { resolveHookedStringValue } from "@/lib/addon-hook-values"
 import { extractSummaryFromContent } from "@/lib/content"
 import { enforceSensitiveText } from "@/lib/content-safety"
 import { createPostMentionNotifications, stripPostContentUserLinks } from "@/lib/post-mentions"
@@ -10,13 +13,15 @@ import { buildPostContentDocument, getAllPostContentText, getPostContentMeta, se
 import { normalizeManualTags, syncPostTaxonomy } from "@/lib/post-editor"
 import { getSiteSettings } from "@/lib/site-settings"
 import { validatePostPayload } from "@/lib/validators"
-import { executeAddonActionHook } from "@/addons-host/runtime/hooks"
+import { queryAddonPosts } from "@/addons-host/runtime/posts"
+import { executeAddonActionHook, executeAddonWaterfallHook } from "@/addons-host/runtime/hooks"
 
 const APPEND_INTERVAL_MS = 60 * 60 * 1000
 
 export async function updatePostFlow(input: {
   postId: string
   body: unknown
+  request: Request
   currentUser: {
     id: number
     role?: string | null
@@ -26,6 +31,12 @@ export async function updatePostFlow(input: {
   }
 }) {
   const settings = await getSiteSettings()
+  const requestUrl = new URL(input.request.url)
+  const hookContext = {
+    request: input.request,
+    pathname: requestUrl.pathname,
+    searchParams: requestUrl.searchParams,
+  }
   const fallbackTitle = "占".repeat(settings.postTitleMinLength)
   const fallbackContent = "文".repeat(settings.postContentMinLength)
   const validated = validatePostPayload({
@@ -46,6 +57,7 @@ export async function updatePostFlow(input: {
   }
 
   const { title, content, coverPath, loginUnlockContent, replyUnlockContent, replyThreshold, purchaseUnlockContent, purchasePrice, commentsVisibleToAuthorOnly, minViewLevel, minViewVipLevel } = validated.data
+  const addonFields = readAddonFormFieldsFromBody(input.body)
   const rawAppendedContent = (input.body as Record<string, unknown> | null)?.appendedContent
   const appendedContent = typeof rawAppendedContent === "string"
     ? rawAppendedContent.trim()
@@ -73,6 +85,30 @@ export async function updatePostFlow(input: {
   const canEditNormally = isAdmin || (editDeadline > Date.now())
 
   if (canEditNormally && !appendedContent) {
+    await verifyCreatePostCaptchaWithAddonProviders({
+      request: input.request,
+      payload: {
+        title,
+        content,
+        isAnonymous: post.isAnonymous,
+        coverPath,
+        boardSlug: validated.data.boardSlug,
+        postType: validated.data.postType,
+        bountyPoints: validated.data.bountyPoints,
+        auctionConfig: validated.data.auctionConfig,
+        pollOptions: validated.data.pollOptions,
+        commentsVisibleToAuthorOnly,
+        loginUnlockContent,
+        replyUnlockContent,
+        replyThreshold,
+        purchaseUnlockContent,
+        purchasePrice,
+        minViewLevel,
+        minViewVipLevel,
+        lotteryConfig: validated.data.lotteryConfig,
+      },
+      addonFields,
+    })
     const existingAttachments = await findPostAttachmentsByPostId(post.id)
     const normalizedAttachments = await normalizePostAttachmentInputs(rawBody?.attachments, {
       settings,
@@ -86,7 +122,17 @@ export async function updatePostFlow(input: {
       uploadOwnerUserIds: isAdmin ? [input.currentUser.id, post.authorId] : [post.authorId],
       allowedExistingAttachmentIds: existingAttachments.map((attachment) => attachment.id),
     })
-    const titleSafety = await enforceSensitiveText({ scene: "post.title", text: title })
+    const titleHookResult = await executeAddonWaterfallHook("post.title.value", title, {
+      ...hookContext,
+      payload: {
+        mode: "update",
+        postId: input.postId,
+        boardSlug: validated.data.boardSlug,
+        postType: validated.data.postType,
+      },
+    })
+    const { value: hookedTitle } = resolveHookedStringValue(title, titleHookResult.value)
+    const titleSafety = await enforceSensitiveText({ scene: "post.title", text: hookedTitle })
     const contentSafety = await enforceSensitiveText({ scene: "post.content", text: content })
     const loginUnlockSafety = loginUnlockContent ? await enforceSensitiveText({ scene: "post.content", text: loginUnlockContent }) : null
     const replyUnlockSafety = replyUnlockContent ? await enforceSensitiveText({ scene: "post.content", text: replyUnlockContent }) : null
@@ -134,6 +180,9 @@ export async function updatePostFlow(input: {
         minViewVipLevel,
         manualTags: sanitizedManualTags,
       },
+    }, {
+      ...hookContext,
+      throwOnError: true,
     })
 
     await runPostUpdateTransaction(async (tx) => {
@@ -176,6 +225,11 @@ export async function updatePostFlow(input: {
     })
 
     await syncPostTaxonomy(input.postId, titleSafety.sanitizedText, finalContent, sanitizedManualTags)
+    const updatedPost = (await queryAddonPosts({
+      ids: [input.postId],
+      statuses: ["NORMAL", "PENDING", "DELETED", "LOCKED", "OFFLINE"],
+      limit: 1,
+    })).items[0]
 
     await executeAddonActionHook("post.update.after", {
       postId: input.postId,
@@ -190,7 +244,8 @@ export async function updatePostFlow(input: {
         minViewVipLevel,
         manualTags: sanitizedManualTags,
       },
-    })
+      ...(updatedPost ? { post: updatedPost } : {}),
+    }, hookContext)
 
     return {
       post,
@@ -219,6 +274,9 @@ export async function updatePostFlow(input: {
     postId: input.postId,
     editorId: String(input.currentUser.id),
     changes: { appendedContent: appendSafety.sanitizedText, mode: "append" },
+  }, {
+    ...hookContext,
+    throwOnError: true,
   })
 
   await runPostUpdateTransaction(async (tx) => {
@@ -253,11 +311,17 @@ export async function updatePostFlow(input: {
     })
   })
 
+  const updatedPost = (await queryAddonPosts({
+    ids: [input.postId],
+    statuses: ["NORMAL", "PENDING", "DELETED", "LOCKED", "OFFLINE"],
+    limit: 1,
+  })).items[0]
   await executeAddonActionHook("post.update.after", {
     postId: input.postId,
     editorId: String(input.currentUser.id),
     changes: { appendedContent: appendSafety.sanitizedText, mode: "append" },
-  })
+    ...(updatedPost ? { post: updatedPost } : {}),
+  }, hookContext)
 
   return {
     post,

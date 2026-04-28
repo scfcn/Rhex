@@ -6,6 +6,7 @@ import { decodeTimestampCursor, encodeTimestampCursor } from "@/lib/cursor-pagin
 import { formatMonthDayTime } from "@/lib/formatters"
 import { getPostCommentPath, getPostPath } from "@/lib/post-links"
 import { getSiteSettings } from "@/lib/site-settings"
+import { applyHookedUserPresentationToNamedItem } from "@/lib/user-presentation-server"
 import { getUserDisplayName } from "@/lib/users"
 
 
@@ -169,8 +170,16 @@ export async function getUserNotifications(
       )),
     )
 
-    return {
-      items: notifications.map((notification, index) => ({
+    const items = await Promise.all(notifications.map(async (notification, index) => {
+      const sender = notification.sender
+        ? await applyHookedUserPresentationToNamedItem({
+            username: notification.sender.username,
+            displayName: getUserDisplayName(notification.sender, "系统"),
+            displayedBadges: [],
+          })
+        : null
+
+      return {
         id: notification.id,
         type: notification.type,
         typeLabel: NOTIFICATION_TYPE_LABELS[notification.type],
@@ -178,9 +187,13 @@ export async function getUserNotifications(
         content: notification.content,
         isRead: notification.isRead,
         createdAt: formatMonthDayTime(notification.createdAt),
-        senderName: getUserDisplayName(notification.sender, "系统"),
+        senderName: sender?.displayName ?? "系统",
         relatedUrl: relatedUrls[index],
-      })),
+      }
+    }))
+
+    return {
+      items,
       hasPrevPage,
       hasNextPage,
       prevCursor: notifications.length > 0 ? encodeTimestampCursor({ id: notifications[0].id, createdAt: notifications[0].createdAt.toISOString() }) : null,

@@ -5,8 +5,11 @@ export interface SiteSettingsVipData {
   vipLevelIcons: VipLevelIcons
   vipNameColors: VipNameColors
   checkInVip1Reward: number
+  checkInVip1RewardText: string
   checkInVip2Reward: number
+  checkInVip2RewardText: string
   checkInVip3Reward: number
+  checkInVip3RewardText: string
   checkInVipMakeUpCardPrice: number
   checkInVip1MakeUpCardPrice: number
   checkInVip2MakeUpCardPrice: number

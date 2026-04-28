@@ -184,6 +184,9 @@ export const defaultSiteSettingsCreateInput = {
         imageUploadEnabled: false,
         fileUploadEnabled: false,
       },
+      siteChat: {
+        enabled: false,
+      },
     },
   }),
   sensitiveStateJson: "{}",

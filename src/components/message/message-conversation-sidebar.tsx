@@ -75,7 +75,9 @@ export function MessageConversationSidebar({
           const hasUnread = conversation.unreadCount > 0
           const mainParticipant = conversation.participants.find((item) => !item.isCurrentUser) ?? conversation.participants[0]
           const isDeleting = deletingConversationId === conversation.id
-          const profileHref = `/users/${mainParticipant.username}`
+          const profileHref = conversation.kind === "SITE_CHAT" || !mainParticipant?.username
+            ? null
+            : `/users/${mainParticipant.username}`
 
           return (
             <div
@@ -90,16 +92,23 @@ export function MessageConversationSidebar({
               )}
             >
               <div className="flex min-w-0 flex-1 items-center gap-3">
-                <Link
-                  href={profileHref}
-                  className="relative z-10 shrink-0 rounded-2xl focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  aria-label={`查看 ${mainParticipant.displayName} 的主页`}
-                >
-                  <div className="relative shrink-0">
-                    <UserAvatar name={mainParticipant.displayName} avatarPath={mainParticipant.avatarPath} size="md" />
+                {profileHref ? (
+                  <Link
+                    href={profileHref}
+                    className="relative z-10 shrink-0 rounded-2xl focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    aria-label={`查看 ${mainParticipant.displayName} 的主页`}
+                  >
+                    <div className="relative shrink-0">
+                      <UserAvatar name={mainParticipant.displayName} avatarPath={mainParticipant.avatarPath} size="md" />
+                      {conversation.unreadCount > 0 ? <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full border border-background bg-rose-500 px-1 text-[10px] font-semibold text-white shadow-[0_4px_12px_rgba(244,63,94,0.22)] dark:border-card dark:bg-rose-300 dark:text-rose-950 dark:shadow-none">{conversation.unreadCount > 99 ? "99+" : conversation.unreadCount}</span> : null}
+                    </div>
+                  </Link>
+                ) : (
+                  <div className="relative z-10 shrink-0">
+                    <UserAvatar name={conversation.title} avatarPath={mainParticipant?.avatarPath} size="md" />
                     {conversation.unreadCount > 0 ? <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full border border-background bg-rose-500 px-1 text-[10px] font-semibold text-white shadow-[0_4px_12px_rgba(244,63,94,0.22)] dark:border-card dark:bg-rose-300 dark:text-rose-950 dark:shadow-none">{conversation.unreadCount > 99 ? "99+" : conversation.unreadCount}</span> : null}
                   </div>
-                </Link>
+                )}
                 <button
                   type="button"
                   onClick={() => onSelectConversation(conversation.id)}
@@ -114,15 +123,17 @@ export function MessageConversationSidebar({
                   </div>
                 </button>
               </div>
-              <button
-                type="button"
-                onClick={() => onDeleteConversation(conversation.id)}
-                disabled={isDeleting}
-                className="mt-1 inline-flex h-8.5 w-8.5 shrink-0 items-center justify-center rounded-full border border-border bg-background/80 text-muted-foreground opacity-0 transition hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60 group-hover:opacity-100"
-                title="删除会话"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              {conversation.kind === "DIRECT" ? (
+                <button
+                  type="button"
+                  onClick={() => onDeleteConversation(conversation.id)}
+                  disabled={isDeleting}
+                  className="mt-1 inline-flex h-8.5 w-8.5 shrink-0 items-center justify-center rounded-full border border-border bg-background/80 text-muted-foreground opacity-0 transition hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60 group-hover:opacity-100"
+                  title="删除会话"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              ) : null}
             </div>
           )
         })}

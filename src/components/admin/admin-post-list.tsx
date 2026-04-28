@@ -78,6 +78,7 @@ const statusFilters = [
   { value: "PENDING", label: "待审核" },
   { value: "NORMAL", label: "正常" },
   { value: "OFFLINE", label: "已下线" },
+  { value: "DELETED", label: "已删除" },
 ]
 
 const sortFilters = [
@@ -591,6 +592,9 @@ function PostActionsCell({
               <DropdownMenuItem onClick={() => setActiveAction("reject")} variant="destructive">
                 驳回
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setActiveAction("delete")} variant="destructive">
+                删除
+              </DropdownMenuItem>
             </>
           ) : (
             <>
@@ -623,9 +627,29 @@ function PostActionsCell({
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
               )}
-              <DropdownMenuItem onClick={() => setActiveAction("hide")} variant="destructive">
-                下线
-              </DropdownMenuItem>
+              {post.status === "OFFLINE" ? (
+                <>
+                  <DropdownMenuItem onClick={() => setActiveAction("show")}>
+                    恢复
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setActiveAction("delete")} variant="destructive">
+                    删除
+                  </DropdownMenuItem>
+                </>
+              ) : post.status === "DELETED" ? (
+                <DropdownMenuItem onClick={() => setActiveAction("show")}>
+                  恢复
+                </DropdownMenuItem>
+              ) : (
+                <>
+                  <DropdownMenuItem onClick={() => setActiveAction("hide")} variant="destructive">
+                    下线
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setActiveAction("delete")} variant="destructive">
+                    删除
+                  </DropdownMenuItem>
+                </>
+              )}
             </>
           )}
         </DropdownMenuContent>
@@ -671,6 +695,20 @@ function PostActionsCell({
             hideTrigger
             open={activeAction === "reject"}
             onOpenChange={(open) => setActiveAction(open ? "reject" : null)}
+          />
+          <AdminPostActionButton
+            action="post.delete"
+            targetId={post.id}
+            label="删除"
+            tone="danger"
+            modalTitle="确认删除帖子"
+            modalDescription={`帖子：${post.title}`}
+            placeholder="填写删除原因（可选）"
+            confirmText="确认删除"
+            className="h-7 rounded-full bg-red-700 px-2.5 text-xs text-white hover:bg-red-600"
+            hideTrigger
+            open={activeAction === "delete"}
+            onOpenChange={(open) => setActiveAction(open ? "delete" : null)}
           />
         </>
       ) : (
@@ -733,20 +771,82 @@ function PostActionsCell({
               ) : null}
             </>
           )}
-          <AdminPostActionButton
-            action="post.hide"
-            targetId={post.id}
-            label="下线"
-            tone="danger"
-            modalTitle="确认下线帖子"
-            modalDescription={`帖子：${post.title}`}
-            placeholder="填写下线原因（可选）"
-            confirmText="确认下线"
-            className="h-7 rounded-full bg-red-600 px-2.5 text-xs text-white hover:bg-red-500"
-            hideTrigger
-            open={activeAction === "hide"}
-            onOpenChange={(open) => setActiveAction(open ? "hide" : null)}
-          />
+          {post.status === "OFFLINE" ? (
+            <>
+              <AdminPostActionButton
+                action="post.show"
+                targetId={post.id}
+                label="恢复"
+                modalTitle="确认恢复帖子"
+                modalDescription={`帖子：${post.title}`}
+                placeholder="填写恢复说明（可选）"
+                confirmText="确认恢复"
+                className="h-7 rounded-full px-2.5 text-xs"
+                hideTrigger
+                open={activeAction === "show"}
+                onOpenChange={(open) => setActiveAction(open ? "show" : null)}
+              />
+              <AdminPostActionButton
+                action="post.delete"
+                targetId={post.id}
+                label="删除"
+                tone="danger"
+                modalTitle="确认删除帖子"
+                modalDescription={`帖子：${post.title}`}
+                placeholder="填写删除原因（可选）"
+                confirmText="确认删除"
+                className="h-7 rounded-full bg-red-700 px-2.5 text-xs text-white hover:bg-red-600"
+                hideTrigger
+                open={activeAction === "delete"}
+                onOpenChange={(open) => setActiveAction(open ? "delete" : null)}
+              />
+            </>
+          ) : post.status === "DELETED" ? (
+            <AdminPostActionButton
+              action="post.show"
+              targetId={post.id}
+              label="恢复"
+              modalTitle="确认恢复帖子"
+              modalDescription={`帖子：${post.title}`}
+              placeholder="填写恢复说明（可选）"
+              confirmText="确认恢复"
+              className="h-7 rounded-full px-2.5 text-xs"
+              hideTrigger
+              open={activeAction === "show"}
+              onOpenChange={(open) => setActiveAction(open ? "show" : null)}
+            />
+          ) : (
+            <>
+              <AdminPostActionButton
+                action="post.hide"
+                targetId={post.id}
+                label="下线"
+                tone="danger"
+                modalTitle="确认下线帖子"
+                modalDescription={`帖子：${post.title}`}
+                placeholder="填写下线原因（可选）"
+                confirmText="确认下线"
+                className="h-7 rounded-full bg-red-600 px-2.5 text-xs text-white hover:bg-red-500"
+                hideTrigger
+                open={activeAction === "hide"}
+                onOpenChange={(open) => setActiveAction(open ? "hide" : null)}
+              />
+              <AdminPostActionButton
+                action="post.delete"
+                targetId={post.id}
+                label="删除"
+                tone="danger"
+                modalTitle="确认删除帖子"
+                modalDescription={`帖子：${post.title}`}
+                placeholder="填写删除原因（可选）"
+                confirmText="确认删除"
+                className="h-7 rounded-full bg-red-700 px-2.5 text-xs text-white hover:bg-red-600"
+                hideTrigger
+                open={activeAction === "delete"}
+                onOpenChange={(open) => setActiveAction(open ? "delete" : null)}
+              />
+            </>
+          )}
         </>
       )}
     </div>
@@ -823,6 +923,9 @@ function getPostStatusBadgeClassName(status: string) {
 
   if (status === "OFFLINE") {
     return "border-transparent bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-200"
+  }
+  if (status === "DELETED") {
+    return "border-transparent bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-200"
   }
 
   return "border-transparent bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200"

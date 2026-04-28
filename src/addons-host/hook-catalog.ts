@@ -360,6 +360,7 @@ const waterfallHookCatalog: readonly AddonExtensionPointCatalogEntry[] = [
   { name: "post.slug.value", kind: "waterfall", category: "post", scope: "service", summary: "串行改写帖子最终 slug。", returns: "string" },
   // ─── v2 扩展 hook ───
   { name: "post.title.value", kind: "waterfall", category: "post", scope: "service", summary: "串行改写帖子标题（落库前；可用于敏感词替换、自动加标记等）。", returns: "string" },
+  { name: "comment.content.value", kind: "waterfall", category: "comment", scope: "service", summary: "串行改写评论内容（写入前；可用于签名补全、文本规范化等）。", returns: "string" },
   { name: "user.displayName.value", kind: "waterfall", category: "user", scope: "service", summary: "串行改写用户展示名（用于列表/详情渲染前的显示加工）。", returns: "string" },
   { name: "user.avatar.url.value", kind: "waterfall", category: "user", scope: "service", summary: "串行改写用户头像 URL（可插入 CDN 前缀、占位头像等）。", returns: "string" },
   { name: "search.query.normalize", kind: "waterfall", category: "search", scope: "service", summary: "串行规范化搜索关键词（大小写、同义词、繁简转换等）。", returns: "string" },

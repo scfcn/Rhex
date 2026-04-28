@@ -1,6 +1,7 @@
 export interface SiteSettingsCommunityData {
   checkInEnabled: boolean
   checkInReward: number
+  checkInRewardText: string
   checkInMakeUpCardPrice: number
   checkInMakeUpEnabled: boolean
   checkInMakeUpCountsTowardStreak: boolean
@@ -12,4 +13,5 @@ export interface SiteSettingsCommunityData {
   nicknameChangePointCost: number
   introductionChangePointCost: number
   avatarChangePointCost: number
+  siteChatEnabled: boolean
 }

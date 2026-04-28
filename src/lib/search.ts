@@ -5,6 +5,7 @@ import { getPostPath } from "@/lib/post-links"
 import { getSiteSettings } from "@/lib/site-settings"
 
 import { mapListPost } from "@/lib/post-map"
+import { applyHookedUserPresentationToSitePosts } from "@/lib/user-presentation-server"
 import {
   executeAddonActionHook,
   executeAddonAsyncWaterfallHook,
@@ -99,10 +100,10 @@ export async function searchPosts(
       getAnonymousMaskDisplayIdentity(),
     ] as const)
 
-    const baseItems = posts.map((post: (typeof posts)[number]) => ({
+    const baseItems = await applyHookedUserPresentationToSitePosts(posts.map((post: (typeof posts)[number]) => ({
       ...mapListPost(post, anonymousMaskIdentity),
       href: getPostPath(post, { mode: postLinkDisplayMode }),
-    }))
+    })))
     type SearchItem = (typeof baseItems)[number]
 
     const itemById = new Map<string, SearchItem>(baseItems.map((it) => [it.id, it]))
@@ -114,6 +115,12 @@ export async function searchPosts(
     const { value: rerankedRefs } = await executeAddonAsyncWaterfallHook(
       "search.results.rerank",
       rerankInput,
+      {
+        payload: {
+          query: normalizedKeyword,
+          scope: "post",
+        },
+      },
     )
     const items: SearchItem[] = rerankedRefs
       .map((ref) => itemById.get(ref.id))

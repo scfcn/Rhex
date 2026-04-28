@@ -1,6 +1,7 @@
 import { updateSiteSettingsRecord } from "@/db/site-settings-write-queries"
 import { apiError, readOptionalNumberField, readOptionalStringField, type JsonObject } from "@/lib/api-route"
 import { normalizeCheckInMakeUpOldestDayLimit } from "@/lib/check-in-policy"
+import { parseCheckInRewardRangeInput, type CheckInRewardRange } from "@/lib/check-in-reward"
 import { finalizeSiteSettingsUpdate, type SiteSettingsRecord } from "@/lib/admin-site-settings-shared"
 import { enqueueRefreshAllUserCheckInStreakSummaries } from "@/lib/check-in-streak-service"
 import {
@@ -12,6 +13,7 @@ import {
   mergeInviteCodePurchasePriceSettings,
   mergeNicknameChangePointCostSettings,
   mergeVipNameColorSettings,
+  resolveCheckInRewardSettings,
   resolveCheckInStreakSettings,
   mergeVipLevelIconSettings,
   resolveAvatarChangePointCostSettings,
@@ -23,6 +25,24 @@ import { normalizeVipLevelIcons } from "@/lib/vip-level-icons"
 
 function isSupportedRedeemCodeHelpUrl(value: string) {
   return value.startsWith("/") || /^https?:\/\//i.test(value)
+}
+
+function resolveCheckInRewardRangeField(
+  body: JsonObject,
+  field: string,
+  fallback: CheckInRewardRange,
+  label: string,
+) {
+  if (!(field in body)) {
+    return fallback
+  }
+
+  const parsed = parseCheckInRewardRangeInput(body[field])
+  if (!parsed) {
+    apiError(400, `${label}格式不正确，支持填写 5 或 5-10`)
+  }
+
+  return parsed
 }
 
 function parseSiteSettingsAppState(raw: string | null | undefined) {
@@ -99,10 +119,15 @@ export async function updateVipSiteSettingsSection(existing: SiteSettingsRecord,
     ? readOptionalStringField(body, "redeemCodeHelpUrl")
     : existingRedeemCodeHelpSettings.url
   const checkInEnabled = body.checkInEnabled === undefined ? existing.checkInEnabled : Boolean(body.checkInEnabled)
-  const checkInReward = Math.max(0, readOptionalNumberField(body, "checkInReward") ?? existing.checkInReward ?? 0)
-  const checkInVip1Reward = Math.max(0, readOptionalNumberField(body, "checkInVip1Reward") ?? checkInReward)
-  const checkInVip2Reward = Math.max(0, readOptionalNumberField(body, "checkInVip2Reward") ?? checkInReward)
-  const checkInVip3Reward = Math.max(0, readOptionalNumberField(body, "checkInVip3Reward") ?? checkInReward)
+  const existingCheckInRewardSettings = resolveCheckInRewardSettings({
+    appStateJson: existing.appStateJson,
+    normalReward: existing.checkInReward ?? 0,
+  })
+  const checkInRewardRange = resolveCheckInRewardRangeField(body, "checkInReward", existingCheckInRewardSettings.normal, "普通用户签到奖励")
+  const checkInVip1RewardRange = resolveCheckInRewardRangeField(body, "checkInVip1Reward", existingCheckInRewardSettings.vip1, "VIP1 签到奖励")
+  const checkInVip2RewardRange = resolveCheckInRewardRangeField(body, "checkInVip2Reward", existingCheckInRewardSettings.vip2, "VIP2 签到奖励")
+  const checkInVip3RewardRange = resolveCheckInRewardRangeField(body, "checkInVip3Reward", existingCheckInRewardSettings.vip3, "VIP3 签到奖励")
+  const checkInReward = checkInRewardRange.min
   const checkInMakeUpCardPrice = Math.max(0, readOptionalNumberField(body, "checkInMakeUpCardPrice") ?? existing.checkInMakeUpCardPrice ?? 0)
   const legacyVipMakeUpCardPrice = Math.max(0, readOptionalNumberField(body, "checkInVipMakeUpCardPrice") ?? existing.checkInVipMakeUpCardPrice ?? 0)
   const checkInVip1MakeUpCardPrice = Math.max(0, readOptionalNumberField(body, "checkInVip1MakeUpCardPrice") ?? legacyVipMakeUpCardPrice)
@@ -170,9 +195,10 @@ export async function updateVipSiteSettingsSection(existing: SiteSettingsRecord,
     vip3: body.vipNameColorVip3 === undefined ? existingVipNameColors.vip3 : readOptionalStringField(body, "vipNameColorVip3"),
   }, existingVipNameColors)
   const appStateWithCheckInRewards = mergeCheckInRewardSettings(existing.appStateJson, {
-    vip1: checkInVip1Reward,
-    vip2: checkInVip2Reward,
-    vip3: checkInVip3Reward,
+    normal: checkInRewardRange,
+    vip1: checkInVip1RewardRange,
+    vip2: checkInVip2RewardRange,
+    vip3: checkInVip3RewardRange,
   })
   const appStateWithCheckInPrices = mergeCheckInMakeUpPriceSettings(appStateWithCheckInRewards, {
     vip1: checkInVip1MakeUpCardPrice,

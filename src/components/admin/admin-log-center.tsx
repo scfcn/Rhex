@@ -51,6 +51,8 @@ const actionOptions = [
   { value: "user.mute", label: "用户禁言" },
   { value: "post.approve", label: "帖子通过" },
   { value: "post.reject", label: "帖子驳回" },
+  { value: "post.delete", label: "帖子删除" },
+  { value: "comment.delete", label: "评论删除" },
 ]
 const checkInActionOptions = [
   { value: "ALL", label: "全部动作" },

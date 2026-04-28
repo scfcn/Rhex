@@ -79,6 +79,24 @@ interface GiftAnchorPosition {
 }
 
 const GIFT_FLOAT_LANES = [-18, 0, 18] as const
+const tipTriggerActiveClassName = [
+  "border-amber-300/70",
+  "bg-[linear-gradient(135deg,rgba(255,251,235,0.98),rgba(255,237,213,0.95))]",
+  "text-slate-900",
+  "shadow-[0_10px_22px_rgba(245,158,11,0.14)]",
+  "dark:border-amber-400/20",
+  "dark:bg-[linear-gradient(135deg,rgba(92,40,14,0.44),rgba(33,17,11,0.9))]",
+  "dark:text-amber-50",
+].join(" ")
+const tipSelectionActiveClassName = [
+  "border-amber-300/70",
+  "bg-[linear-gradient(135deg,rgba(255,251,235,0.96),rgba(255,237,213,0.92))]",
+  "text-slate-900",
+  "shadow-[0_8px_18px_rgba(245,158,11,0.12)]",
+  "dark:border-amber-400/20",
+  "dark:bg-[linear-gradient(135deg,rgba(88,38,14,0.4),rgba(32,18,12,0.86))]",
+  "dark:text-amber-50",
+].join(" ")
 
 export function PostTipPanel({
   postId,
@@ -409,7 +427,7 @@ export function PostTipPanel({
             className={cn(
               "group relative inline-flex h-9 min-w-9 items-center justify-center overflow-visible rounded-full px-1.5 text-left transition-all duration-300 hover:-translate-y-0.5",
               open
-                ? "border-foreground/60 bg-foreground text-background shadow-[0_10px_22px_rgba(15,23,42,0.16)]"
+                ? tipTriggerActiveClassName
                 : giftSummary.length > 0
                   ? "border-amber-200/80 bg-[linear-gradient(135deg,rgba(255,251,235,0.98),rgba(255,237,213,0.94))] text-slate-900 shadow-[0_10px_24px_rgba(245,158,11,0.16)] hover:shadow-[0_14px_30px_rgba(245,158,11,0.22)] dark:border-amber-400/25 dark:bg-[linear-gradient(135deg,rgba(120,53,15,0.3),rgba(67,20,7,0.4))] dark:text-amber-50"
                   : "border-border bg-card text-foreground hover:border-amber-200/80 hover:bg-[linear-gradient(135deg,rgba(255,251,235,0.88),rgba(255,255,255,1))] hover:shadow-[0_10px_22px_rgba(245,158,11,0.1)] dark:hover:border-amber-400/20 dark:hover:bg-[linear-gradient(135deg,rgba(64,24,10,0.28),rgba(15,23,42,0.96))]",
@@ -459,7 +477,7 @@ export function PostTipPanel({
               </span>
             ) : null}
 
-            {giftSummary.length > 0 ? (
+            {giftSummary.length > 0 && !open ? (
               <span
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-0 rounded-full"
@@ -525,7 +543,7 @@ export function PostTipPanel({
                       type="button"
                       className={cn(
                         "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-lg transition-colors",
-                        effectiveSelectedGift?.id === gift.id ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:bg-accent/60",
+                        effectiveSelectedGift?.id === gift.id ? tipSelectionActiveClassName : "border-border bg-card hover:bg-accent/60",
                         getTipBlockedMessage(gift.price, "gift") ? "opacity-60" : "",
                       )}
                       onClick={() => {
@@ -564,7 +582,7 @@ export function PostTipPanel({
                     type="button"
                     className={cn(
                       "rounded-xl border px-2 py-2 text-xs font-medium transition-colors",
-                      effectiveSelectedAmount === amount ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:bg-accent/60",
+                      effectiveSelectedAmount === amount ? tipSelectionActiveClassName : "border-border bg-card hover:bg-accent/60",
                     )}
                     onClick={() => setSelectedAmount(amount)}
                   >
@@ -630,7 +648,7 @@ export function PostTipPanel({
               box-shadow: inset 0 0 0 0 rgba(251, 191, 36, 0), 0 0 0 0 rgba(251, 191, 36, 0);
             }
             50% {
-              box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.18), 0 0 0 6px rgba(251, 191, 36, 0.08);
+              box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.12), 0 0 0 4px rgba(251, 191, 36, 0.05);
             }
           }
 

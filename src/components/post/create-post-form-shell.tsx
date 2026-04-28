@@ -1,6 +1,6 @@
 "use client"
 
-import type { ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 import { ChevronDown, Info, Loader2 } from "lucide-react"
 
 import { AddonSurfaceClientRenderer } from "@/addons-host/client/addon-surface-client-renderer"
@@ -14,8 +14,10 @@ import {
 } from "@/components/post/create-post-form-sections"
 import { PostDraftNotice, type PostDraftNoticeAction } from "@/components/post/post-draft-notice"
 import { AddonEditor } from "@/components/addon-editor"
+import { Modal } from "@/components/ui/modal"
 import { Button } from "@/components/ui/rbutton"
 import { Tooltip } from "@/components/ui/tooltip"
+import { PostDraftBox } from "@/components/post/post-draft-box"
 import type { MarkdownEmojiItem } from "@/lib/markdown-emoji"
 import type { AccessThresholdOption } from "@/lib/access-threshold-options"
 import type { CreatePostFormBoardGroup } from "@/components/post/create-post-form.shared"
@@ -71,7 +73,7 @@ export function CreatePostFormShell({
     isEditMode,
     draft,
     pendingDraftToRestore,
-    pendingDraftUpdatedAt,
+    draftBoxEntries,
     showBoardTips,
     draftRestored,
     lastSavedDraftAt,
@@ -105,6 +107,8 @@ export function CreatePostFormShell({
     handleRestorePendingDraft,
     handleManualDraftSave,
     handleClearDraft,
+    handleRestoreDraftFromBox,
+    handleDeleteDraftFromBox,
     removeManualTag,
     updatePollOption,
     addPollOption,
@@ -122,31 +126,73 @@ export function CreatePostFormShell({
 
   const { loading, showSlowSubmitHint, slowSubmitWaitSeconds, handleSubmit } =
     submitController
+  const [draftBoxModalOpen, setDraftBoxModalOpen] = useState(false)
 
-  const draftMetaTimestamp = pendingDraftUpdatedAt ?? lastSavedDraftAt
+  const hasDraftBoxEntries = draftBoxEntries.length > 0
+  const draftMetaTimestamp = pendingDraftToRestore?.updatedAt ?? lastSavedDraftAt
+  const draftSyncTooltipContent =
+    "按 Ctrl/Cmd+S 会立即保存当前草稿。恢复其他草稿后，后续自动保存会继续更新那一份。"
   const draftNoticeActions: PostDraftNoticeAction[] = []
 
   if (pendingDraftToRestore) {
     draftNoticeActions.push({
-      label: "恢复草稿",
+      label: "恢复",
       onClick: handleRestorePendingDraft,
       variant: "outline",
     })
   }
 
-  if (pendingDraftToRestore || lastSavedDraftAt) {
+  if (pendingDraftToRestore || hasDraftBoxEntries) {
     draftNoticeActions.push({
-      label: "清除草稿",
+      label: "删除",
       onClick: handleClearDraft,
       variant: "ghost",
     })
   }
 
+  if (hasDraftBoxEntries) {
+    draftNoticeActions.push({
+      label: `草稿箱 (${draftBoxEntries.length})`,
+      onClick: () => setDraftBoxModalOpen(true),
+      variant: "ghost",
+    })
+  }
+
   draftNoticeActions.push({
-    label: "保存草稿",
-    onClick: handleManualDraftSave,
+    label: "保存",
+    onClick: () => {
+      handleManualDraftSave()
+      setDraftBoxModalOpen(true)
+    },
     variant: "outline",
   })
+
+  const draftNoticeTitleText = pendingDraftToRestore
+    ? `草稿箱中有 ${draftBoxEntries.length} 份草稿`
+    : lastSavedDraftAt
+      ? draftRestored
+        ? "已恢复草稿"
+        : "当前草稿已同步"
+      : hasDraftBoxEntries
+        ? "草稿箱已启用"
+        : "草稿状态"
+
+  const draftNoticeTitle = (
+    <span className="inline-flex items-center gap-1.5">
+      <span>{draftNoticeTitleText}</span>
+      {!pendingDraftToRestore ? (
+        <Tooltip content={draftSyncTooltipContent}>
+          <span className="inline-flex size-4 items-center justify-center rounded-full text-current/70 transition-colors hover:text-current">
+            <Info className="h-3 w-3" />
+          </span>
+        </Tooltip>
+      ) : null}
+    </span>
+  )
+
+  const draftNoticeDescription = pendingDraftToRestore
+    ? `你在${isEditMode ? "编辑帖子" : "发帖"}页的草稿箱里有历史草稿，可先恢复最近一份。`
+    : undefined
 
   const toolsContent = (
     <>
@@ -459,20 +505,8 @@ export function CreatePostFormShell({
       <div className="flex flex-wrap items-start justify-between gap-2 sm:flex-nowrap sm:items-center">
         <div>
           <PostDraftNotice
-            title={
-              pendingDraftToRestore
-                ? "检测到本地草稿"
-                : lastSavedDraftAt
-                  ? draftRestored
-                    ? "已恢复草稿"
-                    : "本地草稿"
-                  : "草稿状态"
-            }
-            description={
-              pendingDraftToRestore
-                ? `你在${isEditMode ? "编辑帖子" : "发帖"}页有一份未提交内容，可直接恢复继续编辑。支持 Ctrl/Cmd+S 快速保存草稿。`
-                : "当前内容会自动暂存到本地。支持 Ctrl/Cmd+S 快速保存草稿。"
-            }
+            title={draftNoticeTitle}
+            description={draftNoticeDescription}
             meta={draftMetaTimestamp ? `保存于 ${formatDateTime(draftMetaTimestamp)}` : undefined}
             tone={pendingDraftToRestore ? "warning" : "info"}
             size="dense"
@@ -599,6 +633,22 @@ export function CreatePostFormShell({
         fallback={formContent}
       />
       {addonFormAfter}
+      <Modal
+        open={draftBoxModalOpen}
+        onClose={() => setDraftBoxModalOpen(false)}
+        title="草稿箱"
+        description="自动保存和手动保存都会更新对应草稿；恢复后会继续写回当前这份。"
+        size="lg"
+      >
+        <PostDraftBox
+          entries={draftBoxEntries}
+          onRestore={(draftId) => {
+            handleRestoreDraftFromBox(draftId)
+            setDraftBoxModalOpen(false)
+          }}
+          onDelete={handleDeleteDraftFromBox}
+        />
+      </Modal>
     </form>
   )
 }

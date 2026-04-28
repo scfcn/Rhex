@@ -71,6 +71,7 @@ export function CreatePostForm({
     successSlug,
     postLinkDisplayMode,
     draft: draftController.draft,
+    onSuccess: draftController.handleSubmitSuccess,
   })
 
   return (

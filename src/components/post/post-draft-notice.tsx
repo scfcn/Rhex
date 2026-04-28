@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { CircleAlert, Info } from "lucide-react"
 
 import { Button } from "@/components/ui/rbutton"
@@ -12,8 +13,8 @@ export interface PostDraftNoticeAction {
 }
 
 interface PostDraftNoticeProps {
-  title: string
-  description?: string
+  title: ReactNode
+  description?: ReactNode
   tone?: "info" | "warning"
   compact?: boolean
   size?: "default" | "compact" | "dense"
@@ -100,21 +101,23 @@ export function PostDraftNotice({
       role="status"
       aria-live="polite"
     >
-      <div className={cn("flex", sizeStyle.layout)}>
-        <div className={cn("mt-0.5 shrink-0", toneStyle.icon)}>
-          <Icon className={sizeStyle.icon} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className={cn("flex flex-wrap items-center", sizeStyle.titleRow)}>
-            <p className={cn("font-medium", sizeStyle.title)}>{title}</p>
-            {meta ? <span className={cn("opacity-80", sizeStyle.meta)}>{meta}</span> : null}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+        <div className={cn("flex min-w-0 flex-1", sizeStyle.layout)}>
+          <div className={cn("mt-0.5 shrink-0", toneStyle.icon)}>
+            <Icon className={sizeStyle.icon} />
           </div>
-          {description ? <p className={cn("opacity-90", sizeStyle.description)}>{description}</p> : null}
+          <div className="min-w-0 flex-1">
+            <div className={cn("flex flex-wrap items-center", sizeStyle.titleRow)}>
+              <p className={cn("font-medium", sizeStyle.title)}>{title}</p>
+              {meta ? <span className={cn("opacity-80", sizeStyle.meta)}>{meta}</span> : null}
+            </div>
+            {description ? <p className={cn("opacity-90", sizeStyle.description)}>{description}</p> : null}
+          </div>
         </div>
         {resolvedActions.length > 0 ? (
-          <div className={cn("flex shrink-0 flex-wrap items-center justify-end", sizeStyle.actions)}>
-            {resolvedActions.map((action) => (
-              <Button key={`${title}-${action.label}`} type="button" variant={action.variant ?? "outline"} className={sizeStyle.button} onClick={action.onClick}>
+          <div className={cn("flex w-full flex-wrap items-center gap-1.5 pl-6 sm:w-auto sm:shrink-0 sm:justify-end sm:pl-0", sizeStyle.actions)}>
+            {resolvedActions.map((action, index) => (
+              <Button key={`${action.label}-${index}`} type="button" variant={action.variant ?? "outline"} className={sizeStyle.button} onClick={action.onClick}>
                 {action.label}
               </Button>
             ))}

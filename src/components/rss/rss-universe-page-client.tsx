@@ -112,10 +112,10 @@ function syncUniversePageUrl(page: number) {
   window.history.replaceState(window.history.state, "", buildHomeFeedHref("universe", page))
 }
 
-function RssUniverseFeedLoading({ showUniverse }: { showUniverse: boolean }) {
+function RssUniverseFeedLoading() {
   return (
     <div className="overflow-hidden rounded-md bg-background">
-      <RssUniverseFeedView items={[]} showUniverse={showUniverse} />
+      <RssUniverseFeedView items={[]} />
       <div className="space-y-3 px-1 py-4 lg:px-4" aria-live="polite" aria-busy="true">
         <div className="flex items-center gap-2 px-3 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -141,10 +141,8 @@ interface LoadPageOptions {
 
 export function RssUniversePageClient({
   initialPage,
-  showUniverse,
 }: {
   initialPage: number
-  showUniverse: boolean
 }) {
   const [data, setData] = useState<RssUniverseFeedPageData | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
@@ -238,7 +236,7 @@ export function RssUniversePageClient({
   if (!data) {
     return (
       <>
-        <RssUniverseFeedLoading showUniverse={showUniverse} />
+        <RssUniverseFeedLoading />
         {errorMessage ? (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             <span>{errorMessage}</span>
@@ -260,7 +258,7 @@ export function RssUniversePageClient({
   return (
     <>
       <div className={cn("transition-opacity duration-200", loading ? "opacity-70" : "opacity-100")}>
-        <RssUniverseFeedView items={data.items} showUniverse={showUniverse} />
+        <RssUniverseFeedView items={data.items} />
       </div>
 
       {data.items.length === 0 ? (

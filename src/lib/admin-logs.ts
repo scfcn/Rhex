@@ -18,6 +18,7 @@ import {
   findVipOrdersPage,
 } from "@/db/admin-log-queries"
 import { serializeDate, serializeDateTime } from "@/lib/formatters"
+import { buildPointEffectSummaryText, resolvePointLogAuditPresentation } from "@/lib/point-log-audit"
 
 import { normalizePageSize, normalizePositiveInteger } from "@/lib/shared/normalizers"
 
@@ -344,19 +345,24 @@ export async function getAdminLogCenter(options: GetAdminLogCenterOptions = {}):
       summary,
       filters: { keyword, action, changeType, bucketType },
       pagination,
-      rows: rows.map((item) => ({
-        id: item.id,
-        occurredAt: item.createdAt.toISOString(),
-        actorPrimary: item.user.nickname ?? item.user.username,
-        actorSecondary: `@${item.user.username}`,
-        typePrimary: item.changeType,
-        typeSecondary: item.relatedType ?? "SYSTEM",
-        targetPrimary: `${item.changeValue > 0 ? "+" : ""}${item.changeValue}`,
-        targetSecondary: item.relatedId ?? "-",
-        detailPrimary: item.reason,
-        detailSecondary: item.relatedType ? `关联 ${item.relatedType}` : "系统记录",
-        tone: resolvePointTone(item.changeType, item.changeValue),
-      })),
+      rows: rows.map((item) => {
+        const parsed = resolvePointLogAuditPresentation(item.reason, item.eventData)
+        const effectSummary = buildPointEffectSummaryText(parsed.pointEffect)
+
+        return {
+          id: item.id,
+          occurredAt: item.createdAt.toISOString(),
+          actorPrimary: item.user.nickname ?? item.user.username,
+          actorSecondary: `@${item.user.username}`,
+          typePrimary: item.changeType,
+          typeSecondary: item.relatedType ?? "SYSTEM",
+          targetPrimary: `${item.changeValue > 0 ? "+" : ""}${item.changeValue}`,
+          targetSecondary: item.relatedId ?? "-",
+          detailPrimary: effectSummary ? `${parsed.displayReason} · ${effectSummary}` : parsed.displayReason,
+          detailSecondary: item.relatedType ? `关联 ${item.relatedType}` : "系统记录",
+          tone: resolvePointTone(item.changeType, item.changeValue),
+        }
+      }),
     }
   }
 

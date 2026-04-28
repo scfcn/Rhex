@@ -3,10 +3,11 @@ import { executeDirectMessageSend } from "@/lib/message-send-execution"
 
 export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   const body = await readJsonBody(request)
-  const recipientId = requireNumberField(body, "recipientId", "缺少接收方信息")
+  const conversationId = readOptionalStringField(body, "conversationId")
   const content = readOptionalStringField(body, "body")
   const data = await executeDirectMessageSend({
-    recipientId,
+    recipientId: conversationId ? undefined : requireNumberField(body, "recipientId", "缺少接收方信息"),
+    conversationId,
     body: content,
   }, {
     request,

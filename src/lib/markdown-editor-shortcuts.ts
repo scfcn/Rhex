@@ -371,6 +371,12 @@ export function buildLinkMarkdown(linkText: string, url: string) {
   return `[${normalizedText}](${normalizedUrl})`
 }
 
+export function buildRemoteImageMarkdown(altText: string, url: string) {
+  const normalizedAltText = altText.trim() || "image"
+  const normalizedUrl = url.trim() || "https://example.com/image.png"
+  return `![${normalizedAltText}](${normalizedUrl})`
+}
+
 export function buildInlineCodeMarkdown(selectedText: string) {
   return isBlankSelection(selectedText) ? "`代码`" : `\`${selectedText}\``
 }

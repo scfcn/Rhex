@@ -1,14 +1,17 @@
 import { createCommentMentionNotifications, updateCommentContentById, findEditableCommentById } from "@/db/comment-queries"
 
+import { queryAddonComments } from "@/addons-host/runtime/comments"
+import { executeAddonActionHook, executeAddonWaterfallHook } from "@/addons-host/runtime/hooks"
+import { resolveHookedStringValue } from "@/lib/addon-hook-values"
 import { apiError } from "@/lib/api-route"
 import { enforceSensitiveText } from "@/lib/content-safety"
 import { extractMentionTexts, findMentionUsers, resolveMentionsInText } from "@/lib/comment-mentions"
 import { getSiteSettings } from "@/lib/site-settings"
 import { validateCommentPayload } from "@/lib/validators"
-import { executeAddonActionHook } from "@/addons-host/runtime/hooks"
 
 export async function updateCommentFlow(input: {
   body: unknown
+  request: Request
   currentUser: {
     id: number
     role?: string | null
@@ -24,6 +27,12 @@ export async function updateCommentFlow(input: {
 
   if (!validated.success || !validated.data) {
     apiError(400, validated.message ?? "参数错误")
+  }
+  const requestUrl = new URL(input.request.url)
+  const hookContext = {
+    request: input.request,
+    pathname: requestUrl.pathname,
+    searchParams: requestUrl.searchParams,
   }
 
   const { postId, content } = validated.data
@@ -56,7 +65,16 @@ export async function updateCommentFlow(input: {
     }
   }
 
-  const contentSafety = await enforceSensitiveText({ scene: "comment.content", text: content })
+  const hookedCommentContentResult = await executeAddonWaterfallHook("comment.content.value", content, {
+    ...hookContext,
+    payload: {
+      mode: "update",
+      postId,
+      commentId,
+    },
+  })
+  const { value: hookedContent, changed: contentHookAdjusted } = resolveHookedStringValue(content, hookedCommentContentResult.value)
+  const contentSafety = await enforceSensitiveText({ scene: "comment.content", text: hookedContent })
   const mentionTexts = extractMentionTexts(contentSafety.sanitizedText)
   const mentionUsers = await findMentionUsers(mentionTexts)
   const resolvedComment = resolveMentionsInText(contentSafety.sanitizedText, mentionUsers)
@@ -65,6 +83,9 @@ export async function updateCommentFlow(input: {
     commentId,
     editorId: String(input.currentUser.id),
     changes: { content: resolvedComment.content },
+  }, {
+    ...hookContext,
+    throwOnError: true,
   })
 
   const updated = await updateCommentContentById(commentId, {
@@ -81,16 +102,22 @@ export async function updateCommentFlow(input: {
     excludeUserIds: [updated.replyToUserId ?? 0],
   })
 
+  const updatedComment = (await queryAddonComments({
+    ids: [updated.id],
+    statuses: ["NORMAL", "HIDDEN", "DELETED", "PENDING"],
+    limit: 1,
+  })).items[0]
   await executeAddonActionHook("comment.update.after", {
     commentId: updated.id,
     editorId: String(input.currentUser.id),
     changes: { content: resolvedComment.content },
-  })
+    ...(updatedComment ? { comment: updatedComment } : {}),
+  }, hookContext)
 
   return {
     updated,
     contentSafety,
-    contentAdjusted: contentSafety.wasReplaced,
+    contentAdjusted: contentHookAdjusted || contentSafety.wasReplaced,
     mentionUserIds: resolvedComment.mentions.map((item) => item.id),
   }
 }

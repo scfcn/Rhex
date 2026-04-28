@@ -7,6 +7,7 @@ import { formatMonthDayTime } from "@/lib/formatters"
 import { getLevelBadgeData } from "@/lib/level-badge"
 import type { SiteSettingsData } from "@/lib/site-settings"
 import { resolveUserSurfaceSnapshot, type UserSurfaceSnapshot } from "@/lib/user-surface"
+import { applyHookedUserPresentationToHomeSidebarItems } from "@/lib/user-presentation-server"
 import { getUserDisplayName } from "@/lib/users"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
 
@@ -39,9 +40,10 @@ export async function getHomeSidebarHotTopics(limit = 5) {
     title: post.title,
     lastRepliedAt: formatMonthDayTime(post.lastCommentedAt ?? post.createdAt),
   }))
-  const hooked = await executeAddonAsyncWaterfallHook("home.sidebar.hot-topics.items", items)
+  const presentationHookedItems = await applyHookedUserPresentationToHomeSidebarItems(items)
+  const hooked = await executeAddonAsyncWaterfallHook("home.sidebar.hot-topics.items", presentationHookedItems)
 
-  return Array.isArray(hooked.value) ? hooked.value : items
+  return Array.isArray(hooked.value) ? hooked.value : presentationHookedItems
 }
 
 type SidebarUserSource = Awaited<ReturnType<typeof getCurrentUser>> | null
@@ -58,6 +60,13 @@ export async function buildSidebarUser(user: SidebarUserSource, snapshot: UserSu
         ? settings.checkInVip2Reward
         : settings.checkInVip1Reward
     : settings.checkInReward
+  const checkInRewardText = isVipActive(user)
+    ? getVipLevel(user) >= 3
+      ? settings.checkInVip3RewardText
+      : getVipLevel(user) === 2
+        ? settings.checkInVip2RewardText
+        : settings.checkInVip1RewardText
+    : settings.checkInRewardText
   const level = Math.max(1, user.level ?? 1)
   const levelBadge = await getLevelBadgeData(level)
 
@@ -82,6 +91,7 @@ export async function buildSidebarUser(user: SidebarUserSource, snapshot: UserSu
     pointName: settings.pointName,
     checkInEnabled: settings.checkInEnabled,
     checkInReward,
+    checkInRewardText,
     checkInMakeUpEnabled: settings.checkInMakeUpEnabled,
     checkInMakeUpCardPrice: settings.checkInMakeUpCardPrice,
     checkInVipMakeUpCardPrice: settings.checkInVipMakeUpCardPrice,

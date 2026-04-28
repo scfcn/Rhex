@@ -205,6 +205,19 @@ export function useEditorCommands({
     closeLinkPanel()
   }, [applySelectionTransform, closeLinkPanel, linkText, linkUrl, setMessage])
 
+  const handleConvertSelectionToImageMarkdown = useCallback(() => {
+    const state = getEditorState()
+    const selectedText = state.value.slice(state.selectionStart, state.selectionEnd).trim()
+    const result = inferRemoteImageInsert(selectedText, "")
+    if (!result) {
+      setMessage("请先选择一个有效的图片链接")
+      return
+    }
+
+    applyEditorUpdate(insertSelection(state, () => result.template))
+    setMessage("已转换为 Markdown 图片语法")
+  }, [applyEditorUpdate, getEditorState, setMessage])
+
   const handleInsertTable = useCallback((rows: number, columns: number) => {
     insertMarkdownTemplate(buildSizedTableMarkdown(rows, columns))
     closeTablePanel()
@@ -300,6 +313,7 @@ export function useEditorCommands({
       highlight: () => applySelectionTransform(buildInlineHighlightMarkdown),
       codeFormat: applyCodeFormatByType,
       quote: () => applyLinePrefix("> "),
+      convertSelectionToImageMarkdown: handleConvertSelectionToImageMarkdown,
       insertSpoiler: () => applySelectionTransform(buildSpoilerMarkdown),
       insertScratchMask: () => applySelectionTransform(buildScratchMaskMarkdown),
       listFormat: applyListFormatByType,

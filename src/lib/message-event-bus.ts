@@ -30,6 +30,10 @@ function getMessageEventChannel() {
 }
 
 function getEventTargetUserIds(event: MessageStreamEvent) {
+  if ("targetUserIds" in event && Array.isArray(event.targetUserIds) && event.targetUserIds.length > 0) {
+    return new Set(event.targetUserIds.filter((userId): userId is number => Number.isFinite(userId)))
+  }
+
   const userIds = new Set<number>()
 
   if ("userId" in event && typeof event.userId === "number") {

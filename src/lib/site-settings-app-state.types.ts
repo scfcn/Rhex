@@ -1,6 +1,7 @@
 import { parseNonNegativeSafeInteger } from "@/lib/shared/safe-integer"
 import type { RegistrationEmailTemplateSettings } from "@/lib/email-template-settings"
 import type { PostListLoadMode } from "@/lib/post-list-load-mode"
+import type { CheckInRewardRange, CheckInRewardSettings } from "@/lib/check-in-reward"
 import type { VipNameColors } from "@/lib/vip-name-colors"
 import type { VipLevelIcons } from "@/lib/vip-level-icons"
 import type { SiteTippingGiftItem } from "@/lib/tipping-gifts"
@@ -102,7 +103,6 @@ export function normalizeImageWatermarkPosition(
 }
 
 export type CheckInMakeUpPriceSettings = VipTierPricing
-export type CheckInRewardSettings = VipTierPricing
 export type NicknameChangePointCostSettings = VipTierPricing
 export type IntroductionChangePointCostSettings = VipTierPricing
 export type AvatarChangePointCostSettings = VipTierPricing
@@ -214,6 +214,10 @@ export interface CommentAccessSettings {
   initialVisibleReplies: number
 }
 
+export interface SiteChatSettings {
+  enabled: boolean
+}
+
 export interface PostContentLengthSettings {
   postTitleMinLength: number
   postTitleMaxLength: number
@@ -310,4 +314,4 @@ export interface BoardApplicationSettings {
   enabled: boolean
 }
 
-export type { RegistrationEmailTemplateSettings, SiteTippingGiftItem, VipTierPricing }
+export type { CheckInRewardRange, CheckInRewardSettings, RegistrationEmailTemplateSettings, SiteTippingGiftItem, VipTierPricing }

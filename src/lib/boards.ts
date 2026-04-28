@@ -12,6 +12,7 @@ import { resolvePostListDisplayMode, type PostListDisplayMode } from "@/lib/post
 import { dedupeAndMapPinnedPosts, extractPinnedPostIds } from "@/lib/pinned-posts"
 import type { TaxonomyPostSort } from "@/lib/forum-taxonomy-sort"
 import { mapListPost } from "@/lib/post-map"
+import { applyHookedUserPresentationToSitePosts } from "@/lib/user-presentation-server"
 import { findActiveBoardsWithZoneAndPostCount, findBoardBySlugWithZoneAndPostCount, findBoardModeratorsByBoardId } from "@/db/board-read-queries"
 import type { SitePostItem } from "@/lib/posts"
 import { TAXONOMY_CACHE_TAGS } from "@/lib/taxonomy-cache"
@@ -185,9 +186,13 @@ export async function getBoardPosts(
   if (pagination.page === 1) {
     const { pinnedItems, pinnedPostIds } = dedupeAndMapPinnedPosts(pinnedPosts, (post) => mapListPost(post, anonymousMaskIdentity))
     const normalPosts = await findBoardNormalPosts(board.id, pinnedPostIds, 1, pagination.pageSize, sort)
+    const items = await applyHookedUserPresentationToSitePosts([
+      ...pinnedItems,
+      ...normalPosts.map((post) => mapListPost(post, anonymousMaskIdentity)),
+    ])
 
     return {
-      items: [...pinnedItems, ...normalPosts.map((post) => mapListPost(post, anonymousMaskIdentity))],
+      items,
       page: pagination.page,
       pageSize: pagination.pageSize,
       total: pagination.total,
@@ -198,9 +203,12 @@ export async function getBoardPosts(
   }
 
   const normalPosts = await findBoardNormalPosts(board.id, excludedPostIds, pagination.page, pagination.pageSize, sort)
+  const items = await applyHookedUserPresentationToSitePosts(
+    normalPosts.map((post) => mapListPost(post, anonymousMaskIdentity)),
+  )
 
   return {
-    items: normalPosts.map((post) => mapListPost(post, anonymousMaskIdentity)),
+    items,
     page: pagination.page,
     pageSize: pagination.pageSize,
     total: pagination.total,

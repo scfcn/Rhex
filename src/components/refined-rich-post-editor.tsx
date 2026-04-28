@@ -339,6 +339,7 @@ export function RefinedRichPostEditor({
         onStrike={commands.toolbarActions.strike}
         onHighlight={commands.toolbarActions.highlight}
         onInlineCode={() => commands.toolbarActions.codeFormat("inline-code")}
+        onImageLink={commands.toolbarActions.convertSelectionToImageMarkdown}
         onQuote={commands.toolbarActions.quote}
       />
       <MediaInsertPanel

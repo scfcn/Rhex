@@ -12,6 +12,7 @@ import {
   mergePostPageSizeSettings,
   mergePostJackpotSettings,
   mergePostRedPacketSettings,
+  mergeSiteChatSettings,
   resolveAnonymousPostSettings,
   resolveBoardTreasurySettings,
   resolveCommentAccessSettings,
@@ -20,6 +21,7 @@ import {
   resolvePostPageSizeSettings,
   resolvePostJackpotSettings,
   resolvePostRedPacketSettings,
+  resolveSiteChatSettings,
 } from "@/lib/site-settings-app-state"
 import { normalizeHeatColors, normalizeHeatThresholds, normalizeTippingAmounts } from "@/lib/shared/normalizers"
 import { parseNonNegativeSafeInteger } from "@/lib/shared/safe-integer"
@@ -89,6 +91,13 @@ export async function updateInteractionSiteSettingsSection(existing: SiteSetting
       commentContentMaxLengthFallback: 2000,
     })
     const commentPageSize = Math.min(100, Math.max(1, readOptionalNumberField(body, "commentPageSize") ?? existingPostPageSizeSettings.comments))
+    const existingSiteChatSettings = resolveSiteChatSettings({
+      appStateJson: existing.appStateJson,
+      enabledFallback: false,
+    })
+    const siteChatEnabled = body.siteChatEnabled === undefined
+      ? existingSiteChatSettings.enabled
+      : Boolean(body.siteChatEnabled)
     const postTitleMinLength = Math.min(
       100,
       Math.max(1, readOptionalNumberField(body, "postTitleMinLength") ?? existingPostContentLengthSettings.postTitleMinLength),
@@ -253,7 +262,10 @@ export async function updateInteractionSiteSettingsSection(existing: SiteSetting
       commentContentMinLength,
       commentContentMaxLength,
     })
-    const appStateJson = mergeBoardTreasurySettings(appStateWithPostContentLengths, {
+    const appStateWithSiteChat = mergeSiteChatSettings(appStateWithPostContentLengths, {
+      enabled: siteChatEnabled,
+    })
+    const appStateJson = mergeBoardTreasurySettings(appStateWithSiteChat, {
       tipGiftTaxEnabled,
       tipGiftTaxRateBps,
     })

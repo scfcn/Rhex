@@ -1,5 +1,6 @@
 import type { MediaInsertResult } from "@/components/refined-rich-post-editor/types"
 import { AUDIO_EXTENSIONS, MARKDOWN_EMBED_HOST_SET, VIDEO_EXTENSIONS, normalizeMarkdownMediaSrc, normalizeMarkdownMediaUrl } from "@/lib/markdown/media"
+import { buildRemoteImageMarkdown } from "@/lib/markdown-editor-shortcuts"
 
 export function inferMediaInsert(input: string): MediaInsertResult | null {
   const url = normalizeMarkdownMediaUrl(input)
@@ -65,7 +66,7 @@ export function inferRemoteImageInsert(urlInput: string, altInput: string): Medi
   const altText = normalizeMarkdownAltText(altInput) || "image"
 
   return {
-    template: `![${altText}](${originalSrc})`,
+    template: buildRemoteImageMarkdown(altText, originalSrc),
     message: "已插入远程图片地址",
   }
 }

@@ -14,7 +14,7 @@ import {
 import { findAdminBadgeOptions } from "@/db/badge-queries"
 import { apiError } from "@/lib/api-route"
 import type { AdminUserDetailLogItem, AdminUserDetailLogSection, AdminUserDetailResult } from "@/lib/admin-user-management"
-import { resolvePointLogAuditPresentation } from "@/lib/point-log-audit"
+import { buildPointEffectSummaryText, resolvePointLogAuditPresentation } from "@/lib/point-log-audit"
 import { requireSiteAdminActor } from "@/lib/moderator-permissions"
 import { resolveUserProfileSettings } from "@/lib/user-profile-settings"
 
@@ -113,11 +113,12 @@ export async function getAdminUserDetail(userId: number): Promise<AdminUserDetai
       emptyText: "暂无积分日志",
       items: pointLogs.map<AdminUserDetailLogItem>((log) => {
         const parsed = resolvePointLogAuditPresentation(log.reason, log.eventData)
+        const effectSummary = buildPointEffectSummaryText(parsed.pointEffect)
         return {
           id: log.id,
           occurredAt: log.createdAt.toISOString(),
           title: `${log.changeValue > 0 ? "+" : ""}${log.changeValue} · ${log.changeType}`,
-          description: parsed.displayReason,
+          description: effectSummary ? `${parsed.displayReason} · ${effectSummary}` : parsed.displayReason,
           meta: [
             log.createdAt.toISOString(),
             log.relatedType ?? "SYSTEM",

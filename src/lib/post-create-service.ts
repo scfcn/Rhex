@@ -141,6 +141,11 @@ export async function createPostFlow(body: unknown, options: CreatePostFlowOptio
 
   const titleHookResult = await executeAddonWaterfallHook("post.title.value", title, {
     request: options.request,
+    payload: {
+      mode: "create",
+      boardSlug,
+      postType,
+    },
   })
   const hookedTitle = typeof titleHookResult.value === "string" && titleHookResult.value.trim()
     ? titleHookResult.value

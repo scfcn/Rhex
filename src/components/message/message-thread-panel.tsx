@@ -10,6 +10,7 @@ import { MessageBubbleContent } from "@/components/message/message-bubble-conten
 import { useMarkdownEmojiMap } from "@/components/site-settings-provider"
 import { Button } from "@/components/ui/rbutton"
 import { UserAvatar } from "@/components/user/user-avatar"
+import { createSiteChatParticipant } from "@/lib/site-chat"
 import { cn } from "@/lib/utils"
 import type { MessageBubbleItem, MessageConversationDetail, MessageSendResult } from "@/lib/message-types"
 
@@ -49,8 +50,9 @@ export function MessageThreadPanel({
   onBack,
 }: MessageThreadPanelProps) {
   const recipient = useMemo(() => resolveRecipient(conversation, currentUserId), [conversation, currentUserId])
-
-  const recipientProfileHref = recipient ? `/users/${recipient.username}` : null
+  const recipientProfileHref = recipient && conversation?.kind !== "SITE_CHAT"
+    ? `/users/${recipient.username}`
+    : null
 
   if (!conversation || !recipient) {
     if (loadingConversation) {
@@ -240,7 +242,9 @@ function MessageThreadPanelContent({
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ recipientId: recipient.id, body: content }),
+      body: JSON.stringify(conversation.kind === "SITE_CHAT"
+        ? { conversationId: conversation.id, body: content }
+        : { recipientId: recipient.id, body: content }),
     })
 
     const payload = await response.json().catch(() => null)
@@ -569,6 +573,10 @@ function MessageThreadPanelContent({
 }
 
 function resolveRecipient(conversation: MessageConversationDetail | null, currentUserId: number) {
+  if (conversation?.kind === "SITE_CHAT") {
+    return createSiteChatParticipant()
+  }
+
   if (conversation?.recipientId) {
     return conversation.participants.find((item) => item.id === conversation.recipientId)
   }

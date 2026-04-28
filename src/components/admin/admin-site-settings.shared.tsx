@@ -62,6 +62,7 @@ export interface AdminBasicSettingsInitialSettings {
   commentEditableMinutes: number
   guestCanViewComments: boolean
   commentInitialVisibleReplies: number
+  siteChatEnabled: boolean
   anonymousPostEnabled: boolean
   anonymousPostPrice: number
   anonymousPostDailyLimit: number
@@ -168,6 +169,7 @@ export interface AdminBasicSettingsDraft {
   commentEditableMinutes: string
   guestCanViewComments: boolean
   commentInitialVisibleReplies: string
+  siteChatEnabled: boolean
   anonymousPostEnabled: boolean
   anonymousPostPrice: string
   anonymousPostDailyLimit: string
@@ -373,6 +375,7 @@ export function createAdminBasicSettingsDraft(initialSettings: AdminBasicSetting
     commentEditableMinutes: coerceNumberString(initialSettings.commentEditableMinutes, 5),
     guestCanViewComments: coerceBoolean(initialSettings.guestCanViewComments, true),
     commentInitialVisibleReplies: coerceNumberString(initialSettings.commentInitialVisibleReplies, 10),
+    siteChatEnabled: coerceBoolean(initialSettings.siteChatEnabled, false),
     anonymousPostEnabled: coerceBoolean(initialSettings.anonymousPostEnabled, false),
     anonymousPostPrice: coerceNumberString(initialSettings.anonymousPostPrice, 0),
     anonymousPostDailyLimit: coerceNumberString(initialSettings.anonymousPostDailyLimit, 0),
@@ -597,6 +600,7 @@ export function buildAdminBasicSettingsPayload(draft: AdminBasicSettingsDraft, m
     tippingEnabled: draft.tippingEnabled,
     guestCanViewComments: draft.guestCanViewComments,
     commentInitialVisibleReplies: Number(draft.commentInitialVisibleReplies),
+    siteChatEnabled: draft.siteChatEnabled,
     postEditableMinutes: Number(draft.postEditableMinutes),
     commentEditableMinutes: Number(draft.commentEditableMinutes),
     anonymousPostEnabled: draft.anonymousPostEnabled,

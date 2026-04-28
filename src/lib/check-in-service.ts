@@ -3,8 +3,10 @@ import { executeUserCheckIn, listUserCheckInLogsInRange } from "@/db/check-in-qu
 
 import { apiError } from "@/lib/api-route"
 import { getCheckInMakeUpEarliestDateKey, normalizeCheckInMakeUpOldestDayLimit } from "@/lib/check-in-policy"
+import { formatCheckInRewardRange, parseCheckInRewardRangeInput, rollCheckInReward, resolveUserCheckInRewardRange } from "@/lib/check-in-reward"
 import { getUserCheckInStreakSummary } from "@/lib/check-in-streak-service"
 import { getLocalDateKey, getMonthKey } from "@/lib/date-key"
+import { formatNumber } from "@/lib/formatters"
 import { evaluateUserLevelProgress } from "@/lib/level-system"
 import { prepareScopedPointDelta, type PreparedPointDelta } from "@/lib/point-center"
 import { getSiteSettings } from "@/lib/site-settings"
@@ -16,9 +18,13 @@ interface CheckInSettingsSnapshot {
   checkInMakeUpCountsTowardStreak: boolean
   checkInMakeUpOldestDayLimit: number
   checkInReward: number
+  checkInRewardText: string
   checkInVip1Reward: number
+  checkInVip1RewardText: string
   checkInVip2Reward: number
+  checkInVip2RewardText: string
   checkInVip3Reward: number
+  checkInVip3RewardText: string
   checkInMakeUpCardPrice: number
   checkInVip1MakeUpCardPrice: number
   checkInVip2MakeUpCardPrice: number
@@ -64,9 +70,13 @@ export interface CheckInOverview {
   makeUpCountsTowardStreak: boolean
   makeUpOldestDayLimit: number
   checkInReward: number
+  checkInRewardText: string
   vip1CheckInReward: number
+  vip1CheckInRewardText: string
   vip2CheckInReward: number
+  vip2CheckInRewardText: string
   vip3CheckInReward: number
+  vip3CheckInRewardText: string
   makeUpPrice: number
   vipMakeUpPrice: number
   normalMakeUpPrice: number
@@ -78,6 +88,7 @@ export interface CheckInOverview {
 
 export interface CheckInActionResult {
   points: number
+  reward: number
   alreadyCheckedIn: boolean
   date: string
   currentStreak: number
@@ -128,10 +139,26 @@ function readCheckInSettingsSnapshot(settings: CheckInSettingsSnapshot) {
     checkInMakeUpEnabled: settings.checkInMakeUpEnabled,
     checkInMakeUpCountsTowardStreak: settings.checkInMakeUpCountsTowardStreak,
     checkInMakeUpOldestDayLimit: normalizeCheckInMakeUpOldestDayLimit(settings.checkInMakeUpOldestDayLimit),
-    normalReward: Math.max(0, settings.checkInReward),
-    vip1Reward: Math.max(0, settings.checkInVip1Reward),
-    vip2Reward: Math.max(0, settings.checkInVip2Reward),
-    vip3Reward: Math.max(0, settings.checkInVip3Reward),
+    normalRewardRange: parseCheckInRewardRangeInput(settings.checkInRewardText) ?? {
+      min: Math.max(0, settings.checkInReward),
+      max: Math.max(0, settings.checkInReward),
+    },
+    normalRewardText: settings.checkInRewardText,
+    vip1RewardRange: parseCheckInRewardRangeInput(settings.checkInVip1RewardText) ?? {
+      min: Math.max(0, settings.checkInVip1Reward),
+      max: Math.max(0, settings.checkInVip1Reward),
+    },
+    vip1RewardText: settings.checkInVip1RewardText,
+    vip2RewardRange: parseCheckInRewardRangeInput(settings.checkInVip2RewardText) ?? {
+      min: Math.max(0, settings.checkInVip2Reward),
+      max: Math.max(0, settings.checkInVip2Reward),
+    },
+    vip2RewardText: settings.checkInVip2RewardText,
+    vip3RewardRange: parseCheckInRewardRangeInput(settings.checkInVip3RewardText) ?? {
+      min: Math.max(0, settings.checkInVip3Reward),
+      max: Math.max(0, settings.checkInVip3Reward),
+    },
+    vip3RewardText: settings.checkInVip3RewardText,
     normalMakeUpPrice: Math.max(0, settings.checkInMakeUpCardPrice),
     vip1MakeUpPrice: Math.max(0, settings.checkInVip1MakeUpCardPrice),
     vip2MakeUpPrice: Math.max(0, settings.checkInVip2MakeUpCardPrice),
@@ -139,24 +166,28 @@ function readCheckInSettingsSnapshot(settings: CheckInSettingsSnapshot) {
   }
 }
 
-function resolveUserCheckInReward(
+function resolveCheckInRewardSettingsForUser(
   snapshot: ReturnType<typeof readCheckInSettingsSnapshot>,
   user: Pick<CurrentUserRecord, "vipLevel" | "vipExpiresAt">,
 ) {
-  if (!isVipActive(user)) {
-    return snapshot.normalReward
-  }
+  const rewardRange = resolveUserCheckInRewardRange({
+    normal: snapshot.normalRewardRange,
+    vip1: snapshot.vip1RewardRange,
+    vip2: snapshot.vip2RewardRange,
+    vip3: snapshot.vip3RewardRange,
+  }, user)
+  const rewardText = isVipActive(user)
+    ? getVipLevel(user) >= 3
+      ? snapshot.vip3RewardText
+      : getVipLevel(user) === 2
+        ? snapshot.vip2RewardText
+        : snapshot.vip1RewardText
+    : snapshot.normalRewardText
 
-  const vipLevel = getVipLevel(user)
-  if (vipLevel >= 3) {
-    return snapshot.vip3Reward
+  return {
+    rewardRange,
+    rewardText: rewardText || formatCheckInRewardRange(rewardRange),
   }
-
-  if (vipLevel === 2) {
-    return snapshot.vip2Reward
-  }
-
-  return snapshot.vip1Reward
 }
 
 function resolveUserMakeUpPrice(
@@ -233,6 +264,7 @@ export async function getCheckInOverview(user: CurrentUserRecord, month = getMon
   assertCheckInEnabled(settings)
 
   const snapshot = readCheckInSettingsSnapshot(settings)
+  const userRewardSettings = resolveCheckInRewardSettingsForUser(snapshot, user)
   const [entries, streakSummary] = await Promise.all([
     buildCalendarData({ userId: user.id, month }),
     getUserCheckInStreakSummary(user.id),
@@ -246,10 +278,14 @@ export async function getCheckInOverview(user: CurrentUserRecord, month = getMon
     makeUpEnabled: snapshot.checkInMakeUpEnabled,
     makeUpCountsTowardStreak: streakSummary.makeUpCountsTowardStreak,
     makeUpOldestDayLimit: snapshot.checkInMakeUpOldestDayLimit,
-    checkInReward: resolveUserCheckInReward(snapshot, user),
-    vip1CheckInReward: snapshot.vip1Reward,
-    vip2CheckInReward: snapshot.vip2Reward,
-    vip3CheckInReward: snapshot.vip3Reward,
+    checkInReward: userRewardSettings.rewardRange.min,
+    checkInRewardText: userRewardSettings.rewardText,
+    vip1CheckInReward: snapshot.vip1RewardRange.min,
+    vip1CheckInRewardText: snapshot.vip1RewardText || formatCheckInRewardRange(snapshot.vip1RewardRange),
+    vip2CheckInReward: snapshot.vip2RewardRange.min,
+    vip2CheckInRewardText: snapshot.vip2RewardText || formatCheckInRewardRange(snapshot.vip2RewardRange),
+    vip3CheckInReward: snapshot.vip3RewardRange.min,
+    vip3CheckInRewardText: snapshot.vip3RewardText || formatCheckInRewardRange(snapshot.vip3RewardRange),
     makeUpPrice: resolveUserMakeUpPrice(snapshot, user),
     vipMakeUpPrice: snapshot.vip1MakeUpPrice,
     normalMakeUpPrice: snapshot.normalMakeUpPrice,
@@ -267,7 +303,7 @@ export async function submitCheckInAction(user: CurrentUserRecord, body: unknown
   const snapshot = readCheckInSettingsSnapshot(settings)
   const payload = parseCheckInActionPayload(body)
   const todayKey = getLocalDateKey()
-  const reward = resolveUserCheckInReward(snapshot, user)
+  const reward = rollCheckInReward(resolveCheckInRewardSettingsForUser(snapshot, user).rewardRange)
   const rewardDelta = await prepareScopedPointDelta({
     scopeKey: "CHECK_IN_REWARD",
     baseDelta: reward,
@@ -295,15 +331,14 @@ export async function submitCheckInAction(user: CurrentUserRecord, body: unknown
 
     return {
       points: result.points,
+      reward: result.alreadyCheckedIn ? 0 : reward,
       alreadyCheckedIn: result.alreadyCheckedIn,
       date: todayKey,
       currentStreak: streakSummary.currentStreak,
       maxStreak: streakSummary.maxStreak,
       message: result.alreadyCheckedIn
         ? "今天已经签到过了"
-        : rewardDelta.finalDelta !== 0
-          ? `签到成功，相关${snapshot.pointName}已结算`
-          : "签到成功",
+        : `签到成功，获得 ${formatNumber(reward)} ${snapshot.pointName}`,
     }
   }
 
@@ -355,13 +390,12 @@ export async function submitCheckInAction(user: CurrentUserRecord, body: unknown
 
   return {
     points: result.points,
+    reward,
     alreadyCheckedIn: false,
     date: targetDateKey,
     currentStreak: streakSummary.currentStreak,
     maxStreak: streakSummary.maxStreak,
     makeUpCost,
-    message: makeUpCostDelta.finalDelta !== 0 || rewardDelta.finalDelta !== 0
-      ? `补签成功，相关${snapshot.pointName}已结算`
-      : "补签成功",
+    message: `补签成功，获得 ${formatNumber(reward)} ${snapshot.pointName}${makeUpCost > 0 ? `，消耗 ${formatNumber(makeUpCost)} ${snapshot.pointName}` : ""}`,
   }
 }

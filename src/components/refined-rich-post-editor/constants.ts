@@ -83,5 +83,9 @@ export const TOOLBAR_TIPS = {
     },
     description: "打开远程图片地址插入面板。",
   },
+  imageFromSelection: {
+    label: "转为图片",
+    description: "将选中的图片链接转换为 Markdown 图片语法。",
+  },
   help: { label: "Markdown 帮助", description: "查看完整语法、扩展能力和快捷键说明。" },
 } satisfies Record<string, ToolbarTipDefinition>

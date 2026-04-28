@@ -64,6 +64,7 @@ const statusFilters = [
   { value: "PENDING", label: "待审核" },
   { value: "NORMAL", label: "正常" },
   { value: "HIDDEN", label: "已下线" },
+  { value: "DELETED", label: "已删除" },
 ]
 
 const sortFilters = [
@@ -497,13 +498,27 @@ function CommentActionsCell({ comment }: { comment: AdminCommentListItem }) {
               </DropdownMenuItem>
             </>
           ) : comment.status === "HIDDEN" ? (
+            <>
+              <DropdownMenuItem onClick={() => setActiveAction("show")}>
+                恢复
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setActiveAction("delete")} variant="destructive">
+                删除
+              </DropdownMenuItem>
+            </>
+          ) : comment.status === "DELETED" ? (
             <DropdownMenuItem onClick={() => setActiveAction("show")}>
               恢复
             </DropdownMenuItem>
           ) : (
-            <DropdownMenuItem onClick={() => setActiveAction("hide")} variant="destructive">
-              下线
-            </DropdownMenuItem>
+            <>
+              <DropdownMenuItem onClick={() => setActiveAction("hide")} variant="destructive">
+                下线
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setActiveAction("delete")} variant="destructive">
+                删除
+              </DropdownMenuItem>
+            </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
@@ -536,8 +551,52 @@ function CommentActionsCell({ comment }: { comment: AdminCommentListItem }) {
             open={activeAction === "reject"}
             onOpenChange={(open) => setActiveAction(open ? "reject" : null)}
           />
+          <AdminPostActionButton
+            action="comment.delete"
+            targetId={comment.id}
+            label="删除"
+            tone="danger"
+            modalTitle="确认删除评论"
+            modalDescription={`帖子：${comment.postTitle}`}
+            placeholder="填写删除原因（可选）"
+            confirmText="确认删除"
+            className="h-7 rounded-full bg-red-700 px-2.5 text-xs text-white hover:bg-red-600"
+            hideTrigger
+            open={activeAction === "delete"}
+            onOpenChange={(open) => setActiveAction(open ? "delete" : null)}
+          />
         </>
       ) : comment.status === "HIDDEN" ? (
+        <>
+          <AdminPostActionButton
+            action="comment.show"
+            targetId={comment.id}
+            label="恢复"
+            modalTitle="确认恢复评论"
+            modalDescription={`帖子：${comment.postTitle}`}
+            placeholder="填写恢复说明（可选）"
+            confirmText="确认恢复"
+            className="h-7 rounded-full px-2.5 text-xs"
+            hideTrigger
+            open={activeAction === "show"}
+            onOpenChange={(open) => setActiveAction(open ? "show" : null)}
+          />
+          <AdminPostActionButton
+            action="comment.delete"
+            targetId={comment.id}
+            label="删除"
+            tone="danger"
+            modalTitle="确认删除评论"
+            modalDescription={`帖子：${comment.postTitle}`}
+            placeholder="填写删除原因（可选）"
+            confirmText="确认删除"
+            className="h-7 rounded-full bg-red-700 px-2.5 text-xs text-white hover:bg-red-600"
+            hideTrigger
+            open={activeAction === "delete"}
+            onOpenChange={(open) => setActiveAction(open ? "delete" : null)}
+          />
+        </>
+      ) : comment.status === "DELETED" ? (
         <AdminPostActionButton
           action="comment.show"
           targetId={comment.id}
@@ -552,20 +611,36 @@ function CommentActionsCell({ comment }: { comment: AdminCommentListItem }) {
           onOpenChange={(open) => setActiveAction(open ? "show" : null)}
         />
       ) : (
-        <AdminPostActionButton
-          action="comment.hide"
-          targetId={comment.id}
-          label="下线"
-          tone="danger"
-          modalTitle="确认下线评论"
-          modalDescription={`帖子：${comment.postTitle}`}
-          placeholder="填写下线原因（可选）"
-          confirmText="确认下线"
-          className="h-7 rounded-full bg-red-600 px-2.5 text-xs text-white hover:bg-red-500"
-          hideTrigger
-          open={activeAction === "hide"}
-          onOpenChange={(open) => setActiveAction(open ? "hide" : null)}
-        />
+        <>
+          <AdminPostActionButton
+            action="comment.hide"
+            targetId={comment.id}
+            label="下线"
+            tone="danger"
+            modalTitle="确认下线评论"
+            modalDescription={`帖子：${comment.postTitle}`}
+            placeholder="填写下线原因（可选）"
+            confirmText="确认下线"
+            className="h-7 rounded-full bg-red-600 px-2.5 text-xs text-white hover:bg-red-500"
+            hideTrigger
+            open={activeAction === "hide"}
+            onOpenChange={(open) => setActiveAction(open ? "hide" : null)}
+          />
+          <AdminPostActionButton
+            action="comment.delete"
+            targetId={comment.id}
+            label="删除"
+            tone="danger"
+            modalTitle="确认删除评论"
+            modalDescription={`帖子：${comment.postTitle}`}
+            placeholder="填写删除原因（可选）"
+            confirmText="确认删除"
+            className="h-7 rounded-full bg-red-700 px-2.5 text-xs text-white hover:bg-red-600"
+            hideTrigger
+            open={activeAction === "delete"}
+            onOpenChange={(open) => setActiveAction(open ? "delete" : null)}
+          />
+        </>
       )}
     </div>
   )

@@ -30,3 +30,39 @@ export function buildHomeFeedHref(sort: HomeFeedSort, page = 1) {
 
   return `/${sort}?page=${normalizedPage}`
 }
+
+export function normalizeAddonHomeFeedSlug(slug?: string) {
+  return typeof slug === "string"
+    ? slug
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, "-")
+      .replace(/-{2,}/g, "-")
+      .replace(/^-+|-+$/g, "")
+    : ""
+}
+
+export function buildAddonHomeFeedHref(
+  slug: string,
+  page = 1,
+  useRootAlias = false,
+) {
+  const normalizedSlug = normalizeAddonHomeFeedSlug(slug)
+  const normalizedPage = Math.max(1, Math.trunc(page))
+
+  if (!normalizedSlug) {
+    return "/"
+  }
+
+  if (useRootAlias && normalizedPage <= 1) {
+    return "/"
+  }
+
+  const baseHref = `/feed/${normalizedSlug}`
+
+  if (normalizedPage <= 1) {
+    return baseHref
+  }
+
+  return `${baseHref}?page=${normalizedPage}`
+}

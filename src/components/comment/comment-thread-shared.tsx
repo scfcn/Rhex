@@ -219,13 +219,17 @@ export function buildCommentAdminActions({ entry, isAdmin, adminRole, canPinComm
     actions.push({ key: entry.isPinnedByAuthor ? "comment.unpinByAuthor" : "comment.pinByAuthor", label: pinningCommentId === entry.id ? "处理中..." : entry.isPinnedByAuthor ? "取消置顶" : "置顶评论", targetId: entry.id, disabled: pinningCommentId === entry.id })
   }
   if (!isAdmin) return actions
-  if (entry.status === "HIDDEN") {
-    actions.push({ key: "comment.show", label: "上线评论", targetId: entry.id })
+  if (entry.status === "HIDDEN" || entry.status === "DELETED") {
+    actions.push({ key: "comment.show", label: entry.status === "DELETED" ? "恢复评论" : "上线评论", targetId: entry.id })
+    if (entry.status === "HIDDEN") {
+      actions.push({ key: "comment.delete", label: "删除评论", tone: "danger", targetId: entry.id })
+    }
     if (entry.authorStatus === "BANNED" && adminRole === "ADMIN") actions.push({ key: "user.activate", label: "解除封禁", targetId: String(entry.authorId), payload: { commentId: entry.id } })
     if (entry.authorStatus === "MUTED" && canModerateEntryAuthor) actions.push({ key: "user.activate", label: "解除禁言", targetId: String(entry.authorId), payload: { commentId: entry.id } })
     return actions
   }
   actions.push({ key: "comment.hide", label: "下线评论", tone: "danger", targetId: entry.id })
+  actions.push({ key: "comment.delete", label: "删除评论", tone: "danger", targetId: entry.id })
   if (entry.authorStatus === "BANNED") {
     if (adminRole === "ADMIN") actions.push({ key: "user.activate", label: "解除封禁", targetId: String(entry.authorId), payload: { commentId: entry.id } })
     return actions

@@ -7,6 +7,7 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   const body = await readJsonBody(request)
   const result = await updateCommentFlow({
     body,
+    request,
     currentUser: {
       id: currentUser.id,
       role: currentUser.role,

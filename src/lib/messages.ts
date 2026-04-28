@@ -1,9 +1,10 @@
+import { prisma } from "@/db/client"
 import { DbTransaction, withDbTransaction } from "@/db/helpers"
 import {
   findConversationByIdForParticipant,
   findConversationDetailById,
-  findDirectConversationByUsers,
   findConversationListItems,
+  findDirectConversationByUsers,
   findLatestMessageByConversationId,
   getUnreadConversationCount,
   updateConversationReadState,
@@ -15,43 +16,61 @@ import {
   findMessageHistoryAnchor,
   findMessageRecipientById,
 } from "@/db/message-write-queries"
-
-import { Prisma, ConversationKind, UserStatus } from "@/db/types"
-
-
+import { ConversationKind, Prisma, UserStatus } from "@/db/types"
 
 import { apiError } from "@/lib/api-route"
 import { enforceSensitiveText } from "@/lib/content-safety"
 import { formatMonthDayTime } from "@/lib/formatters"
-import { containsMessageFileToken, containsMessageImageSyntax, protectMessageMediaTokens, summarizeMessagePreview } from "@/lib/message-media"
+import {
+  containsMessageFileToken,
+  containsMessageImageSyntax,
+  protectMessageMediaTokens,
+  summarizeMessagePreview,
+} from "@/lib/message-media"
 import { messageEventBus } from "@/lib/message-event-bus"
 import { isPublicRouteError } from "@/lib/public-route-error"
+import {
+  createSiteChatParticipant,
+  insertSiteChatConversationFirst,
+  isSiteChatConversationId,
+  SITE_CHAT_CONVERSATION_ID,
+  SITE_CHAT_EMPTY_PREVIEW,
+  SITE_CHAT_ROOM_DB_ID,
+  SITE_CHAT_SUBTITLE,
+  SITE_CHAT_TITLE,
+  SITE_CHAT_UPDATED_AT_PLACEHOLDER,
+} from "@/lib/site-chat"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getUserDisplayName } from "@/lib/user-display"
 import { ensureUsersCanInteract } from "@/lib/user-blocks"
 import type {
-
-
   MessageBubbleItem,
   MessageCenterData,
   MessageConversationDetail,
   MessageConversationListItem,
   MessageHistoryResult,
   MessageParticipantProfile,
+  MessageSendResult,
 } from "@/lib/message-types"
 
-
-
 type MessageTransactionClient = DbTransaction
-
-
-
-
 
 const INITIAL_MESSAGE_PAGE_SIZE = 20
 const MESSAGE_HISTORY_BATCH_SIZE = 50
 
 type MessageRecipientRecord = NonNullable<Awaited<ReturnType<typeof findMessageRecipientById>>>
+type SiteChatMessageSendResult = MessageSendResult & { participantUserIds: number[] }
+type DirectConversationListEntry = {
+  id: string
+  kind: "DIRECT"
+  title: string
+  subtitle: string
+  preview: string
+  updatedAt: string
+  unreadCount: number
+  participants: MessageParticipantProfile[]
+  sortAt: Date
+}
 
 type ResolvedConversationReference =
   | { kind: "database"; conversationId: string }
@@ -86,7 +105,6 @@ function mapUserProfile(
 function mapConversationParticipant(
   participant: {
     userId: number
-    unreadCount: number
     user: {
       id: number
       username: string
@@ -175,6 +193,287 @@ function isUniqueConstraintError(error: unknown, target?: string) {
   return errorTarget.includes(target)
 }
 
+async function isSiteChatEnabled() {
+  const settings = await getSiteSettings()
+  return Boolean(settings.siteChatEnabled)
+}
+
+async function ensureSiteChatConversation() {
+  return prisma.conversation.upsert({
+    where: {
+      id: SITE_CHAT_ROOM_DB_ID,
+    },
+    update: {
+      kind: ConversationKind.GROUP,
+    },
+    create: {
+      id: SITE_CHAT_ROOM_DB_ID,
+      kind: ConversationKind.GROUP,
+    },
+  })
+}
+
+async function ensureSiteChatParticipant(userId: number) {
+  await ensureSiteChatConversation()
+
+  return prisma.conversationParticipant.upsert({
+    where: {
+      conversationId_userId: {
+        conversationId: SITE_CHAT_ROOM_DB_ID,
+        userId,
+      },
+    },
+    update: {
+      archivedAt: null,
+    },
+    create: {
+      conversationId: SITE_CHAT_ROOM_DB_ID,
+      userId,
+      unreadCount: 0,
+    },
+  })
+}
+
+async function getSiteChatParticipantUnreadCount(currentUserId: number) {
+  const participant = await prisma.conversationParticipant.findUnique({
+    where: {
+      conversationId_userId: {
+        conversationId: SITE_CHAT_ROOM_DB_ID,
+        userId: currentUserId,
+      },
+    },
+    select: {
+      unreadCount: true,
+      archivedAt: true,
+    },
+  })
+
+  return participant && participant.archivedAt === null
+    ? participant.unreadCount
+    : 0
+}
+
+async function findSiteChatConversationWithMessages(messageLimit: number) {
+  await ensureSiteChatConversation()
+
+  return prisma.conversation.findUnique({
+    where: {
+      id: SITE_CHAT_ROOM_DB_ID,
+    },
+    include: {
+      messages: {
+        orderBy: {
+          createdAt: "desc",
+        },
+        take: messageLimit,
+        include: {
+          sender: {
+            select: {
+              id: true,
+              username: true,
+              nickname: true,
+              avatarPath: true,
+            },
+          },
+        },
+      },
+    },
+  })
+}
+
+async function buildSiteChatConversationListItem(currentUserId: number): Promise<MessageConversationListItem> {
+  const [conversation, unreadCount] = await Promise.all([
+    findSiteChatConversationWithMessages(1),
+    getSiteChatParticipantUnreadCount(currentUserId),
+  ])
+  const latestMessage = conversation?.messages[0]
+
+  return {
+    id: SITE_CHAT_CONVERSATION_ID,
+    kind: "SITE_CHAT",
+    title: SITE_CHAT_TITLE,
+    subtitle: unreadCount > 0 ? `未读 ${unreadCount} 条` : latestMessage ? SITE_CHAT_SUBTITLE : "聊天室已开启",
+    preview: latestMessage ? summarizeMessagePreview(latestMessage.body) : SITE_CHAT_EMPTY_PREVIEW,
+    updatedAt: latestMessage ? formatMonthDayTime(latestMessage.createdAt) : SITE_CHAT_UPDATED_AT_PLACEHOLDER,
+    unreadCount,
+    participants: [createSiteChatParticipant()],
+  }
+}
+
+async function markSiteChatConversationAsRead(currentUserId: number) {
+  await ensureSiteChatParticipant(currentUserId)
+  const latestMessage = await findLatestMessageByConversationId(SITE_CHAT_ROOM_DB_ID)
+
+  await updateConversationReadState(SITE_CHAT_ROOM_DB_ID, currentUserId, latestMessage?.id)
+}
+
+async function getSiteChatConversationDetail(currentUserId: number): Promise<MessageConversationDetail | null> {
+  if (!await isSiteChatEnabled()) {
+    return null
+  }
+
+  await ensureSiteChatParticipant(currentUserId)
+  const conversation = await findSiteChatConversationWithMessages(INITIAL_MESSAGE_PAGE_SIZE + 1)
+
+  if (!conversation) {
+    return null
+  }
+
+  const orderedMessages = [...conversation.messages].reverse()
+  const hasMoreHistory = orderedMessages.length > INITIAL_MESSAGE_PAGE_SIZE
+  const visibleMessages = hasMoreHistory ? orderedMessages.slice(1) : orderedMessages
+
+  await markSiteChatConversationAsRead(currentUserId)
+
+  return {
+    id: SITE_CHAT_CONVERSATION_ID,
+    kind: "SITE_CHAT",
+    title: SITE_CHAT_TITLE,
+    subtitle: visibleMessages.length > 0 ? SITE_CHAT_SUBTITLE : SITE_CHAT_EMPTY_PREVIEW,
+    updatedAt: visibleMessages.length > 0
+      ? formatMonthDayTime(visibleMessages.at(-1)?.createdAt ?? conversation.lastMessageAt)
+      : SITE_CHAT_UPDATED_AT_PLACEHOLDER,
+    participants: [createSiteChatParticipant()],
+    hasMoreHistory,
+    messages: visibleMessages.map((message) => mapMessageBubble(message, currentUserId)),
+  }
+}
+
+async function sanitizeOutgoingMessageBody(body: string) {
+  const content = body.trim()
+
+  if (!content) {
+    apiError(400, "消息内容不能为空")
+  }
+
+  if (content.length > 1000) {
+    apiError(400, "消息内容不能超过 1000 个字符")
+  }
+
+  const settings = await getSiteSettings()
+  if (containsMessageImageSyntax(content) && !settings.messageImageUploadEnabled) {
+    apiError(403, "当前站点未开启私信图片发送")
+  }
+
+  if (containsMessageFileToken(content) && !settings.messageFileUploadEnabled) {
+    apiError(403, "当前站点未开启私信文件发送")
+  }
+
+  const protectedContent = protectMessageMediaTokens(content)
+  const contentSafety = await enforceSensitiveText({
+    scene: "message.body",
+    text: protectedContent.protectedText,
+  })
+
+  return {
+    sanitizedContent: protectedContent.restore(contentSafety.sanitizedText),
+    contentAdjusted: contentSafety.wasReplaced,
+  }
+}
+
+async function sendSiteChatMessage(senderId: number, body: string): Promise<SiteChatMessageSendResult> {
+  if (!await isSiteChatEnabled()) {
+    apiError(403, "当前站点未开启全站聊天室")
+  }
+
+  const { sanitizedContent, contentAdjusted } = await sanitizeOutgoingMessageBody(body)
+  await ensureSiteChatParticipant(senderId)
+
+  const sender = await findMessageRecipientById(senderId)
+  const { message, participants } = await prisma.$transaction(async (tx) => {
+    const created = await tx.directMessage.create({
+      data: {
+        conversationId: SITE_CHAT_ROOM_DB_ID,
+        senderId,
+        body: sanitizedContent,
+      },
+    })
+
+    await tx.conversation.update({
+      where: {
+        id: SITE_CHAT_ROOM_DB_ID,
+      },
+      data: {
+        lastMessageAt: created.createdAt,
+      },
+    })
+
+    await tx.conversationParticipant.updateMany({
+      where: {
+        conversationId: SITE_CHAT_ROOM_DB_ID,
+        userId: senderId,
+      },
+      data: {
+        unreadCount: 0,
+        lastReadMessageId: created.id,
+        archivedAt: null,
+      },
+    })
+
+    await tx.conversationParticipant.updateMany({
+      where: {
+        conversationId: SITE_CHAT_ROOM_DB_ID,
+        userId: {
+          not: senderId,
+        },
+        archivedAt: null,
+      },
+      data: {
+        unreadCount: {
+          increment: 1,
+        },
+      },
+    })
+
+    const allParticipants = await tx.conversationParticipant.findMany({
+      where: {
+        conversationId: SITE_CHAT_ROOM_DB_ID,
+        archivedAt: null,
+      },
+      select: {
+        userId: true,
+        unreadCount: true,
+      },
+    })
+
+    return {
+      message: created,
+      participants: allParticipants,
+    }
+  })
+
+  const occurredAt = message.createdAt.toISOString()
+  const senderDisplayName = sender ? getUserDisplayName(sender) : "用户"
+  const senderUsername = sender?.username ?? ""
+  const senderAvatarPath = sender?.avatarPath ?? null
+
+  await Promise.all(participants.map((participant) => messageEventBus.publish({
+    type: "message.created",
+    conversationId: SITE_CHAT_CONVERSATION_ID,
+    messageId: message.id,
+    content: message.body,
+    createdAtLabel: formatMonthDayTime(message.createdAt),
+    senderId,
+    senderUsername,
+    senderDisplayName,
+    senderAvatarPath,
+    recipientId: participant.userId,
+    recipientUnreadMessageCount: participant.userId === senderId ? 0 : participant.unreadCount,
+    targetUserIds: [participant.userId],
+    occurredAt,
+  })))
+
+  return {
+    id: message.id,
+    conversationId: SITE_CHAT_CONVERSATION_ID,
+    content: message.body,
+    createdAt: formatMonthDayTime(message.createdAt),
+    occurredAt,
+    contentAdjusted: Boolean(contentAdjusted),
+    participantUserIds: participants.map((participant) => participant.userId),
+  }
+}
+
 async function getOrCreateConversation(userAId: number, userBId: number) {
   const pair = normalizeDirectPair(userAId, userBId)
   const existing = await findDirectConversationByUsers(pair.userLowId, pair.userHighId)
@@ -238,9 +537,13 @@ async function resolveCanonicalConversationId(currentUserId: number, conversatio
     return undefined
   }
 
-  const partnerIds = conversation.participants.map((participant) => participant.userId).filter((userId) => userId !== currentUserId)
+  const partnerIds = conversation.participants
+    .map((participant) => participant.userId)
+    .filter((userId) => userId !== currentUserId)
 
-  return partnerIds.length === 1 && conversation.participants.length === 2 ? conversation.id : undefined
+  return partnerIds.length === 1 && conversation.participants.length === 2
+    ? conversation.id
+    : undefined
 }
 
 async function getDatabaseBackedConversations(currentUserId: number): Promise<MessageConversationListItem[]> {
@@ -260,6 +563,7 @@ async function getDatabaseBackedConversations(currentUserId: number): Promise<Me
 
       return {
         id: item.conversation.id,
+        kind: "DIRECT" as const,
         title: partner.displayName,
         subtitle: item.unreadCount > 0 ? `未读 ${item.unreadCount} 条` : latestMessage ? "最近互动" : "新会话",
         preview: latestMessage ? summarizeMessagePreview(latestMessage.body) : "还没有消息，发一条开始聊天吧",
@@ -269,10 +573,11 @@ async function getDatabaseBackedConversations(currentUserId: number): Promise<Me
         sortAt,
       }
     })
-    .filter((conversation): conversation is MessageConversationListItem & { sortAt: Date } => Boolean(conversation))
+    .filter((conversation): conversation is DirectConversationListEntry => Boolean(conversation))
     .sort((left, right) => right.sortAt.getTime() - left.sortAt.getTime())
     .map((conversation) => ({
       id: conversation.id,
+      kind: conversation.kind,
       title: conversation.title,
       subtitle: conversation.subtitle,
       preview: conversation.preview,
@@ -286,18 +591,22 @@ export async function getUnreadMessageConversationCount(currentUserId: number) {
   return getUnreadConversationCount(currentUserId)
 }
 
-
 export async function markConversationAsRead(conversationId: string, currentUserId: number) {
+  if (isSiteChatConversationId(conversationId)) {
+    if (await isSiteChatEnabled()) {
+      await markSiteChatConversationAsRead(currentUserId)
+    }
+    return
+  }
+
   const canonicalConversationId = await resolveCanonicalConversationId(currentUserId, conversationId)
   if (!canonicalConversationId) {
     return
   }
 
   const latestMessage = await findLatestMessageByConversationId(canonicalConversationId)
-
   await updateConversationReadState(canonicalConversationId, currentUserId, latestMessage?.id)
 }
-
 
 async function getDatabaseConversationDetail(currentUserId: number, conversationId: string): Promise<MessageConversationDetail | null> {
   const canonicalConversationId = await resolveCanonicalConversationId(currentUserId, conversationId)
@@ -306,8 +615,6 @@ async function getDatabaseConversationDetail(currentUserId: number, conversation
   }
 
   const conversation = await findConversationDetailById(canonicalConversationId, currentUserId, INITIAL_MESSAGE_PAGE_SIZE)
-
-
   if (!conversation) {
     return null
   }
@@ -327,6 +634,7 @@ async function getDatabaseConversationDetail(currentUserId: number, conversation
 
   return {
     id: conversation.id,
+    kind: "DIRECT",
     title: partner.displayName,
     subtitle: visibleMessages.length > 0 ? "实时会话" : "还没有聊天记录，发一条消息开始聊天吧",
     updatedAt: formatMonthDayTime(visibleMessages.at(-1)?.createdAt ?? conversation.lastMessageAt),
@@ -356,11 +664,7 @@ async function getValidatedMessageRecipient(
     blockedByMessage: messages.blockedByMessage,
   })
 
-
   const recipient = await findMessageRecipientById(targetUserId)
-
-
-
   if (!recipient || recipient.status !== UserStatus.ACTIVE) {
     apiError(400, "接收方不存在或不可接收私信")
   }
@@ -373,6 +677,7 @@ function buildDraftConversationDetail(currentUserId: number, recipient: MessageR
 
   return {
     id: `user-${recipient.id}`,
+    kind: "DIRECT",
     title: participant.displayName,
     subtitle: "还没有聊天记录，发一条消息开始聊天吧",
     updatedAt: "待发送",
@@ -433,6 +738,10 @@ async function resolveConversationReference(currentUserId: number, conversationI
 }
 
 export async function getMessageConversationDetail(currentUserId: number, conversationId: string): Promise<MessageConversationDetail | null> {
+  if (isSiteChatConversationId(conversationId)) {
+    return getSiteChatConversationDetail(currentUserId)
+  }
+
   const resolvedConversation = await resolveConversationReference(currentUserId, conversationId)
 
   return resolvedConversation?.kind === "database"
@@ -442,36 +751,29 @@ export async function getMessageConversationDetail(currentUserId: number, conver
       : null
 }
 
-export async function sendDirectMessage(senderId: number, recipientId: number, body: string) {
-  const content = body.trim()
-
-  if (!content) {
-    apiError(400, "消息内容不能为空")
+export async function sendDirectMessage(
+  senderId: number,
+  recipientId: number | undefined,
+  body: string,
+  options?: {
+    conversationId?: string
+  },
+): Promise<MessageSendResult | SiteChatMessageSendResult> {
+  if (isSiteChatConversationId(options?.conversationId)) {
+    return sendSiteChatMessage(senderId, body)
   }
 
-  if (content.length > 1000) {
-    apiError(400, "消息内容不能超过 1000 个字符")
+  if (typeof recipientId !== "number" || !Number.isFinite(recipientId)) {
+    apiError(400, "缺少接收方信息")
   }
 
-  const settings = await getSiteSettings()
-  if (containsMessageImageSyntax(content) && !settings.messageImageUploadEnabled) {
-    apiError(403, "当前站点未开启私信图片发送")
-  }
-
-  if (containsMessageFileToken(content) && !settings.messageFileUploadEnabled) {
-    apiError(403, "当前站点未开启私信文件发送")
-  }
-
+  const { sanitizedContent, contentAdjusted } = await sanitizeOutgoingMessageBody(body)
   const recipient = await getValidatedMessageRecipient(senderId, recipientId, {
     blockedMessage: "你已拉黑该用户，无法发送私信",
     blockedByMessage: "对方已将你拉黑，无法发送私信",
   })
 
-  const protectedContent = protectMessageMediaTokens(content)
-  const contentSafety = await enforceSensitiveText({ scene: "message.body", text: protectedContent.protectedText })
   const conversation = await getOrCreateConversation(senderId, recipient.id)
-  const sanitizedContent = protectedContent.restore(contentSafety.sanitizedText)
-
   const message = await createDirectMessageInTransaction(conversation.id, senderId, recipient.id, sanitizedContent)
   const sender = await findMessageRecipientById(senderId)
   const recipientUnreadMessageCount = await getUnreadConversationCount(recipient.id)
@@ -495,39 +797,55 @@ export async function sendDirectMessage(senderId: number, recipientId: number, b
     occurredAt,
   })
 
-
   return {
     id: message.id,
     conversationId: conversation.id,
     content: message.body,
     createdAt: formatMonthDayTime(message.createdAt),
     occurredAt,
-    contentAdjusted: contentSafety.wasReplaced,
+    contentAdjusted: Boolean(contentAdjusted),
   }
 }
 
 export async function getConversationHistory(currentUserId: number, conversationId: string, beforeMessageId: string): Promise<MessageHistoryResult> {
+  if (isSiteChatConversationId(conversationId)) {
+    if (!await isSiteChatEnabled()) {
+      apiError(404, "会话不存在或无权查看")
+    }
+
+    await ensureSiteChatParticipant(currentUserId)
+    const anchor = await findMessageHistoryAnchor(beforeMessageId, SITE_CHAT_ROOM_DB_ID)
+
+    if (!anchor) {
+      apiError(404, "历史消息定位失败")
+    }
+
+    const history = await findConversationHistoryBatch(SITE_CHAT_ROOM_DB_ID, anchor.createdAt, MESSAGE_HISTORY_BATCH_SIZE)
+    const hasMoreHistory = history.length > MESSAGE_HISTORY_BATCH_SIZE
+    const visibleHistory = hasMoreHistory ? history.slice(0, MESSAGE_HISTORY_BATCH_SIZE) : history
+
+    return {
+      messages: visibleHistory.reverse().map((message) => mapMessageBubble(message, currentUserId)),
+      hasMoreHistory,
+    }
+  }
+
   const canonicalConversationId = await resolveCanonicalConversationId(currentUserId, conversationId)
   if (!canonicalConversationId) {
     apiError(404, "会话不存在或无权查看")
   }
 
   const participant = await findConversationParticipantByUser(canonicalConversationId, currentUserId)
-
   if (!participant) {
     apiError(404, "会话不存在或无权查看")
   }
 
   const anchor = await findMessageHistoryAnchor(beforeMessageId, canonicalConversationId)
-
   if (!anchor) {
     apiError(404, "历史消息定位失败")
   }
 
-
   const history = await findConversationHistoryBatch(canonicalConversationId, anchor.createdAt, MESSAGE_HISTORY_BATCH_SIZE)
-
-
   const hasMoreHistory = history.length > MESSAGE_HISTORY_BATCH_SIZE
   const visibleHistory = hasMoreHistory ? history.slice(0, MESSAGE_HISTORY_BATCH_SIZE) : history
 
@@ -538,21 +856,32 @@ export async function getConversationHistory(currentUserId: number, conversation
 }
 
 export async function deleteConversationForUser(conversationId: string, currentUserId: number) {
+  if (isSiteChatConversationId(conversationId)) {
+    apiError(400, "全站聊天室不支持删除")
+  }
+
   const canonicalConversationId = await resolveCanonicalConversationId(currentUserId, conversationId)
   if (!canonicalConversationId) {
     apiError(404, "会话不存在或无权删除")
   }
 
-
   await withDbTransaction(async (tx) => {
     await removeConversationForUser(tx, canonicalConversationId, currentUserId)
   })
-
 }
 
 export async function getMessageCenterData(currentUserId: number, conversationId?: string): Promise<MessageCenterData> {
   try {
-    const conversations = await getDatabaseBackedConversations(currentUserId)
+    const [siteSettings, databaseConversations] = await Promise.all([
+      getSiteSettings(),
+      getDatabaseBackedConversations(currentUserId),
+    ])
+    const siteChatConversation = siteSettings.siteChatEnabled
+      ? await buildSiteChatConversationListItem(currentUserId)
+      : null
+    const conversations = siteChatConversation
+      ? insertSiteChatConversationFirst(databaseConversations, siteChatConversation)
+      : databaseConversations
     let activeConversation: MessageConversationDetail | null = null
     let errorMessage: string | null = null
 

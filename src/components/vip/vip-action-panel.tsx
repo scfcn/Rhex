@@ -29,13 +29,20 @@ interface VipActionResult {
   }
 }
 
+function createVipRequestId() {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID()
+  }
+
+  return `vip-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
 export function VipActionPanel({ vipMonthlyPrice, vipQuarterlyPrice, vipYearlyPrice, pointName, userPoints = 0, vipExpiresAt = null }: VipActionPanelProps) {
 
   const vipActive = isVipActive({ vipExpiresAt })
 
   const router = useRouter()
 
-  const [message, setMessage] = useState("")
   const [loading, setLoading] = useState("")
 
   async function runAction(action: VipPurchaseAction) {
@@ -57,29 +64,35 @@ export function VipActionPanel({ vipMonthlyPrice, vipQuarterlyPrice, vipYearlyPr
     }
 
     setLoading(action)
-    setMessage("")
 
     try {
+      const requestId = createVipRequestId()
       const response = await fetch("/api/vip", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, requestId }),
       })
       const result = await response.json() as VipActionResult
 
-      setMessage(result.message ?? (response.ok ? "操作成功" : "操作失败"))
-      if (response.ok) {
-        const successTitle = result.data?.mode === "renew" ? "续费成功" : "开通成功"
-        const expiresAt = result.data?.expiresAt
-        if (expiresAt) {
-          toast.success(`到期时间：${formatDateTime(expiresAt)}`, successTitle)
-        } else {
-          toast.success(result.message ?? "操作成功", successTitle)
-        }
-        router.refresh()
+      const nextMessage = result.message ?? (response.ok ? "操作成功" : "操作失败")
+
+      if (!response.ok) {
+        toast.error(nextMessage, vipActive ? "续费失败" : "开通失败")
+        return
       }
+
+      const successTitle = result.data?.mode === "renew" ? "续费成功" : "开通成功"
+      const expiresAt = result.data?.expiresAt
+      if (expiresAt) {
+        toast.success(`到期时间：${formatDateTime(expiresAt)}`, successTitle)
+      } else {
+        toast.success(nextMessage, successTitle)
+      }
+
+      router.refresh()
     } catch {
-      setMessage("操作失败，请稍后重试")
+      const errorMessage = "操作失败，请稍后重试"
+      toast.error(errorMessage, vipActive ? "续费失败" : "开通失败")
     } finally {
       setLoading("")
     }
@@ -100,8 +113,6 @@ export function VipActionPanel({ vipMonthlyPrice, vipQuarterlyPrice, vipYearlyPr
 
         </div>
       </div>
-      {message ? <p className="mt-4 text-sm text-muted-foreground">{message}</p> : null}
     </div>
   )
 }
-

@@ -353,6 +353,7 @@ export const ADDON_WATERFALL_HOOK_NAMES = [
   "post.slug.value",
   // ─── v2 扩展 ───
   "post.title.value",
+  "comment.content.value",
   "user.displayName.value",
   "user.avatar.url.value",
   "search.query.normalize",
@@ -949,6 +950,16 @@ export type AddonNotificationRelatedType =
   | "ANNOUNCEMENT"
   | "YINYANG_CHALLENGE"
 
+export type AddonNotificationType =
+  | "REPLY_POST"
+  | "REPLY_COMMENT"
+  | "LIKE"
+  | "MENTION"
+  | "FOLLOWED_YOU"
+  | "FOLLOWING_ACTIVITY"
+  | "SYSTEM"
+  | "REPORT_RESULT"
+
 export interface AddonNotificationCreateInput {
   recipientId?: number
   recipientUsername?: string
@@ -962,7 +973,7 @@ export interface AddonNotificationCreateInput {
 export interface AddonNotificationRecord {
   id: string
   userId: number
-  type: "SYSTEM"
+  type: AddonNotificationType
   senderId: number | null
   relatedType: AddonNotificationRelatedType
   relatedId: string
@@ -1350,6 +1361,7 @@ export interface AddonActionHookPayloadMap {
 
 export interface AddonWaterfallHookValueMap {
   "post.title.value": string
+  "comment.content.value": string
   "user.displayName.value": string
   "user.avatar.url.value": string
   "search.query.normalize": string
@@ -1359,6 +1371,25 @@ export interface AddonWaterfallHookValueMap {
     label: string
     href?: string
   }>
+}
+
+export interface AddonWaterfallHookPayloadMap {
+  "post.title.value": {
+    mode: "create" | "update"
+    postId?: string
+    boardSlug: string
+    postType: string
+  }
+  "comment.content.value": {
+    mode: "create" | "update"
+    postId: string
+    commentId?: string
+  }
+  "breadcrumb.items": {
+    scope: "admin"
+    currentKey: string
+    adminRole: "ADMIN" | "MODERATOR"
+  }
 }
 
 export interface AddonAsyncWaterfallHookValueMap {
@@ -1383,6 +1414,32 @@ export interface AddonAsyncWaterfallHookValueMap {
   "post.content.render": string
 }
 
+export interface AddonAsyncWaterfallHookPayloadMap {
+  "feed.posts.items": {
+    source: "feed" | "post-stream"
+    sort: string
+    pathname?: string
+  }
+  "search.results.rerank": {
+    query: string
+    scope: string
+  }
+  "notification.dispatch.targets": {
+    draft: {
+      userId: number
+      type: string
+      senderId: number | null
+      relatedType: string
+      relatedId: string
+      title: string
+      content: string
+    }
+  }
+  "post.related.items": {
+    postId: string
+  }
+}
+
 /** 按 hook 名查 payload 类型；未登记则回落 unknown（向后兼容）。 */
 export type LookupAddonActionHookPayload<H extends AddonActionHookName> =
   H extends keyof AddonActionHookPayloadMap ? AddonActionHookPayloadMap[H] : unknown
@@ -1391,9 +1448,17 @@ export type LookupAddonActionHookPayload<H extends AddonActionHookName> =
 export type LookupAddonWaterfallHookValue<H extends AddonWaterfallHookName> =
   H extends keyof AddonWaterfallHookValueMap ? AddonWaterfallHookValueMap[H] : unknown
 
+/** 按 hook 名查 waterfall payload 类型；未登记则回落 unknown。 */
+export type LookupAddonWaterfallHookPayload<H extends AddonWaterfallHookName> =
+  H extends keyof AddonWaterfallHookPayloadMap ? AddonWaterfallHookPayloadMap[H] : unknown
+
 /** 按 hook 名查 asyncWaterfall value 类型；未登记则回落 unknown。 */
 export type LookupAddonAsyncWaterfallHookValue<H extends AddonAsyncWaterfallHookName> =
   H extends keyof AddonAsyncWaterfallHookValueMap ? AddonAsyncWaterfallHookValueMap[H] : unknown
+
+/** 按 hook 名查 asyncWaterfall payload 类型；未登记则回落 unknown。 */
+export type LookupAddonAsyncWaterfallHookPayload<H extends AddonAsyncWaterfallHookName> =
+  H extends keyof AddonAsyncWaterfallHookPayloadMap ? AddonAsyncWaterfallHookPayloadMap[H] : unknown
 
 export interface AddonActionHookContext<
   THook extends AddonActionHookName = AddonActionHookName,
@@ -1406,9 +1471,15 @@ export interface AddonActionHookContext<
 export interface AddonWaterfallHookContext<
   THook extends AddonHookName = AddonHookName,
   TValue = unknown,
+  TPayload = THook extends AddonWaterfallHookName
+    ? LookupAddonWaterfallHookPayload<THook>
+    : THook extends AddonAsyncWaterfallHookName
+      ? LookupAddonAsyncWaterfallHookPayload<THook>
+      : unknown,
 > extends AddonExecutionContextBase {
   hook: THook
   value: TValue
+  payload?: TPayload
 }
 
 export interface AddonSlotRegistration<
@@ -1504,6 +1575,7 @@ export interface AddonActionHookRegistration<
 export interface AddonWaterfallHookRegistration<
   THook extends AddonWaterfallHookName = AddonWaterfallHookName,
   TValue = LookupAddonWaterfallHookValue<THook>,
+  TPayload = LookupAddonWaterfallHookPayload<THook>,
 > {
   key: string
   hook: THook
@@ -1511,13 +1583,14 @@ export interface AddonWaterfallHookRegistration<
   title?: string
   description?: string
   transform: (
-    context: AddonWaterfallHookContext<THook, TValue>,
+    context: AddonWaterfallHookContext<THook, TValue, TPayload>,
   ) => TValue | undefined
 }
 
 export interface AddonAsyncWaterfallHookRegistration<
   THook extends AddonAsyncWaterfallHookName = AddonAsyncWaterfallHookName,
   TValue = LookupAddonAsyncWaterfallHookValue<THook>,
+  TPayload = LookupAddonAsyncWaterfallHookPayload<THook>,
 > {
   key: string
   hook: THook
@@ -1525,7 +1598,7 @@ export interface AddonAsyncWaterfallHookRegistration<
   title?: string
   description?: string
   transform: (
-    context: AddonWaterfallHookContext<THook, TValue>,
+    context: AddonWaterfallHookContext<THook, TValue, TPayload>,
   ) => AddonMaybePromise<TValue | undefined>
 }
 

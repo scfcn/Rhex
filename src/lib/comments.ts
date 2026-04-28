@@ -5,6 +5,10 @@ import { formatRelativeTime } from "@/lib/formatters"
 import type { AnonymousDisplayIdentity } from "@/lib/post-anonymous"
 import type { PostRewardPoolEffectFeedback } from "@/lib/post-reward-effect-feedback"
 import type { PostRewardPoolMode } from "@/lib/post-reward-pool-config"
+import {
+  applyHookedUserPresentationToCommentThreads,
+  applyHookedUserPresentationToFlatCommentItems,
+} from "@/lib/user-presentation-server"
 import { getUserDisplayName } from "@/lib/users"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
 
@@ -573,7 +577,7 @@ export async function getCommentsByPostId(
 
       return {
         items: [],
-        flatItems,
+        flatItems: await applyHookedUserPresentationToFlatCommentItems(flatItems),
         total,
         page,
         pageSize,
@@ -668,7 +672,7 @@ export async function getCommentsByPostId(
     })
 
     return {
-      items: normalizedComments,
+      items: await applyHookedUserPresentationToCommentThreads(normalizedComments),
       flatItems: [],
       total,
       page,

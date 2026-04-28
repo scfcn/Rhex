@@ -53,6 +53,9 @@ async function resolveHookedRelatedTopics(input: {
     {
       pathname: input.pathname,
       searchParams: input.searchParams,
+      payload: {
+        postId: input.postId,
+      },
     },
   )
 

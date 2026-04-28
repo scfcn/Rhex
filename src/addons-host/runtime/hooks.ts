@@ -9,7 +9,9 @@ import type {
   AddonWaterfallHookName,
   LoadedAddonRuntime,
   LookupAddonActionHookPayload,
+  LookupAddonAsyncWaterfallHookPayload,
   LookupAddonAsyncWaterfallHookValue,
+  LookupAddonWaterfallHookPayload,
   LookupAddonWaterfallHookValue,
 } from "@/addons-host/types"
 
@@ -31,6 +33,11 @@ interface AddonHookExecutionInput {
   pathname?: string
   searchParams?: URLSearchParams
   throwOnError?: boolean
+}
+
+interface AddonWaterfallHookExecutionInput<TPayload = unknown>
+  extends AddonHookExecutionInput {
+  payload?: TPayload
 }
 
 interface ActionHookCandidate {
@@ -104,7 +111,7 @@ async function buildActionHookCandidates(
 async function buildWaterfallHookCandidates<TValue>(
   kind: "waterfall" | "asyncWaterfall",
   hook: AddonWaterfallHookName | AddonAsyncWaterfallHookName,
-  input?: AddonHookExecutionInput,
+  input?: AddonWaterfallHookExecutionInput,
 ) {
   const candidates: WaterfallHookCandidate<TValue>[] = []
   const registry = await loadAddonsRegistry()
@@ -129,6 +136,9 @@ async function buildWaterfallHookCandidates<TValue>(
             }),
             hook: registration.hook,
             value,
+            ...(typeof input?.payload === "undefined"
+              ? {}
+              : { payload: input.payload }),
           }
 
           return runWithAddonExecutionScope(addon, {
@@ -158,6 +168,9 @@ async function buildWaterfallHookCandidates<TValue>(
           }),
           hook: registration.hook,
           value,
+          ...(typeof input?.payload === "undefined"
+            ? {}
+            : { payload: input.payload }),
         }
 
         return runWithAddonExecutionScope(addon, {
@@ -206,10 +219,11 @@ export async function executeAddonActionHook<
 export async function executeAddonWaterfallHook<
   THook extends AddonWaterfallHookName,
   TValue = LookupAddonWaterfallHookValue<THook>,
+  TPayload = LookupAddonWaterfallHookPayload<THook>,
 >(
   hook: THook,
   initialValue: TValue,
-  input?: AddonHookExecutionInput,
+  input?: AddonWaterfallHookExecutionInput<TPayload>,
 ) {
   const candidates = await buildWaterfallHookCandidates<TValue>("waterfall", hook, input)
   const results: ExecutedAddonWaterfallHookResult<TValue>[] = []
@@ -248,10 +262,11 @@ export async function executeAddonWaterfallHook<
 export async function executeAddonAsyncWaterfallHook<
   THook extends AddonAsyncWaterfallHookName,
   TValue = LookupAddonAsyncWaterfallHookValue<THook>,
+  TPayload = LookupAddonAsyncWaterfallHookPayload<THook>,
 >(
   hook: THook,
   initialValue: TValue,
-  input?: AddonHookExecutionInput,
+  input?: AddonWaterfallHookExecutionInput<TPayload>,
 ) {
   const candidates = await buildWaterfallHookCandidates<TValue>("asyncWaterfall", hook, input)
   const results: ExecutedAddonWaterfallHookResult<TValue>[] = []

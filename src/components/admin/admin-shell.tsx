@@ -65,6 +65,13 @@ export async function AdminShell({
   const { value: hookedBreadcrumbs } = await executeAddonWaterfallHook(
     "breadcrumb.items",
     resolvedBreadcrumbs,
+    {
+      payload: {
+        scope: "admin",
+        currentKey,
+        adminRole,
+      },
+    },
   )
   const finalBreadcrumbs =
     Array.isArray(hookedBreadcrumbs) && hookedBreadcrumbs.length > 0

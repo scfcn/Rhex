@@ -1,6 +1,8 @@
 import { countRootCommentsByPostId, countVisibleCommentsByPostId, createCommentWithRelations, findCommentAuthorByUserId, findCommentParentById, findRootCommentPageById } from "@/db/comment-queries"
 import { findAnonymousMaskUserById } from "@/db/anonymous-post-queries"
 
+import { executeAddonWaterfallHook } from "@/addons-host/runtime/hooks"
+import { resolveHookedStringValue } from "@/lib/addon-hook-values"
 import { apiError } from "@/lib/api-route"
 import { checkBoardPermission, getBoardAccessContextByPostId } from "@/lib/board-access"
 import { extractMentionTexts, findMentionUsers, resolveMentionsInText } from "@/lib/comment-mentions"
@@ -31,7 +33,14 @@ export async function createCommentFlow(input: {
   }
 
   const { postId, content, parentId, replyToUserName, replyToCommentId, useAnonymousIdentity: requestedAnonymousIdentity, commentView } = validated.data
-  const contentSafety = await enforceSensitiveText({ scene: "comment.content", text: content })
+  const contentHookResult = await executeAddonWaterfallHook("comment.content.value", content, {
+    payload: {
+      mode: "create",
+      postId,
+    },
+  })
+  const { value: hookedContent, changed: contentHookAdjusted } = resolveHookedStringValue(content, contentHookResult.value)
+  const contentSafety = await enforceSensitiveText({ scene: "comment.content", text: hookedContent })
   const mentionTexts = extractMentionTexts(contentSafety.sanitizedText)
 
   const [postContext, dbUser, parentComment, replyTargetComment, mentionUsers] = await Promise.all([
@@ -211,7 +220,7 @@ export async function createCommentFlow(input: {
     mentionUserIds: resolvedComment.mentions.map((mention) => mention.id),
     senderName,
     contentSafety,
-    contentAdjusted: contentSafety.wasReplaced,
+    contentAdjusted: contentHookAdjusted || contentSafety.wasReplaced,
     reviewRequired,
   }
 }

@@ -10,6 +10,7 @@ import {
   executeAddonActionHook,
   executeAddonAsyncWaterfallHook,
 } from "@/addons-host/runtime/hooks"
+import { mapAddonNotificationRecord } from "@/addons-host/runtime/notification-record"
 import { enqueueBackgroundJob, registerBackgroundJobHandler } from "@/lib/background-jobs"
 import { logError } from "@/lib/logger"
 import { notificationEventBus } from "@/lib/notification-event-bus"
@@ -161,31 +162,30 @@ export function createReportResultNotification(params: {
   })
 }
 async function fireNotificationCreateBefore(draft: NotificationDraft) {
-  try {
-    await executeAddonActionHook("notification.create.before", {
-      recipientId: String(draft.userId),
-      type: String(draft.type),
-      payload: {
-        senderId: draft.senderId ?? null,
-        relatedType: draft.relatedType,
-        relatedId: draft.relatedId,
-        title: draft.title,
-        content: draft.content,
-      },
-    })
-  } catch (error) {
-    logError({ scope: "addons", action: "notification.create.before" }, error)
-  }
+  await executeAddonActionHook("notification.create.before", {
+    recipientId: String(draft.userId),
+    type: String(draft.type),
+    payload: {
+      senderId: draft.senderId ?? null,
+      relatedType: draft.relatedType,
+      relatedId: draft.relatedId,
+      title: draft.title,
+      content: draft.content,
+    },
+  }, {
+    throwOnError: true,
+  })
 }
 
 async function fireNotificationCreateAfter(
   _draft: NotificationDraft,
-  _record: { id: string; createdAt: Date } | null,
+  record: Awaited<ReturnType<typeof createNotificationEntry>> | null,
 ) {
   void _draft
-  void _record
   try {
-    await executeAddonActionHook("notification.create.after", {})
+    await executeAddonActionHook("notification.create.after", {
+      ...(record ? { notification: mapAddonNotificationRecord(record) } : {}),
+    })
   } catch (error) {
     logError({ scope: "addons", action: "notification.create.after" }, error)
   }
@@ -200,6 +200,19 @@ async function expandNotificationTargets(drafts: NotificationDraft[]): Promise<N
       const result = await executeAddonAsyncWaterfallHook(
         "notification.dispatch.targets",
         [{ userId: String(draft.userId), channel: "inapp" }],
+        {
+          payload: {
+            draft: {
+              userId: draft.userId,
+              type: String(draft.type),
+              senderId: draft.senderId ?? null,
+              relatedType: String(draft.relatedType),
+              relatedId: draft.relatedId,
+              title: draft.title,
+              content: draft.content,
+            },
+          },
+        },
       )
       targets = result.value
     } catch (error) {

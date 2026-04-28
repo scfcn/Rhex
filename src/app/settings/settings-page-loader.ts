@@ -6,11 +6,12 @@ import { getUserAccountBindingView } from "@/lib/account-binding"
 import { getCurrentUser } from "@/lib/auth"
 import { getBoardApplicationPageData } from "@/lib/board-applications"
 import { describeBadgeRule, getBadgeCenterData } from "@/lib/badges"
-import { getUserPointLogs } from "@/lib/points"
+import { getUserPointLogs, getUserPointsDashboard } from "@/lib/points"
 import { readSearchParam } from "@/lib/search-params"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getCurrentUserLevelProgressView } from "@/lib/user-level-view"
 import { getUserFavoriteCollectionManageData } from "@/lib/favorite-collections"
+import { getMonthKey } from "@/lib/date-key"
 import { getUserBlocks, getUserBoardFollows, getUserFavoritePosts, getUserFollowers, getUserLikedPosts, getUserPostFollows, getUserPosts, getUserReplies, getUserTagFollows, getUserUserFollows } from "@/lib/user-panel"
 import { getUserAccountSettings, getUserProfile } from "@/lib/users"
 import { getCurrentUserVerificationData } from "@/lib/verifications"
@@ -97,6 +98,9 @@ interface RawSettingsSearchParams {
   listBefore?: string | string[]
   pointsAfter?: string | string[]
   pointsBefore?: string | string[]
+  pointsMonth?: string | string[]
+  pointsPanel?: string | string[]
+  pointsRecordTab?: string | string[]
   pointsChangeType?: string | string[]
   pointsEventType?: string | string[]
 }
@@ -206,6 +210,9 @@ export interface ResolvedSettingsRoute {
   listBefore: string | null
   pointsAfter: string | null
   pointsBefore: string | null
+  pointsMonth: string
+  pointsPanel: "calendar" | "chart"
+  pointsRecordTab: "today" | "history"
   pointsChangeType: string | null
   pointsEventType: string | null
 }
@@ -266,6 +273,7 @@ export interface SettingsPageData {
   boardApplicationData: Awaited<ReturnType<typeof getBoardApplicationPageData>>
   boardApplicationZones: Awaited<ReturnType<typeof getZones>>
   verificationData: Awaited<ReturnType<typeof getCurrentUserVerificationData>>
+  pointsDashboard: Awaited<ReturnType<typeof getUserPointsDashboard>> | null
   pointLogs: Awaited<ReturnType<typeof getUserPointLogs>> | null
   accountBindings: Awaited<ReturnType<typeof getUserAccountBindingView>> | null
 }
@@ -297,6 +305,11 @@ export function resolveSettingsRoute(
   const listBefore = readSearchParam(searchParams?.listBefore) ?? null
   const pointsAfter = readSearchParam(searchParams?.pointsAfter) ?? null
   const pointsBefore = readSearchParam(searchParams?.pointsBefore) ?? null
+  const pointsMonth = /^\d{4}-\d{2}$/.test(readSearchParam(searchParams?.pointsMonth) ?? "")
+    ? (readSearchParam(searchParams?.pointsMonth) as string)
+    : getMonthKey()
+  const pointsPanel = readSearchParam(searchParams?.pointsPanel) === "chart" ? "chart" : "calendar"
+  const pointsRecordTab = readSearchParam(searchParams?.pointsRecordTab) === "history" ? "history" : "today"
   const pointsChangeType = readSearchParam(searchParams?.pointsChangeType) ?? null
   const pointsEventType = readSearchParam(searchParams?.pointsEventType) ?? null
 
@@ -311,6 +324,9 @@ export function resolveSettingsRoute(
     listBefore,
     pointsAfter,
     pointsBefore,
+    pointsMonth,
+    pointsPanel,
+    pointsRecordTab,
     pointsChangeType,
     pointsEventType,
   }
@@ -361,6 +377,7 @@ async function loadSettingsTabData(
     boardApplicationData,
     boardApplicationZones,
     verificationData,
+    pointsDashboard,
     pointLogs,
     accountBindings,
   ] = await Promise.all([
@@ -403,6 +420,18 @@ async function loadSettingsTabData(
     currentTab === "board-applications" ? getZones() : Promise.resolve([]),
     currentTab === "verifications" ? getCurrentUserVerificationData() : Promise.resolve({ currentUserId: userId, types: [], approvedVerification: null }),
     currentTab === "points"
+      ? getUserPointsDashboard({
+          userId: currentUser.id,
+          username: currentUser.username,
+          nickname: currentUser.nickname,
+          avatarPath: currentUser.avatarPath,
+          points: currentUser.points,
+          status: currentUser.status,
+          month: route.pointsMonth,
+        })
+      : Promise.resolve(null),
+    currentTab === "points"
+      && route.pointsRecordTab === "history"
       ? getUserPointLogs(userId, {
           pageSize: 10,
           after: route.pointsAfter,
@@ -437,6 +466,7 @@ async function loadSettingsTabData(
     boardApplicationData,
     boardApplicationZones,
     verificationData,
+    pointsDashboard,
     pointLogs,
     accountBindings,
   }

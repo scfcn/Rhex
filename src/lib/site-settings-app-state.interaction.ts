@@ -19,6 +19,7 @@ import type {
   PostContentLengthSettings,
   PostJackpotSettings,
   PostRedPacketSettings,
+  SiteChatSettings,
   SiteTippingGiftItem,
   VipLevelIconSettings,
   VipNameColorSettings,
@@ -89,6 +90,34 @@ export function mergeCommentAccessSettings(
     commentAccess: {
       guestCanView: input.guestCanView,
       initialVisibleReplies: Math.min(100, Math.max(1, normalizeNonNegativeInteger(input.initialVisibleReplies, 10))),
+    },
+  })
+}
+
+export function resolveSiteChatSettings(options: {
+  appStateJson?: string | null
+  enabledFallback?: boolean
+} = {}): SiteChatSettings {
+  const siteSettingsState = readSiteSettingsState(options.appStateJson)
+  const siteChat = isRecord(siteSettingsState.siteChat)
+    ? siteSettingsState.siteChat
+    : {}
+
+  return {
+    enabled: typeof siteChat.enabled === "boolean" ? siteChat.enabled : options.enabledFallback ?? false,
+  }
+}
+
+export function mergeSiteChatSettings(
+  appStateJson: string | null | undefined,
+  input: SiteChatSettings,
+) {
+  const siteSettingsState = readSiteSettingsState(appStateJson)
+
+  return writeSiteSettingsState(appStateJson, {
+    ...siteSettingsState,
+    siteChat: {
+      enabled: Boolean(input.enabled),
     },
   })
 }

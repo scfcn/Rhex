@@ -273,8 +273,10 @@ import { BoardSelectField } from "@/components/board/board-select-field"
 import { ForumPostStreamView } from "@/components/forum/forum-post-stream-view"
 import { LevelBadge } from "@/components/level-badge"
 import { LevelIcon } from "@/components/level-icon"
+import { MarkdownContent } from "@/components/markdown-content"
 import { UserAvatar } from "@/components/user/user-avatar"
 import { UserDisplayedBadges } from "@/components/user/user-displayed-badges"
+import { UserProfilePreviewCardTrigger } from "@/components/user/user-profile-preview-card-trigger"
 import { UserStatusBadge } from "@/components/user/user-status-badge"
 import { UserVerificationBadge } from "@/components/user/user-verification-badge"
 import { AvatarVipBadge } from "@/components/vip/avatar-vip-badge"
@@ -605,8 +607,10 @@ const addonClientCustom = Object.freeze({
   ForumPostStreamView,
   LevelBadge,
   LevelIcon,
+  MarkdownContent,
   UserAvatar,
   UserDisplayedBadges,
+  UserProfilePreviewCardTrigger,
   UserStatusBadge,
   UserVerificationBadge,
   VipDisplayName,

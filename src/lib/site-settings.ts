@@ -14,11 +14,12 @@ import {
   parseHeatThresholds,
   parseTippingAmounts,
 } from "@/lib/shared/config-parsers"
+import { formatCheckInRewardRange } from "@/lib/check-in-reward"
 import { defaultSiteSettingsCreateInput } from "@/lib/site-settings-defaults"
 import { parseMarkdownEmojiMapJson } from "@/lib/markdown-emoji"
 import { normalizePostListLoadMode } from "@/lib/post-list-load-mode"
 import { normalizePostListDisplayMode } from "@/lib/post-list-display"
-import { resolveAnonymousPostSettings, resolveAttachmentFeatureSettings, resolveAuthProviderSettings, resolveAvatarChangePointCostSettings, resolveBoardApplicationSettings, resolveBoardTreasurySettings, resolveCheckInMakeUpPriceSettings, resolveCheckInRewardSettings, resolveCheckInStreakSettings, resolveCommentAccessSettings, resolveFooterCopyrightSettings, resolveHomeFeedPostListLoadSettings, resolveHomeHotFeedSettings, resolveHomeSidebarAnnouncementSettings, resolveImageWatermarkSettings, resolveInteractionGateSettings, resolveIntroductionChangePointCostSettings, resolveInviteCodePurchasePriceSettings, resolveLeftSidebarDisplaySettings, resolveMarkdownImageUploadSettings, resolveMessageMediaSettings, resolveNicknameChangePointCostSettings, resolvePostContentLengthSettings, resolvePostJackpotSettings, resolvePostPageSizeSettings, resolvePostRedPacketSettings, resolvePostSlugGenerationSettings, resolveRegisterEmailWhitelistSettings, resolveRegisterInviteCodeHelpSettings, resolveRegisterNicknameLengthSettings, resolveRegistrationEmailTemplateSettings, resolveRegistrationRewardSettings, resolveSiteBrandingSettings, resolveSiteSecuritySettings, resolveUploadObjectStorageSettings, resolveVipLevelIconSettings, resolveVipNameColorSettings } from "@/lib/site-settings-app-state"
+import { resolveAnonymousPostSettings, resolveAttachmentFeatureSettings, resolveAuthProviderSettings, resolveAvatarChangePointCostSettings, resolveBoardApplicationSettings, resolveBoardTreasurySettings, resolveCheckInMakeUpPriceSettings, resolveCheckInRewardSettings, resolveCheckInStreakSettings, resolveCommentAccessSettings, resolveFooterCopyrightSettings, resolveHomeFeedPostListLoadSettings, resolveHomeHotFeedSettings, resolveHomeSidebarAnnouncementSettings, resolveImageWatermarkSettings, resolveInteractionGateSettings, resolveIntroductionChangePointCostSettings, resolveInviteCodePurchasePriceSettings, resolveLeftSidebarDisplaySettings, resolveMarkdownImageUploadSettings, resolveMessageMediaSettings, resolveNicknameChangePointCostSettings, resolvePostContentLengthSettings, resolvePostJackpotSettings, resolvePostPageSizeSettings, resolvePostRedPacketSettings, resolvePostSlugGenerationSettings, resolveRegisterEmailWhitelistSettings, resolveRegisterInviteCodeHelpSettings, resolveRegisterNicknameLengthSettings, resolveRegistrationEmailTemplateSettings, resolveRegistrationRewardSettings, resolveSiteBrandingSettings, resolveSiteChatSettings, resolveSiteSecuritySettings, resolveUploadObjectStorageSettings, resolveVipLevelIconSettings, resolveVipNameColorSettings } from "@/lib/site-settings-app-state"
 import { resolveAuthPageShowcaseSettings } from "@/lib/site-settings-app-state"
 import { resolveAuthProviderSensitiveConfig, resolveCaptchaSensitiveConfig, resolveUploadStorageSensitiveConfig } from "@/lib/site-settings-sensitive-state"
 import { resolveSiteSearchSettings } from "@/lib/site-search-settings"
@@ -257,6 +258,10 @@ function mapSiteSettings(record: SiteSettingsRecordData, tippingGifts: SiteTippi
     guestCanViewFallback: true,
     initialVisibleRepliesFallback: 10,
   })
+  const siteChatSettings = resolveSiteChatSettings({
+    appStateJson: record.appStateJson,
+    enabledFallback: false,
+  })
   const interactionGateSettings = resolveInteractionGateSettings({
     appStateJson: record.appStateJson,
   })
@@ -387,10 +392,14 @@ function mapSiteSettings(record: SiteSettingsRecordData, tippingGifts: SiteTippi
     friendLinkApplicationEnabled: record.friendLinkApplicationEnabled,
     friendLinkAnnouncement: record.friendLinkAnnouncement,
     checkInEnabled: record.checkInEnabled,
-    checkInReward: checkInRewards.normal,
-    checkInVip1Reward: checkInRewards.vip1,
-    checkInVip2Reward: checkInRewards.vip2,
-    checkInVip3Reward: checkInRewards.vip3,
+    checkInReward: checkInRewards.normal.min,
+    checkInRewardText: formatCheckInRewardRange(checkInRewards.normal),
+    checkInVip1Reward: checkInRewards.vip1.min,
+    checkInVip1RewardText: formatCheckInRewardRange(checkInRewards.vip1),
+    checkInVip2Reward: checkInRewards.vip2.min,
+    checkInVip2RewardText: formatCheckInRewardRange(checkInRewards.vip2),
+    checkInVip3Reward: checkInRewards.vip3.min,
+    checkInVip3RewardText: formatCheckInRewardRange(checkInRewards.vip3),
     checkInMakeUpCardPrice: checkInMakeUpPrices.normal,
     checkInMakeUpEnabled: checkInStreakSettings.enabled,
     checkInVipMakeUpCardPrice: checkInMakeUpPrices.vip1,
@@ -434,6 +443,7 @@ function mapSiteSettings(record: SiteSettingsRecordData, tippingGifts: SiteTippi
     avatarChangeVip1PointCost: avatarChangePointCosts.vip1,
     avatarChangeVip2PointCost: avatarChangePointCosts.vip2,
     avatarChangeVip3PointCost: avatarChangePointCosts.vip3,
+    siteChatEnabled: siteChatSettings.enabled,
     postEditableMinutes: normalizePositiveInteger(record.postEditableMinutes, 10),
     commentEditableMinutes: normalizePositiveInteger(record.commentEditableMinutes, 5),
     guestCanViewComments: commentAccessSettings.guestCanView,

@@ -19,6 +19,7 @@ import {
   type MessageStreamCursor,
 } from "@/lib/message-event-bus"
 import { notificationEventBus } from "@/lib/notification-event-bus"
+import { SITE_CHAT_ROOM_DB_ID, isSiteChatConversationId } from "@/lib/site-chat"
 import { getUserDisplayName } from "@/lib/user-display"
 
 export const dynamic = "force-dynamic"
@@ -65,6 +66,7 @@ function mapMessageRowToEnvelope(
   },
 ): MessageStreamEventEnvelope {
   const cursor = createMessageStreamCursor(message.id, message.createdAt)
+  const isSiteChat = isSiteChatConversationId(message.conversationId)
 
   return {
     cursor,
@@ -78,7 +80,7 @@ function mapMessageRowToEnvelope(
       senderUsername: message.sender.username,
       senderDisplayName: getUserDisplayName(message.sender),
       senderAvatarPath: message.sender.avatarPath,
-      recipientId: message.conversation.participants[0]?.userId ?? userId,
+      recipientId: isSiteChat ? userId : (message.conversation.participants[0]?.userId ?? userId),
       occurredAt: cursor.createdAt,
     },
   }
@@ -88,13 +90,16 @@ async function findLatestCursor(userId: number): Promise<MessageStreamCursor | n
   const latest = await prisma.directMessage.findFirst({
     where: {
       conversation: {
-        kind: ConversationKind.DIRECT,
         participants: {
           some: {
             userId,
             archivedAt: null,
           },
         },
+        OR: [
+          { kind: ConversationKind.DIRECT },
+          { id: SITE_CHAT_ROOM_DB_ID },
+        ],
       },
     },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -115,13 +120,16 @@ async function findMessageEventsAfterCursor(userId: number, cursor: MessageStrea
   const messages = await prisma.directMessage.findMany({
     where: {
       conversation: {
-        kind: ConversationKind.DIRECT,
         participants: {
           some: {
             userId,
             archivedAt: null,
           },
         },
+        OR: [
+          { kind: ConversationKind.DIRECT },
+          { id: SITE_CHAT_ROOM_DB_ID },
+        ],
       },
       ...(cursor
         ? {

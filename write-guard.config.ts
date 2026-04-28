@@ -278,12 +278,12 @@ const writeGuardConfig = {
   "vip-action": {
     description: "VIP 购买 / 续费防重，避免连点重复扣积分。",
     scope: "vip-action",
-    cooldownMs: 1_500,
+    cooldownMs: 300,
     cooldownMessage: "VIP 操作过于频繁，请稍后再试",
     releaseOnError: true,
     dedupe: {
       windowMs: 10_000,
-      parts: ["userId", "action"],
+      parts: ["userId", "requestId"],
     },
   },
 } satisfies WriteGuardPolicyConfigMap

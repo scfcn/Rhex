@@ -9,6 +9,7 @@ export function findPostUpdateContext(postId: string) {
       id: true,
       slug: true,
       authorId: true,
+      isAnonymous: true,
       content: true,
       createdAt: true,
       lastAppendedAt: true,

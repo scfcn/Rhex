@@ -1,4 +1,5 @@
 import type { InboxStreamEvent } from "@/lib/message-types"
+import { isSiteChatConversationId } from "@/lib/site-chat"
 
 export interface InboxUnreadCounts {
   unreadMessageCount: number
@@ -17,6 +18,10 @@ export function applyInboxStreamEvent(
         unreadNotificationCount: event.unreadNotificationCount,
       }
     case "message.created":
+      if (isSiteChatConversationId(event.conversationId)) {
+        return previous
+      }
+
       if (activeUserId && event.recipientId === activeUserId && typeof event.recipientUnreadMessageCount === "number") {
         return {
           ...previous,
@@ -57,6 +62,10 @@ export function shouldPlayInboxPrompt(
 
   switch (event.type) {
     case "message.created":
+      if (isSiteChatConversationId(event.conversationId)) {
+        return false
+      }
+
       return event.recipientId === activeUserId && event.senderId !== activeUserId
     case "notification.count":
       return (

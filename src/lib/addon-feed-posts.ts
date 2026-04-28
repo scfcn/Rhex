@@ -35,6 +35,11 @@ interface AddonFeedHookInput {
   pathname?: string
   request?: Request
   searchParams?: URLSearchParams
+  payload?: {
+    source: "feed" | "post-stream"
+    sort: string
+    pathname?: string
+  }
 }
 
 export function buildAddonHookSearchParams(
@@ -121,6 +126,11 @@ export async function buildHookedFeedDisplayItems(input: {
       pathname: input.pathname,
       request: input.request,
       searchParams: input.searchParams,
+      payload: {
+        source: "feed",
+        sort: input.sort,
+        pathname: input.pathname,
+      },
     },
   )
 
@@ -208,6 +218,11 @@ export async function buildHookedPostStreamDisplayItems(input: {
       pathname: input.pathname,
       request: input.request,
       searchParams: input.searchParams,
+      payload: {
+        source: "post-stream",
+        sort: input.sort,
+        pathname: input.pathname,
+      },
     },
   )
 

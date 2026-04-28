@@ -248,7 +248,6 @@ export function VerificationCenter({ types, approvedVerification }: Verification
                           {hasReviewTrail ? renderStatusPill(item.currentApplication?.status) : null}
                         </div>
                         <p className="mt-1 text-xs leading-6 text-muted-foreground line-clamp-2">{item.description || "暂无说明"}</p>
-                        <p className="mt-1 text-[11px] text-muted-foreground">字段数：{item.formFields.length || 1}</p>
                       </div>
                     </div>
                   </button>

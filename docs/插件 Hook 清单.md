@@ -9,6 +9,11 @@
 - `waterfall`：同步串行改写数据
 - `asyncWaterfall`：异步串行改写数据
 
+说明：
+
+- `provider` 类能力不在这份 hook 清单里单独枚举；例如 `payment`、`navigation`、`editor`、`upload`、`home-feed` 都属于“由宿主按 kind 消费的 provider 扩展”
+- 新增首页 tabs / 首页主内容切换时，应优先看主文档里的 `home-feed provider`，而不是把它误解成 `slot` 或 `surface`
+
 ## 通用规则
 
 - 所有扩展点都按 `order` 升序执行
@@ -88,6 +93,7 @@
 | --- | --- | --- | --- |
 | `post.slug.value` | post | 串行改写帖子最终 slug | `string` |
 | `post.title.value` | post | 串行改写帖子标题（落库前；可用于敏感词替换、自动加标记等） | `string` |
+| `comment.content.value` | comment | 串行改写评论内容（写入前；可用于签名补全、文本规范化等） | `string` |
 | `user.displayName.value` | user | 串行改写用户展示名（用于列表/详情渲染前的显示加工） | `string` |
 | `user.avatar.url.value` | user | 串行改写用户头像 URL（可插入 CDN 前缀、占位头像等） | `string` |
 | `search.query.normalize` | search | 串行规范化搜索关键词（大小写、同义词、繁简转换等） | `string` |

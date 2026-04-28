@@ -75,7 +75,7 @@ export function SettingsInputField({
       <span className="text-sm font-medium">{label}{required ? " *" : ""}</span>
       <Input
         type={type}
-        value={value}
+        value={value ?? ""}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         required={required}

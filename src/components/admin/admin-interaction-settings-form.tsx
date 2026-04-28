@@ -142,8 +142,9 @@ export function AdminInteractionSettingsForm({
             <AdminBooleanSelectField label="游客可查看评论" checked={draft.guestCanViewComments} onChange={(value) => updateDraftField("guestCanViewComments", value)} />
             <TextField label="楼中楼默认展开条数" value={draft.commentInitialVisibleReplies} onChange={(value) => updateDraftField("commentInitialVisibleReplies", value)} placeholder="如 10" />
             <TextField label="评论区一页显示数" value={draft.commentPageSize} onChange={(value) => updateDraftField("commentPageSize", value)} placeholder="如 15" />
+            <AdminBooleanSelectField label="开启全站聊天室" checked={draft.siteChatEnabled} onChange={(value) => updateDraftField("siteChatEnabled", value)} />
           </div>
-          <p className="text-xs leading-6 text-muted-foreground">楼中楼超过默认展开条数后，前台会显示“展开其余 X 条回复”；评论区一页显示数控制主评论分页容量。</p>
+          <p className="text-xs leading-6 text-muted-foreground">楼中楼超过默认展开条数后，前台会显示“展开其余 X 条回复”；评论区一页显示数控制主评论分页容量。开启全站聊天室后，站内私信页会在会话列表首位显示聊天室入口。</p>
         </div>
       ) : null}
 

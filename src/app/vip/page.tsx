@@ -33,7 +33,7 @@ const vipMilestones = (settings: Awaited<ReturnType<typeof getSiteSettings>>) =>
     requirement: `使用 ${formatNumber(settings.vipMonthlyPrice)} ${settings.pointName} 购买月卡，生效 30 天`,
     privileges: [
       "可访问 VIP 专属节点、帖子与回复区域",
-      `签到奖励：${formatNumber(settings.checkInVip1Reward)} ${settings.pointName} / 次`,
+      `签到奖励：${settings.checkInVip1RewardText} ${settings.pointName} / 次`,
       `补签价格：${formatPointValue(settings.checkInVip1MakeUpCardPrice, settings.pointName, " / 次")}`,
       `修改昵称：${formatPointValue(settings.nicknameChangeVip1PointCost, settings.pointName, " / 次")}`,
       `购买邀请码：${settings.inviteCodePurchaseEnabled ? formatPointValue(settings.inviteCodeVip1Price, settings.pointName, " / 个") : "未开启"}`,
@@ -46,7 +46,7 @@ const vipMilestones = (settings: Awaited<ReturnType<typeof getSiteSettings>>) =>
     requirement: `使用 ${formatNumber(settings.vipQuarterlyPrice)} ${settings.pointName} 购买季卡，生效 90 天`,
     privileges: [
       "包含 VIP1 全部权益，并可进入更高等级权限节点",
-      `签到奖励：${formatNumber(settings.checkInVip2Reward)} ${settings.pointName} / 次`,
+      `签到奖励：${settings.checkInVip2RewardText} ${settings.pointName} / 次`,
       `补签价格：${formatPointValue(settings.checkInVip2MakeUpCardPrice, settings.pointName, " / 次")}`,
       `修改昵称：${formatPointValue(settings.nicknameChangeVip2PointCost, settings.pointName, " / 次")}`,
       `购买邀请码：${settings.inviteCodePurchaseEnabled ? formatPointValue(settings.inviteCodeVip2Price, settings.pointName, " / 个") : "未开启"}`,
@@ -59,7 +59,7 @@ const vipMilestones = (settings: Awaited<ReturnType<typeof getSiteSettings>>) =>
     requirement: `使用 ${formatNumber(settings.vipYearlyPrice)} ${settings.pointName} 购买年卡，生效 365 天`,
     privileges: [
       "包含 VIP1、VIP2 全部权益，并享受最高档位身份能力",
-      `签到奖励：${formatNumber(settings.checkInVip3Reward)} ${settings.pointName} / 次`,
+      `签到奖励：${settings.checkInVip3RewardText} ${settings.pointName} / 次`,
       `补签价格：${formatPointValue(settings.checkInVip3MakeUpCardPrice, settings.pointName, " / 次")}`,
       `修改昵称：${formatPointValue(settings.nicknameChangeVip3PointCost, settings.pointName, " / 次")}`,
       `购买邀请码：${settings.inviteCodePurchaseEnabled ? formatPointValue(settings.inviteCodeVip3Price, settings.pointName, " / 个") : "未开启"}`,

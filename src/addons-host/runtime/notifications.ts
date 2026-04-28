@@ -2,6 +2,7 @@ import "server-only"
 
 import { createSystemNotification } from "@/lib/notification-writes"
 import { resolveAddonActor } from "@/addons-host/runtime/actors"
+import { mapAddonNotificationRecord } from "@/addons-host/runtime/notification-record"
 import type {
   AddonNotificationCreateInput,
   AddonNotificationRecord,
@@ -17,22 +18,6 @@ async function resolveNotificationRecipient(input: AddonNotificationCreateInput)
     username: input.recipientUsername,
     label: "通知接收账号",
   })
-}
-
-function mapAddonNotificationRecord(
-  notification: Awaited<ReturnType<typeof createSystemNotification>>,
-): AddonNotificationRecord {
-  return {
-    id: notification.id,
-    userId: notification.userId,
-    type: "SYSTEM",
-    senderId: notification.senderId ?? null,
-    relatedType: notification.relatedType,
-    relatedId: notification.relatedId,
-    title: notification.title,
-    content: notification.content,
-    createdAt: notification.createdAt.toISOString(),
-  }
 }
 
 export async function createAddonNotification(

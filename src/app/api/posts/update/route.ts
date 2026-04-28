@@ -9,6 +9,7 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   const result = await updatePostFlow({
     postId,
     body,
+    request,
     currentUser: {
       id: currentUser.id,
       role: currentUser.role,

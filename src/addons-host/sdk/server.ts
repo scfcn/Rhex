@@ -147,3 +147,10 @@ export type {
   AddonUploadProviderRuntimeHooks,
   AddonUploadProviderSaveResult,
 } from "@/addons-host/upload-types"
+export type {
+  AddonHomeFeedProviderMetadata,
+  AddonHomeFeedProviderRenderInput,
+  AddonHomeFeedProviderRuntimeHooks,
+  AddonHomeFeedTabRegistration,
+  ResolvedAddonHomeFeedTab,
+} from "@/addons-host/home-feed-types"

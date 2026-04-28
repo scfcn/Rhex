@@ -168,7 +168,7 @@ export default async function WritePage(props: PageProps<"/write">) {
                   <CreatePostForm
                     boardOptions={boardOptions}
                     pointName={settings.pointName}
-                    addonCaptcha={null}
+                    addonCaptcha={<AddonSlotRenderer slot="post.create.captcha" />}
                     anonymousPostEnabled={settings.anonymousPostEnabled}
                     anonymousPostPrice={settings.anonymousPostPrice}
                     markdownEmojiMap={settings.markdownEmojiMap}

@@ -5,6 +5,10 @@ import { getLevelBadgeData } from "@/lib/level-badge"
 import { getAnonymousMaskDisplayIdentity } from "@/lib/post-anonymous"
 import { mapListPost } from "@/lib/post-map"
 import type { UserProfileVisibility } from "@/lib/user-profile-settings"
+import {
+  applyHookedUserPresentationToNamedItem,
+  applyHookedUserPresentationToSitePosts,
+} from "@/lib/user-presentation-server"
 import { resolveUserProfileSettings } from "@/lib/user-profile-settings"
 import { getUserDisplayName } from "@/lib/user-display"
 import { withRuntimeFallback } from "@/lib/runtime-errors"
@@ -83,7 +87,7 @@ export async function getUserProfile(username: string): Promise<SiteUserProfile 
     const approvedVerification = user.verificationApplications?.[0]
     const profileSettings = resolveUserProfileSettings(user.signature)
 
-    return {
+    return applyHookedUserPresentationToNamedItem({
       id: Number(user.id),
       createdAt: user.createdAt.toISOString(),
       username: user.username,
@@ -122,7 +126,8 @@ export async function getUserProfile(username: string): Promise<SiteUserProfile 
       followerCount: user._count.followedByUsers,
       favoriteCount: user._count.favorites,
       boardCount: user._count.boardFollows,
-    }
+      displayedBadges: [],
+    })
   }, {
     area: "users",
     action: "getUserProfile",
@@ -160,7 +165,9 @@ export async function getUserPostsPage(username: string, input: { page?: unknown
     ])
 
     return {
-      items: posts.map((post) => mapListPost(post, anonymousMaskIdentity)),
+      items: await applyHookedUserPresentationToSitePosts(
+        posts.map((post) => mapListPost(post, anonymousMaskIdentity)),
+      ),
       pagination: {
         page: pagination.page,
         pageSize: pagination.pageSize,

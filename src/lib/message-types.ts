@@ -1,3 +1,5 @@
+export type MessageConversationKind = "DIRECT" | "SITE_CHAT"
+
 export interface MessageParticipantProfile {
   id: number
   username: string
@@ -8,6 +10,7 @@ export interface MessageParticipantProfile {
 
 export interface MessageConversationListItem {
   id: string
+  kind: MessageConversationKind
   title: string
   subtitle: string
   preview: string
@@ -29,6 +32,7 @@ export interface MessageBubbleItem {
 
 export interface MessageConversationDetail {
   id: string
+  kind: MessageConversationKind
   title: string
   subtitle: string
   updatedAt: string
@@ -44,7 +48,7 @@ export interface MessageSendResult {
   content: string
   createdAt: string
   occurredAt: string
-  contentAdjusted?: boolean
+  contentAdjusted: boolean
 }
 
 export interface MessageHistoryResult {
@@ -64,6 +68,7 @@ export interface MessageCreatedStreamEvent {
   senderAvatarPath: string | null
   recipientId: number
   recipientUnreadMessageCount?: number
+  targetUserIds?: number[]
   occurredAt: string
 }
 

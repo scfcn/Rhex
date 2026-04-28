@@ -16,6 +16,7 @@ interface UseCreatePostSubmitOptions {
   successSlug?: string
   postLinkDisplayMode: PostLinkDisplayMode
   draft: LocalPostDraft
+  onSuccess?: () => void
 }
 
 export function useCreatePostSubmit({
@@ -24,6 +25,7 @@ export function useCreatePostSubmit({
   successSlug,
   postLinkDisplayMode,
   draft,
+  onSuccess,
 }: UseCreatePostSubmitOptions) {
   const isEditMode = mode === "edit"
   const slowSubmitThresholdMs = 8000
@@ -93,6 +95,7 @@ export function useCreatePostSubmit({
 
       const successMessage = result?.message ?? (isEditMode ? "保存成功，正在返回详情页…" : "发布成功，正在跳转详情页…")
       toast.success(successMessage, isEditMode ? "保存成功" : "发布成功")
+      onSuccess?.()
 
       const nextPostId = result?.data?.id ?? postId
       const nextPostSlug = result?.data?.slug ?? successSlug ?? nextPostId
