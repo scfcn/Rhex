@@ -56,8 +56,8 @@ function buildZonePostsApiPath(slug: string, sort: TaxonomyPostSort) {
 }
 
 export async function generateStaticParams() {
-  const zones = await getZones()
-  return zones.map((zone) => ({ slug: zone.slug }))
+  // Generate zone routes on demand so official image builds do not require a database.
+  return []
 }
 
 export async function generateMetadata(props: PageProps<"/zones/[slug]">): Promise<Metadata> {
@@ -259,4 +259,3 @@ export default async function ZonePage(props: PageProps<"/zones/[slug]">) {
     </div>
   )
 }
-

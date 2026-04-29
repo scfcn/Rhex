@@ -59,8 +59,8 @@ function buildBoardPostsApiPath(slug: string, sort: TaxonomyPostSort) {
 }
 
 export async function generateStaticParams() {
-  const boards = await getBoards()
-  return boards.map((board) => ({ slug: board.slug }))
+  // Generate board routes on demand so official image builds do not require a database.
+  return []
 }
 
 export async function generateMetadata(props: PageProps<"/boards/[slug]">): Promise<Metadata> {

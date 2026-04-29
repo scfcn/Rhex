@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next"
+import { headers } from "next/headers"
 
 import { executeAddonAsyncWaterfallHook } from "@/addons-host/runtime/hooks"
 import { getBoards } from "@/lib/boards"
@@ -11,6 +12,8 @@ import { getZones } from "@/lib/zones"
 
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  await headers()
+
   const [boards, posts, zones, settings] = await Promise.all([getBoards(), getHomepagePosts(), getZones(), getSiteSettings()])
 
   const boardUrls = await Promise.all(boards.map(async (board) => ({
