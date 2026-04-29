@@ -9,6 +9,7 @@ const includeEntries = [
   "src",
   ".npmrc",
   ".gitignore",
+  ".github",
   "docs",
   "public",
   "prisma",
