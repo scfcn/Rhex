@@ -274,6 +274,11 @@ export interface CreatePostFormProps {
   successSlug?: string
   postLinkDisplayMode?: PostLinkDisplayMode
   initialValues?: CreatePostFormInitialValues
+  preferredBoardLocked?: boolean
+  aiAssist?: {
+    boardAutoSelectEnabled: boolean
+    tagAutoExtractEnabled: boolean
+  }
 }
 
 export type HiddenModalType = "login" | "reply" | "purchase" | "view-level" | null

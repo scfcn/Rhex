@@ -12,7 +12,7 @@ export interface AdminCommentListItem {
   authorUsername: string
   parentId: string | null
   likeCount: number
-  status: "NORMAL" | "HIDDEN" | "DELETED" | "PENDING"
+  status: "NORMAL" | "HIDDEN" | "PENDING"
   statusLabel: string
   reviewNote: string | null
   reviewedAt: string | null

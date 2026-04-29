@@ -227,7 +227,7 @@ export async function updatePostFlow(input: {
     await syncPostTaxonomy(input.postId, titleSafety.sanitizedText, finalContent, sanitizedManualTags)
     const updatedPost = (await queryAddonPosts({
       ids: [input.postId],
-      statuses: ["NORMAL", "PENDING", "DELETED", "LOCKED", "OFFLINE"],
+      statuses: ["NORMAL", "PENDING", "LOCKED", "OFFLINE"],
       limit: 1,
     })).items[0]
 
@@ -313,7 +313,7 @@ export async function updatePostFlow(input: {
 
   const updatedPost = (await queryAddonPosts({
     ids: [input.postId],
-    statuses: ["NORMAL", "PENDING", "DELETED", "LOCKED", "OFFLINE"],
+    statuses: ["NORMAL", "PENDING", "LOCKED", "OFFLINE"],
     limit: 1,
   })).items[0]
   await executeAddonActionHook("post.update.after", {

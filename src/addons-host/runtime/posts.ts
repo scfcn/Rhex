@@ -47,7 +47,6 @@ const ADDON_POST_QUERY_SORT_FIELDS = new Set<AddonPostQuerySort["field"]>([
 const ADDON_POST_QUERY_STATUSES = new Set<AddonPostRecord["status"]>([
   "NORMAL",
   "PENDING",
-  "DELETED",
   "LOCKED",
   "OFFLINE",
 ])

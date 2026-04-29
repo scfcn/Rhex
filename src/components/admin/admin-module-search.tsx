@@ -31,6 +31,7 @@ const ADMIN_MODULE_SEARCH_ITEMS: AdminModuleSearchItem[] = [
   { href: "/admin?tab=verifications&verificationSubTab=types", label: "认证类型", category: "模块子页", description: "配置认证类型、展示样式和申请字段。", keywords: ["认证类型", "认证配置", "实名类型", "资质类型", "新增认证类型", "编辑认证类型"] },
   { href: "/admin?tab=verifications&verificationSubTab=reviews", label: "认证审核", category: "模块子页", description: "独立处理用户认证申请、通过与驳回。", keywords: ["认证审核", "审核认证", "认证申请审核", "实名审核", "资质审核", "待审核认证"] },
   { href: "/admin?tab=announcements", label: "站点文档", category: "模块", description: "统一管理公告与帮助文档，支持内部文档和链接跳转。", keywords: ["公告", "帮助文档", "文档", "站点文档", "通知", "置顶公告", "slug"] },
+  { href: "/admin?tab=custom-pages", label: "自定义页面", category: "模块", description: "管理独立 HTML 页面、自定义路由和页面外壳开关。", keywords: ["自定义页面", "HTML 页面", "落地页", "活动页", "独立页面", "自定义路由", "页头", "页脚", "左侧栏", "右侧栏"] },
   { href: "/admin?tab=reports", label: "举报中心", category: "模块", description: "处理帖子、回复和用户举报。", keywords: ["举报", "投诉", "违规", "风控", "举报处理"] },
   { href: "/admin?tab=logs", label: "日志中心", category: "模块", description: "查看管理员、登录、积分、上传、支付和 VIP 订单日志。", keywords: ["日志", "操作记录", "登录日志", "积分日志", "上传日志", "支付流水", "审计日志"] },
   { href: "/admin?tab=logs&logSubTab=admin", label: "管理员日志", category: "日志子页", description: "查看管理员处理举报、审核、封禁、置顶等后台操作记录。", keywords: ["管理员日志", "后台日志", "操作日志", "审核日志", "封禁日志", "禁言日志", "帖子审核日志"] },

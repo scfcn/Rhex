@@ -22,6 +22,7 @@ import {
   getEffectiveRewardPoolOptions,
   resolveAvailableRewardPoolMode,
 } from "@/components/post/use-create-post-draft.shared"
+import { useCreatePostAiAssist } from "@/components/post/use-create-post-ai-assist"
 import { useCreatePostLottery } from "@/components/post/use-create-post-lottery"
 import { useCreatePostTags } from "@/components/post/use-create-post-tags"
 
@@ -54,6 +55,11 @@ interface UseCreatePostDraftOptions {
   mode?: "create" | "edit"
   postId?: string
   initialValues?: CreatePostFormInitialValues
+  preferredBoardLocked?: boolean
+  aiAssist?: {
+    boardAutoSelectEnabled: boolean
+    tagAutoExtractEnabled: boolean
+  }
 }
 
 export function useCreatePostDraft({
@@ -71,6 +77,8 @@ export function useCreatePostDraft({
   mode = "create",
   postId,
   initialValues,
+  preferredBoardLocked = false,
+  aiAssist,
 }: UseCreatePostDraftOptions) {
   const isEditMode = mode === "edit"
   const storageMode = isEditMode ? "edit" : "create"
@@ -145,31 +153,6 @@ export function useCreatePostDraft({
     () => boardOptions.flatMap((group) => group.items),
     [boardOptions],
   )
-  const selectedBoard =
-    allBoards.find((item) => item.value === draft.boardSlug) ?? allBoards[0]
-  const allowedPostTypes = useMemo(
-    () => resolveAllowedPostTypes(selectedBoard),
-    [selectedBoard],
-  )
-  const anonymousAllowedPostTypes = useMemo(
-    () => allowedPostTypes.filter((item) => item === "NORMAL" || item === "POLL"),
-    [allowedPostTypes],
-  )
-  const availablePostTypes = useMemo(
-    () =>
-      getAvailablePostTypes(
-        draft.isAnonymous ? anonymousAllowedPostTypes : allowedPostTypes,
-        pointName,
-      ),
-    [allowedPostTypes, anonymousAllowedPostTypes, draft.isAnonymous, pointName],
-  )
-  const selectedPostTypeOption = useMemo(
-    () =>
-      availablePostTypes.find((item) => item.value === draft.postType)
-      ?? availablePostTypes[0]
-      ?? null,
-    [availablePostTypes, draft.postType],
-  )
   const autoExtractedTagPool = useMemo(
     () => (
       jiebaReady
@@ -197,11 +180,6 @@ export function useCreatePostDraft({
   const canAddAttachments = canBypassAttachmentPermission || meetsAttachmentPermission
   const canManageAttachments = isEditMode || canAddAttachments || draft.attachments.length > 0
   const shouldShowAttachmentEntry = canAddAttachments || draft.attachments.length > 0
-  const minPostVipLevel = selectedBoard?.minPostVipLevel ?? 0
-  const canPostInBoard =
-    currentUser.points >= (selectedBoard?.minPostPoints ?? 0)
-    && currentUser.level >= (selectedBoard?.minPostLevel ?? 0)
-    && currentVipLevel >= minPostVipLevel
   const currentUserSummary = `${currentUser.nickname ?? currentUser.username} · Lv.${currentUser.level} · ${currentUser.points} ${pointName} ${isVipActive ? `· VIP ${currentVipLevel}` : "· 非 VIP"}`
   const currentUserVipClassName = getVipNameClass(isVipActive, currentUser.vipLevel, {
     medium: true,
@@ -218,6 +196,60 @@ export function useCreatePostDraft({
   ) {
     setDraft((current) => ({ ...current, [field]: value }))
   }
+
+  const aiAssistController = useCreatePostAiAssist({
+    draft,
+    mode,
+    boardAutoSelectEnabled: aiAssist?.boardAutoSelectEnabled ?? false,
+    tagAutoExtractEnabled: aiAssist?.tagAutoExtractEnabled ?? false,
+    preferredBoardLocked,
+    localAutoExtractedTagPool: autoExtractedTagPool,
+    updateDraftField,
+  })
+
+  const effectiveBoardSlug =
+    aiAssistController.canUseAutoBoardSelection
+    && aiAssistController.boardSelectionMode === "auto"
+    && aiAssistController.aiSuggestedBoard?.slug
+      ? aiAssistController.aiSuggestedBoard.slug
+      : draft.boardSlug
+  const matchedBoard =
+    allBoards.find((item) => item.value === effectiveBoardSlug) ?? allBoards[0] ?? null
+  const autoBoardPendingSelection =
+    aiAssistController.canUseAutoBoardSelection
+    && aiAssistController.boardSelectionMode === "auto"
+    && !aiAssistController.aiSuggestedBoard?.slug
+  const selectedBoard = autoBoardPendingSelection ? null : matchedBoard
+  const allowedPostTypes = useMemo(
+    () => resolveAllowedPostTypes(selectedBoard ?? undefined),
+    [selectedBoard],
+  )
+  const anonymousAllowedPostTypes = useMemo(
+    () => allowedPostTypes.filter((item) => item === "NORMAL" || item === "POLL"),
+    [allowedPostTypes],
+  )
+  const availablePostTypes = useMemo(
+    () =>
+      getAvailablePostTypes(
+        draft.isAnonymous ? anonymousAllowedPostTypes : allowedPostTypes,
+        pointName,
+      ),
+    [allowedPostTypes, anonymousAllowedPostTypes, draft.isAnonymous, pointName],
+  )
+  const selectedPostTypeOption = useMemo(
+    () =>
+      availablePostTypes.find((item) => item.value === draft.postType)
+      ?? availablePostTypes[0]
+      ?? null,
+    [availablePostTypes, draft.postType],
+  )
+  const minPostVipLevel = selectedBoard?.minPostVipLevel ?? 0
+  const canPostInBoard =
+    autoBoardPendingSelection
+      ? true
+      : currentUser.points >= (selectedBoard?.minPostPoints ?? 0)
+        && currentUser.level >= (selectedBoard?.minPostLevel ?? 0)
+        && currentVipLevel >= minPostVipLevel
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -320,7 +352,7 @@ export function useCreatePostDraft({
 
   const tags = useCreatePostTags({
     draft,
-    autoExtractedTagPool,
+    autoExtractedTagPool: aiAssistController.resolvedAutoExtractedTagPool,
     updateDraftField,
   })
 
@@ -365,11 +397,19 @@ export function useCreatePostDraft({
     rewardPoolFeatureEnabled,
     showRewardPoolEntry,
     selectedBoard,
+    autoBoardPendingSelection,
     allowedPostTypes,
     anonymousAllowedPostTypes,
     availablePostTypes,
     selectedPostTypeOption,
     autoExtractedTags: tags.autoExtractedTags,
+    canUseAutoBoardSelection: aiAssistController.canUseAutoBoardSelection,
+    boardSelectionMode: aiAssistController.boardSelectionMode,
+    setBoardSelectionMode: aiAssistController.setBoardSelectionMode,
+    aiSuggestedBoard: aiAssistController.aiSuggestedBoard,
+    aiSuggestionPending: aiAssistController.aiSuggestionPending,
+    aiSuggestionError: aiAssistController.aiSuggestionError,
+    aiSuggestionStatus: aiAssistController.aiSuggestionStatus,
     isVipActive,
     currentVipLevel,
     canBypassAttachmentPermission,
@@ -392,6 +432,7 @@ export function useCreatePostDraft({
     attachmentFeature,
     patchDraft,
     updateDraftField,
+    resolveDraftBeforeSubmit: aiAssistController.resolveDraftBeforeSubmit,
     setTagInput: tags.setTagInput,
     setTagModalOpen: tags.setTagModalOpen,
     setCoverModalOpen,

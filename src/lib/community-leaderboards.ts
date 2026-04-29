@@ -9,6 +9,7 @@ import { getUserDisplayName } from "@/lib/user-display"
 import { applyHookedUserPresentationToNamedItem } from "@/lib/user-presentation-server"
 
 const LEADERBOARD_VISIBLE_USER_STATUSES = [UserStatus.ACTIVE, UserStatus.MUTED] as const
+export const MAX_COMMUNITY_LEADERBOARD_LIMIT = 100
 
 const visibleLeaderboardUserWhere = {
   status: {
@@ -54,7 +55,7 @@ export interface CheckInLeaderboardData {
 }
 
 function normalizeLeaderboardLimit(limit: unknown, fallback = 10) {
-  return Math.min(200, Math.max(1, normalizePositiveInteger(limit, fallback)))
+  return Math.min(MAX_COMMUNITY_LEADERBOARD_LIMIT, Math.max(1, normalizePositiveInteger(limit, fallback)))
 }
 
 function isVisibleLeaderboardStatus(status: UserStatus | null | undefined) {

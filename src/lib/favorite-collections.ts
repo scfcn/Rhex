@@ -199,11 +199,10 @@ async function ensurePostExists(postId: string) {
     select: {
       id: true,
       title: true,
-      status: true,
     },
   })
 
-  if (!post || post.status === "DELETED") {
+  if (!post) {
     apiError(404, "帖子不存在")
   }
 

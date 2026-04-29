@@ -6,6 +6,7 @@ import { useConfirm } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/rbutton"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TextField } from "@/components/ui/text-field"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/toast"
@@ -16,6 +17,8 @@ import type { AiReplyAdminData } from "@/lib/ai-reply"
 interface AiReplyAdminPageProps {
   initialData: AiReplyAdminData
 }
+
+type TaskTabKey = "auto-categorize" | "ai-reply"
 
 const TASK_STATUS_LABELS = {
   PENDING: "待执行",
@@ -33,8 +36,30 @@ const TASK_STATUS_CLASS_NAMES = {
   CANCELLED: "border-muted bg-muted/60 text-muted-foreground",
 } as const
 
+const AUTO_CATEGORIZE_SOURCE_LABELS = {
+  PREVIEW: "发布页预览",
+  POST_CREATE: "发帖后入队",
+} as const
+
+const AUTO_CATEGORIZE_RESULT_LABELS = {
+  ok: "已生成建议",
+  empty_suggestion: "无有效建议",
+  invalid_json: "模型返回无效 JSON",
+  provider_not_configured: "模型未配置",
+  no_candidate_boards: "无可选节点",
+  no_requested_capabilities: "未请求能力",
+} as const
+
 function canDeleteTaskLog(status: keyof typeof TASK_STATUS_LABELS) {
   return status === "SUCCEEDED" || status === "FAILED" || status === "CANCELLED"
+}
+
+function renderAutoCategorizeResultLabel(status: string | null) {
+  if (!status) {
+    return "未产出结果"
+  }
+
+  return AUTO_CATEGORIZE_RESULT_LABELS[status as keyof typeof AUTO_CATEGORIZE_RESULT_LABELS] ?? status
 }
 
 function LabeledTextarea(props: {
@@ -73,6 +98,10 @@ export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
   const [systemPrompt, setSystemPrompt] = useState(initialData.config.systemPrompt)
   const [postReplyPrompt, setPostReplyPrompt] = useState(initialData.config.postReplyPrompt)
   const [commentReplyPrompt, setCommentReplyPrompt] = useState(initialData.config.commentReplyPrompt)
+  const [writeBoardAutoSelectEnabled, setWriteBoardAutoSelectEnabled] = useState(initialData.autoCategorizeConfig.writeBoardAutoSelectEnabled)
+  const [writeTagAutoExtractEnabled, setWriteTagAutoExtractEnabled] = useState(initialData.autoCategorizeConfig.writeTagAutoExtractEnabled)
+  const [defaultBoardSlug, setDefaultBoardSlug] = useState(initialData.autoCategorizeConfig.defaultBoardSlug)
+  const [autoCategorizePromptTemplate, setAutoCategorizePromptTemplate] = useState(initialData.autoCategorizeConfig.promptTemplate)
   const [apiKey, setApiKey] = useState("")
   const [clearApiKey, setClearApiKey] = useState(false)
   const [feedback, setFeedback] = useState("")
@@ -83,6 +112,7 @@ export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
   const [isTaskListLoading, setIsTaskListLoading] = useState(false)
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState<string | null>(null)
   const [isDeletingAllTaskLogs, setIsDeletingAllTaskLogs] = useState(false)
+  const [activeTaskTab, setActiveTaskTab] = useState<TaskTabKey>("auto-categorize")
 
   const currentAgentLabel = data.agentUser
     ? `${data.agentUser.nickname ?? data.agentUser.username} (@${data.agentUser.username})`
@@ -111,6 +141,10 @@ export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
     setSystemPrompt(nextData.config.systemPrompt)
     setPostReplyPrompt(nextData.config.postReplyPrompt)
     setCommentReplyPrompt(nextData.config.commentReplyPrompt)
+    setWriteBoardAutoSelectEnabled(nextData.autoCategorizeConfig.writeBoardAutoSelectEnabled)
+    setWriteTagAutoExtractEnabled(nextData.autoCategorizeConfig.writeTagAutoExtractEnabled)
+    setDefaultBoardSlug(nextData.autoCategorizeConfig.defaultBoardSlug)
+    setAutoCategorizePromptTemplate(nextData.autoCategorizeConfig.promptTemplate)
     setApiKey("")
     setClearApiKey(false)
   }
@@ -135,17 +169,26 @@ export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
         apiKey,
         clearApiKey,
       },
+      autoCategorizeConfig: {
+        writeBoardAutoSelectEnabled,
+        writeTagAutoExtractEnabled,
+        defaultBoardSlug,
+        promptTemplate: autoCategorizePromptTemplate,
+      },
       pagination: {
         page: data.recentTasksPagination.page,
+        autoCategorizePage: data.autoCategorizeRecentTasksPagination.page,
       },
     }
   }
 
-  async function loadTaskPage(page: number) {
+  async function loadTaskPage(target: TaskTabKey, page: number) {
     setIsTaskListLoading(true)
 
     try {
-      const response = await fetch(`/api/admin/apps/ai-reply?page=${page}`, {
+      const replyPage = target === "ai-reply" ? page : data.recentTasksPagination.page
+      const autoPage = target === "auto-categorize" ? page : data.autoCategorizeRecentTasksPagination.page
+      const response = await fetch(`/api/admin/apps/ai-reply?page=${replyPage}&autoPage=${autoPage}`, {
         method: "GET",
         cache: "no-store",
       })
@@ -189,6 +232,7 @@ export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
           taskId,
           pagination: {
             page: data.recentTasksPagination.page,
+            autoCategorizePage: data.autoCategorizeRecentTasksPagination.page,
           },
         }),
       })
@@ -234,6 +278,7 @@ export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
           deleteAllLogs: true,
           pagination: {
             page: data.recentTasksPagination.page,
+            autoCategorizePage: data.autoCategorizeRecentTasksPagination.page,
           },
         }),
       })
@@ -297,7 +342,7 @@ export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <form className="space-y-6" onSubmit={(event) => event.preventDefault()}>
       <Card>
         <CardHeader className="border-b">
           <CardTitle>运行概览</CardTitle>
@@ -362,7 +407,13 @@ export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <TextField label="AI 代理账号" value={agentUsername} onChange={setAgentUsername} placeholder="填写用户名或昵称" />
+            <TextField
+              label="AI 代理账号"
+              value={agentUsername}
+              onChange={setAgentUsername}
+              placeholder="填写用户名或昵称"
+              autoComplete="username"
+            />
             <TextField label="模型接口 Base URL" value={baseUrl} onChange={setBaseUrl} placeholder="https://api.openai.com/v1" />
             <TextField label="模型名称" value={model} onChange={setModel} placeholder="gpt-4.1-mini / qwen-max / deepseek-chat" />
             <div className="space-y-2">
@@ -374,7 +425,14 @@ export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">
-            <TextField label="API Key" value={apiKey} onChange={setApiKey} placeholder="留空则保留当前密钥" type="password" />
+            <TextField
+              label="API Key"
+              value={apiKey}
+              onChange={setApiKey}
+              placeholder="留空则保留当前密钥"
+              type="password"
+              autoComplete="current-password"
+            />
             <div className="rounded-xl border border-border p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -390,9 +448,53 @@ export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
 
       <Card>
         <CardHeader className="border-b">
+          <CardTitle>发帖辅助</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 py-5">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-xl border border-border p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-medium">节点自动选择</p>
+                  <p className="mt-1 text-sm text-muted-foreground">发布页可默认交给 AI 根据标题和正文自动匹配节点，用户仍可切回手动选择。</p>
+                </div>
+                <Switch checked={writeBoardAutoSelectEnabled} onCheckedChange={setWriteBoardAutoSelectEnabled} />
+              </div>
+            </div>
+            <div className="rounded-xl border border-border p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-medium">标签自动提取</p>
+                  <p className="mt-1 text-sm text-muted-foreground">发布页会使用 AI 产出标签候选，若 AI 没有结果则继续回退到本地提取。</p>
+                </div>
+                <Switch checked={writeTagAutoExtractEnabled} onCheckedChange={setWriteTagAutoExtractEnabled} />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(260px,1fr)] md:items-end">
+            <TextField
+              label="默认回退节点 slug"
+              value={defaultBoardSlug}
+              onChange={setDefaultBoardSlug}
+              placeholder="例如：general"
+            />
+            <p className="text-sm text-muted-foreground">
+              {defaultBoardSlug.trim()
+                ? data.autoCategorizeDefaultBoard
+                  ? `当前命中节点：${data.autoCategorizeDefaultBoard.name}（${data.autoCategorizeDefaultBoard.slug}）。当 AI 没选出节点时会回退到这里。`
+                  : "当前 slug 未匹配到有效节点，保存后不会生效。"
+                : "留空则不启用默认节点回退。"}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="border-b">
           <CardTitle>提示词</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-5 py-5 xl:grid-cols-3">
+        <CardContent className="grid gap-5 py-5 xl:grid-cols-2 2xl:grid-cols-4">
           <LabeledTextarea
             label="系统提示词"
             value={systemPrompt}
@@ -411,20 +513,26 @@ export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
             onChange={setCommentReplyPrompt}
             placeholder="定义 @AI 出现在评论时的楼中楼回复策略。"
           />
+          <LabeledTextarea
+            label="发帖辅助提示词"
+            value={autoCategorizePromptTemplate}
+            onChange={setAutoCategorizePromptTemplate}
+            placeholder="定义 AI 如何从候选节点和标签中做分类。候选列表会在请求时自动拼接。"
+          />
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="border-b">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <CardTitle>最近任务</CardTitle>
+              <CardTitle>任务日志</CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">
-                共 {data.recentTasksPagination.total} 条任务日志，当前第 {data.recentTasksPagination.page} / {data.recentTasksPagination.totalPages} 页
+                发帖辅助任务和 AI 回复任务统一在这里查看，通过 Tab 切换。
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {(data.summary.succeeded + data.summary.failed + data.summary.cancelled) > 0 ? (
+              {activeTaskTab === "ai-reply" && (data.summary.succeeded + data.summary.failed + data.summary.cancelled) > 0 ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -439,74 +547,169 @@ export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3 py-5">
-          {data.recentTasks.length > 0 ? data.recentTasks.map((task) => (
-            <div key={task.id} className="rounded-xl border border-border p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${TASK_STATUS_CLASS_NAMES[task.status]}`}>{TASK_STATUS_LABELS[task.status]}</span>
-                  <span className="text-sm font-medium">{task.sourceType === "POST" ? "帖子提及" : "评论提及"}</span>
-                  <span className="text-sm text-muted-foreground">#{task.id.slice(0, 8)}</span>
+        <CardContent className="py-5">
+          <Tabs value={activeTaskTab} onValueChange={(value) => setActiveTaskTab(value as TaskTabKey)} className="w-full flex-col">
+            <TabsList className="self-start">
+              <TabsTrigger value="auto-categorize">发帖辅助任务</TabsTrigger>
+              <TabsTrigger value="ai-reply">最近任务</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="auto-categorize" className="mt-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-muted-foreground">
+                  共 {data.autoCategorizeRecentTasksPagination.total} 条任务日志，当前第 {data.autoCategorizeRecentTasksPagination.page} / {data.autoCategorizeRecentTasksPagination.totalPages} 页
+                </p>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 font-medium ${TASK_STATUS_CLASS_NAMES.PENDING}`}>待执行 {data.autoCategorizeSummary.pending}</span>
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 font-medium ${TASK_STATUS_CLASS_NAMES.PROCESSING}`}>执行中 {data.autoCategorizeSummary.processing}</span>
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 font-medium ${TASK_STATUS_CLASS_NAMES.SUCCEEDED}`}>成功 {data.autoCategorizeSummary.succeeded}</span>
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 font-medium ${TASK_STATUS_CLASS_NAMES.FAILED}`}>失败 {data.autoCategorizeSummary.failed}</span>
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 font-medium ${TASK_STATUS_CLASS_NAMES.CANCELLED}`}>取消 {data.autoCategorizeSummary.cancelled}</span>
                 </div>
-                {canDeleteTaskLog(task.status) ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={isTaskListLoading || pendingDeleteTaskId === task.id}
-                    onClick={() => void deleteTaskLog(task.id)}
-                  >
-                    {pendingDeleteTaskId === task.id ? "删除中..." : "删除日志"}
-                  </Button>
-                ) : (
-                  <span className="text-xs text-muted-foreground">执行中的任务暂不支持删除</span>
-                )}
               </div>
 
-              <p className="mt-3 text-sm font-medium">{task.postTitle}</p>
-              <p className="mt-1 text-sm text-muted-foreground">触发者：{task.triggerUserDisplayName}，代理：{task.agentDisplayName}</p>
-              <p className="mt-1 text-sm text-muted-foreground">创建于 {formatOptionalPreciseDateTime(task.createdAt)}，完成于 {formatOptionalPreciseDateTime(task.finishedAt)}</p>
-              <p className="mt-1 text-sm text-muted-foreground">尝试次数 {task.attemptCount} / {task.maxAttempts}</p>
-              {task.sourceCommentExcerpt ? <p className="mt-2 text-sm text-muted-foreground">源评论：{task.sourceCommentExcerpt}</p> : null}
-              {task.resultExcerpt ? <p className="mt-2 text-sm text-muted-foreground">AI 回复：{task.resultExcerpt}</p> : null}
-              {task.errorMessage ? <p className="mt-2 text-sm text-rose-600 dark:text-rose-300">错误：{task.errorMessage}</p> : null}
-            </div>
-          )) : (
-            <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-              还没有 AI 回复任务。
-            </div>
-          )}
+              {data.autoCategorizeRecentTasks.length > 0 ? data.autoCategorizeRecentTasks.map((task) => (
+                <div key={task.id} className="rounded-xl border border-border p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${TASK_STATUS_CLASS_NAMES[task.status]}`}>{TASK_STATUS_LABELS[task.status]}</span>
+                      <span className="text-sm font-medium">{AUTO_CATEGORIZE_SOURCE_LABELS[task.sourceType]}</span>
+                      <span className="text-sm text-muted-foreground">#{task.id.slice(0, 8)}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{renderAutoCategorizeResultLabel(task.resultStatus)}</span>
+                  </div>
 
-          {data.recentTasksPagination.totalPages > 1 ? (
-            <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-muted-foreground">
-                第 {data.recentTasksPagination.page} / {data.recentTasksPagination.totalPages} 页，每页 {data.recentTasksPagination.pageSize} 条
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={!data.recentTasksPagination.hasPrevPage || isTaskListLoading}
-                  onClick={() => void loadTaskPage(data.recentTasksPagination.page - 1)}
-                >
-                  上一页
-                </Button>
-                <span className="inline-flex h-8 min-w-10 items-center justify-center rounded-full border border-border bg-muted px-3 text-sm font-medium">
-                  {data.recentTasksPagination.page}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={!data.recentTasksPagination.hasNextPage || isTaskListLoading}
-                  onClick={() => void loadTaskPage(data.recentTasksPagination.page + 1)}
-                >
-                  下一页
-                </Button>
+                  <p className="mt-3 text-sm font-medium">{task.postTitle ?? task.previewTitle}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">请求者：{task.requesterDisplayName}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">创建于 {formatOptionalPreciseDateTime(task.createdAt)}，完成于 {formatOptionalPreciseDateTime(task.finishedAt)}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">尝试次数 {task.attemptCount} / {task.maxAttempts}</p>
+                  {task.resultBoard ? <p className="mt-2 text-sm text-muted-foreground">建议节点：{task.resultBoard.name}（{task.resultBoard.slug}）</p> : null}
+                  {task.resultTags.length > 0 ? <p className="mt-2 text-sm text-muted-foreground">建议标签：{task.resultTags.map((tag) => tag.name).join("、")}</p> : null}
+                  {task.resultReasoning ? <p className="mt-2 text-sm text-muted-foreground">理由：{task.resultReasoning}</p> : null}
+                  {task.resultRawPreview ? <p className="mt-2 text-sm text-muted-foreground">原始片段：{task.resultRawPreview}</p> : null}
+                  {task.errorMessage ? <p className="mt-2 text-sm text-rose-600 dark:text-rose-300">错误：{task.errorMessage}</p> : null}
+                </div>
+              )) : (
+                <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+                  还没有发帖辅助任务。
+                </div>
+              )}
+
+              {data.autoCategorizeRecentTasksPagination.totalPages > 1 ? (
+                <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    第 {data.autoCategorizeRecentTasksPagination.page} / {data.autoCategorizeRecentTasksPagination.totalPages} 页，每页 {data.autoCategorizeRecentTasksPagination.pageSize} 条
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!data.autoCategorizeRecentTasksPagination.hasPrevPage || isTaskListLoading}
+                      onClick={() => void loadTaskPage("auto-categorize", data.autoCategorizeRecentTasksPagination.page - 1)}
+                    >
+                      上一页
+                    </Button>
+                    <span className="inline-flex h-8 min-w-10 items-center justify-center rounded-full border border-border bg-muted px-3 text-sm font-medium">
+                      {data.autoCategorizeRecentTasksPagination.page}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!data.autoCategorizeRecentTasksPagination.hasNextPage || isTaskListLoading}
+                      onClick={() => void loadTaskPage("auto-categorize", data.autoCategorizeRecentTasksPagination.page + 1)}
+                    >
+                      下一页
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </TabsContent>
+
+            <TabsContent value="ai-reply" className="mt-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-muted-foreground">
+                  共 {data.recentTasksPagination.total} 条任务日志，当前第 {data.recentTasksPagination.page} / {data.recentTasksPagination.totalPages} 页
+                </p>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 font-medium ${TASK_STATUS_CLASS_NAMES.PENDING}`}>待执行 {data.summary.pending}</span>
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 font-medium ${TASK_STATUS_CLASS_NAMES.PROCESSING}`}>执行中 {data.summary.processing}</span>
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 font-medium ${TASK_STATUS_CLASS_NAMES.SUCCEEDED}`}>成功 {data.summary.succeeded}</span>
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 font-medium ${TASK_STATUS_CLASS_NAMES.FAILED}`}>失败 {data.summary.failed}</span>
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 font-medium ${TASK_STATUS_CLASS_NAMES.CANCELLED}`}>取消 {data.summary.cancelled}</span>
+                </div>
               </div>
-            </div>
-          ) : null}
+
+              {data.recentTasks.length > 0 ? data.recentTasks.map((task) => (
+                <div key={task.id} className="rounded-xl border border-border p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${TASK_STATUS_CLASS_NAMES[task.status]}`}>{TASK_STATUS_LABELS[task.status]}</span>
+                      <span className="text-sm font-medium">{task.sourceType === "POST" ? "帖子提及" : "评论提及"}</span>
+                      <span className="text-sm text-muted-foreground">#{task.id.slice(0, 8)}</span>
+                    </div>
+                    {canDeleteTaskLog(task.status) ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isTaskListLoading || pendingDeleteTaskId === task.id}
+                        onClick={() => void deleteTaskLog(task.id)}
+                      >
+                        {pendingDeleteTaskId === task.id ? "删除中..." : "删除日志"}
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">执行中的任务暂不支持删除</span>
+                    )}
+                  </div>
+
+                  <p className="mt-3 text-sm font-medium">{task.postTitle}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">触发者：{task.triggerUserDisplayName}，代理：{task.agentDisplayName}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">创建于 {formatOptionalPreciseDateTime(task.createdAt)}，完成于 {formatOptionalPreciseDateTime(task.finishedAt)}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">尝试次数 {task.attemptCount} / {task.maxAttempts}</p>
+                  {task.sourceCommentExcerpt ? <p className="mt-2 text-sm text-muted-foreground">源评论：{task.sourceCommentExcerpt}</p> : null}
+                  {task.resultExcerpt ? <p className="mt-2 text-sm text-muted-foreground">AI 回复：{task.resultExcerpt}</p> : null}
+                  {task.errorMessage ? <p className="mt-2 text-sm text-rose-600 dark:text-rose-300">错误：{task.errorMessage}</p> : null}
+                </div>
+              )) : (
+                <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+                  还没有 AI 回复任务。
+                </div>
+              )}
+
+              {data.recentTasksPagination.totalPages > 1 ? (
+                <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    第 {data.recentTasksPagination.page} / {data.recentTasksPagination.totalPages} 页，每页 {data.recentTasksPagination.pageSize} 条
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!data.recentTasksPagination.hasPrevPage || isTaskListLoading}
+                      onClick={() => void loadTaskPage("ai-reply", data.recentTasksPagination.page - 1)}
+                    >
+                      上一页
+                    </Button>
+                    <span className="inline-flex h-8 min-w-10 items-center justify-center rounded-full border border-border bg-muted px-3 text-sm font-medium">
+                      {data.recentTasksPagination.page}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!data.recentTasksPagination.hasNextPage || isTaskListLoading}
+                      onClick={() => void loadTaskPage("ai-reply", data.recentTasksPagination.page + 1)}
+                    >
+                      下一页
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
@@ -532,6 +735,6 @@ export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
           </CardContent>
         </Card>
       ) : null}
-    </div>
+    </form>
   )
 }

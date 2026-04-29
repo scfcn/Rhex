@@ -1,5 +1,5 @@
 import { LeaderboardPageShell } from "@/components/leaderboards/leaderboard-page-shell"
-import { getCheckInLeaderboard } from "@/lib/community-leaderboards"
+import { getCheckInLeaderboard, MAX_COMMUNITY_LEADERBOARD_LIMIT } from "@/lib/community-leaderboards"
 import { formatNumber } from "@/lib/formatters"
 import { getLeaderboardPageChromeData } from "@/lib/leaderboard-page-chrome"
 
@@ -15,7 +15,7 @@ export default async function CheckInLeaderboardPage() {
         status: chrome.currentUser.status,
       }
     : null, {
-      limit: 200,
+      limit: MAX_COMMUNITY_LEADERBOARD_LIMIT,
     })
 
   return (

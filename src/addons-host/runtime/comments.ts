@@ -30,7 +30,6 @@ const ADDON_COMMENT_QUERY_SORT_FIELDS = new Set<AddonCommentQuerySort["field"]>(
 const ADDON_COMMENT_QUERY_STATUSES = new Set<AddonCommentRecord["status"]>([
   "NORMAL",
   "HIDDEN",
-  "DELETED",
   "PENDING",
 ])
 

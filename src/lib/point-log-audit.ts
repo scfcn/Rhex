@@ -296,12 +296,36 @@ export function formatPointEffectAdjustmentValue(value: number) {
   return formatNumber(value)
 }
 
-export function buildPointEffectSummaryText(effect: PointLogEffectMetadata | null | undefined) {
+export function buildPointEffectNameText(effect: PointLogEffectMetadata | null | undefined) {
   if (!effect) {
     return null
   }
 
-  return `勋章特效：原始 ${formatPointEffectAdjustmentValue(effect.baseValue)} -> 特效后 ${formatPointEffectAdjustmentValue(effect.finalValue)}`
+  const names = effect.rules.reduce<string[]>((current, rule) => {
+    const name = rule.effectName.trim()
+    if (!name || current.includes(name)) {
+      return current
+    }
+
+    current.push(name)
+    return current
+  }, [])
+
+  return names.length > 0 ? names.join("、") : null
+}
+
+export function buildPointEffectChangeSummaryText(effect: PointLogEffectMetadata | null | undefined) {
+  if (!effect) {
+    return null
+  }
+
+  return `原始 ${formatPointEffectAdjustmentValue(effect.baseValue)} -> 特效后 ${formatPointEffectAdjustmentValue(effect.finalValue)}`
+}
+
+export function buildPointEffectSummaryText(effect: PointLogEffectMetadata | null | undefined) {
+  const changeSummary = buildPointEffectChangeSummaryText(effect)
+
+  return changeSummary ? `勋章特效：${changeSummary}` : null
 }
 
 export function normalizeAuditedPointLogEntry(entry: PointLogAuditEntry) {

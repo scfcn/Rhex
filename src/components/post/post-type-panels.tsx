@@ -486,8 +486,7 @@ export function LotteryPanel({ postId, isOwnerOrAdmin, lottery }: LotteryPanelPr
                   <CollapsibleContent>
                     <div className="mt-3 flex flex-col gap-2">
                       {lottery.conditionGroups.map((group) => (
-                        <div key={group.key} className="rounded-[16px] border border-border bg-background px-3 py-3">
-                          <p className="text-xs font-medium text-foreground">{group.label}</p>
+                        <div key={group.key} className=" bg-background ">
                           <ul className="mt-2 flex flex-col gap-2">
                             {group.conditions.map((condition) => (
                               <li key={condition.id} className="flex flex-col gap-2 rounded-[14px] border border-border px-3 py-2.5 sm:flex-row sm:items-start sm:justify-between">

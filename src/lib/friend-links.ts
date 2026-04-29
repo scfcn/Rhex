@@ -12,6 +12,7 @@ import {
 import { getCurrentUser } from "@/lib/auth"
 import { apiError } from "@/lib/api-route"
 import { enforceSensitiveText } from "@/lib/content-safety"
+import { reviewFriendLinkPlacement } from "@/lib/friend-link-auto-review"
 import { normalizeTrimmedText } from "@/lib/shared/normalizers"
 import { getSiteSettings } from "@/lib/site-settings"
 
@@ -42,11 +43,16 @@ export interface FriendLinkListData {
 export interface FriendLinkSubmissionInput {
   name: string
   url: string
+  placementPageUrl: string
   logoPath?: string
+  siteOrigin: string
 }
 
 
-export interface AdminFriendLinkInput extends FriendLinkSubmissionInput {
+export interface AdminFriendLinkInput {
+  name: string
+  url: string
+  logoPath?: string
   sortOrder?: number
   reviewNote?: string
 }
@@ -147,6 +153,7 @@ export async function submitFriendLinkApplication(input: FriendLinkSubmissionInp
 
   const rawName = normalizeTrimmedText(input.name, 40)
   const url = normalizeUrl(input.url)
+  const placementPageUrl = normalizeUrl(input.placementPageUrl)
   const logoPath = normalizeTrimmedText(input.logoPath, 300)
 
   if (!rawName) {
@@ -157,22 +164,30 @@ export async function submitFriendLinkApplication(input: FriendLinkSubmissionInp
     apiError(400, "请输入网站链接")
   }
 
+  if (!placementPageUrl) {
+    apiError(400, "请输入友情链接所在页面")
+  }
+
   const duplicated = await findFriendLinkByUrl(url)
   if (duplicated) {
     apiError(409, "该网站链接已存在，请勿重复提交")
   }
 
   const nameSafety = await enforceSensitiveText({ scene: "friendLink.name", text: rawName })
+  const autoReview = await reviewFriendLinkPlacement(placementPageUrl, input.siteOrigin)
   const friendLink = await createFriendLink({
     name: nameSafety.sanitizedText,
     url,
     logoPath: logoPath || null,
-    status: FriendLinkStatus.PENDING,
+    status: autoReview.autoApproved ? FriendLinkStatus.APPROVED : FriendLinkStatus.PENDING,
+    reviewNote: autoReview.reviewNote,
+    reviewedAt: autoReview.autoApproved ? new Date() : null,
   })
 
   return {
     ...friendLink,
     contentAdjusted: nameSafety.wasReplaced,
+    autoApproved: autoReview.autoApproved,
   }
 }
 

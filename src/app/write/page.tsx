@@ -10,6 +10,7 @@ import { buildUserLevelThresholdOptions, buildVipLevelThresholdOptions } from "@
 import { getCurrentUser } from "@/lib/auth"
 import { getBoards, type SiteBoardItem } from "@/lib/boards"
 import { getLevelDefinitions } from "@/lib/level-system"
+import { getAutoCategorizeConfig } from "@/lib/ai/capabilities/auto-categorize-config"
 import { parsePostContentDocument } from "@/lib/post-content"
 import { parsePostRewardPoolConfigFromContent } from "@/lib/post-red-packets"
 import { getEditablePostBySlug } from "@/lib/posts"
@@ -61,7 +62,14 @@ export async function generateMetadata(props: PageProps<"/write">): Promise<Meta
 
 export default async function WritePage(props: PageProps<"/write">) {
   const searchParams = await props.searchParams;
-  const [user, zones, boards, settings, levelDefinitions] = await Promise.all([getCurrentUser(), getZones(), getBoards(), getSiteSettings(), getLevelDefinitions()])
+  const [user, zones, boards, settings, levelDefinitions, autoCategorizeConfig] = await Promise.all([
+    getCurrentUser(),
+    getZones(),
+    getBoards(),
+    getSiteSettings(),
+    getLevelDefinitions(),
+    getAutoCategorizeConfig(),
+  ])
   const mode = readSearchParam(searchParams?.mode) === "edit" ? "edit" : "create"
   const editingSlug = readSearchParam(searchParams?.post)
   const preferredBoardSlug = readSearchParam(searchParams?.board) ?? ""
@@ -264,6 +272,11 @@ export default async function WritePage(props: PageProps<"/write">) {
                     postJackpotMaxInitialPoints={settings.postJackpotMaxInitialPoints}
                     postJackpotReplyIncrementPoints={settings.postJackpotReplyIncrementPoints}
                     postJackpotHitProbability={settings.postJackpotHitProbability}
+                    preferredBoardLocked={false}
+                    aiAssist={{
+                      boardAutoSelectEnabled: autoCategorizeConfig.writeBoardAutoSelectEnabled,
+                      tagAutoExtractEnabled: autoCategorizeConfig.writeTagAutoExtractEnabled,
+                    }}
                     {...addonFormSlots}
                   />
                 )
@@ -303,6 +316,11 @@ export default async function WritePage(props: PageProps<"/write">) {
                   viewVipLevelOptions={viewVipLevelOptions}
                   postLinkDisplayMode={settings.postLinkDisplayMode}
                   initialValues={preferredBoardSlug ? { title: "", content: "", isAnonymous: false, boardSlug: preferredBoardSlug, postType: "NORMAL" } : undefined}
+                  preferredBoardLocked={Boolean(preferredBoardSlug)}
+                  aiAssist={{
+                    boardAutoSelectEnabled: autoCategorizeConfig.writeBoardAutoSelectEnabled,
+                    tagAutoExtractEnabled: autoCategorizeConfig.writeTagAutoExtractEnabled,
+                  }}
                 />
               )}
             </CardContent>

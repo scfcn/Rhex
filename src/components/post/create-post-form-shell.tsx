@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, type ReactNode } from "react"
-import { ChevronDown, Info, Loader2 } from "lucide-react"
+import { createElement, useState, type ReactNode } from "react"
+import { ChevronDown, Coins, Gavel, Gift, Info, Loader2, MessageSquareText, Vote, type LucideIcon } from "lucide-react"
 
 import { AddonSurfaceClientRenderer } from "@/addons-host/client/addon-surface-client-renderer"
 import { BoardSelectField } from "@/components/board/board-select-field"
@@ -16,6 +16,14 @@ import { PostDraftNotice, type PostDraftNoticeAction } from "@/components/post/p
 import { AddonEditor } from "@/components/addon-editor"
 import { Modal } from "@/components/ui/modal"
 import { Button } from "@/components/ui/rbutton"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+} from "@/components/ui/select"
 import { Tooltip } from "@/components/ui/tooltip"
 import { PostDraftBox } from "@/components/post/post-draft-box"
 import type { MarkdownEmojiItem } from "@/lib/markdown-emoji"
@@ -46,6 +54,26 @@ interface CreatePostFormShellProps {
   postJackpotHitProbability: number
   draftController: CreatePostDraftController
   submitController: CreatePostSubmitController
+}
+
+function getPostTypeIcon(type: LocalPostType): LucideIcon {
+  switch (type) {
+    case "BOUNTY":
+      return Coins
+    case "POLL":
+      return Vote
+    case "LOTTERY":
+      return Gift
+    case "AUCTION":
+      return Gavel
+    case "NORMAL":
+    default:
+      return MessageSquareText
+  }
+}
+
+function PostTypeIcon({ type, className }: { type: LocalPostType; className?: string }) {
+  return createElement(getPostTypeIcon(type), { className })
 }
 
 export function CreatePostFormShell({
@@ -82,9 +110,16 @@ export function CreatePostFormShell({
     effectiveRewardPoolOptions,
     showRewardPoolEntry,
     selectedBoard,
+    autoBoardPendingSelection,
     availablePostTypes,
     selectedPostTypeOption,
     autoExtractedTags,
+    canUseAutoBoardSelection,
+    boardSelectionMode,
+    setBoardSelectionMode,
+    aiSuggestedBoard,
+    aiSuggestionPending,
+    aiSuggestionError,
     shouldShowAttachmentEntry,
     minPostVipLevel,
     canPostInBoard,
@@ -200,17 +235,58 @@ export function CreatePostFormShell({
       <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
         <div className="space-y-2">
           <p className="text-sm font-medium">选择节点</p>
-          <BoardSelectField
-            value={draft.boardSlug}
-            onChange={(value) => updateDraftField("boardSlug", value)}
-            boardOptions={boardOptions}
-            disabled={isEditMode}
-          />
-          <p className="text-xs leading-6 text-muted-foreground">
-            {isEditMode
-              ? "编辑模式下暂不允许切换节点，避免跨节点权限和审核状态不一致。"
-              : "现在支持搜索分区、节点名和 slug，节点变多后也能快速找到。"}
-          </p>
+          {!isEditMode && canUseAutoBoardSelection && boardSelectionMode === "auto" ? (
+            <div className="rounded-xl border border-border bg-card/70 px-4 py-3">
+              <p className="text-sm leading-7 text-muted-foreground">
+                节点会在你点击发布时，根据标题和正文由 AI 自动选择。
+                <button
+                  type="button"
+                  className="ml-1 text-foreground underline underline-offset-4 transition-opacity hover:opacity-70"
+                  onClick={() => setBoardSelectionMode("manual")}
+                >
+                  切换至手动选择？
+                </button>
+              </p>
+              <p className="mt-2 text-xs leading-6 text-muted-foreground">
+                {aiSuggestionError
+                  ? aiSuggestionError
+                  : selectedBoard
+                    ? `当前匹配节点：${selectedBoard.label}（${selectedBoard.value}）`
+                    : autoBoardPendingSelection
+                      ? null
+                      : aiSuggestedBoard
+                        ? `当前匹配节点：${aiSuggestedBoard.name}（${aiSuggestedBoard.slug}）`
+                        : "暂未匹配到节点，可继续补充内容或切换为手动选择。"}
+              </p>
+            </div>
+          ) : (
+            <>
+              <BoardSelectField
+                value={draft.boardSlug}
+                onChange={(value) => updateDraftField("boardSlug", value)}
+                boardOptions={boardOptions}
+                disabled={isEditMode}
+              />
+              <p className="text-xs leading-6 text-muted-foreground">
+                {isEditMode
+                  ? "编辑模式下暂不允许切换节点。"
+                  : canUseAutoBoardSelection
+                    ? (
+                        <>
+                          已切换为手动选择。
+                          <button
+                            type="button"
+                            className="ml-1 text-foreground underline underline-offset-4 transition-opacity hover:opacity-70"
+                            onClick={() => setBoardSelectionMode("auto")}
+                          >
+                            切换回 AI 自动选择？
+                          </button>
+                        </>
+                      )
+                    : "选择一个合适的节点发布内容"}
+              </p>
+            </>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -218,20 +294,50 @@ export function CreatePostFormShell({
             <p className="text-sm font-medium">帖子类型</p>
             <p className="text-xs text-muted-foreground">选择后再填写对应内容</p>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <select
-              value={draft.postType}
-              onChange={(event) =>
-                updateDraftField("postType", event.target.value as LocalPostType)}
-              className="h-11 w-full rounded-full border border-border bg-card px-4 text-sm outline-hidden"
-              disabled={isEditMode}
-            >
-              {availablePostTypes.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+            <div className="space-y-3">
+              <Select
+                value={draft.postType}
+                onValueChange={(value) => updateDraftField("postType", value as LocalPostType)}
+                disabled={isEditMode}
+              >
+                <SelectTrigger className="h-auto min-h-11 rounded-full bg-card px-4 py-2.5 text-left">
+                  {selectedPostTypeOption ? (
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground">
+                        <PostTypeIcon type={selectedPostTypeOption.value} className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-medium">{selectedPostTypeOption.label}</span>
+                      </span>
+                    </div>
+                  ) : null}
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>帖子类型</SelectLabel>
+                    {availablePostTypes.map((item) => {
+                      return (
+                        <SelectItem
+                          key={item.value}
+                          value={item.value}
+                          className="rounded-xl py-2.5 pl-10 pr-3 [&>span:last-child]:flex [&>span:last-child]:w-full"
+                        >
+                          <div className="flex w-full items-start gap-3">
+                            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground">
+                              <PostTypeIcon type={item.value} className="h-3.5 w-3.5" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-sm font-medium text-foreground">{item.label}</span>
+                            </span>
+                          </div>
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
             {!isEditMode && anonymousPostEnabled ? (
               <label className="flex h-11 shrink-0 items-center justify-between gap-3 rounded-full border border-border bg-card px-4 text-sm sm:min-w-[168px]">
                 <span className="flex items-center gap-2 whitespace-nowrap">
@@ -255,11 +361,6 @@ export function CreatePostFormShell({
               </label>
             ) : null}
           </div>
-          {selectedPostTypeOption ? (
-            <p className="text-xs leading-6 text-muted-foreground">
-              {selectedPostTypeOption.hint}
-            </p>
-          ) : null}
         </div>
       </div>
 
@@ -532,7 +633,11 @@ export function CreatePostFormShell({
           {loading ? (
             <>
               <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin sm:h-4 sm:w-4" />
-              {isEditMode ? "保存中..." : "发布中..."}
+              {aiSuggestionPending && !isEditMode
+                ? "AI 分析中..."
+                : isEditMode
+                  ? "保存中..."
+                  : "发布中..."}
             </>
           ) : isEditMode ? (
             "保存帖子"

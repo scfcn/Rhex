@@ -64,7 +64,6 @@ const statusFilters = [
   { value: "PENDING", label: "待审核" },
   { value: "NORMAL", label: "正常" },
   { value: "HIDDEN", label: "已下线" },
-  { value: "DELETED", label: "已删除" },
 ]
 
 const sortFilters = [
@@ -506,10 +505,6 @@ function CommentActionsCell({ comment }: { comment: AdminCommentListItem }) {
                 删除
               </DropdownMenuItem>
             </>
-          ) : comment.status === "DELETED" ? (
-            <DropdownMenuItem onClick={() => setActiveAction("show")}>
-              恢复
-            </DropdownMenuItem>
           ) : (
             <>
               <DropdownMenuItem onClick={() => setActiveAction("hide")} variant="destructive">
@@ -596,20 +591,6 @@ function CommentActionsCell({ comment }: { comment: AdminCommentListItem }) {
             onOpenChange={(open) => setActiveAction(open ? "delete" : null)}
           />
         </>
-      ) : comment.status === "DELETED" ? (
-        <AdminPostActionButton
-          action="comment.show"
-          targetId={comment.id}
-          label="恢复"
-          modalTitle="确认恢复评论"
-          modalDescription={`帖子：${comment.postTitle}`}
-          placeholder="填写恢复说明（可选）"
-          confirmText="确认恢复"
-          className="h-7 rounded-full px-2.5 text-xs"
-          hideTrigger
-          open={activeAction === "show"}
-          onOpenChange={(open) => setActiveAction(open ? "show" : null)}
-        />
       ) : (
         <>
           <AdminPostActionButton
@@ -705,9 +686,6 @@ function getCommentStatusBadgeClassName(
   }
   if (status === "HIDDEN") {
     return "border-transparent bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-200"
-  }
-  if (status === "DELETED") {
-    return "border-transparent bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-200"
   }
   return "border-transparent bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200"
 }

@@ -34,6 +34,7 @@ export type AdminPostSort =
 export type AdminPostPinFilter = "ALL" | "pinned" | "not-pinned"
 export type AdminPostFeaturedFilter = "ALL" | "featured" | "not-featured"
 export type AdminPostReviewFilter = "ALL" | "reviewed" | "unreviewed"
+const ADMIN_POST_STATUSES = new Set<PostStatus>(["NORMAL", "PENDING", "OFFLINE", "LOCKED"])
 
 export interface NormalizedAdminPostQuery {
   keyword: string
@@ -66,10 +67,12 @@ export function normalizeAdminPostSort(sort?: string): AdminPostSort {
 }
 
 export function normalizeAdminPostQuery(query: AdminPostQuery = {}): NormalizedAdminPostQuery {
+  const normalizedStatus = query.status?.trim().toUpperCase() ?? ""
+
   return {
     keyword: query.keyword?.trim() ?? "",
     type: query.type && query.type !== "" ? query.type : "ALL",
-    status: query.status && query.status !== "" ? query.status : "ALL",
+    status: ADMIN_POST_STATUSES.has(normalizedStatus as PostStatus) ? normalizedStatus : "ALL",
     boardSlug: query.boardSlug ?? "",
     sort: normalizeAdminPostSort(query.sort),
     pin: query.pin === "pinned" || query.pin === "not-pinned" ? query.pin : "ALL",
@@ -84,7 +87,7 @@ export function buildAdminPostWhere(actor: AdminActor, query: NormalizedAdminPos
   return {
     ...(buildManagedPostWhereInput(actor) ?? {}),
     ...(isLocalPostType(query.type) ? { type: query.type as LocalPostType } : {}),
-    ...(query.status !== "ALL" ? { status: query.status as PostStatus } : {}),
+    ...(query.status !== "ALL" && ADMIN_POST_STATUSES.has(query.status as PostStatus) ? { status: query.status as PostStatus } : {}),
     ...(query.boardSlug ? { board: { slug: query.boardSlug } } : {}),
     ...(query.pin === "pinned" ? { isPinned: true } : {}),
     ...(query.pin === "not-pinned" ? { isPinned: false } : {}),
@@ -179,4 +182,3 @@ export function buildAdminPostFilters(query: NormalizedAdminPostQuery): AdminPos
     review: query.review,
   }
 }
-

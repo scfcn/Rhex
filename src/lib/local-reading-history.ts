@@ -157,6 +157,18 @@ function readSnapshotFromStorage() {
   }
 }
 
+export function preloadReadingHistorySnapshot() {
+  if (!isBrowser()) {
+    return []
+  }
+
+  const entries = readSnapshotFromStorage()
+  cachedSnapshot = entries
+  cacheHydrated = true
+  window.__RHEX_PRELOADED_READING_HISTORY__ = entries
+  return entries
+}
+
 function updateSnapshot(entries: ReadingHistoryEntry[], syncStorage = true) {
   cachedSnapshot = entries
   cacheHydrated = true

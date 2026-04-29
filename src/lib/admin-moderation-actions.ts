@@ -1,5 +1,6 @@
 import { BoardStatus, CommentStatus } from "@/db/types"
 import {
+  deleteCommentPermanently,
   findBoardPostingState,
   findBoardVisibilityState,
   updateCommentModerationState,
@@ -56,12 +57,7 @@ export const adminModerationActionHandlers: Record<string, AdminActionDefinition
     }, {
       throwOnError: true,
     })
-    await updateCommentModerationState(context.targetId, {
-      status: CommentStatus.DELETED,
-      reviewNote: reason,
-      reviewedById: context.adminUserId,
-      reviewedAt: new Date(),
-    })
+    await deleteCommentPermanently(context.targetId)
     revalidateHomeSidebarStatsCache()
 
     if (comment.userId !== context.adminUserId) {

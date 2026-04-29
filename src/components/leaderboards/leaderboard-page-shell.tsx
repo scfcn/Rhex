@@ -122,7 +122,6 @@ export function LeaderboardPageShell<TEntry extends LeaderboardShellEntry>({
   eyebrow,
   title,
   description,
-  totalUsers,
   entries,
   currentUserEntry,
   currentUserHint,
@@ -174,9 +173,7 @@ export function LeaderboardPageShell<TEntry extends LeaderboardShellEntry>({
                         <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">{title}</h1>
                         <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p>
                       </div>
-                      <div className="inline-flex items-center rounded-full border border-border bg-background px-4 py-2 text-xs text-muted-foreground">
-                        上榜用户 <span className="mx-1 font-semibold text-foreground">{formatNumber(totalUsers)}</span>
-                      </div>
+              
                     </div>
 
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

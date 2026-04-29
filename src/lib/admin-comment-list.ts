@@ -23,6 +23,7 @@ export interface AdminCommentQuery {
 export type AdminCommentSort = "newest" | "oldest" | "mostLikes"
 export type AdminCommentReviewFilter = "ALL" | "reviewed" | "unreviewed"
 export type AdminCommentTypeFilter = "ALL" | "ROOT" | "REPLY"
+const ADMIN_COMMENT_STATUSES = new Set<CommentStatus>(["NORMAL", "HIDDEN", "PENDING"])
 
 export interface NormalizedAdminCommentQuery {
   keyword: string
@@ -44,8 +45,6 @@ export function getCommentStatusLabel(status: CommentStatus) {
       return "待审核"
     case "HIDDEN":
       return "已下线"
-    case "DELETED":
-      return "已删除"
     default:
       return "正常"
   }
@@ -62,9 +61,11 @@ export function normalizeAdminCommentSort(sort?: string): AdminCommentSort {
 }
 
 export function normalizeAdminCommentQuery(query: AdminCommentQuery = {}): NormalizedAdminCommentQuery {
+  const normalizedStatus = query.status?.trim().toUpperCase() ?? ""
+
   return {
     keyword: query.keyword?.trim() ?? "",
-    status: query.status?.trim() || "ALL",
+    status: ADMIN_COMMENT_STATUSES.has(normalizedStatus as CommentStatus) ? normalizedStatus : "ALL",
     boardSlug: query.boardSlug?.trim() ?? "",
     sort: normalizeAdminCommentSort(query.sort),
     review: query.review === "reviewed" || query.review === "unreviewed" ? query.review : "ALL",
@@ -91,7 +92,7 @@ export function buildAdminCommentWhere(actor: AdminActor, query: NormalizedAdmin
 
   return {
     ...(buildManagedCommentWhereInput(actor) ?? {}),
-    ...(query.status !== "ALL" ? { status: query.status as CommentStatus } : {}),
+    ...(query.status !== "ALL" && ADMIN_COMMENT_STATUSES.has(query.status as CommentStatus) ? { status: query.status as CommentStatus } : {}),
     ...(query.boardSlug ? { post: { board: { slug: query.boardSlug } } } : {}),
     ...(and.length > 0 ? { AND: and } : {}),
     ...(query.keyword

@@ -188,7 +188,7 @@ export default async function BoardPage(props: PageProps<"/boards/[slug]">) {
                   icon={board.icon}
                   description={board.description}
                   summary={`当前共收录 ${board.count} 篇内容`}
-                  summaryActions={<RssSubscribeButton href={`/boards/${board.slug}/rss.xml`} label="订阅节点 RSS" />}
+                  summaryActions={<RssSubscribeButton href={`/boards/${board.slug}/rss.xml`} label="RSS" />}
                   detailAction={<BoardFollowButton boardId={board.id} initialFollowed={isFollowingBoard} showLabel className="border border-border bg-background/85 px-2.5 py-1 text-[11px] font-medium text-foreground hover:bg-accent" />}
                   alwaysOpen
                   hidePills

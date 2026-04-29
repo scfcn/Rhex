@@ -1,4 +1,10 @@
-import { AiReplyTaskSourceType, AiReplyTaskStatus, NotificationType } from "@/db/types"
+import {
+  AiReplyTaskSourceType,
+  AiReplyTaskStatus,
+  AutoCategorizeTaskSourceType,
+  NotificationType,
+  type Prisma,
+} from "@/db/types"
 import { prisma } from "@/db/client"
 
 import { apiError } from "@/lib/api-route"
@@ -16,6 +22,7 @@ import { resolveAiProvider, type AiProviderConfig } from "@/lib/ai/provider"
 import { runAiTask } from "@/lib/ai/service"
 import { AiProviderError } from "@/lib/ai/provider/types"
 import { AiRateLimitError } from "@/lib/ai/rate-limit"
+import { getAutoCategorizeConfig, type AutoCategorizeConfig } from "@/lib/ai/capabilities/auto-categorize-config"
 
 const AI_REPLY_BACKGROUND_JOB_NAME = "ai-reply.process"
 const AI_REPLY_MAX_CONTEXT_CHARS = 4_000
@@ -23,8 +30,9 @@ const AI_REPLY_RESULT_EXCERPT_CHARS = 240
 const AI_REPLY_NOTIFICATION_PREVIEW_CHARS = 80
 const AI_REPLY_RETRY_BASE_DELAY_MS = 30_000
 const AI_REPLY_RETRY_MAX_DELAY_MS = 10 * 60 * 1_000
-const DEFAULT_AI_REPLY_PROCESSING_STALE_MS = 30 * 60 * 1_000
+const DEFAULT_AI_REPLY_PROCESSING_STALE_MS = 5 * 60 * 1_000
 const AI_REPLY_ADMIN_TASKS_PAGE_SIZE = 10
+const AUTO_CATEGORIZE_ADMIN_TASKS_PAGE_SIZE = 10
 const AI_REPLY_DELETABLE_TASK_STATUSES = [
   AiReplyTaskStatus.SUCCEEDED,
   AiReplyTaskStatus.FAILED,
@@ -32,9 +40,49 @@ const AI_REPLY_DELETABLE_TASK_STATUSES = [
 ] as const
 
 type AiReplyTaskWorkerRecord = Awaited<ReturnType<typeof loadAiReplyTaskForWorker>>
+const autoCategorizeRecentTaskSelect = {
+  id: true,
+  sourceType: true,
+  status: true,
+  postId: true,
+  title: true,
+  attemptCount: true,
+  maxAttempts: true,
+  errorMessage: true,
+  resultStatus: true,
+  resultTagIds: true,
+  resultTagsJson: true,
+  resultReasoning: true,
+  resultRawPreview: true,
+  createdAt: true,
+  updatedAt: true,
+  finishedAt: true,
+  post: {
+    select: {
+      title: true,
+    },
+  },
+  requesterUser: {
+    select: {
+      username: true,
+      nickname: true,
+    },
+  },
+  resultBoard: {
+    select: {
+      slug: true,
+      name: true,
+    },
+  },
+} satisfies Prisma.AutoCategorizeTaskSelect
 
 export interface AiReplyAdminData {
   config: AiReplyConfigData
+  autoCategorizeConfig: AutoCategorizeConfig
+  autoCategorizeDefaultBoard: {
+    slug: string
+    name: string
+  } | null
   agentUser: {
     id: number
     username: string
@@ -48,7 +96,22 @@ export interface AiReplyAdminData {
     failed: number
     cancelled: number
   }
+  autoCategorizeSummary: {
+    pending: number
+    processing: number
+    succeeded: number
+    failed: number
+    cancelled: number
+  }
   recentTasksPagination: {
+    page: number
+    pageSize: number
+    total: number
+    totalPages: number
+    hasPrevPage: boolean
+    hasNextPage: boolean
+  }
+  autoCategorizeRecentTasksPagination: {
     page: number
     pageSize: number
     total: number
@@ -72,6 +135,32 @@ export interface AiReplyAdminData {
     maxAttempts: number
     errorMessage: string | null
     resultExcerpt: string | null
+    createdAt: string
+    updatedAt: string
+    finishedAt: string | null
+  }>
+  autoCategorizeRecentTasks: Array<{
+    id: string
+    sourceType: AutoCategorizeTaskSourceType
+    status: AiReplyTaskStatus
+    postId: string | null
+    postTitle: string | null
+    previewTitle: string
+    requesterDisplayName: string
+    attemptCount: number
+    maxAttempts: number
+    errorMessage: string | null
+    resultStatus: string | null
+    resultBoard: {
+      slug: string
+      name: string
+    } | null
+    resultTags: Array<{
+      slug: string
+      name: string
+    }>
+    resultReasoning: string | null
+    resultRawPreview: string | null
     createdAt: string
     updatedAt: string
     finishedAt: string | null
@@ -127,6 +216,29 @@ function buildDisplayName(user: { username: string; nickname: string | null }, a
   }
 
   return user.nickname ?? user.username
+}
+
+function parseAutoCategorizeTagsJson(value: unknown) {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        return null
+      }
+
+      const record = item as Record<string, unknown>
+      const slug = typeof record.slug === "string" ? record.slug.trim() : ""
+      const name = typeof record.name === "string" ? record.name.trim() : ""
+      if (!slug || !name) {
+        return null
+      }
+
+      return { slug, name }
+    })
+    .filter((item): item is { slug: string; name: string } => Boolean(item))
 }
 
 function getPostVisibleText(post: {
@@ -1001,15 +1113,19 @@ export async function enqueueAiReplyForCommentMention(params: {
 }
 
 export async function getAiReplyAdminData(): Promise<AiReplyAdminData> {
-  return getAiReplyAdminDataPage({ page: 1 })
+  return getAiReplyAdminDataPage({ page: 1, autoCategorizePage: 1 })
 }
 
 export async function getAiReplyAdminDataPage(options?: {
   page?: number | null
+  autoCategorizePage?: number | null
 }): Promise<AiReplyAdminData> {
-  const config = await getAiReplyConfig()
+  const [config, autoCategorizeConfig] = await Promise.all([
+    getAiReplyConfig(),
+    getAutoCategorizeConfig(),
+  ])
 
-  const [agentUser, pending, processing, succeeded, failed, cancelled, totalRecentTasks] = await Promise.all([
+  const [agentUser, autoCategorizeDefaultBoard, pending, processing, succeeded, failed, cancelled, totalRecentTasks, autoPending, autoProcessing, autoSucceeded, autoFailed, autoCancelled, autoTotalRecentTasks] = await Promise.all([
     config.agentUserId
       ? prisma.user.findUnique({
           where: { id: config.agentUserId },
@@ -1021,22 +1137,43 @@ export async function getAiReplyAdminDataPage(options?: {
           },
         })
       : Promise.resolve(null),
+    autoCategorizeConfig.defaultBoardSlug
+      ? prisma.board.findUnique({
+          where: { slug: autoCategorizeConfig.defaultBoardSlug },
+          select: {
+            slug: true,
+            name: true,
+          },
+        })
+      : Promise.resolve(null),
     prisma.aiReplyTask.count({ where: { status: AiReplyTaskStatus.PENDING } }),
     prisma.aiReplyTask.count({ where: { status: AiReplyTaskStatus.PROCESSING } }),
     prisma.aiReplyTask.count({ where: { status: AiReplyTaskStatus.SUCCEEDED } }),
     prisma.aiReplyTask.count({ where: { status: AiReplyTaskStatus.FAILED } }),
     prisma.aiReplyTask.count({ where: { status: AiReplyTaskStatus.CANCELLED } }),
     prisma.aiReplyTask.count(),
+    prisma.autoCategorizeTask.count({ where: { status: AiReplyTaskStatus.PENDING } }),
+    prisma.autoCategorizeTask.count({ where: { status: AiReplyTaskStatus.PROCESSING } }),
+    prisma.autoCategorizeTask.count({ where: { status: AiReplyTaskStatus.SUCCEEDED } }),
+    prisma.autoCategorizeTask.count({ where: { status: AiReplyTaskStatus.FAILED } }),
+    prisma.autoCategorizeTask.count({ where: { status: AiReplyTaskStatus.CANCELLED } }),
+    prisma.autoCategorizeTask.count(),
   ])
   const pageSize = AI_REPLY_ADMIN_TASKS_PAGE_SIZE
   const totalPages = Math.max(1, Math.ceil(totalRecentTasks / pageSize))
   const page = Math.min(normalizeAiReplyAdminTasksPage(options?.page), totalPages)
-  const recentTasks = await prisma.aiReplyTask.findMany({
+  const autoCategorizePageSize = AUTO_CATEGORIZE_ADMIN_TASKS_PAGE_SIZE
+  const autoCategorizeTotalPages = Math.max(1, Math.ceil(autoTotalRecentTasks / autoCategorizePageSize))
+  const autoCategorizePage = Math.min(normalizeAiReplyAdminTasksPage(options?.autoCategorizePage), autoCategorizeTotalPages)
+  const effectiveSkip = (page - 1) * pageSize
+  const autoCategorizeEffectiveSkip = (autoCategorizePage - 1) * autoCategorizePageSize
+  const [pagedRecentTasks, autoRecentTasks] = await Promise.all([
+    prisma.aiReplyTask.findMany({
       orderBy: [
         { createdAt: "desc" },
         { id: "desc" },
       ],
-      skip: (page - 1) * pageSize,
+      skip: effectiveSkip,
       take: pageSize,
       select: {
         id: true,
@@ -1076,10 +1213,34 @@ export async function getAiReplyAdminDataPage(options?: {
           },
         },
       },
+    }),
+    prisma.autoCategorizeTask.findMany({
+      orderBy: [
+        { createdAt: "desc" },
+        { id: "desc" },
+      ],
+      skip: autoCategorizeEffectiveSkip,
+      take: autoCategorizePageSize,
+      select: autoCategorizeRecentTaskSelect,
+    }),
+  ])
+  const autoRecentTaskTagIds = Array.from(new Set(autoRecentTasks.flatMap((task) => task.resultTagIds)))
+  const autoRecentTaskTags = autoRecentTaskTagIds.length > 0
+    ? await prisma.tag.findMany({
+      where: { id: { in: autoRecentTaskTagIds } },
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+      },
     })
+    : []
+  const autoRecentTaskTagMap = new Map(autoRecentTaskTags.map((tag) => [tag.id, tag]))
 
   return {
     config,
+    autoCategorizeConfig,
+    autoCategorizeDefaultBoard,
     agentUser,
     summary: {
       pending,
@@ -1087,6 +1248,13 @@ export async function getAiReplyAdminDataPage(options?: {
       succeeded,
       failed,
       cancelled,
+    },
+    autoCategorizeSummary: {
+      pending: autoPending,
+      processing: autoProcessing,
+      succeeded: autoSucceeded,
+      failed: autoFailed,
+      cancelled: autoCancelled,
     },
     recentTasksPagination: {
       page,
@@ -1096,7 +1264,15 @@ export async function getAiReplyAdminDataPage(options?: {
       hasPrevPage: page > 1,
       hasNextPage: page < totalPages,
     },
-    recentTasks: recentTasks.map((task) => ({
+    autoCategorizeRecentTasksPagination: {
+      page: autoCategorizePage,
+      pageSize: autoCategorizePageSize,
+      total: autoTotalRecentTasks,
+      totalPages: autoCategorizeTotalPages,
+      hasPrevPage: autoCategorizePage > 1,
+      hasNextPage: autoCategorizePage < autoCategorizeTotalPages,
+    },
+    recentTasks: pagedRecentTasks.map((task) => ({
       id: task.id,
       sourceType: task.sourceType,
       status: task.status,
@@ -1112,6 +1288,40 @@ export async function getAiReplyAdminDataPage(options?: {
       maxAttempts: task.maxAttempts,
       errorMessage: task.errorMessage,
       resultExcerpt: task.resultExcerpt,
+      createdAt: task.createdAt.toISOString(),
+      updatedAt: task.updatedAt.toISOString(),
+      finishedAt: task.finishedAt ? task.finishedAt.toISOString() : null,
+    })),
+    autoCategorizeRecentTasks: autoRecentTasks.map((task) => ({
+      id: task.id,
+      sourceType: task.sourceType,
+      status: task.status,
+      postId: task.postId,
+      postTitle: task.post?.title ?? null,
+      previewTitle: task.title,
+      requesterDisplayName: buildDisplayName(task.requesterUser),
+      attemptCount: task.attemptCount,
+      maxAttempts: task.maxAttempts,
+      errorMessage: task.errorMessage,
+      resultStatus: task.resultStatus,
+      resultBoard: task.resultBoard
+        ? {
+            slug: task.resultBoard.slug,
+            name: task.resultBoard.name,
+          }
+        : null,
+      resultTags: task.resultTagIds
+        .length > 0 && parseAutoCategorizeTagsJson(task.resultTagsJson).length === 0
+        ? task.resultTagIds
+          .map((id) => autoRecentTaskTagMap.get(id))
+          .filter((tag): tag is { id: string; slug: string; name: string } => Boolean(tag))
+          .map((tag) => ({
+            slug: tag.slug,
+            name: tag.name,
+          }))
+        : parseAutoCategorizeTagsJson(task.resultTagsJson),
+      resultReasoning: task.resultReasoning,
+      resultRawPreview: task.resultRawPreview,
       createdAt: task.createdAt.toISOString(),
       updatedAt: task.updatedAt.toISOString(),
       finishedAt: task.finishedAt ? task.finishedAt.toISOString() : null,

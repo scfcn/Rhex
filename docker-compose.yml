@@ -1,3 +1,7 @@
+x-app-environment: &app-environment
+  DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-bbs}?schema=public
+  REDIS_URL: redis://redis:6379
+
 services:
   postgres:
     image: postgres:16-bookworm
@@ -41,6 +45,7 @@ services:
     image: rhex-app:local
     env_file:
       - .env
+    environment: *app-environment
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,6 +69,7 @@ services:
     env_file:
       - .env
     environment:
+      <<: *app-environment
       HOSTNAME: ${HOSTNAME:-0.0.0.0}
       PORT: ${PORT:-3000}
     depends_on:
@@ -91,6 +97,7 @@ services:
     stop_grace_period: 30s
     env_file:
       - .env
+    environment: *app-environment
     depends_on:
       postgres:
         condition: service_healthy

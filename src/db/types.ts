@@ -1,6 +1,7 @@
 export {
   AiReplyTaskSourceType,
   AiReplyTaskStatus,
+  AutoCategorizeTaskSourceType,
   AnnouncementStatus,
   BadgeGrantSource,
   BadgeRuleOperator,
@@ -44,6 +45,7 @@ export {
 
 export type {
   AiReplyTask,
+  AutoCategorizeTask,
   Board,
   BoardApplication,
   Comment,

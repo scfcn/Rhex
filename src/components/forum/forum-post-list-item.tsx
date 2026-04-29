@@ -4,7 +4,7 @@ import Link from "next/link"
 
 import { LevelIcon } from "@/components/level-icon"
 import { PostListLink } from "@/components/post/post-list-link"
-import { getPostPinTone, getPostTitleClassName, PostAccessBadges, PostRewardPoolIcon, PostTypeBadge } from "@/components/post/post-list-shared"
+import { getPostTitleClassName, PostAccessBadges, PostPinBadge, PostRewardPoolIcon, PostTypeBadge } from "@/components/post/post-list-shared"
 import { TimeTooltip } from "@/components/time-tooltip"
 import { Tooltip } from "@/components/ui/tooltip"
 import { VipNameTooltip } from "@/components/vip/vip-name-tooltip"
@@ -66,6 +66,7 @@ interface ForumPostListItemProps {
   compactFirstItem?: boolean
   hideDivider?: boolean
   postLinkDisplayMode?: "SLUG" | "ID"
+  showPinBadge?: boolean
 }
 
 export function ForumPostListItem({
@@ -74,10 +75,9 @@ export function ForumPostListItem({
   compactFirstItem = false,
   hideDivider = false,
   postLinkDisplayMode = "SLUG",
+  showPinBadge = true,
 }: ForumPostListItemProps) {
-
   const isRestrictedAuthor = item.authorStatus === "BANNED" || item.authorStatus === "MUTED"
-  const pinTone = getPostPinTone(item.pinScope, true)
   const postPath = getPostPath({ id: item.id, slug: item.slug }, { mode: postLinkDisplayMode })
   const latestReplyPath = item.latestReplyCommentId
     ? getPostCommentPath(
@@ -156,8 +156,8 @@ export function ForumPostListItem({
             <PostAccessBadges minViewLevel={item.minViewLevel} minViewVipLevel={item.minViewVipLevel} compact />
           </div>
 
-          <PostTypeBadge type={item.type} label={item.typeLabel} compact />
-          {item.pinLabel && pinTone ? <span className={pinTone.badgeClassName}>{item.pinLabel}</span> : null}
+          <PostTypeBadge type={item.type} label={item.typeLabel} compact mobileIconOnly />
+          {showPinBadge ? <PostPinBadge scope={item.pinScope} label={item.pinLabel} compact /> : null}
           {item.isFeatured ? <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200 sm:px-2 sm:text-[11px]">精华</span> : null}
           <PostListLink href={`${postPath}#comments`} className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-normal transition-colors hover:opacity-90 sm:px-2 sm:text-[11px]" style={{ backgroundColor: `${item.commentAccentColor}14`, color: item.commentAccentColor }}>
 

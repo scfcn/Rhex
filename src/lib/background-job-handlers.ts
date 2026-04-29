@@ -11,6 +11,7 @@ export async function registerDefaultBackgroundJobHandlers() {
 
   await Promise.all([
     import("@/lib/account-security"),
+    import("@/lib/ai/capabilities/auto-categorize"),
     import("@/lib/ai-reply"),
     import("@/addons-host/runtime/background-jobs"),
     import("@/lib/rss-harvest"),

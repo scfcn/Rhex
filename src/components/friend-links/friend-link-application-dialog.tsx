@@ -18,6 +18,7 @@ interface FriendLinkApplicationDialogProps {
 const INITIAL_FORM = {
   name: "",
   url: "",
+  placementPageUrl: "",
   logoPath: "",
 }
 
@@ -26,7 +27,10 @@ export function FriendLinkApplicationDialog({ announcement, disabled = false, bu
   const [submitting, setSubmitting] = useState(false)
   const [form, setForm] = useState(INITIAL_FORM)
 
-  const canSubmit = useMemo(() => form.name.trim() && form.url.trim() && !submitting, [form.name, form.url, submitting])
+  const canSubmit = useMemo(
+    () => form.name.trim() && form.url.trim() && form.placementPageUrl.trim() && !submitting,
+    [form.name, form.url, form.placementPageUrl, submitting],
+  )
 
   function closeDialog() {
     if (submitting) {
@@ -84,7 +88,7 @@ export function FriendLinkApplicationDialog({ announcement, disabled = false, bu
         closeOnEscape={!submitting}
         size="lg"
         title="申请友情链接"
-        description="提交后将进入后台审核，审核通过后会展示在友情链接列表中。"
+        description="提交时会自动检查你填写的页面是否已放置本站链接，命中后将直接通过。"
         onSubmit={handleSubmit}
         formClassName="space-y-4 sm:space-y-5"
         footer={({ formId }) => (
@@ -111,6 +115,10 @@ export function FriendLinkApplicationDialog({ announcement, disabled = false, bu
           <input value={form.url} onChange={(event) => updateField("url", event.target.value)} className="h-11 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-hidden" placeholder="请输入您的网站地址（以 http 开头）" />
         </Field>
 
+        <Field label="友情链接所在页面" hint="请输入已放置本站链接的页面地址，提交时会自动检测">
+          <input value={form.placementPageUrl} onChange={(event) => updateField("placementPageUrl", event.target.value)} className="h-11 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-hidden" placeholder="请输入友情链接所在页面 URL（以 http 开头）" />
+        </Field>
+
         <Field label="LOGO URL" hint="仅支持填写图片 URL，例如：https://example.com/logo.png">
           <div className="space-y-3 rounded-xl border border-dashed border-border bg-card/60 p-4">
             <input value={form.logoPath} onChange={(event) => updateField("logoPath", event.target.value)} className="h-11 w-full rounded-[18px] border border-border bg-background px-4 text-sm outline-hidden" placeholder="请输入 LOGO 图片 URL" />
@@ -135,4 +143,3 @@ function Field({ label, hint, children }: { label: string; hint: string; childre
     </label>
   )
 }
-

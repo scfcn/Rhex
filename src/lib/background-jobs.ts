@@ -104,6 +104,9 @@ export interface BackgroundJobPayloadMap {
   "ai-reply.process": {
     taskId: string
   }
+  "ai.auto-categorize.process": {
+    taskId: string
+  }
   "rss-harvest.process-queue-item": {
     queueId: string
   }

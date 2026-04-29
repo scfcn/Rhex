@@ -30,7 +30,7 @@ function parseRewardEffectFeedback(rawValue: string) {
 
 export interface SiteCommentReplyItem {
   id: string
-  status: "NORMAL" | "HIDDEN" | "DELETED" | "PENDING"
+  status: "NORMAL" | "HIDDEN" | "PENDING"
   reviewNote?: string | null
   author: string
   authorIsAnonymous?: boolean
@@ -83,7 +83,7 @@ export interface SiteCommentReplyItem {
 
 export interface SiteCommentItem {
   id: string
-  status: "NORMAL" | "HIDDEN" | "DELETED" | "PENDING"
+  status: "NORMAL" | "HIDDEN" | "PENDING"
   reviewNote?: string | null
   author: string
   authorIsAnonymous?: boolean
@@ -285,7 +285,7 @@ export async function getCommentsByPostId(
 
     type RawCommentRecord = {
       id: string
-      status: "NORMAL" | "HIDDEN" | "DELETED" | "PENDING"
+      status: "NORMAL" | "HIDDEN" | "PENDING"
       reviewNote: string | null
       userId: number
       useAnonymousIdentity: boolean
@@ -299,7 +299,7 @@ export async function getCommentsByPostId(
       replyToUser?: CommentQueryUser | null
       parent?: {
         id: string
-        status: "NORMAL" | "HIDDEN" | "DELETED" | "PENDING"
+        status: "NORMAL" | "HIDDEN" | "PENDING"
         userId: number
         useAnonymousIdentity: boolean
         content: string
@@ -307,7 +307,7 @@ export async function getCommentsByPostId(
       } | null
       replyToComment?: {
         id: string
-        status: "NORMAL" | "HIDDEN" | "DELETED" | "PENDING"
+        status: "NORMAL" | "HIDDEN" | "PENDING"
         userId: number
         useAnonymousIdentity: boolean
         content: string

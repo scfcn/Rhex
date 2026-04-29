@@ -63,8 +63,6 @@ export function getPostStatusLabel(status: PostStatus | string) {
       return "已下线"
     case "LOCKED":
       return "已锁定"
-    case "DELETED":
-      return "已删除"
     case "NORMAL":
     default:
       return "正常"

@@ -15,7 +15,7 @@ import {
 import { Button } from "@/components/ui/rbutton"
 import { Card, CardContent } from "@/components/ui/card"
 import { formatDateTime, formatNumber } from "@/lib/formatters"
-import { buildPointEffectSummaryText } from "@/lib/point-log-audit"
+import { buildPointEffectChangeSummaryText, buildPointEffectNameText } from "@/lib/point-log-audit"
 import { getPointLogEventLabel, POINT_LOG_EVENT_TYPES } from "@/lib/point-log-events"
 import { buildSettingsHref } from "@/app/settings/settings-page-loader"
 import type { SettingsPageData } from "@/app/settings/settings-page-loader"
@@ -165,14 +165,19 @@ function renderPointEffectSummary(log: PointLogItem) {
     return null
   }
 
+  const effectNameText = buildPointEffectNameText(log.pointEffect)
+  const effectSummary = buildPointEffectChangeSummaryText(log.pointEffect)
+
   return (
     <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
       {log.pointEffect ? (
         <>
           <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800">
             <Sparkles className="h-3 w-3" />
-            {buildPointEffectSummaryText(log.pointEffect) ?? "勋章特效"}
+            勋章特效
           </span>
+          {effectNameText ? <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-700">{effectNameText}</span> : null}
+          {effectSummary ? <span>{effectSummary}</span> : null}
         </>
       ) : null}
       {log.pointTax ? (

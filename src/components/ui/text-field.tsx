@@ -9,6 +9,7 @@ interface TextFieldProps {
   placeholder?: string
   required?: boolean
   type?: HTMLInputTypeAttribute
+  autoComplete?: string
   background?: "background" | "card"
   inputClassName?: string
   containerClassName?: string
@@ -21,6 +22,7 @@ export function TextField({
   placeholder,
   required = false,
   type = "text",
+  autoComplete,
   background = "background",
   inputClassName,
   containerClassName,
@@ -34,6 +36,7 @@ export function TextField({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         required={required}
+        autoComplete={autoComplete}
         className={cn(
           "h-11 w-full rounded-full border border-border px-4 text-sm outline-hidden",
           background === "card" ? "bg-card" : "bg-background",

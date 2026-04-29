@@ -6,7 +6,7 @@ import { ImageIcon, ImageOff, MessageCircle, type LucideIcon } from "lucide-reac
 
 import { LevelIcon } from "@/components/level-icon"
 import { PostListLink } from "@/components/post/post-list-link"
-import { getPostPinTone, getPostTitleClassName, PostAccessBadges, PostRewardPoolIcon, PostTypeBadge } from "@/components/post/post-list-shared"
+import { getPostTitleClassName, PostAccessBadges, PostPinBadge, PostRewardPoolIcon, PostTypeBadge } from "@/components/post/post-list-shared"
 import { Skeleton } from "@/components/ui/skeleton"
 import { TimeTooltip } from "@/components/time-tooltip"
 import { Tooltip } from "@/components/ui/tooltip"
@@ -49,6 +49,7 @@ interface PostGalleryGridProps {
   }>
   showBoard?: boolean
   postLinkDisplayMode?: "SLUG" | "ID"
+  showPinBadge?: boolean
 }
 
 function GalleryCoverPlaceholder({ label, icon: Icon = ImageIcon }: { label: string; icon?: LucideIcon }) {
@@ -101,12 +102,11 @@ function PostGalleryCover({ coverImage, title }: { coverImage?: string | null; t
   return <GalleryCoverImage key={normalizedCoverImage} src={normalizedCoverImage} title={title} />
 }
 
-export function PostGalleryGrid({ items, showBoard = true, postLinkDisplayMode = "SLUG" }: PostGalleryGridProps) {
+export function PostGalleryGrid({ items, showBoard = true, postLinkDisplayMode = "SLUG", showPinBadge = true }: PostGalleryGridProps) {
   return (
     <div className="post-gallery-grid px-1.5 py-1.5 sm:px-2">
       {items.map((item) => {
         const postPath = getPostPath({ id: item.id, slug: item.slug }, { mode: postLinkDisplayMode })
-        const pinTone = getPostPinTone(item.pinScope, true)
         const isRestrictedAuthor = item.authorStatus === "BANNED" || item.authorStatus === "MUTED"
 
         return (
@@ -135,7 +135,7 @@ export function PostGalleryGrid({ items, showBoard = true, postLinkDisplayMode =
                   </div>
 
                   <div className="mt-1.5 flex min-w-0 items-center gap-1.5 overflow-hidden">
-                    {item.pinLabel && pinTone ? <span className={cn(pinTone.badgeClassName, "shrink-0")}>{item.pinLabel}</span> : null}
+                    {showPinBadge ? <PostPinBadge scope={item.pinScope} label={item.pinLabel} compact className="shrink-0" /> : null}
                   </div>
 
                   <div className={cn("mt-2 flex min-w-0 items-center gap-1 overflow-hidden text-[11px] text-muted-foreground", isRestrictedAuthor && "grayscale")}>
@@ -173,7 +173,7 @@ export function PostGalleryGrid({ items, showBoard = true, postLinkDisplayMode =
                     {item.commentCount}
                   </PostListLink>
                   {item.isFeatured ? <span className="rounded-full bg-emerald-100 px-2 py-[0.2rem] text-[10px] text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">精华</span> : null}
-                  <PostTypeBadge type={item.type} label={item.typeLabel} compact />
+                  <PostTypeBadge type={item.type} label={item.typeLabel} compact mobileIconOnly />
                 </div>
               </div>
             </div>

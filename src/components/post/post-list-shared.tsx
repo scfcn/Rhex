@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { Coins, Gavel, Gift, Vote, type LucideIcon } from "lucide-react"
+import { Coins, Gavel, Gift, Pin, Vote, type LucideIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Tooltip } from "@/components/ui/tooltip"
@@ -28,6 +28,24 @@ const postTypeBadgeMap = {
     variant: "bounty",
   },
 } satisfies Record<string, { icon: LucideIcon; variant: PostTypeBadgeVariant }>
+
+const postPinBadgeMap = {
+  GLOBAL: {
+    icon: Pin,
+    label: "全局置顶",
+    variant: "pinGlobal",
+  },
+  ZONE: {
+    icon: Pin,
+    label: "分区置顶",
+    variant: "pinZone",
+  },
+  BOARD: {
+    icon: Pin,
+    label: "节点置顶",
+    variant: "pinBoard",
+  },
+} satisfies Record<string, { icon: LucideIcon; label: string; variant: "pinGlobal" | "pinZone" | "pinBoard" }>
 
 export function getPostPinTone(pinScope?: string | null, compact = false) {
   const badgeSizeClassName = compact
@@ -78,11 +96,13 @@ export function PostTypeBadge({
   type,
   label,
   compact = false,
+  mobileIconOnly = false,
   className,
 }: {
   type?: string | null
   label?: string | null
   compact?: boolean
+  mobileIconOnly?: boolean
   className?: string
 }) {
   if (!type || type === "NORMAL" || !label) {
@@ -113,15 +133,57 @@ export function PostTypeBadge({
   return (
     <Badge
       variant={config.variant}
+      aria-label={label}
       className={cn(
         "rounded-full",
-        compact ? "px-1.5 text-[10px] sm:px-2 sm:text-[11px]" : "px-2 sm:px-2.5",
+        mobileIconOnly
+          ? "size-5 p-0 sm:w-fit sm:px-2 sm:py-0.5 sm:text-[11px]"
+          : compact ? "px-1.5 text-[10px] sm:px-2 sm:text-[11px]" : "px-2 sm:px-2.5",
         className,
       )}
     >
-      <Icon data-icon="inline-start" />
-      {label}
+      <Icon {...(mobileIconOnly ? {} : { "data-icon": "inline-start" })} />
+      <span className={mobileIconOnly ? "hidden sm:inline" : undefined}>{label}</span>
     </Badge>
+  )
+}
+
+export function PostPinBadge({
+  scope,
+  label,
+  compact = false,
+  className,
+}: {
+  scope?: string | null
+  label?: string | null
+  compact?: boolean
+  className?: string
+}) {
+  if (!scope) {
+    return null
+  }
+
+  const config = scope in postPinBadgeMap
+    ? postPinBadgeMap[scope as keyof typeof postPinBadgeMap]
+    : null
+
+  if (!config) {
+    return null
+  }
+
+  const Icon = config.icon
+  const tooltipLabel = label?.trim() || config.label
+
+  return (
+    <Tooltip content={tooltipLabel}>
+      <Badge
+        variant={config.variant}
+        aria-label={tooltipLabel}
+        className={cn("rounded-full", compact ? "size-5 p-0" : "size-6 p-0", className)}
+      >
+        <Icon />
+      </Badge>
+    </Tooltip>
   )
 }
 

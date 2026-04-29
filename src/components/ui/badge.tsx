@@ -12,6 +12,12 @@ const badgeVariants = cva(
         default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
         secondary:
           "bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80",
+        pinGlobal:
+          "bg-rose-100 text-rose-700 [a]:hover:bg-rose-100/80 dark:bg-rose-500/15 dark:text-rose-200",
+        pinZone:
+          "bg-orange-100 text-orange-700 [a]:hover:bg-orange-100/80 dark:bg-orange-500/15 dark:text-orange-200",
+        pinBoard:
+          "bg-amber-100 text-amber-700 [a]:hover:bg-amber-100/80 dark:bg-amber-500/15 dark:text-amber-200",
         auction:
           "bg-amber-100 text-amber-700 [a]:hover:bg-amber-100/80 dark:bg-amber-500/15 dark:text-amber-200",
         lottery:

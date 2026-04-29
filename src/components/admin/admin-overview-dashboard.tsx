@@ -1014,7 +1014,7 @@ function getCommentStatusBadgeClassName(status: string) {
     return "border-transparent bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-200"
   }
 
-  return "border-transparent bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-200"
+  return "border-transparent bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200"
 }
 
 function getCommentStatusLabel(status: string) {
@@ -1028,10 +1028,6 @@ function getCommentStatusLabel(status: string) {
 
   if (status === "HIDDEN") {
     return "已隐藏"
-  }
-
-  if (status === "DELETED") {
-    return "已删除"
   }
 
   return status

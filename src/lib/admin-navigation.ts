@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react"
 import {
   AppWindow,
   BookText,
+  FileCode2,
   Flag,
   LayoutGrid,
   Logs,
@@ -27,6 +28,7 @@ export type AdminTabKey =
   | "badges"
   | "verifications"
   | "announcements"
+  | "custom-pages"
   | "reports"
   | "logs"
   | "security"
@@ -84,6 +86,7 @@ export const adminTabs: AdminTabKey[] = [
   "badges",
   "verifications",
   "announcements",
+  "custom-pages",
   "reports",
   "logs",
   "security",
@@ -128,6 +131,7 @@ export const adminTabLabels: Record<AdminTabKey, string> = {
   badges: "勋章系统",
   verifications: "认证系统",
   announcements: "站点文档",
+  "custom-pages": "自定义页面",
   reports: "举报中心",
   logs: "日志中心",
   security: "内容安全",
@@ -282,6 +286,15 @@ export const adminNavigation: AdminNavigationItem[] = [
     label: "站点文档",
     description: "公告和帮助文档。",
     icon: Megaphone,
+    group: "operations",
+    adminOnly: true,
+  },
+  {
+    key: "custom-pages",
+    href: "/admin?tab=custom-pages",
+    label: "自定义页面",
+    description: "独立 HTML 页面和自定义路由。",
+    icon: FileCode2,
     group: "operations",
     adminOnly: true,
   },

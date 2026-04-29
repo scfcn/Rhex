@@ -17,6 +17,7 @@ interface UseCreatePostSubmitOptions {
   postLinkDisplayMode: PostLinkDisplayMode
   draft: LocalPostDraft
   onSuccess?: () => void
+  resolveDraftBeforeSubmit?: (draft: LocalPostDraft) => Promise<LocalPostDraft>
 }
 
 export function useCreatePostSubmit({
@@ -26,6 +27,7 @@ export function useCreatePostSubmit({
   postLinkDisplayMode,
   draft,
   onSuccess,
+  resolveDraftBeforeSubmit,
 }: UseCreatePostSubmitOptions) {
   const isEditMode = mode === "edit"
   const slowSubmitThresholdMs = 8000
@@ -68,7 +70,10 @@ export function useCreatePostSubmit({
       const addonFields = collectAddonFormFieldsFromFormData(
         new FormData(event.currentTarget),
       )
-      const { endpoint, payload } = buildSubmitRequest({ mode, postId, draft })
+      const submitDraft = resolveDraftBeforeSubmit
+        ? await resolveDraftBeforeSubmit(draft)
+        : draft
+      const { endpoint, payload } = buildSubmitRequest({ mode, postId, draft: submitDraft })
       const response = await fetch(endpoint, {
         method: "POST",
         headers: {

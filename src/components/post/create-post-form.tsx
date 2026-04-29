@@ -47,6 +47,8 @@ export function CreatePostForm({
   successSlug,
   postLinkDisplayMode = "SLUG",
   initialValues,
+  preferredBoardLocked = false,
+  aiAssist,
 }: CreatePostFormProps) {
   const draftController = useCreatePostDraft({
     boardOptions,
@@ -63,6 +65,8 @@ export function CreatePostForm({
     mode,
     postId,
     initialValues,
+    preferredBoardLocked,
+    aiAssist,
   })
 
   const submitController = useCreatePostSubmit({
@@ -72,6 +76,7 @@ export function CreatePostForm({
     postLinkDisplayMode,
     draft: draftController.draft,
     onSuccess: draftController.handleSubmitSuccess,
+    resolveDraftBeforeSubmit: draftController.resolveDraftBeforeSubmit,
   })
 
   return (

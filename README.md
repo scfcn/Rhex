@@ -205,12 +205,16 @@ pnpm install
 cp .env.example .env
 ```
 
-`.env.example` 已按「必填 / 可选」两大区块整理并附中文注释，常见场景只需填好必填项即可启动。
+`.env.example` 已按「启动方式 / 必填 / 可选」整理并附中文注释。
+数据库相关变量按部署方式二选一：
+
+- 宿主机直接运行：主要配置 `DATABASE_URL` / `REDIS_URL`
+- Docker Compose：主要配置 `POSTGRES_*`，应用容器内连接串会自动注入
 
 **必填（缺一不可）：**
 
 ```env
-DATABASE_URL="postgresql://postgres:password@localhost:5432/bbs?schema=public"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/bbs?schema=public"
 SESSION_SECRET="replace-with-a-long-random-secret"
 CAPTCHA_SECRET_KEY="replace-with-a-long-random-secret"
 REDIS_URL="redis://127.0.0.1:6379"
@@ -298,12 +302,12 @@ pnpm run worker
 ```bash
 git clone https://github.com/lovedevpanda/Rhex.git
 cd Rhex
-cp .env.docker.example .env
+cp .env.example .env
 # 编辑 .env
 docker compose up -d --build
 ```
 
-仓库已提供 `Dockerfile`、`docker-compose.yml`、`.dockerignore` 和 `.env.docker.example`。
+仓库已提供 `Dockerfile`、`docker-compose.yml`、`.dockerignore` 和 `.env.example`。
 Compose 默认会自动完成数据库初始化，然后启动：
 
 - `web`
@@ -320,21 +324,23 @@ Compose 默认会自动完成数据库初始化，然后启动：
 #### 1. 准备配置
 
 ```bash
-cp .env.docker.example .env
+cp .env.example .env
 ```
 
 然后修改 `.env`，至少确认以下几项：
 
 - `SESSION_SECRET`
 - `CAPTCHA_SECRET_KEY`
-- `POSTGRES_PASSWORD`
 - `NEXT_PUBLIC_SITE_URL` / `SITE_URL` / `APP_URL`
 
 说明：
 
-- Docker 安装时，`DATABASE_URL` 必须使用 `postgres` 作为数据库主机名。
-- Docker 安装时，`REDIS_URL` 必须使用 `redis` 作为 Redis 主机名。
-- 如果你修改了 `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD`，记得同步更新 `DATABASE_URL`。
+- Docker 模式下，你不需要同时手改 `.env` 里的 `DATABASE_URL` 和 `POSTGRES_*` 两套值。
+- `docker-compose.yml` 会为 `setup` / `web` / `worker` 自动注入容器内 `DATABASE_URL` 和 `REDIS_URL`，因此不需要再手动把 `.env` 里的主机名改成 `postgres` / `redis`。
+- `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` 表示内置 PostgreSQL 首次初始化时使用的数据库名 / 用户名 / 密码；Compose 会据此自动生成容器内数据库连接串。
+- `POSTGRES_*` 在当前 Compose 里都有默认值，所以不手动填写也能自动初始化；生产环境再改成你自己的初始强密码即可。
+- 如果 PostgreSQL 数据卷已经存在，后续再改 `POSTGRES_*` 不会自动修改已有数据库里的账号密码；这时需要清卷重建，或在库内手动改密码。
+- 只有在你要从宿主机直接运行 `pnpm run setup`、`pnpm run start` 之类命令时，才需要保证 `.env` 里的 `DATABASE_URL` / `REDIS_URL` 指向宿主机能访问到的地址。
 
 #### 2. 启动服务
 
@@ -508,7 +514,7 @@ Rhex/
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .dockerignore
-├── .env.docker.example
+├── .env.example
 ├── scripts/              # setup、worker 等脚本
 ├── public/               # 静态资源
 ├── uploads/              # 本地上传目录

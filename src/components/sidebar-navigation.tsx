@@ -39,6 +39,7 @@ interface SidebarNavigationProps {
   displayMode?: LeftSidebarDisplayMode
   collapsed?: boolean
   onToggle?: () => void
+  stickyTopClass?: string
 }
 
 export function SidebarNavigation({
@@ -49,6 +50,7 @@ export function SidebarNavigation({
   displayMode = "DEFAULT",
   collapsed = false,
   onToggle,
+  stickyTopClass = "top-14",
 }: SidebarNavigationProps) {
   if (displayMode === "HIDDEN") {
     return null
@@ -82,7 +84,8 @@ export function SidebarNavigation({
 
       <aside
         className={cn(
-          "forum-page-sidebar-inner sticky top-14 h-[calc(100vh-3.5rem)] overflow-hidden py-1 pr-4",
+          "forum-page-sidebar-inner sticky h-[calc(100vh-3.5rem)] overflow-hidden py-1 pr-4",
+          stickyTopClass,
           isDocked && "forum-page-sidebar-docked-inner",
         )}
       >

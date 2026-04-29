@@ -1,7 +1,33 @@
 import { apiSuccess, createAdminRouteHandler } from "@/lib/api-route"
 import { prisma } from "@/db/client"
+import type { Prisma } from "@/db/types"
 
 const PAGE_SIZE = 20
+
+const moderationSuggestionListSelect = {
+  id: true,
+  postId: true,
+  suggestedBoardId: true,
+  suggestedTagIds: true,
+  suggestedTagsJson: true,
+  reasoning: true,
+  modelKey: true,
+  status: true,
+  createdAt: true,
+  post: {
+    select: {
+      id: true,
+      title: true,
+      boardId: true,
+      status: true,
+      authorId: true,
+      createdAt: true,
+      author: { select: { id: true, username: true, nickname: true } },
+      board: { select: { id: true, name: true, slug: true } },
+    },
+  },
+  suggestedBoard: { select: { id: true, name: true, slug: true } },
+} satisfies Prisma.AiModerationSuggestionSelect
 
 export const GET = createAdminRouteHandler(async ({ request }) => {
   const { searchParams } = new URL(request.url)
@@ -15,29 +41,7 @@ export const GET = createAdminRouteHandler(async ({ request }) => {
       orderBy: { createdAt: "desc" },
       take: PAGE_SIZE,
       skip,
-      select: {
-        id: true,
-        postId: true,
-        suggestedBoardId: true,
-        suggestedTagIds: true,
-        reasoning: true,
-        modelKey: true,
-        status: true,
-        createdAt: true,
-        post: {
-          select: {
-            id: true,
-            title: true,
-            boardId: true,
-            status: true,
-            authorId: true,
-            createdAt: true,
-            author: { select: { id: true, username: true, nickname: true } },
-            board: { select: { id: true, name: true, slug: true } },
-          },
-        },
-        suggestedBoard: { select: { id: true, name: true, slug: true } },
-      },
+      select: moderationSuggestionListSelect,
     }),
     prisma.aiModerationSuggestion.count({ where: { status: "PENDING" } }),
   ])
@@ -53,9 +57,28 @@ export const GET = createAdminRouteHandler(async ({ request }) => {
 
   const result = items.map((item) => ({
     ...item,
-    suggestedTags: item.suggestedTagIds
-      .map((id) => tagMap.get(id))
-      .filter((tag): tag is { id: string; name: string; slug: string } => Boolean(tag)),
+    suggestedTags: Array.isArray(item.suggestedTagsJson) && item.suggestedTagsJson.length > 0
+      ? item.suggestedTagsJson
+        .map((entry: unknown) => {
+          if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+            return null
+          }
+          const record = entry as Record<string, unknown>
+          const slug = typeof record.slug === "string" ? record.slug.trim() : ""
+          const name = typeof record.name === "string" ? record.name.trim() : ""
+          if (!slug || !name) {
+            return null
+          }
+          return {
+            id: typeof record.id === "string" ? record.id : `${slug}:new`,
+            slug,
+            name,
+          }
+        })
+        .filter((tag: { id: string; name: string; slug: string } | null): tag is { id: string; name: string; slug: string } => Boolean(tag))
+      : item.suggestedTagIds
+        .map((id) => tagMap.get(id))
+        .filter((tag: { id: string; name: string; slug: string } | undefined): tag is { id: string; name: string; slug: string } => Boolean(tag)),
   }))
 
   return apiSuccess({

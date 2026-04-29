@@ -540,18 +540,19 @@ export function CommentThread({ threadId, comments, flatComments = [], postId, p
       return
     }
 
-    if (action === "comment.hide" || action === "comment.show" || action === "comment.approve" || action === "comment.reject" || action === "comment.delete") {
-      const nextStatus = action === "comment.delete"
-        ? "DELETED"
-        : action === "comment.hide" || action === "comment.reject"
-          ? "HIDDEN"
-          : "NORMAL"
+    if (action === "comment.delete") {
+      router.refresh()
+      return
+    }
+
+    if (action === "comment.hide" || action === "comment.show" || action === "comment.approve" || action === "comment.reject") {
+      const nextStatus = action === "comment.hide" || action === "comment.reject"
+        ? "HIDDEN"
+        : "NORMAL"
       const nextReviewNote = action === "comment.hide"
         ? "管理员下线评论"
         : action === "comment.reject"
           ? "审核未通过"
-          : action === "comment.delete"
-            ? "管理员删除评论"
           : null
 
       patchCommentThreadEntries({

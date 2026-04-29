@@ -157,8 +157,8 @@ export function PostAdminPanel({
           extra: { scope },
         }))
 
-  const postVisibilityAction: AdminQuickAction = postStatus === "OFFLINE" || postStatus === "DELETED"
-    ? { action: "post.show", targetId: postId, label: postStatus === "DELETED" ? "恢复帖子" : "上线帖子" }
+  const postVisibilityAction: AdminQuickAction = postStatus === "OFFLINE"
+    ? { action: "post.show", targetId: postId, label: "上线帖子" }
     : { action: "post.hide", targetId: postId, label: "下线帖子", tone: "danger" as const }
 
   const actions: AdminQuickAction[] = [
@@ -166,7 +166,7 @@ export function PostAdminPanel({
     { action: "post.feature", targetId: postId, label: isFeatured ? "取消精华" : "设为精华" },
     ...userActions,
     postVisibilityAction,
-    ...(postStatus === "DELETED" ? [] : [{ action: "post.delete", targetId: postId, label: "删除帖子", tone: "danger" as const }]),
+    { action: "post.delete", targetId: postId, label: "删除帖子", tone: "danger" as const },
   ]
 
   return (

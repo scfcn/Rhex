@@ -1,8 +1,10 @@
 import Link from "next/link"
 import { FolderOpen, Tag } from "lucide-react"
 
+import { PostTableOfContents } from "@/components/post/post-table-of-contents"
 import { SidebarUserCard, type SidebarUserCardData } from "@/components/user/sidebar-user-card"
 import { getPostPath } from "@/lib/post-links"
+import type { MarkdownHeadingItem } from "@/lib/markdown/toc"
 import { AddonSlotRenderer } from "@/addons-host"
 
 interface RelatedTopic {
@@ -28,6 +30,7 @@ interface PostSidebarPanelsProps {
   relatedTopics: RelatedTopic[]
   tags: TopicTag[]
   collections: FavoriteCollectionTag[]
+  tableOfContents?: MarkdownHeadingItem[]
   postLinkDisplayMode?: "SLUG" | "ID"
   siteName?: string
   siteDescription?: string
@@ -40,6 +43,7 @@ export function PostSidebarPanels({
   relatedTopics,
   tags,
   collections,
+  tableOfContents = [],
   postLinkDisplayMode = "SLUG",
   siteName,
   siteDescription,
@@ -47,7 +51,7 @@ export function PostSidebarPanels({
   siteIconPath,
 }: PostSidebarPanelsProps) {
   return (
-    <div className="post-sidebar-panels mobile-sidebar-stack flex min-w-0 w-full max-w-full flex-col gap-4">
+    <div className="post-sidebar-panels mobile-sidebar-stack flex min-w-0 w-full max-w-full flex-col gap-4 lg:h-full">
       <AddonSlotRenderer slot="post.sidebar.top" />
       <SidebarUserCard user={currentUser} siteName={siteName} siteDescription={siteDescription} siteLogoPath={siteLogoPath} siteIconPath={siteIconPath} />
 
@@ -110,6 +114,11 @@ export function PostSidebarPanels({
           ) : null}
         </div>
       </div>
+      {tableOfContents.length > 0 ? (
+        <div className="min-h-0 w-full lg:sticky lg:top-20">
+          <PostTableOfContents items={tableOfContents} />
+        </div>
+      ) : null}
       <AddonSlotRenderer slot="post.sidebar.bottom" />
     </div>
   )

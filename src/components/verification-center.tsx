@@ -197,7 +197,7 @@ export function VerificationCenter({ types, approvedVerification }: Verification
                   <LevelIcon icon={approvedVerification.customIconText?.trim() || approvedVerification.iconText} color={approvedVerification.color} className="h-5 w-5 text-[20px]" emojiClassName="text-inherit" svgClassName="[&>svg]:block" />
                 </div>
                 <div>
-                  <p>当前已通过：<span className="font-medium">{approvedVerification.name}</span></p>
+                  <p>已通过：<span className="font-medium">{approvedVerification.name}</span></p>
                   {approvedVerification.customDescription ? <p className="text-emerald-600/90 dark:text-emerald-200/90">{approvedVerification.customDescription}</p> : null}
                 </div>
               </div>

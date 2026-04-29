@@ -6,6 +6,7 @@ import { AdminModuleSearch } from "@/components/admin/admin-module-search"
 import { AdminOverviewDashboard } from "@/components/admin/admin-overview-dashboard"
 import { AdminPillTabs } from "@/components/admin/admin-pill-tabs"
 import { AdminBadgeManager } from "@/components/admin/admin-badge-manager"
+import { AdminCustomPageManager } from "@/components/admin/admin-custom-page-manager"
 import { AdminVerificationManager } from "@/components/admin/admin-verification-manager"
 import { AdminLevelSettingsForm } from "@/components/admin/admin-level-settings-form"
 import { AdminLogCenter } from "@/components/admin/admin-log-center"
@@ -18,6 +19,7 @@ import { AdminShell } from "@/components/admin/admin-shell"
 import { AdminUserList } from "@/components/admin/admin-user-list"
 import { getAdminComments, getAdminDashboardData, getAdminPosts, getAdminStructureData } from "@/lib/admin"
 import { getAdminAnnouncementList } from "@/lib/admin-announcements"
+import { getAdminCustomPageList } from "@/lib/admin-custom-pages"
 import { getVerificationAdminData } from "@/lib/admin-verification-service"
 import {
   adminTabs,
@@ -127,7 +129,7 @@ export default async function AdminPage(props: PageProps<"/admin">) {
   const currentLogPage = readSearchParam(searchParams?.logPage) ?? "1"
   const currentLogPageSize = readSearchParam(searchParams?.logPageSize) ?? "20"
 
-  const [dashboardData, structureData, adminUsers, filteredPosts, filteredComments, levelDefinitions, badges, announcements, reports, sensitiveWordResult, logCenter, verificationAdminData] = await Promise.all([
+  const [dashboardData, structureData, adminUsers, filteredPosts, filteredComments, levelDefinitions, badges, announcements, customPages, reports, sensitiveWordResult, logCenter, verificationAdminData] = await Promise.all([
     admin.role === "ADMIN" && tab === "overview"
       ? getAdminDashboardData()
       : Promise.resolve<Awaited<ReturnType<typeof getAdminDashboardData>> | null>(null),
@@ -177,6 +179,7 @@ export default async function AdminPage(props: PageProps<"/admin">) {
       : Promise.resolve<Awaited<ReturnType<typeof getLevelDefinitions>>>([]),
     admin.role === "ADMIN" && tab === "badges" ? getAllBadges() : Promise.resolve<Awaited<ReturnType<typeof getAllBadges>>>([]),
     admin.role === "ADMIN" && tab === "announcements" ? getAdminAnnouncementList() : Promise.resolve<Awaited<ReturnType<typeof getAdminAnnouncementList>>>([]),
+    admin.role === "ADMIN" && tab === "custom-pages" ? getAdminCustomPageList() : Promise.resolve<Awaited<ReturnType<typeof getAdminCustomPageList>>>([]),
     admin.role === "ADMIN" && tab === "reports"
       ? getAdminReports({ page: Number(currentReportPage), pageSize: Number(currentReportPageSize) })
       : Promise.resolve<Awaited<ReturnType<typeof getAdminReports>> | null>(null),
@@ -275,6 +278,7 @@ export default async function AdminPage(props: PageProps<"/admin">) {
           },
         }))} /> : null}
         {tab === "announcements" ? <AdminAnnouncementManager initialItems={announcements} /> : null}
+        {tab === "custom-pages" ? <AdminCustomPageManager initialItems={customPages} /> : null}
         {tab === "reports" ? <AdminReportCenter data={reports!} /> : null}
         {tab === "logs" ? <AdminLogCenter data={logCenter!} /> : null}
         {tab === "security" ? <AdminSensitiveWordManager data={sensitiveWordResult!} /> : null}

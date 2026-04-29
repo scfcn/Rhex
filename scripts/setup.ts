@@ -30,7 +30,7 @@ const requiredEnvSpecs: RequiredEnvSpec[] = [
   {
     key: "DATABASE_URL",
     description: "PostgreSQL 连接串",
-    example: "postgresql://postgres:password@localhost:5432/bbs?schema=public",
+    example: "postgresql://postgres:postgres@localhost:5432/bbs?schema=public",
   },
   {
     key: "SESSION_SECRET",
@@ -103,8 +103,7 @@ function shouldForceSeed() {
 }
 
 function runSchemaStep() {
-
-  runStep("npx", ["prisma", "db", "push","--accept-data-loss"], "同步数据库结构")
+  runStep("npx", ["tsx", "scripts/prisma-db-push.ts", "--accept-data-loss"], "同步数据库结构")
 }
 
 function runPrismaScript<T>(script: string) {

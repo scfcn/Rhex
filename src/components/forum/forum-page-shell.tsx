@@ -8,6 +8,7 @@ import { useSiteSettingsContext } from "@/components/site-settings-provider"
 import { Button } from "@/components/ui/rbutton"
 import { Sidebar, SidebarContent, SidebarProvider, useSidebar } from "@/components/ui/sidebar"
 import { useIsMobile } from "@/hooks/use-mobile"
+import type { LeftSidebarDisplayMode } from "@/lib/site-settings"
 import { cn } from "@/lib/utils"
 import {
   readSidebarNavigationCollapsedSnapshot,
@@ -44,7 +45,9 @@ interface ForumPageShellProps {
   activeZoneSlug?: string
   activeBoardSlug?: string
   main: ReactNode
-  rightSidebar: ReactNode
+  rightSidebar?: ReactNode
+  leftSidebarDisplayModeOverride?: LeftSidebarDisplayMode
+  sidebarStickyTopClass?: string
 }
 
 const FORUM_MOBILE_SIDEBAR_BREAKPOINT = 1024
@@ -118,11 +121,22 @@ function MobileRightSidebarSheet({ content }: { content: ReactNode }) {
   )
 }
 
-export function ForumPageShell({ zones, boards, activeZoneSlug, activeBoardSlug, main, rightSidebar }: ForumPageShellProps) {
+export function ForumPageShell({
+  zones,
+  boards,
+  activeZoneSlug,
+  activeBoardSlug,
+  main,
+  rightSidebar,
+  leftSidebarDisplayModeOverride,
+  sidebarStickyTopClass,
+}: ForumPageShellProps) {
   const { leftSidebarDisplayMode } = useSiteSettingsContext()
+  const resolvedLeftSidebarDisplayMode = leftSidebarDisplayModeOverride ?? leftSidebarDisplayMode
   const sidebarCollapsed = useSyncExternalStore(subscribeSidebarNavigationPreference, readSidebarNavigationCollapsedSnapshot, () => false)
   const shouldUseMobileRightSidebar = useIsMobile(FORUM_MOBILE_SIDEBAR_BREAKPOINT)
   const mobileRightSidebar = buildMobileRightSidebarContent(rightSidebar)
+  const hasRightSidebar = Boolean(rightSidebar)
 
   function handleToggleSidebar() {
     setSidebarNavigationCollapsedPreference(!sidebarCollapsed)
@@ -139,16 +153,18 @@ export function ForumPageShell({ zones, boards, activeZoneSlug, activeBoardSlug,
 
       <div
         className="forum-page-shell grid grid-cols-1 gap-6"
-        data-sidebar-display-mode={leftSidebarDisplayMode.toLowerCase()}
+        data-sidebar-display-mode={resolvedLeftSidebarDisplayMode.toLowerCase()}
+        data-has-right-sidebar={hasRightSidebar ? "true" : "false"}
       >
         <SidebarNavigation
           zones={zones}
           boards={boards}
           activeZoneSlug={activeZoneSlug}
           activeBoardSlug={activeBoardSlug}
-          displayMode={leftSidebarDisplayMode}
+          displayMode={resolvedLeftSidebarDisplayMode}
           collapsed={sidebarCollapsed}
           onToggle={handleToggleSidebar}
+          stickyTopClass={sidebarStickyTopClass}
         />
         <div className="forum-page-main min-w-0" data-sidebar-collapsed={sidebarCollapsed ? "true" : "false"}>{main}</div>
         <div className="forum-page-right-sidebar min-w-0 w-full justify-self-end *:w-full *:max-w-full">{rightSidebar}</div>

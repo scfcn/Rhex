@@ -3,6 +3,7 @@ import { Github } from "lucide-react"
 
 import packageJson from "../../package.json"
 
+import { SiteAnalytics } from "@/components/site-analytics"
 import { getSiteSettings } from "@/lib/site-settings"
 import ShinyText from '@/components/ShinyText';
 import { AddonSlotRenderer, AddonSurfaceRenderer } from "@/addons-host";
@@ -112,8 +113,7 @@ export async function SiteFooter() {
         </div>
         </AddonSurfaceRenderer>
         <AddonSlotRenderer slot="layout.footer.after" />
-        <div id="site-analytics-hook" data-hook="site-analytics" />
-        {settings.analyticsCode ? <div dangerouslySetInnerHTML={{ __html: settings.analyticsCode }} /> : null}
+        <SiteAnalytics code={settings.analyticsCode} />
       </div>
     </footer>
   )

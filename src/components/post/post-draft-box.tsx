@@ -37,7 +37,7 @@ export function PostDraftBox({
   className,
 }: PostDraftBoxProps) {
   return (
-    <section className={cn("rounded-2xl border border-border bg-card/70 p-3", className)}>
+    <section className={cn("bg-card/70", className)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-sm font-medium">草稿箱</p>

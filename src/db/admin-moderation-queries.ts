@@ -1,4 +1,4 @@
-import { BoardStatus, CommentStatus } from "@/db/types"
+import { BoardStatus, CommentStatus, Prisma } from "@/db/types"
 
 import { prisma } from "@/db/client"
 
@@ -30,6 +30,131 @@ export function updateCommentModerationState(commentId: string, data: {
       reviewedById: data.reviewedById ?? null,
       reviewedAt: data.reviewedAt ?? null,
     },
+  })
+}
+
+type CommentTreeRow = {
+  id: string
+  userId: number
+  isAcceptedAnswer: boolean
+}
+
+function buildAcceptedAnswerGroups(rows: CommentTreeRow[]) {
+  const counts = new Map<number, number>()
+
+  for (const row of rows) {
+    if (!row.isAcceptedAnswer) {
+      continue
+    }
+
+    counts.set(row.userId, (counts.get(row.userId) ?? 0) + 1)
+  }
+
+  return [...counts.entries()].map(([userId, count]) => ({ userId, count }))
+}
+
+function buildCommentAuthorGroups(rows: CommentTreeRow[]) {
+  const counts = new Map<number, number>()
+
+  for (const row of rows) {
+    counts.set(row.userId, (counts.get(row.userId) ?? 0) + 1)
+  }
+
+  return [...counts.entries()].map(([userId, count]) => ({ userId, count }))
+}
+
+async function findCommentTreeRows(tx: Prisma.TransactionClient, commentId: string) {
+  return tx.$queryRaw<CommentTreeRow[]>(Prisma.sql`
+    WITH RECURSIVE "comment_tree" AS (
+      SELECT id, "userId", "isAcceptedAnswer"
+      FROM "Comment"
+      WHERE id = ${commentId}
+      UNION ALL
+      SELECT child.id, child."userId", child."isAcceptedAnswer"
+      FROM "Comment" AS child
+      INNER JOIN "comment_tree" AS parent ON child."parentId" = parent.id
+    )
+    SELECT id, "userId", "isAcceptedAnswer"
+    FROM "comment_tree"
+  `)
+}
+
+export async function deleteCommentPermanently(commentId: string) {
+  return prisma.$transaction(async (tx) => {
+    const comment = await tx.comment.findUnique({
+      where: { id: commentId },
+      select: {
+        id: true,
+        postId: true,
+      },
+    })
+
+    if (!comment) {
+      throw new Error("评论不存在")
+    }
+
+    const commentTree = await findCommentTreeRows(tx, commentId)
+    const deletedIds = commentTree.map((row) => row.id)
+    const acceptedAnswerIds = new Set(commentTree.filter((row) => row.isAcceptedAnswer).map((row) => row.id))
+    const authorGroups = buildCommentAuthorGroups(commentTree)
+    const acceptedAnswerGroups = buildAcceptedAnswerGroups(commentTree)
+
+    if (acceptedAnswerIds.size > 0) {
+      const post = await tx.post.findUnique({
+        where: { id: comment.postId },
+        select: {
+          acceptedCommentId: true,
+        },
+      })
+
+      if (post?.acceptedCommentId && acceptedAnswerIds.has(post.acceptedCommentId)) {
+        await tx.post.update({
+          where: { id: comment.postId },
+          data: {
+            acceptedCommentId: null,
+          },
+        })
+      }
+    }
+
+    await tx.comment.delete({
+      where: { id: commentId },
+    })
+
+    await tx.post.update({
+      where: { id: comment.postId },
+      data: {
+        commentCount: {
+          decrement: deletedIds.length,
+        },
+      },
+    })
+
+    for (const group of authorGroups) {
+      await tx.user.update({
+        where: { id: group.userId },
+        data: {
+          commentCount: {
+            decrement: group.count,
+          },
+        },
+      })
+    }
+
+    for (const group of acceptedAnswerGroups) {
+      await tx.user.update({
+        where: { id: group.userId },
+        data: {
+          acceptedAnswerCount: {
+            decrement: group.count,
+          },
+        },
+      })
+    }
+
+    return {
+      deletedIds,
+    }
   })
 }
 

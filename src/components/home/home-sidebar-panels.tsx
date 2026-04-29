@@ -12,6 +12,7 @@ import type { FriendLinkItem } from "@/lib/friend-links"
 import type { HomeSidebarPanelItem } from "@/lib/home-sidebar-layout"
 import type { HomeSidebarStatsData } from "@/lib/home-sidebar-stats"
 import { getPostPath } from "@/lib/post-links"
+import { cn } from "@/lib/utils"
 import { AddonSlotRenderer } from "@/addons-host"
 
 interface HotTopicItem {
@@ -41,11 +42,12 @@ interface HomeSidebarPanelsProps {
   siteDescription?: string
   siteLogoPath?: string | null
   siteIconPath?: string | null
+  stickyTopClass?: string
 }
 
-export function HomeSidebarPanels({ user, hotTopics, postLinkDisplayMode = "SLUG", announcements = [], showAnnouncements = true, friendLinks = [], friendLinksEnabled = false, createPostHref, topPanels = [], middlePanels = [], bottomPanels = [], stats = null, siteName, siteDescription, siteLogoPath, siteIconPath }: HomeSidebarPanelsProps) {
+export function HomeSidebarPanels({ user, hotTopics, postLinkDisplayMode = "SLUG", announcements = [], showAnnouncements = true, friendLinks = [], friendLinksEnabled = false, createPostHref, topPanels = [], middlePanels = [], bottomPanels = [], stats = null, siteName, siteDescription, siteLogoPath, siteIconPath, stickyTopClass = "top-20" }: HomeSidebarPanelsProps) {
   return (
-    <div className="home-sidebar-panels mobile-sidebar-stack sticky top-20 flex min-w-0 w-full max-w-full flex-col gap-4">
+    <div className={cn("home-sidebar-panels mobile-sidebar-stack sticky flex min-w-0 w-full max-w-full flex-col gap-4", stickyTopClass)}>
       <SidebarUserCard user={user} createPostHref={createPostHref} siteName={siteName} siteDescription={siteDescription} siteLogoPath={siteLogoPath} siteIconPath={siteIconPath} />
 
 

@@ -9,14 +9,14 @@ export async function findHomeSidebarStats() {
     prisma.post.count({
       where: {
         status: {
-          notIn: [PostStatus.PENDING, PostStatus.DELETED],
+          notIn: [PostStatus.PENDING],
         },
       },
     }),
     prisma.comment.count({
       where: {
         status: {
-          notIn: [CommentStatus.PENDING, CommentStatus.DELETED],
+          notIn: [CommentStatus.PENDING],
         },
       },
     }),

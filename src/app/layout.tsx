@@ -1,5 +1,4 @@
 import type { Metadata } from "next"
-import Script from "next/script"
 import { cookies } from "next/headers"
 import { Suspense, type CSSProperties } from "react"
 
@@ -7,6 +6,7 @@ import { BackToTopButton } from "@/components/back-to-top-button"
 import { ConditionalSiteFooter } from "@/components/conditional-site-footer"
 import { GlobalNavigationProgress } from "@/components/global-navigation-progress"
 import { InboxRealtimeProvider } from "@/components/inbox-realtime-provider"
+import { RootBootstrap } from "@/components/root-bootstrap"
 import { SiteFooter } from "@/components/site-footer"
 import { SiteSettingsProvider } from "@/components/site-settings-provider"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -25,12 +25,12 @@ import { listAddonSurfaceOverrideDescriptors } from "@/lib/addon-surface-overrid
 
 import { getRssFeedUrl } from "@/lib/rss"
 
-import { getReadingHistoryInitScript } from "@/lib/local-reading-history"
 import { resolveSiteIconPath } from "@/lib/site-branding"
 import { resolveSiteOrigin } from "@/lib/site-origin"
-import { getSidebarNavigationDisplayModeAttribute, getSidebarNavigationInitScript } from "@/lib/sidebar-navigation-preference"
+import { getSidebarNavigationDisplayModeAttribute } from "@/lib/sidebar-navigation-preference"
+import { getPublishedCustomPageFooterHiddenPaths } from "@/lib/custom-pages"
 import { getSiteSettings } from "@/lib/site-settings"
-import { getThemeInitScript, resolveThemeDocumentPropsFromCookieString } from "@/lib/theme"
+import { resolveThemeDocumentPropsFromCookieString } from "@/lib/theme"
 import { resolveUserSurfaceSnapshot } from "@/lib/user-surface"
 import { buildVipNameColorStyleVariables } from "@/lib/vip-name-colors"
 import { AddonRenderBlock, executeAddonSlot } from "@/addons-host"
@@ -45,9 +45,6 @@ import { cn } from "@/lib/utils";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
-const sidebarNavigationInitScript = getSidebarNavigationInitScript()
-const readingHistoryInitScript = getReadingHistoryInitScript()
-const themeInitScript = getThemeInitScript()
 const noScriptRootInitStyles = `
   html[data-root-init="pending"] {
     overflow: auto;
@@ -62,21 +59,6 @@ const noScriptRootInitStyles = `
   html[data-root-init="pending"]::after {
     display: none;
   }
-`
-const rootInitScript = `
-  (function () {
-    try {
-      ${themeInitScript}
-      ${sidebarNavigationInitScript}
-      ${readingHistoryInitScript}
-    } finally {
-      try {
-        document.documentElement.setAttribute("data-root-init", "ready");
-      } catch (_error) {
-        // Ignore root init cleanup failures.
-      }
-    }
-  })();
 `
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -112,7 +94,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const currentUserPromise = getCurrentUser()
   const cookieStorePromise = cookies()
-  const [settings, currentUser, surfaceSnapshot, editorProviders, editorToolbarItems, addonSurfaceOverrides, headBeforeBlocks, headAfterBlocks, bodyStartBlocks, bodyEndBlocks, cookieStore] = await Promise.all([
+  const [settings, currentUser, surfaceSnapshot, editorProviders, editorToolbarItems, addonSurfaceOverrides, headBeforeBlocks, headAfterBlocks, bodyStartBlocks, bodyEndBlocks, footerHiddenPaths, cookieStore] = await Promise.all([
     getSiteSettings(),
     currentUserPromise,
     currentUserPromise.then((user) => resolveUserSurfaceSnapshot(user)),
@@ -123,6 +105,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     executeAddonSlot("layout.head.after"),
     executeAddonSlot("layout.body.start"),
     executeAddonSlot("layout.body.end"),
+    getPublishedCustomPageFooterHiddenPaths(),
     cookieStorePromise,
   ])
   const vipNameColorStyle = buildVipNameColorStyleVariables(settings.vipNameColors) as CSSProperties
@@ -171,9 +154,6 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             result={block.result}
           />
         ))}
-        <Script id="site-root-init" strategy="beforeInteractive">
-          {rootInitScript}
-        </Script>
         <noscript>
           <style>{noScriptRootInitStyles}</style>
         </noscript>
@@ -188,6 +168,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       </head>
       <body style={vipNameColorStyle}>
         <RhexGlobalSdkBootstrap session={rhexSession} site={rhexSite} />
+        <RootBootstrap />
         {bodyStartBlocks.map((block) => (
           <AddonRenderBlock
             key={`${block.addon.manifest.id}:${block.key}:body-start`}
@@ -216,7 +197,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
                   </Suspense>
                   <ConfirmProvider>
                     {children}
-                    <ConditionalSiteFooter>
+                    <ConditionalSiteFooter hiddenPaths={footerHiddenPaths}>
                       <>
                         <SiteFooter />
                         {bodyEndBlocks.map((block) => (

@@ -633,8 +633,8 @@ export interface AddonSchedulerApi {
 
 export type AddonPostStatusMode = "AUTO" | "PUBLISHED" | "PENDING"
 export type AddonPostType = "NORMAL" | "BOUNTY" | "POLL" | "LOTTERY" | "AUCTION"
-export type AddonReadablePostStatus = "NORMAL" | "PENDING" | "DELETED" | "LOCKED" | "OFFLINE"
-export type AddonReadableCommentStatus = "NORMAL" | "HIDDEN" | "DELETED" | "PENDING"
+export type AddonReadablePostStatus = "NORMAL" | "PENDING" | "LOCKED" | "OFFLINE"
+export type AddonReadableCommentStatus = "NORMAL" | "HIDDEN" | "PENDING"
 export type AddonSortDirection = "asc" | "desc"
 
 export interface AddonPostCreateInput {

@@ -44,6 +44,7 @@ import { getPostSidebarData } from "@/lib/post-sidebar"
 import { getPostRedPacketSummary } from "@/lib/post-red-packets"
 import { canUseAnonymousIdentityForPostReply, getAnonymousMaskDisplayIdentity } from "@/lib/post-anonymous"
 import { isImageOnlyMarkdown } from "@/lib/markdown/render"
+import { normalizeRenderedMarkdownHtmlHeadings } from "@/lib/markdown/toc"
 import { getPostTipSummary } from "@/lib/post-tips"
 import { getPostOfflineActionMeta } from "@/lib/post-offline"
 import { getPostAuctionSummary } from "@/lib/post-auctions"
@@ -433,6 +434,28 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
       })),
     ),
   ])
+  const usedHeadingIds = new Map<string, number>()
+  const tableOfContents: Array<{ id: string; text: string; level: number }> = []
+  const normalizedRenderedContentBlockHtmlById = new Map<string, string>()
+
+  for (const block of displayPost.contentBlocks ?? []) {
+    const html = renderedContentBlockHtmlById.get(block.id) ?? ""
+    if (!html) {
+      continue
+    }
+
+    const normalized = normalizeRenderedMarkdownHtmlHeadings(html, usedHeadingIds)
+    normalizedRenderedContentBlockHtmlById.set(block.id, normalized.html)
+    tableOfContents.push(...normalized.headings)
+  }
+
+  const normalizedRenderedAppendices = renderedAppendices.map((appendix) => {
+    const normalized = normalizeRenderedMarkdownHtmlHeadings(appendix.html ?? "", usedHeadingIds)
+    return {
+      ...appendix,
+      html: normalized.html,
+    }
+  })
 
   return (
     <div className="min-h-screen">
@@ -515,7 +538,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                           <AddonSlotRenderer slot="post.body.before" />
                           {(displayPost.contentBlocks ?? []).map((block) => (
                             block.type === "PUBLIC"
-                              ? <MarkdownContent key={block.id} content={block.text} html={renderedContentBlockHtmlById.get(block.id)} markdownEmojiMap={settings.markdownEmojiMap} expandImagesWhenImageOnly imageOnly={isImageOnlyMarkdown(block.text, settings.markdownEmojiMap)} />
+                              ? <MarkdownContent key={block.id} content={block.text} html={normalizedRenderedContentBlockHtmlById.get(block.id)} markdownEmojiMap={settings.markdownEmojiMap} expandImagesWhenImageOnly imageOnly={isImageOnlyMarkdown(block.text, settings.markdownEmojiMap)} />
 
                               : (
                                 <RestrictedPostBlock
@@ -524,7 +547,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                                   postId={displayPost.id}
                                   blockId={block.id}
                                   text={block.text}
-                                  html={renderedContentBlockHtmlById.get(block.id)}
+                                  html={normalizedRenderedContentBlockHtmlById.get(block.id)}
                                   visible={block.visible}
                                   currentUserId={currentUser?.id}
                                   pointName={settings.pointName}
@@ -574,7 +597,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                   <PostRewardPoolHighlightBar summary={displayPost.redPacket} attachedTop attachedBottom={hasAppendices} />
 
                   {hasAppendices ? (
-                    <PostAppendixTimeline appendices={renderedAppendices} markdownEmojiMap={settings.markdownEmojiMap} />
+                    <PostAppendixTimeline appendices={normalizedRenderedAppendices} markdownEmojiMap={settings.markdownEmojiMap} />
                   ) : null}
                 </div>
 
@@ -680,12 +703,13 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
             </article>
           )}
           rightSidebar={(
-            <aside className="mt-6 hidden pb-12 lg:block">
+            <aside className="mt-6 hidden pb-12 lg:block lg:h-full">
               <PostSidebarPanels
                 currentUser={sidebarUser}
                 relatedTopics={sidebarData.relatedTopics}
                 tags={sidebarData.tags}
                 collections={sidebarData.collections}
+                tableOfContents={tableOfContents}
                 postLinkDisplayMode={settings.postLinkDisplayMode}
                 siteName={settings.siteName}
                 siteDescription={settings.siteDescription}

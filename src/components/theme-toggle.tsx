@@ -1,10 +1,10 @@
 "use client"
 
 import { Monitor, Moon, Palette, Sun, Type } from "lucide-react"
-import { useTheme } from "next-themes"
 import { useEffect, useRef, useState, useSyncExternalStore } from "react"
 
 import { Button } from "@/components/ui/rbutton"
+import { useTheme } from "@/components/theme-provider"
 import {
   FONT_SIZE_PRESET_STORAGE_KEY,
   FONT_SIZE_PRESETS,

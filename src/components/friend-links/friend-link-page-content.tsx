@@ -63,6 +63,7 @@ export function FriendLinkPageContent({ links, announcement, applicationEnabled 
             <p className="mt-4 whitespace-pre-line text-sm leading-7 text-muted-foreground">{announcement}</p>
             <div className="mt-4 space-y-2 rounded-xl border border-border bg-background/70 p-4 text-xs leading-6 text-muted-foreground">
               <p>提交前请先确认站点链接可访问，并建议提供清晰的 LOGO 图片地址。</p>
+              <p>请填写已放置本站链接的页面地址，系统会自动抓取检测；命中后将直接通过，否则进入人工审核。</p>
               <p>系统会自动拦截重复链接；审核通过后才会出现在友情链接目录中。</p>
               <p>{applicationEnabled ? "当前站点已开放友情链接申请入口。" : "当前站点暂未开放友情链接申请入口。"}</p>
             </div>
@@ -72,7 +73,6 @@ export function FriendLinkPageContent({ links, announcement, applicationEnabled 
             <div className="flex flex-col gap-2 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h2 className="text-lg font-semibold">友链目录</h2>
-                <p className="mt-1 text-sm text-muted-foreground">按紧凑卡片展示站点名称和域名，移动端默认压缩尺寸以提高可见数量。</p>
               </div>
               <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{links.length} Links</p>
             </div>

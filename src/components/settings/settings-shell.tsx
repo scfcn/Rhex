@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ChevronLeft, Settings2 } from "lucide-react"
+import { ChevronLeft } from "lucide-react"
 
 import { AddonSurfaceClientRenderer } from "@/addons-host/client/addon-surface-client-renderer"
 import { SettingsSidebarNav, type SettingsNavItem } from "@/components/settings/settings-sidebar-nav"
@@ -100,23 +100,14 @@ export function SettingsShell({
         ) : (
           <div className="space-y-4">
             {sidebarTop}
-            <div className="rounded-xl border border-border bg-[linear-gradient(160deg,rgba(15,23,42,0.06),rgba(15,23,42,0.02),transparent)] p-5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-foreground text-background">
-                  <Settings2 className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-base font-semibold">设置中心</p>
-                </div>
-              </div>
-            </div>
+       
 
             <SettingsSidebarNav
               items={navItems}
               title="Settings"
               showDescriptions
               buildHref={(item) => `/settings?tab=${item.key}&mobile=detail`}
-              className="p-3"
+              className="p-3 mt-2"
             />
             {sidebarBottom}
           </div>

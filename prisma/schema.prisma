@@ -29,7 +29,6 @@ enum BoardStatus {
 enum PostStatus {
   NORMAL
   PENDING
-  DELETED
   LOCKED
   OFFLINE
 }
@@ -125,7 +124,6 @@ enum LotteryStatus {
 enum CommentStatus {
   NORMAL
   HIDDEN
-  DELETED
   PENDING
 }
 
@@ -336,6 +334,11 @@ enum AiReplyTaskSourceType {
   COMMENT
 }
 
+enum AutoCategorizeTaskSourceType {
+  PREVIEW
+  POST_CREATE
+}
+
 enum AiModerationStatus {
   PENDING
   APPROVED
@@ -462,6 +465,7 @@ model User {
   userBadges                       UserBadge[]
   adminLogs                        AdminLog[]
   announcements                    Announcement[]                 @relation("announcementCreator")
+  customPages                      CustomPage[]                   @relation("customPageCreator")
   loginLogs                        UserLoginLog[]
   messageParticipants              ConversationParticipant[]
   sentDirectMessages               DirectMessage[]
@@ -484,6 +488,7 @@ model User {
   reviewedBoardApplications        BoardApplication[]             @relation("boardApplicationReviewer")
   aiReplyTasksTriggered            AiReplyTask[]                  @relation("AiReplyTaskTriggerUser")
   aiReplyTasksAssigned             AiReplyTask[]                  @relation("AiReplyTaskAgentUser")
+  autoCategorizeTasksRequested     AutoCategorizeTask[]           @relation("AutoCategorizeTaskRequesterUser")
   paymentOrders                    PaymentOrder[]
   aiModerationSuggestionsReviewed  AiModerationSuggestion[]
 
@@ -754,6 +759,7 @@ model Board {
   moderatorScopes                 ModeratorBoardScope[]
   boardApplications               BoardApplication[]
   aiModerationSuggestionsAsTarget AiModerationSuggestion[]
+  autoCategorizeTasksAsResult     AutoCategorizeTask[]           @relation("AutoCategorizeTaskResultBoard")
 
   @@index([zoneId])
   @@index([status])
@@ -919,6 +925,7 @@ model Post {
   followers                     PostFollow[]
   aiReplyTasks                  AiReplyTask[]
   aiModerationSuggestions       AiModerationSuggestion[]
+  autoCategorizeTasks           AutoCategorizeTask[]
 
   @@index([boardId])
   @@index([authorId])
@@ -1664,6 +1671,25 @@ model Announcement {
   @@index([type, publishedAt])
 }
 
+model CustomPage {
+  id                  String             @id @default(cuid())
+  title               String
+  routePath           String             @unique
+  htmlContent         String
+  status              AnnouncementStatus @default(DRAFT)
+  includeHeader       Boolean            @default(true)
+  includeFooter       Boolean            @default(true)
+  includeLeftSidebar  Boolean            @default(false)
+  includeRightSidebar Boolean            @default(false)
+  publishedAt         DateTime?          @db.Timestamptz(3)
+  createdBy           Int
+  createdAt           DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime           @updatedAt @db.Timestamptz(3)
+  creator             User               @relation("customPageCreator", fields: [createdBy], references: [id])
+
+  @@index([status, publishedAt])
+}
+
 model SensitiveWord {
   id         String   @id @default(cuid())
   word       String   @unique
@@ -2046,6 +2072,43 @@ model AiReplyTask {
   @@index([triggerUserId, createdAt])
 }
 
+model AutoCategorizeTask {
+  id                   String                     @id @default(cuid())
+  sourceType           AutoCategorizeTaskSourceType
+  sourceKey            String                     @unique
+  status               AiReplyTaskStatus          @default(PENDING)
+  postId               String?
+  requesterUserId      Int
+  title                String
+  content              String
+  appendedContent      String?
+  allowBoardSuggestion Boolean                    @default(true)
+  allowTagSuggestion   Boolean                    @default(true)
+  attemptCount         Int                        @default(0)
+  maxAttempts          Int                        @default(3)
+  scheduledAt          DateTime                   @default(now()) @db.Timestamptz(3)
+  startedAt            DateTime?                  @db.Timestamptz(3)
+  finishedAt           DateTime?                  @db.Timestamptz(3)
+  errorMessage         String?
+  resultStatus         String?
+  resultBoardId        String?
+  resultTagIds         String[]
+  resultTagsJson       Json?
+  resultReasoning      String?
+  resultModelKey       String?
+  resultRawPreview     String?
+  createdAt            DateTime                   @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime                   @updatedAt @db.Timestamptz(3)
+  post                 Post?                      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  requesterUser        User                       @relation("AutoCategorizeTaskRequesterUser", fields: [requesterUserId], references: [id], onDelete: Cascade)
+  resultBoard          Board?                     @relation("AutoCategorizeTaskResultBoard", fields: [resultBoardId], references: [id], onDelete: SetNull)
+
+  @@index([status, scheduledAt, createdAt])
+  @@index([postId, createdAt])
+  @@index([requesterUserId, createdAt])
+  @@index([sourceType, createdAt])
+}
+
 model PostTip {
   id         String   @id @default(cuid())
   postId     String
@@ -2359,6 +2422,7 @@ model AiModerationSuggestion {
   postId           String
   suggestedBoardId String?
   suggestedTagIds  String[]
+  suggestedTagsJson Json?
   reasoning        String?
   modelKey         String
   status           AiModerationStatus @default(PENDING)

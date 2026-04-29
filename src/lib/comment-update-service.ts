@@ -104,7 +104,7 @@ export async function updateCommentFlow(input: {
 
   const updatedComment = (await queryAddonComments({
     ids: [updated.id],
-    statuses: ["NORMAL", "HIDDEN", "DELETED", "PENDING"],
+    statuses: ["NORMAL", "HIDDEN", "PENDING"],
     limit: 1,
   })).items[0]
   await executeAddonActionHook("comment.update.after", {

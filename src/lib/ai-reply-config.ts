@@ -159,6 +159,7 @@ function buildNextAiReplyStateEntry(existing: Record<string, unknown> | null, co
   const pickStr = (k: string): string | null => (existing && typeof existing[k] === "string" ? (existing[k] as string) : null)
   const now = new Date().toISOString()
   return {
+    ...(existing ?? {}),
     AppId: AI_REPLY_APP_KEY,
     enabled: config.enabled,
     installedAt: pickStr("installedAt") ?? now,

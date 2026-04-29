@@ -7,8 +7,18 @@ import {
   type JsonObject,
 } from "@/lib/api-route"
 import { prisma } from "@/db/client"
+import type { Prisma } from "@/db/types"
 import { revalidateHomeSidebarStatsCache } from "@/lib/home-sidebar-stats"
 import { expireTaxonomyCacheImmediately } from "@/lib/taxonomy-cache"
+
+const moderationSuggestionDecisionSelect = {
+  id: true,
+  status: true,
+  postId: true,
+  suggestedBoardId: true,
+  suggestedTagIds: true,
+  suggestedTagsJson: true,
+} satisfies Prisma.AiModerationSuggestionSelect
 
 export const POST = createAdminRouteHandler(async ({ request, adminUser }) => {
   const body = (await readJsonBody(request)) as JsonObject
@@ -22,13 +32,7 @@ export const POST = createAdminRouteHandler(async ({ request, adminUser }) => {
 
   const suggestion = await prisma.aiModerationSuggestion.findUnique({
     where: { id },
-    select: {
-      id: true,
-      status: true,
-      postId: true,
-      suggestedBoardId: true,
-      suggestedTagIds: true,
-    },
+    select: moderationSuggestionDecisionSelect,
   })
 
   if (!suggestion) {
@@ -67,15 +71,36 @@ export const POST = createAdminRouteHandler(async ({ request, adminUser }) => {
     }
   }
 
-  // 校验 tags 仍存在
-  const validTagIds = suggestedTagIds.length > 0
-    ? (await prisma.tag.findMany({
-      where: { id: { in: suggestedTagIds } },
-      select: { id: true },
-    })).map((tag) => tag.id)
-    : []
+  const suggestedTags = Array.isArray(suggestion.suggestedTagsJson) && suggestion.suggestedTagsJson.length > 0
+    ? suggestion.suggestedTagsJson
+      .map((entry: unknown) => {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+          return null
+        }
+        const record = entry as Record<string, unknown>
+        const slug = typeof record.slug === "string" ? record.slug.trim() : ""
+        const name = typeof record.name === "string" ? record.name.trim() : ""
+        if (!slug || !name) {
+          return null
+        }
+        return { slug, name }
+      })
+      .filter((tag: { slug: string; name: string } | null): tag is { slug: string; name: string } => Boolean(tag))
+    : (
+      suggestedTagIds.length > 0
+        ? await prisma.tag.findMany({
+          where: { id: { in: suggestedTagIds } },
+          select: { slug: true, name: true },
+        })
+        : []
+    )
 
   await prisma.$transaction(async (tx) => {
+    const existingRelations = await tx.postTag.findMany({
+      where: { postId },
+      select: { tagId: true },
+    })
+
     if (suggestedBoardId) {
       await tx.post.update({
         where: { id: postId },
@@ -83,13 +108,43 @@ export const POST = createAdminRouteHandler(async ({ request, adminUser }) => {
       })
     }
 
-    if (validTagIds.length > 0) {
-      // 以建议 tags 替换原 tags（简单策略：删除旧的，加新的；若 tag 已存在则跳过）
+    if (suggestedTags.length > 0) {
+      const syncedTags = await Promise.all(
+        suggestedTags.map((tag: { slug: string; name: string }) => tx.tag.upsert({
+          where: { slug: tag.slug },
+          update: {
+            name: tag.name,
+          },
+          create: {
+            slug: tag.slug,
+            name: tag.name,
+          },
+        })),
+      )
+
       await tx.postTag.deleteMany({ where: { postId } })
       await tx.postTag.createMany({
-        data: validTagIds.map((tagId) => ({ postId, tagId })),
+        data: syncedTags.map((tag) => ({ postId, tagId: tag.id })),
         skipDuplicates: true,
       })
+
+      const affectedTagIds = [...new Set([
+        ...existingRelations.map((relation) => relation.tagId),
+        ...syncedTags.map((tag: { id: string }) => tag.id),
+      ])]
+      const counts = await Promise.all(
+        affectedTagIds.map((tagId: string) => tx.postTag.count({
+          where: { tagId },
+        })),
+      )
+      await Promise.all(
+        affectedTagIds.map((tagId: string, index: number) => tx.tag.update({
+          where: { id: tagId },
+          data: {
+            postCount: counts[index] ?? 0,
+          },
+        })),
+      )
     }
 
     await tx.aiModerationSuggestion.update({

@@ -23,6 +23,7 @@ export function ForumFeedView({ items, listDisplayMode, postLinkDisplayMode = "S
           key={item.id}
           item={item}
           showBoard
+          showPinBadge
           postLinkDisplayMode={postLinkDisplayMode}
         />
       ))}
@@ -33,12 +34,13 @@ export function ForumFeedView({ items, listDisplayMode, postLinkDisplayMode = "S
         </div>
       ) : null}
       {resolvedListDisplayMode === "GALLERY" ? (
-        <PostGalleryGrid items={normalItems} showBoard postLinkDisplayMode={postLinkDisplayMode} />
+        <PostGalleryGrid items={normalItems} showBoard showPinBadge={false} postLinkDisplayMode={postLinkDisplayMode} />
       ) : normalItems.map((item) => (
         <ForumPostListItem
           key={item.id}
           item={item}
           showBoard
+          showPinBadge={false}
           postLinkDisplayMode={postLinkDisplayMode}
         />
       ))}
