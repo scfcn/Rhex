@@ -38,11 +38,8 @@ services:
       start_period: 5s
 
   setup:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    pull_policy: build
-    image: rhex-app:local
+    image: ${APP_IMAGE:-ghcr.io/lovedevpanda/rhex:latest}
+    pull_policy: always
     env_file:
       - .env
     environment: *app-environment
@@ -58,11 +55,8 @@ services:
     restart: "no"
 
   web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    pull_policy: build
-    image: rhex-app:local
+    image: ${APP_IMAGE:-ghcr.io/lovedevpanda/rhex:latest}
+    pull_policy: always
     init: true
     restart: unless-stopped
     stop_grace_period: 30s
@@ -87,11 +81,8 @@ services:
     command: ["pnpm", "run", "start"]
 
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    pull_policy: build
-    image: rhex-app:local
+    image: ${APP_IMAGE:-ghcr.io/lovedevpanda/rhex:latest}
+    pull_policy: always
     init: true
     restart: unless-stopped
     stop_grace_period: 30s

@@ -29,6 +29,8 @@ ENV NODE_ENV=production
 
 WORKDIR /app
 
+LABEL org.opencontainers.image.source="https://github.com/lovedevpanda/Rhex"
+
 RUN mkdir -p uploads
 
 COPY --from=builder /app/node_modules ./node_modules

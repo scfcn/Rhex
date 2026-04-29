@@ -1,13 +1,7 @@
 import { headers } from "next/headers";
+import { getConfiguredSiteOrigin, normalizeSiteOrigin } from "@/lib/site-origin-config"
 
-function normalizeOrigin(value: string) {
-  return value.trim().replace(/\/$/, "");
-}
-
-export function getConfiguredSiteOrigin() {
-  const envOrigin = process.env.NEXT_PUBLIC_SITE_URL?.trim() || process.env.SITE_URL?.trim() || process.env.APP_URL?.trim()
-  return envOrigin ? normalizeOrigin(envOrigin) : null
-}
+export { getConfiguredSiteOrigin } from "@/lib/site-origin-config"
 
 export async function resolveSiteOrigin() {
   const configuredOrigin = getConfiguredSiteOrigin()
@@ -21,10 +15,10 @@ export async function resolveSiteOrigin() {
   const host = forwardedHost?.split(",")[0]?.trim() || headerStore.get("host")?.trim()
 
   if (!host) {
-    throw new Error("无法解析站点 origin，请配置 NEXT_PUBLIC_SITE_URL 或在请求中提供 host 头")
+    throw new Error("无法解析站点 origin，请配置 SITE_URL / APP_URL，或在请求中提供 host 头")
   }
 
-  return normalizeOrigin(`${proto}://${host}`)
+  return normalizeSiteOrigin(`${proto}://${host}`)
 }
 
 export async function toAbsoluteSiteUrl(path = "/") {

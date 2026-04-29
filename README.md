@@ -224,7 +224,7 @@ REDIS_URL="redis://127.0.0.1:6379"
 
 | 分组 | 关键变量 | 说明 |
 |------|----------|------|
-| 站点 URL | `NEXT_PUBLIC_SITE_URL` / `SITE_URL` / `APP_URL` | 用于生成外链、OAuth 回调、邮件中的绝对 URL，未设置时回落到请求头 |
+| 站点 URL | `SITE_URL` / `APP_URL` | 用于生成外链、OAuth 回调、邮件中的绝对 URL，未设置时回落到请求头；`NEXT_PUBLIC_SITE_URL` 仅兼容旧配置，不推荐新部署使用 |
 | Redis | `REDIS_KEY_PREFIX`、`REDIS_CLIENT_NAME_PREFIX`、`REDIS_SLOWLOG_SAMPLE_INTERVAL_MS` | Key 前缀与 SLOWLOG 采样周期 |
 | 鉴权 | `AUTH_FLOW_SECRET`、`POW_CAPTCHA_SECRET_KEY`、`POW_CAPTCHA_DIFFICULTY`、`POW_CAPTCHA_EXPIRE_SECONDS` | 未设置的密钥会回落到 `SESSION_SECRET` / `CAPTCHA_SECRET_KEY` |
 | 后台任务 | `BACKGROUND_JOB_WEB_RUNTIME`、`BACKGROUND_JOB_CONCURRENCY`、`BACKGROUND_JOB_MAX_ATTEMPTS`、`BACKGROUND_JOB_RETRY_*`、`BACKGROUND_JOB_STREAM_MAX_LENGTH`、`BACKGROUND_JOB_PENDING_*`、`BACKGROUND_JOB_DEAD_LETTER_*`、`BACKGROUND_JOB_IDEMPOTENCY_TTL_SECONDS`、`BACKGROUND_JOB_LANE_RESTART_*` | Redis Streams 队列行为调优 |
@@ -297,94 +297,58 @@ pnpm run worker
 - Docker Engine / Docker Desktop
 - Docker Compose Plugin
 
-快速启动：
+启动：
 
 ```bash
 git clone https://github.com/lovedevpanda/Rhex.git
 cd Rhex
 cp .env.example .env
 # 编辑 .env
-docker compose up -d --build
+docker compose up -d
 ```
 
-仓库已提供 `Dockerfile`、`docker-compose.yml`、`.dockerignore` 和 `.env.example`。
-Compose 默认会自动完成数据库初始化，然后启动：
+至少确认以下配置：
+
+- `SESSION_SECRET`
+- `CAPTCHA_SECRET_KEY`
+- `SITE_URL` / `APP_URL`
+
+默认镜像：`ghcr.io/lovedevpanda/rhex:latest`
+
+如需覆盖官方镜像，再设置 `APP_IMAGE`。
+
+默认服务：
 
 - `web`
 - `worker`
 - `postgres`
 - `redis`
 
-并持久化：
-
-- `./uploads`
-- `./addons`
-- PostgreSQL / Redis named volume
-
-#### 1. 准备配置
-
-```bash
-cp .env.example .env
-```
-
-然后修改 `.env`，至少确认以下几项：
-
-- `SESSION_SECRET`
-- `CAPTCHA_SECRET_KEY`
-- `NEXT_PUBLIC_SITE_URL` / `SITE_URL` / `APP_URL`
-
-说明：
-
-- Docker 模式下，你不需要同时手改 `.env` 里的 `DATABASE_URL` 和 `POSTGRES_*` 两套值。
-- `docker-compose.yml` 会为 `setup` / `web` / `worker` 自动注入容器内 `DATABASE_URL` 和 `REDIS_URL`，因此不需要再手动把 `.env` 里的主机名改成 `postgres` / `redis`。
-- `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` 表示内置 PostgreSQL 首次初始化时使用的数据库名 / 用户名 / 密码；Compose 会据此自动生成容器内数据库连接串。
-- `POSTGRES_*` 在当前 Compose 里都有默认值，所以不手动填写也能自动初始化；生产环境再改成你自己的初始强密码即可。
-- 如果 PostgreSQL 数据卷已经存在，后续再改 `POSTGRES_*` 不会自动修改已有数据库里的账号密码；这时需要清卷重建，或在库内手动改密码。
-- 只有在你要从宿主机直接运行 `pnpm run setup`、`pnpm run start` 之类命令时，才需要保证 `.env` 里的 `DATABASE_URL` / `REDIS_URL` 指向宿主机能访问到的地址。
-
-#### 2. 启动服务
-
-```bash
-docker compose up -d --build
-```
-
-首次启动时，建议显式加上 `--build`，确保 Compose 直接使用本地 `Dockerfile` 构建镜像，而不是先尝试拉取 `rhex-app:local`。初始化完成后会继续启动站点和 worker。
-
-#### 3. 访问站点
+访问地址：
 
 | 入口 | 地址 |
 |------|------|
 | 前台 | `http://localhost:3000` |
 | 后台 | `http://localhost:3000/admin` |
 
-如果你在 `.env` 里修改了 `PORT`，请同时把站点 URL 一并改掉。
-
-#### 4. 更新项目
+更新：
 
 ```bash
 git pull
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
-更新时也会自动重新执行初始化流程，用于同步数据库结构。
-
-#### 5. 常用 Docker 命令
+常用命令：
 
 ```bash
 docker compose logs -f web
 docker compose logs -f worker
 docker compose down
-```
-
-如需连同 PostgreSQL / Redis 数据卷一起删除：
-
-```bash
 docker compose down -v
 ```
 
-> 注意：`docker compose down -v` 会清空数据库和 Redis 持久化数据，但不会删除仓库里的 `uploads/` 与 `addons/` 目录内容。
-
-## 生产部署
+## 生产部署（宿主机直跑）
 
 最小推荐部署方式：
 
