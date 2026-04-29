@@ -13,6 +13,8 @@ WORKDIR /app
 
 FROM base AS builder
 
+RUN mkdir -p addons
+
 COPY package.json pnpm-lock.yaml .npmrc ./
 COPY prisma ./prisma
 
@@ -31,7 +33,7 @@ WORKDIR /app
 
 LABEL org.opencontainers.image.source="https://github.com/lovedevpanda/Rhex"
 
-RUN mkdir -p uploads
+RUN mkdir -p uploads addons
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
