@@ -27,6 +27,8 @@ import { getZoneBoards, getZoneBySlug, getZonePosts, getZones } from "@/lib/zone
 import { RssSubscribeButton } from "@/components/rss/rss-subscribe-button"
 import { ForumPostStreamView } from "@/components/forum/forum-post-stream-view"
 
+export const dynamic = "force-dynamic"
+
 
 function buildZonePageHref(slug: string, page = 1, sort: TaxonomyPostSort = DEFAULT_TAXONOMY_POST_SORT) {
   const normalizedPage = Math.max(1, Math.trunc(page))
@@ -53,11 +55,6 @@ function buildZonePostsApiPath(slug: string, sort: TaxonomyPostSort) {
 
   const queryString = query.toString()
   return queryString ? `/api/zones/${encodeURIComponent(slug)}/posts?${queryString}` : `/api/zones/${encodeURIComponent(slug)}/posts`
-}
-
-export async function generateStaticParams() {
-  // Generate zone routes on demand so official image builds do not require a database.
-  return []
 }
 
 export async function generateMetadata(props: PageProps<"/zones/[slug]">): Promise<Metadata> {

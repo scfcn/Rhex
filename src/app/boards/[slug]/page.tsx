@@ -28,6 +28,8 @@ import { getSiteSettings } from "@/lib/site-settings"
 import { getZones } from "@/lib/zones"
 import { ForumPostStreamView } from "@/components/forum/forum-post-stream-view"
 
+export const dynamic = "force-dynamic"
+
 
 
 
@@ -56,11 +58,6 @@ function buildBoardPostsApiPath(slug: string, sort: TaxonomyPostSort) {
 
   const queryString = query.toString()
   return queryString ? `/api/boards/${encodeURIComponent(slug)}/posts?${queryString}` : `/api/boards/${encodeURIComponent(slug)}/posts`
-}
-
-export async function generateStaticParams() {
-  // Generate board routes on demand so official image builds do not require a database.
-  return []
 }
 
 export async function generateMetadata(props: PageProps<"/boards/[slug]">): Promise<Metadata> {

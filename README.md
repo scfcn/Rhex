@@ -170,10 +170,49 @@ pnpm run worker
 
 ## 快速开始
 
-你可以按两种方式启动项目：
+### 推荐：Docker Compose
 
-- 本地开发 / 裸机部署：继续看下面的本地步骤
-- Docker Compose 安装：见下方同名章节
+```bash
+git clone https://github.com/lovedevpanda/Rhex.git
+cd Rhex
+cp .env.example .env
+# 编辑 .env
+docker compose up -d
+```
+
+至少确认以下配置：
+
+- `SESSION_SECRET`
+- `CAPTCHA_SECRET_KEY`
+- `SITE_URL` / `APP_URL`
+
+默认镜像：`ghcr.io/lovedevpanda/rhex:latest`
+
+如需覆盖官方镜像，再设置 `APP_IMAGE`。
+
+访问地址：
+
+| 入口 | 地址 |
+|------|------|
+| 前台 | `http://localhost:3000` |
+| 后台 | `http://localhost:3000/admin` |
+
+更新：
+
+```bash
+git pull
+docker compose pull
+docker compose up -d
+```
+
+常用命令：
+
+```bash
+docker compose logs -f web
+docker compose logs -f worker
+docker compose down
+docker compose down -v
+```
 
 ### 本地开发 / 裸机部署
 
@@ -296,26 +335,6 @@ pnpm run worker
 
 - Docker Engine / Docker Desktop
 - Docker Compose Plugin
-
-启动：
-
-```bash
-git clone https://github.com/lovedevpanda/Rhex.git
-cd Rhex
-cp .env.example .env
-# 编辑 .env
-docker compose up -d
-```
-
-至少确认以下配置：
-
-- `SESSION_SECRET`
-- `CAPTCHA_SECRET_KEY`
-- `SITE_URL` / `APP_URL`
-
-默认镜像：`ghcr.io/lovedevpanda/rhex:latest`
-
-如需覆盖官方镜像，再设置 `APP_IMAGE`。
 
 默认服务：
 

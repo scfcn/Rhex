@@ -4,7 +4,7 @@ x-app-environment: &app-environment
 
 services:
   postgres:
-    image: postgres:16-bookworm
+    image: postgres:latest
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-bbs}
@@ -12,9 +12,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       TZ: ${TZ:-Asia/Shanghai}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-bbs}"]
       interval: 10s
@@ -23,11 +23,11 @@ services:
       start_period: 10s
 
   redis:
-    image: redis:7-bookworm
+    image: redis:latest
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
