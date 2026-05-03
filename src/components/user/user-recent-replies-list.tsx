@@ -1,3 +1,4 @@
+import { InlineTokenContent } from "@/components/inline-token-content"
 import { PostListLink } from "@/components/post/post-list-link"
 import { formatMonthDayTime, parseBusinessDateTime, serializeDate, serializeDateTime } from "@/lib/formatters"
 import { getPostCommentPath } from "@/lib/post-links"
@@ -68,7 +69,7 @@ export function UserRecentRepliesList({
               {reply.replyToUsername ? <span className="shrink-0">回复 @{reply.replyToUsername}</span> : null}
             </div>
             <p className="line-clamp-3 break-words text-[13px] leading-6 text-foreground sm:text-sm sm:leading-6">
-              {reply.content}
+              <InlineTokenContent content={reply.content} />
             </p>
           </article>
         )

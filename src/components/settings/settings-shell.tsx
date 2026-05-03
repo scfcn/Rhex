@@ -51,6 +51,7 @@ export function SettingsShell({
     { key: "verifications", label: "账号认证", description: "提交个人认证、商家认证等身份申请。" },
     { key: "points", label: `${pointName}明细`, description: `查看当前${pointName}余额与全部变动记录。` },
     { key: "follows", label: "我的关注", description: "查看你关注的节点、用户、标签与帖子。" },
+    { key: "tasks", label: "任务中心", description: "查看新手任务、日常任务与挑战任务进度。", href: "/tasks" },
   ] satisfies SettingsNavItem[]
   const currentItem = navItems.find((item) => item.key === currentTab) ?? navItems[0]
 

@@ -1,5 +1,7 @@
 import type { CurrentUserRecord } from "@/db/current-user"
-import { executeUserCheckIn, listUserCheckInLogsInRange } from "@/db/check-in-queries"
+import { prisma } from "@/db/client"
+import { executeUserCheckIn, listUserCheckInLogsInRange, updateUserCheckInReward } from "@/db/check-in-queries"
+import { countTaskDefinitions } from "@/db/task-definition-queries"
 
 import { apiError } from "@/lib/api-route"
 import { getCheckInMakeUpEarliestDateKey, normalizeCheckInMakeUpOldestDayLimit } from "@/lib/check-in-policy"
@@ -10,6 +12,8 @@ import { formatNumber } from "@/lib/formatters"
 import { evaluateUserLevelProgress } from "@/lib/level-system"
 import { prepareScopedPointDelta, type PreparedPointDelta } from "@/lib/point-center"
 import { getSiteSettings } from "@/lib/site-settings"
+import { ensureTaskCenterSeeded } from "@/lib/task-center-defaults"
+import { recordCheckInTaskEvent } from "@/lib/task-center-service"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
 
 interface CheckInSettingsSnapshot {
@@ -263,6 +267,8 @@ export async function getCheckInOverview(user: CurrentUserRecord, month = getMon
   const settings = await getSiteSettings()
   assertCheckInEnabled(settings)
 
+  await ensureTaskCenterSeeded()
+
   const snapshot = readCheckInSettingsSnapshot(settings)
   const userRewardSettings = resolveCheckInRewardSettingsForUser(snapshot, user)
   const [entries, streakSummary] = await Promise.all([
@@ -303,7 +309,11 @@ export async function submitCheckInAction(user: CurrentUserRecord, body: unknown
   const snapshot = readCheckInSettingsSnapshot(settings)
   const payload = parseCheckInActionPayload(body)
   const todayKey = getLocalDateKey()
-  const reward = rollCheckInReward(resolveCheckInRewardSettingsForUser(snapshot, user).rewardRange)
+  const taskDefinitionCount = await countTaskDefinitions()
+  const usesLegacyReward = taskDefinitionCount === 0
+  const reward = usesLegacyReward
+    ? rollCheckInReward(resolveCheckInRewardSettingsForUser(snapshot, user).rewardRange)
+    : 0
   const rewardDelta = await prepareScopedPointDelta({
     scopeKey: "CHECK_IN_REWARD",
     baseDelta: reward,
@@ -327,18 +337,50 @@ export async function submitCheckInAction(user: CurrentUserRecord, body: unknown
       isMakeUp: false,
       makeUpCountsTowardStreak: snapshot.checkInMakeUpCountsTowardStreak,
     })
+    let finalReward = result.alreadyCheckedIn ? 0 : reward
+    let finalPoints = result.points
+
+    if (!result.alreadyCheckedIn && !usesLegacyReward) {
+      try {
+        const taskReward = await recordCheckInTaskEvent({
+          type: "CHECK_IN",
+          userId: user.id,
+          dateKey: todayKey,
+        })
+        finalReward = taskReward.awardedPoints
+        await updateUserCheckInReward({
+          userId: user.id,
+          dateKey: todayKey,
+          reward: finalReward,
+        })
+        const latestUser = await prisma.user.findUnique({
+          where: { id: user.id },
+          select: {
+            points: true,
+          },
+        })
+        if (latestUser) {
+          finalPoints = latestUser.points
+        }
+      } catch (error) {
+        console.warn("[check-in-service] failed to settle task rewards for check-in", error)
+      }
+    }
+
     const streakSummary = await getUserCheckInStreakSummary(user.id)
 
     return {
-      points: result.points,
-      reward: result.alreadyCheckedIn ? 0 : reward,
+      points: finalPoints,
+      reward: finalReward,
       alreadyCheckedIn: result.alreadyCheckedIn,
       date: todayKey,
       currentStreak: streakSummary.currentStreak,
       maxStreak: streakSummary.maxStreak,
       message: result.alreadyCheckedIn
         ? "今天已经签到过了"
-        : `签到成功，获得 ${formatNumber(reward)} ${snapshot.pointName}`,
+        : finalReward > 0
+          ? `签到成功，获得 ${formatNumber(finalReward)} ${snapshot.pointName}`
+          : "签到成功",
     }
   }
 

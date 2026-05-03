@@ -25,10 +25,12 @@ import { resolveAuthProviderSensitiveConfig, resolveCaptchaSensitiveConfig, reso
 import { resolveSiteSearchSettings } from "@/lib/site-search-settings"
 import { normalizePositiveInteger } from "@/lib/shared/normalizers"
 import type { SiteSettingsRecordData } from "@/lib/site-settings.record"
+import { resolveTaskDrivenCheckInRewardRanges } from "@/lib/task-check-in-display"
 import { type SiteTippingGiftItem } from "@/lib/tipping-gifts"
 import { normalizeUploadProvider } from "@/lib/upload-provider"
 import type { ServerSiteSettingsData, SiteSettingsData } from "@/lib/site-settings.types"
 import { normalizeHeaderAppIconName, parseSiteHeaderAppLinks } from "./site-header-app-links"
+import { DEFAULT_MESSAGE_PROMPT_AUDIO_PATH } from "@/lib/message-prompt-audio"
 
 export type { FooterLinkItem } from "@/lib/shared/config-parsers"
 
@@ -252,6 +254,7 @@ function mapSiteSettings(record: SiteSettingsRecordData, tippingGifts: SiteTippi
     appStateJson: record.appStateJson,
     imageUploadEnabledFallback: false,
     fileUploadEnabledFallback: false,
+    promptAudioPathFallback: DEFAULT_MESSAGE_PROMPT_AUDIO_PATH,
   })
   const commentAccessSettings = resolveCommentAccessSettings({
     appStateJson: record.appStateJson,
@@ -551,6 +554,7 @@ function mapSiteSettings(record: SiteSettingsRecordData, tippingGifts: SiteTippi
     attachmentMaxFileSizeMb: attachmentFeatureSettings.maxFileSizeMb,
     messageImageUploadEnabled: messageMediaSettings.imageUploadEnabled,
     messageFileUploadEnabled: messageMediaSettings.fileUploadEnabled,
+    messagePromptAudioPath: messageMediaSettings.promptAudioPath,
     markdownEmojiMap: parseMarkdownEmojiMapJson(record.markdownEmojiMapJson),
     appStateJson: record.appStateJson,
   }
@@ -644,7 +648,9 @@ function isMissingIncrementalCacheInUnstableCacheError(error: unknown) {
 async function resolveServerSiteSettings(): Promise<ServerSiteSettingsData> {
   try {
     return applyAddonSiteSettings(
-      normalizeLegacyServerSiteSettings(await getPersistentSiteSettings()),
+      await applyTaskDrivenCheckInRewardSettings(
+        normalizeLegacyServerSiteSettings(await getPersistentSiteSettings()),
+      ),
     )
   } catch (error) {
     if (!isMissingIncrementalCacheInUnstableCacheError(error)) {
@@ -652,8 +658,29 @@ async function resolveServerSiteSettings(): Promise<ServerSiteSettingsData> {
     }
 
     return applyAddonSiteSettings(
-      normalizeLegacyServerSiteSettings(await readSiteSettingsFromDB()),
+      await applyTaskDrivenCheckInRewardSettings(
+        normalizeLegacyServerSiteSettings(await readSiteSettingsFromDB()),
+      ),
     )
+  }
+}
+
+async function applyTaskDrivenCheckInRewardSettings(data: ServerSiteSettingsData): Promise<ServerSiteSettingsData> {
+  const taskRewardRanges = await resolveTaskDrivenCheckInRewardRanges()
+  if (!taskRewardRanges) {
+    return data
+  }
+
+  return {
+    ...data,
+    checkInReward: taskRewardRanges.normal.min,
+    checkInRewardText: formatCheckInRewardRange(taskRewardRanges.normal),
+    checkInVip1Reward: taskRewardRanges.vip1.min,
+    checkInVip1RewardText: formatCheckInRewardRange(taskRewardRanges.vip1),
+    checkInVip2Reward: taskRewardRanges.vip2.min,
+    checkInVip2RewardText: formatCheckInRewardRange(taskRewardRanges.vip2),
+    checkInVip3Reward: taskRewardRanges.vip3.min,
+    checkInVip3RewardText: formatCheckInRewardRange(taskRewardRanges.vip3),
   }
 }
 

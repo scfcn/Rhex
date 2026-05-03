@@ -661,7 +661,6 @@ export function ProfileEditForm({
           </div>
 
           <div className="flex flex-wrap items-center gap-3 text-sm">
-            <span className={emailVerified ? "rounded-full bg-emerald-100 px-3 py-1 text-emerald-700" : "rounded-full bg-amber-100 px-3 py-1 text-amber-700"}>{emailVerified ? "已验证" : "未验证"}</span>
             {!emailVerified ? <Button type="button" variant="outline" onClick={handleSendEmailCode} disabled={sendingCode || !email}>{sendingCode ? "发送中..." : "发送邮箱验证码"}</Button> : null}
           </div>
 

@@ -68,7 +68,7 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   })
 
   const response = NextResponse.json(apiSuccess(undefined, "Passkey 已绑定到当前账户"))
-  clearPasskeyCeremonyState(response, "connect")
+  clearPasskeyCeremonyState(response, "connect", request)
   return response
 }, {
   errorMessage: "绑定 Passkey 失败",

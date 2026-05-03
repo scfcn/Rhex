@@ -164,7 +164,7 @@ export async function HomeFeedPage({
     getHomeAnnouncements(3),
     settingsPromise,
     rssHomeSettingsPromise,
-    getFriendLinkListData(),
+    getFriendLinkListData(10),
     getSelfServeAdsAppConfig(),
     getSelfServeAdsPanelData(),
     addonTabsPromise,

@@ -300,6 +300,9 @@ export const ADDON_ACTION_HOOK_NAMES = [
   "comment.create.after",
   "message.send.before",
   "message.send.after",
+  "report.create.before",
+  "report.create.after",
+  "task.complete.after",
   "payment.paid.before",
   "payment.paid.after",
   "invite-code.purchase.before",
@@ -353,7 +356,13 @@ export const ADDON_WATERFALL_HOOK_NAMES = [
   "post.slug.value",
   // ─── v2 扩展 ───
   "post.title.value",
+  "post.content.value",
   "comment.content.value",
+  "message.body.value",
+  "report.reasonDetail.value",
+  "user.profile.nickname.value",
+  "user.profile.bio.value",
+  "user.profile.introduction.value",
   "user.displayName.value",
   "user.avatar.url.value",
   "search.query.normalize",
@@ -685,6 +694,100 @@ export interface AddonUserSummary {
   vipLevel: number
 }
 
+export type AddonUserProfileVisibility = "PUBLIC" | "MEMBERS" | "PRIVATE"
+
+export interface AddonUserProfileRecord {
+  id: number
+  username: string
+  nickname: string | null
+  bio: string | null
+  introduction: string
+  gender: string | null
+  avatarPath: string | null
+  email: string | null
+  emailVerifiedAt: string | null
+  activityVisibility: AddonUserProfileVisibility
+  introductionVisibility: AddonUserProfileVisibility
+  points: number
+}
+
+export type AddonTaskCategory = "NEWBIE" | "DAILY" | "CHALLENGE"
+export type AddonTaskCycleType = "PERMANENT" | "DAILY" | "WEEKLY"
+export type AddonTaskConditionType =
+  | "CHECK_IN_COUNT"
+  | "APPROVED_POST_COUNT"
+  | "APPROVED_COMMENT_COUNT"
+  | "GIVEN_LIKE_COUNT"
+  | "RECEIVED_LIKE_COUNT"
+  | "APPROVED_COMMENT_DISTINCT_POST_COUNT"
+  | "FAVORITE_POST_COUNT"
+  | "FOLLOW_BOARD_COUNT"
+  | "FOLLOW_USER_COUNT"
+  | "FOLLOW_TAG_COUNT"
+  | "FOLLOW_POST_COUNT"
+export type AddonTaskDefinitionStatus = "ACTIVE" | "PAUSED" | "ARCHIVED"
+export type AddonTaskRewardTier = "NORMAL" | "VIP1" | "VIP2" | "VIP3"
+export type AddonUserTaskProgressStatus = "IN_PROGRESS" | "COMPLETED"
+export type AddonTaskTriggerType =
+  | "CHECK_IN"
+  | "APPROVED_POST"
+  | "APPROVED_COMMENT"
+  | "GIVEN_LIKE"
+  | "RECEIVED_LIKE"
+  | "FAVORITE_POST"
+  | "FOLLOW_BOARD"
+  | "FOLLOW_USER"
+  | "FOLLOW_TAG"
+  | "FOLLOW_POST"
+
+export interface AddonTaskDefinitionRecord {
+  id: string
+  code: string
+  title: string
+  description: string | null
+  category: AddonTaskCategory
+  cycleType: AddonTaskCycleType
+  conditionType: AddonTaskConditionType
+  conditionConfig: unknown
+  targetCount: number
+  rewardNormalMin: number
+  rewardNormalMax: number
+  rewardVip1Min: number
+  rewardVip1Max: number
+  rewardVip2Min: number
+  rewardVip2Max: number
+  rewardVip3Min: number
+  rewardVip3Max: number
+  status: AddonTaskDefinitionStatus
+  sortOrder: number
+  startsAt: string | null
+  endsAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AddonUserTaskProgressRecord {
+  id: string
+  userId: number
+  taskId: string
+  cycleKey: string
+  categorySnapshot: AddonTaskCategory
+  cycleTypeSnapshot: AddonTaskCycleType
+  conditionTypeSnapshot: AddonTaskConditionType
+  targetCountSnapshot: number
+  rewardTierSnapshot: AddonTaskRewardTier
+  rewardMinSnapshot: number
+  rewardMaxSnapshot: number
+  progressCount: number
+  settledRewardPoints: number | null
+  status: AddonUserTaskProgressStatus
+  completedAt: string | null
+  settledAt: string | null
+  metadataJson: unknown
+  createdAt: string
+  updatedAt: string
+}
+
 export interface AddonZoneSummary {
   id: string | null
   slug: string | null
@@ -940,6 +1043,23 @@ export interface AddonMessageSendResult {
 
 export interface AddonMessagesApi {
   send: (input: AddonMessageSendInput) => Promise<AddonMessageSendResult>
+}
+
+export type AddonReportTargetType = "POST" | "COMMENT" | "USER"
+export type AddonReportStatus = "PENDING" | "PROCESSING" | "RESOLVED" | "REJECTED"
+
+export interface AddonReportRecord {
+  id: string
+  reporterId: number
+  targetType: AddonReportTargetType
+  targetId: string
+  reasonType: string
+  reasonDetail: string | null
+  status: AddonReportStatus
+  handledBy: number | null
+  handledNote: string | null
+  handledAt: string | null
+  createdAt: string
 }
 
 export type AddonNotificationRelatedType =
@@ -1206,8 +1326,9 @@ export interface AddonApiHandlerContext extends AddonExecutionContextBase {
  *
  * 设计说明：
  * 1. 三张 Map 分别登记 Action / Waterfall / AsyncWaterfall 三类 hook 的
- *    payload / value 类型；仅登记**新增的 v2 hook**，历史老 hook 不登记，
- *    由查表 helper 回落为 `unknown`——这保证**现有插件代码 100% 向后兼容**。
+ *    payload / value 类型；当前以新增 hook 和已补齐契约的高频 hook 为主，
+ *    其余历史 hook 仍可由查表 helper 回落为 `unknown`——这保证**现有插件代码
+ *    100% 向后兼容**。
  * 2. 三张 Map 均为 `interface`，插件作者可通过
  *    [declaration merging](https://www.typescriptlang.org/docs/handbook/declaration-merging.html)
  *    在自己的 `*.d.ts` 中扩展未登记的 hook，以获得端到端类型安全。
@@ -1296,6 +1417,84 @@ export interface AddonActionHookPayloadMap {
     liked: boolean
     likeCount?: number
   }
+  // ─── 私信 ───
+  "message.send.before": {
+    senderId: number
+    senderUsername: string
+    recipientId: number
+    conversationId?: string
+    conversationKind: "DIRECT" | "SITE_CHAT"
+    body: string
+  }
+  "message.send.after": {
+    senderId: number
+    senderUsername: string
+    recipientId: number
+    messageId: string
+    conversationId: string
+    conversationKind: "DIRECT" | "SITE_CHAT"
+    body: string
+    contentAdjusted: boolean
+    occurredAt: string
+  }
+  // ─── 用户资料 ───
+  "user.update.before": {
+    userId: number
+    username: string
+    currentProfile: AddonUserProfileRecord
+    nickname: string
+    bio: string
+    introduction: string
+    gender: string
+    avatarPath: string
+    email: string | null
+    activityVisibility: AddonUserProfileVisibility
+    introductionVisibility: AddonUserProfileVisibility
+    nicknameChanged: boolean
+    bioChanged: boolean
+    introductionChanged: boolean
+    avatarChanged: boolean
+    emailChanged: boolean
+    contentAdjusted: boolean
+  }
+  "user.update.after": {
+    userId: number
+    username: string
+    nicknameChanged: boolean
+    bioChanged: boolean
+    introductionChanged: boolean
+    avatarChanged: boolean
+    emailChanged: boolean
+    contentAdjusted: boolean
+    profile: AddonUserProfileRecord
+  }
+  // ─── 举报 ───
+  "report.create.before": {
+    reporterId: number
+    targetType: AddonReportTargetType
+    targetId: string
+    reasonType: string
+    reasonDetail: string | null
+  }
+  "report.create.after": {
+    reporterId: number
+    targetType: AddonReportTargetType
+    targetId: string
+    reasonType: string
+    reasonDetail: string | null
+    contentAdjusted: boolean
+    report: AddonReportRecord
+  }
+  // ─── 任务中心 ───
+  "task.complete.after": {
+    userId: number
+    triggerType: AddonTaskTriggerType
+    eventKey: string
+    pointName: string
+    rewardPoints: number
+    task: AddonTaskDefinitionRecord
+    progress: AddonUserTaskProgressRecord
+  }
   // ─── 用户关系 ───
   "user.follow.toggle.after": {
     followerId: string
@@ -1361,7 +1560,13 @@ export interface AddonActionHookPayloadMap {
 
 export interface AddonWaterfallHookValueMap {
   "post.title.value": string
+  "post.content.value": string
   "comment.content.value": string
+  "message.body.value": string
+  "report.reasonDetail.value": string
+  "user.profile.nickname.value": string
+  "user.profile.bio.value": string
+  "user.profile.introduction.value": string
   "user.displayName.value": string
   "user.avatar.url.value": string
   "search.query.normalize": string
@@ -1380,10 +1585,57 @@ export interface AddonWaterfallHookPayloadMap {
     boardSlug: string
     postType: string
   }
+  "post.content.value": {
+    mode: "create" | "update" | "append"
+    postId?: string
+    boardSlug: string
+    postType: string
+  }
   "comment.content.value": {
     mode: "create" | "update"
     postId: string
     commentId?: string
+  }
+  "message.body.value": {
+    recipientId?: number
+    conversationId?: string
+    conversationKind: "DIRECT" | "SITE_CHAT"
+  }
+  "report.reasonDetail.value": {
+    reporterId: number
+    targetType: AddonReportTargetType
+    targetId: string
+    reasonType: string
+  }
+  "user.profile.nickname.value": {
+    userId: number
+    username: string
+    currentProfile: AddonUserProfileRecord
+    nextGender: string
+    nextAvatarPath: string
+    nextEmail: string | null
+    nextActivityVisibility: AddonUserProfileVisibility
+    nextIntroductionVisibility: AddonUserProfileVisibility
+  }
+  "user.profile.bio.value": {
+    userId: number
+    username: string
+    currentProfile: AddonUserProfileRecord
+    nextGender: string
+    nextAvatarPath: string
+    nextEmail: string | null
+    nextActivityVisibility: AddonUserProfileVisibility
+    nextIntroductionVisibility: AddonUserProfileVisibility
+  }
+  "user.profile.introduction.value": {
+    userId: number
+    username: string
+    currentProfile: AddonUserProfileRecord
+    nextGender: string
+    nextAvatarPath: string
+    nextEmail: string | null
+    nextActivityVisibility: AddonUserProfileVisibility
+    nextIntroductionVisibility: AddonUserProfileVisibility
   }
   "breadcrumb.items": {
     scope: "admin"

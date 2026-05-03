@@ -3,6 +3,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto"
 import type { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 
+import { shouldUseSecureCookies } from "@/lib/cookie-security"
 import type { OAuthFlowState, PasskeyCeremonyState, PendingExternalAuthState } from "@/lib/external-auth-types"
 import { createRedisKey, getRedis } from "@/lib/redis"
 
@@ -83,25 +84,31 @@ function parseSignedValue<T extends object>(token: string | undefined) {
   }
 }
 
-function getCookieOptions(maxAge: number) {
+function getCookieOptions(maxAge: number, request?: Pick<Request, "headers" | "url"> | null) {
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookies({ request }),
     path: "/",
     maxAge,
   }
 }
 
-function clearCookie(response: NextResponse, cookieName: string) {
-  response.cookies.set(cookieName, "", getCookieOptions(0))
+function clearCookie(response: NextResponse, cookieName: string, request?: Pick<Request, "headers" | "url"> | null) {
+  response.cookies.set(cookieName, "", getCookieOptions(0, request))
 }
 
 function getRedisAuthFlowKey(cookieName: string, nonce: string) {
   return createRedisKey("auth-flow", cookieName, nonce)
 }
 
-async function setCookie<T extends object>(response: NextResponse, cookieName: string, value: T, ttlSeconds: number) {
+async function setCookie<T extends object>(
+  response: NextResponse,
+  cookieName: string,
+  value: T,
+  ttlSeconds: number,
+  request?: Pick<Request, "headers" | "url"> | null,
+) {
 
   const nonce = randomUUID()
   const expiresAt = Date.now() + ttlSeconds * 1000
@@ -116,7 +123,7 @@ async function setCookie<T extends object>(response: NextResponse, cookieName: s
     ttlSeconds,
   )
 
-  response.cookies.set(cookieName, createSignedValue<SignedAuthFlowPointer>({ nonce }, ttlSeconds), getCookieOptions(ttlSeconds))
+  response.cookies.set(cookieName, createSignedValue<SignedAuthFlowPointer>({ nonce }, ttlSeconds), getCookieOptions(ttlSeconds, request))
 }
 
 async function readCookieValue<T extends object>(cookieName: string) {
@@ -153,28 +160,28 @@ export function buildOAuthStateCookieName(provider: string) {
   return `bbs_oauth_${provider}`
 }
 
-export async function setOAuthFlowState(response: NextResponse, provider: string, value: OAuthFlowState, ttlSeconds = 600) {
-  await setCookie(response, buildOAuthStateCookieName(provider), value, ttlSeconds)
+export async function setOAuthFlowState(response: NextResponse, provider: string, value: OAuthFlowState, request?: Pick<Request, "headers" | "url"> | null, ttlSeconds = 600) {
+  await setCookie(response, buildOAuthStateCookieName(provider), value, ttlSeconds, request)
 }
 
 export async function readOAuthFlowState(provider: string) {
   return readCookieValue<OAuthFlowState>(buildOAuthStateCookieName(provider))
 }
 
-export function clearOAuthFlowState(response: NextResponse, provider: string) {
-  clearCookie(response, buildOAuthStateCookieName(provider))
+export function clearOAuthFlowState(response: NextResponse, provider: string, request?: Pick<Request, "headers" | "url"> | null) {
+  clearCookie(response, buildOAuthStateCookieName(provider), request)
 }
 
-export async function setPendingExternalAuthState(response: NextResponse, value: PendingExternalAuthState, ttlSeconds = 900) {
-  await setCookie(response, PENDING_AUTH_COOKIE_NAME, value, ttlSeconds)
+export async function setPendingExternalAuthState(response: NextResponse, value: PendingExternalAuthState, request?: Pick<Request, "headers" | "url"> | null, ttlSeconds = 900) {
+  await setCookie(response, PENDING_AUTH_COOKIE_NAME, value, ttlSeconds, request)
 }
 
 export async function readPendingExternalAuthState() {
   return readCookieValue<PendingExternalAuthState>(PENDING_AUTH_COOKIE_NAME)
 }
 
-export function clearPendingExternalAuthState(response: NextResponse) {
-  clearCookie(response, PENDING_AUTH_COOKIE_NAME)
+export function clearPendingExternalAuthState(response: NextResponse, request?: Pick<Request, "headers" | "url"> | null) {
+  clearCookie(response, PENDING_AUTH_COOKIE_NAME, request)
 }
 
 function getPasskeyCeremonyCookieName(flow: "register" | "login" | "connect") {
@@ -189,14 +196,14 @@ function getPasskeyCeremonyCookieName(flow: "register" | "login" | "connect") {
   return PASSKEY_LOGIN_COOKIE_NAME
 }
 
-export async function setPasskeyCeremonyState(response: NextResponse, flow: "register" | "login" | "connect", value: PasskeyCeremonyState, ttlSeconds = 600) {
-  await setCookie(response, getPasskeyCeremonyCookieName(flow), value, ttlSeconds)
+export async function setPasskeyCeremonyState(response: NextResponse, flow: "register" | "login" | "connect", value: PasskeyCeremonyState, request?: Pick<Request, "headers" | "url"> | null, ttlSeconds = 600) {
+  await setCookie(response, getPasskeyCeremonyCookieName(flow), value, ttlSeconds, request)
 }
 
 export async function readPasskeyCeremonyState(flow: "register" | "login" | "connect") {
   return readCookieValue<PasskeyCeremonyState>(getPasskeyCeremonyCookieName(flow))
 }
 
-export function clearPasskeyCeremonyState(response: NextResponse, flow: "register" | "login" | "connect") {
-  clearCookie(response, getPasskeyCeremonyCookieName(flow))
+export function clearPasskeyCeremonyState(response: NextResponse, flow: "register" | "login" | "connect", request?: Pick<Request, "headers" | "url"> | null) {
+  clearCookie(response, getPasskeyCeremonyCookieName(flow), request)
 }

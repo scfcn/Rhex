@@ -91,7 +91,7 @@ export function MessageBubbleContent({
               markdownEmojiMap={markdownEmojiMap}
               expandImagesWhenImageOnly
               className={cn(
-                "[&_p]:!my-0 [&_p]:leading-6 [&_ul]:my-1.5 [&_ol]:my-1.5 [&_li]:my-0 prose-headings:my-0 prose-blockquote:my-2 prose-pre:my-2 prose-p:text-inherit prose-headings:text-inherit prose-strong:text-inherit prose-code:text-inherit prose-blockquote:text-inherit prose-li:text-inherit prose-a:text-inherit",
+                "message-markdown [&_p]:!my-0 [&_p]:leading-6 [&_ul]:my-1.5 [&_ol]:my-1.5 [&_li]:my-0 prose-headings:my-0 prose-blockquote:my-2 prose-pre:my-2 prose-p:text-inherit prose-headings:text-inherit prose-strong:text-inherit prose-code:text-inherit prose-blockquote:text-inherit prose-li:text-inherit prose-a:text-inherit",
                 isMine && "text-inherit **:text-inherit [&_.md-list]:text-inherit [&_.md-task-list_.task-list-item_label]:text-inherit [&_.md-task-list_.task-list-item:has(input[type='checkbox']:checked)]:text-inherit [&_.md-callout-title]:text-inherit",
               )}
             />

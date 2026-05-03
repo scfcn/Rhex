@@ -161,3 +161,21 @@ export async function listUserCheckInStreakEntries(userId: number): Promise<User
     },
   })
 }
+
+export async function updateUserCheckInReward(params: {
+  userId: number
+  dateKey: string
+  reward: number
+}) {
+  return prisma.userCheckInLog.update({
+    where: {
+      userId_checkedInOn: {
+        userId: params.userId,
+        checkedInOn: params.dateKey,
+      },
+    },
+    data: {
+      reward: params.reward,
+    },
+  })
+}

@@ -150,7 +150,7 @@ export const POST = createRouteHandler(async ({ request }) => {
 
     const response = NextResponse.json(apiSuccess({ username: user.username }, "success"))
     const sessionToken = await createSessionToken(user.username, loginIp)
-    response.cookies.set(getSessionCookieName(), sessionToken, getSessionCookieOptions())
+    response.cookies.set(getSessionCookieName(), sessionToken, getSessionCookieOptions({ request }))
     await executeAddonActionHook("auth.login.after", {
       userId: user.id,
       username: user.username,

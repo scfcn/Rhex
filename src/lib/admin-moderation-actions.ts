@@ -14,6 +14,7 @@ import { defineAdminAction, writeAdminActionLog, type AdminActionDefinition } fr
 import { revalidateHomeSidebarStatsCache } from "@/lib/home-sidebar-stats"
 import { ensureCanEditBoard, ensureCanManageComment } from "@/lib/moderator-permissions"
 import { createSystemNotification } from "@/lib/notification-writes"
+import { recordApprovedCommentTaskEvent } from "@/lib/task-center-service"
 import { expireTaxonomyCacheImmediately } from "@/lib/taxonomy-cache"
 
 
@@ -137,6 +138,15 @@ export const adminModerationActionHandlers: Record<string, AdminActionDefinition
     }
 
     await writeAdminActionLog(context, adminModerationActionHandlers["comment.approve"].metadata)
+    void recordApprovedCommentTaskEvent({
+      type: "APPROVED_COMMENT",
+      userId: comment.userId,
+      commentId: comment.id,
+      postId: comment.postId,
+      boardId: comment.post.boardId,
+    }).catch((error) => {
+      console.warn("[admin-moderation-actions] failed to record task progress for approved comment", error)
+    })
     return {
       message: "评论已审核通过",
       revalidatePaths: [`/posts/${comment.post.slug}`, `/boards/${comment.post.board.slug}`, "/admin", "/notifications", "/"],

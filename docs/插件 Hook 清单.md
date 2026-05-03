@@ -49,14 +49,17 @@
 | `comment.create.after` | comment | 评论创建成功后执行副作用逻辑 | `void` |
 | `message.send.before` | message | 私信发送前执行副作用或拦截逻辑 | `void` |
 | `message.send.after` | message | 私信发送成功后执行副作用逻辑 | `void` |
+| `report.create.before` | report | 举报创建前执行副作用或拦截逻辑 | `void` |
+| `report.create.after` | report | 举报创建成功后执行副作用逻辑（含 report 快照） | `void` |
+| `task.complete.after` | task | 任务完成并结算奖励后执行副作用逻辑（含 task / progress 快照与奖励结果） | `void` |
 | `payment.paid.before` | payment | 支付到账后的宿主处理前执行副作用逻辑 | `void` |
 | `payment.paid.after` | payment | 支付到账后执行副作用逻辑 | `void` |
 | `invite-code.purchase.before` | invite | 邀请码购买扣点前执行副作用或拦截逻辑 | `void` |
 | `invite-code.purchase.after` | invite | 邀请码购买成功后执行副作用逻辑 | `void` |
 | `redeem-code.redeem.before` | redeem | 兑换码核销前执行副作用或拦截逻辑 | `void` |
 | `redeem-code.redeem.after` | redeem | 兑换码核销成功后执行副作用逻辑 | `void` |
-| `user.update.before` | user | 用户资料更新写入前执行副作用或拦截逻辑 | `void` |
-| `user.update.after` | user | 用户资料更新后执行副作用逻辑 | `void` |
+| `user.update.before` | user | 用户资料更新写入前执行副作用或拦截逻辑（payload 为最终待写入资料字段） | `void` |
+| `user.update.after` | user | 用户资料更新后执行副作用逻辑（含最新 profile 快照） | `void` |
 | `user.notification-settings.update.before` | user | 用户通知设置写入前执行副作用或拦截逻辑 | `void` |
 | `user.notification-settings.update.after` | user | 用户通知设置更新后执行副作用逻辑 | `void` |
 | `addon.config.changed.before` | system | 插件配置写入前执行副作用或拦截逻辑 | `void` |
@@ -87,19 +90,40 @@
 | `addon.disabled.after` | system | 插件禁用后执行副作用逻辑 | `void` |
 | `search.query.after` | search | 搜索请求完成后执行副作用（埋点、热词统计等） | `void` |
 
+补充说明：
+
+- `message.send.before` / `message.send.after` 的 payload 当前都会携带 `conversationKind`（`DIRECT` / `SITE_CHAT`）；其中 `after` 的 `contentAdjusted` 会同时反映插件文本改写和宿主敏感词替换。
+- `report.create.after` 的 payload 当前会携带结构化 `report` 快照；`contentAdjusted` 会同时反映 `report.reasonDetail.value` 改写和宿主敏感词替换。
+- `user.update.after` 的 payload 当前会携带结构化 `profile` 快照；`contentAdjusted` 会同时反映资料字段的插件改写和宿主敏感词替换。
+- `task.complete.after` 只会在本轮任务首次完成并完成奖励结算后触发；重复事件、重复点赞、已完成任务不会再次派发。
+
 ## Waterfall
 
 | Hook | 分类 | 说明 | 返回值 |
 | --- | --- | --- | --- |
 | `post.slug.value` | post | 串行改写帖子最终 slug | `string` |
 | `post.title.value` | post | 串行改写帖子标题（落库前；可用于敏感词替换、自动加标记等） | `string` |
+| `post.content.value` | post | 串行改写帖子正文（写入前；创建、编辑、追加内容都可接入） | `string` |
 | `comment.content.value` | comment | 串行改写评论内容（写入前；可用于签名补全、文本规范化等） | `string` |
+| `message.body.value` | message | 串行改写私信内容（发送前；可用于模板展开、文本规范化等） | `string` |
+| `report.reasonDetail.value` | report | 串行改写举报补充说明（写入前；可用于模板展开、文本规范化等） | `string` |
+| `user.profile.nickname.value` | user | 串行改写用户昵称（资料写入前；后续仍会做敏感词与重名校验） | `string` |
+| `user.profile.bio.value` | user | 串行改写用户简介（资料写入前；可返回空串清空） | `string` |
+| `user.profile.introduction.value` | user | 串行改写用户个人介绍（资料写入前；可返回空串清空） | `string` |
 | `user.displayName.value` | user | 串行改写用户展示名（用于列表/详情渲染前的显示加工） | `string` |
 | `user.avatar.url.value` | user | 串行改写用户头像 URL（可插入 CDN 前缀、占位头像等） | `string` |
 | `search.query.normalize` | search | 串行规范化搜索关键词（大小写、同义词、繁简转换等） | `string` |
 | `seo.meta.title` | seo | 串行改写 SEO `<title>` | `string` |
 | `seo.meta.description` | seo | 串行改写 SEO meta description | `string` |
 | `breadcrumb.items` | navigation | 串行改写当前页面面包屑条目数组 | `AddonBreadcrumbItem[]` |
+
+补充说明：
+
+- `post.content.value` 当前会在帖子创建、普通编辑和超时后追加内容三条链路执行；它只改写公开正文 / 追加正文，不会自动改写登录解锁、回复解锁、购买解锁等附加文本。
+- `message.body.value` 会在宿主敏感词处理和 `message.send.before` action hook 之前执行；其 `payload` 当前包含 `recipientId?`、`conversationId?` 与 `conversationKind`（`DIRECT` / `SITE_CHAT`）。
+- `report.reasonDetail.value` 即使初始补充说明为空也会执行；插件可以基于 `reasonType`、`targetType` 自动补全模板化说明。
+- `user.profile.bio.value` 与 `user.profile.introduction.value` 允许返回空串，宿主会按“显式清空”处理，不会自动回退到旧值。
+- `user.profile.nickname.value` 仍沿用非空保护；插件若返回空串，宿主会保留原始昵称继续后续校验。
 
 ## AsyncWaterfall
 

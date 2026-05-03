@@ -203,6 +203,12 @@ REDIS_URL="redis://127.0.0.1:6379"
 - `web`
 - `worker`
 
+其中：
+
+- `setup` 是一次性初始化 / 升级任务
+- `docker compose up -d` 时会自动执行它
+- `docker compose restart` 只会重启正在运行的常驻服务，不会重复执行它
+
 #### 1. 获取代码
 
 ```bash
@@ -221,12 +227,20 @@ cp .env.example .env
 
 
 
-#### 3. 启动完整环境
+#### 3. 首次安装或后续启动
 
 ```bash
 docker compose up -d
 ```
 
+这条命令会自动完成完整启动链：
+
+- 自动拉起 `postgres`、`redis`
+- 等待它们通过健康检查
+- 自动执行一次 `setup`
+- `setup` 成功后再启动 `web` 和 `worker`
+
+如果首次安装失败，通常是 `.env`、数据库或 Redis 连通性问题；修复后仍然直接重跑同一条 `docker compose up -d` 即可。
 
 #### 4. 访问站点
 
@@ -235,12 +249,61 @@ docker compose up -d
 | 前台 | `http://localhost:3000` |
 | 后台 | `http://localhost:3000/admin` |
 
-#### 5. 更新与维护
+#### 5. 升级
+
+如果镜像由 `pull_policy: always` 管理，常规升级可以直接：
 
 ```bash
-git pull
-docker compose pull setup web worker
-docker compose up -d --force-recreate setup web worker
+docker compose up -d
+```
+
+如果你希望显式先拉新镜像，再执行升级启动链，可以使用：
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+这时 `setup` 会自动重新参与本次启动流程，用于：
+
+- `setup` 会补齐 Prisma Client、同步数据库结构，并只在需要时写入初始化数据
+- `web` / `worker` 只会在 `setup` 成功后继续启动
+
+如果你修改了 `.env`、`docker-compose.yml` 或镜像标签，并且希望明确重建容器，执行：
+
+```bash
+docker compose up -d --force-recreate
+```
+
+#### 6. 日常重启
+
+仅重启服务进程而不改镜像、不改环境变量时，直接执行：
+
+```bash
+docker compose restart web worker
+```
+
+这不会重复执行 `setup`，更适合纯进程级重启。
+
+#### 7. 常见排查
+
+初始化失败时优先查看：
+
+```bash
+docker compose logs postgres redis
+docker compose logs setup
+```
+
+如果你修复问题后想手动单独重跑一次安装任务，也可以执行：
+
+```bash
+docker compose up -d setup
+```
+
+如果 `setup` 成功但业务服务没起来，再看：
+
+```bash
+docker compose logs web worker
 ```
 
 ### 方案二：编译运行

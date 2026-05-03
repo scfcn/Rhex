@@ -42,7 +42,7 @@ export const POST = createRouteHandler(async ({ request }) => {
 
     try {
       const sessionToken = await createSessionToken(result.user.username, getRequestIp(request))
-      response.cookies.set(getSessionCookieName(), sessionToken, getSessionCookieOptions())
+      response.cookies.set(getSessionCookieName(), sessionToken, getSessionCookieOptions({ request }))
     } catch (error) {
       console.error("[api/auth/register] auto login failed after successful registration", {
         error,

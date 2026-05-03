@@ -19,6 +19,7 @@ import type { AccessThresholdOption } from "@/lib/access-threshold-options"
 import { saveAdminSiteSettings } from "@/lib/admin-site-settings-client"
 import { getAdminSettingsHref } from "@/lib/admin-settings-navigation"
 import type { AdminSettingsSectionKey } from "@/lib/admin-navigation"
+import { DEFAULT_MESSAGE_PROMPT_AUDIO_PATH } from "@/lib/message-prompt-audio"
 import type { UploadProvider } from "@/lib/upload-provider"
 import type { ImageWatermarkPosition } from "@/lib/site-settings-app-state"
 
@@ -54,6 +55,7 @@ interface AdminUploadSettingsFormProps {
     attachmentMaxFileSizeMb: number
     messageImageUploadEnabled: boolean
     messageFileUploadEnabled: boolean
+    messagePromptAudioPath: string
   }
   levelOptions: AccessThresholdOption[]
   vipLevelOptions: AccessThresholdOption[]
@@ -80,7 +82,7 @@ type WatermarkFontPresetKey = "default" | "zhimangxing" | "yahei" | "pingfang" |
 const UPLOAD_TABS = [
   { key: "storage", label: "上传配置" },
   { key: "watermark", label: "水印配置" },
-  { key: "attachment", label: "附件配置" },
+  { key: "attachment", label: "附件与私信" },
 ] as const
 
 const WATERMARK_FONT_PRESETS: Array<{
@@ -167,6 +169,7 @@ export function AdminUploadSettingsForm({
   const [attachmentMaxFileSizeMb, setAttachmentMaxFileSizeMb] = useState(String(normalizedAttachmentMaxFileSizeMb))
   const [messageImageUploadEnabled, setMessageImageUploadEnabled] = useState(Boolean(initialSettings.messageImageUploadEnabled))
   const [messageFileUploadEnabled, setMessageFileUploadEnabled] = useState(Boolean(initialSettings.messageFileUploadEnabled))
+  const [messagePromptAudioPath, setMessagePromptAudioPath] = useState(initialSettings.messagePromptAudioPath || DEFAULT_MESSAGE_PROMPT_AUDIO_PATH)
   const [feedback, setFeedback] = useState("")
   const [isPending, startTransition] = useTransition()
   const [activeTab, setActiveTab] = useState<UploadSettingsTabKey>(() => resolveUploadTab(initialSubTab))
@@ -179,7 +182,7 @@ export function AdminUploadSettingsForm({
     ? "保存上传配置"
     : activeTab === "watermark"
       ? "保存水印配置"
-      : "保存附件配置"
+      : "保存附件与私信配置"
 
   useEffect(() => {
     setActiveTab(resolveUploadTab(initialSubTab))
@@ -224,6 +227,7 @@ export function AdminUploadSettingsForm({
             attachmentMaxFileSizeMb: Number(attachmentMaxFileSizeMb),
             messageImageUploadEnabled,
             messageFileUploadEnabled,
+            messagePromptAudioPath,
             section: "upload",
           })
           setFeedback(result.message)
@@ -387,6 +391,14 @@ export function AdminUploadSettingsForm({
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <SettingsToggleField label="私信图片发送" checked={messageImageUploadEnabled} onChange={setMessageImageUploadEnabled} description="开启后，私信输入框支持上传和粘贴发送图片，并以内嵌图片消息展示。" />
               <SettingsToggleField label="私信文件发送" checked={messageFileUploadEnabled} onChange={setMessageFileUploadEnabled} description="开启后，私信支持上传文件，并以 file::FILENAME:FILEURL 的专用消息卡片展示。" />
+              <SettingsInputField
+                label="消息提示音 URL"
+                value={messagePromptAudioPath}
+                onChange={setMessagePromptAudioPath}
+                placeholder={DEFAULT_MESSAGE_PROMPT_AUDIO_PATH}
+                description="留空会回退到默认提示音 /apps/messages/prompt.mp3。可填写站内静态资源路径，也可填写完整音频 URL。"
+                className="md:col-span-2 xl:col-span-2"
+              />
               <SettingsToggleField label="启用附件上传" checked={attachmentUploadEnabled} onChange={setAttachmentUploadEnabled} description="关闭后不再允许上传站内附件，但仍可继续添加网盘链接附件。" />
               <SettingsToggleField label="启用附件下载" checked={attachmentDownloadEnabled} onChange={setAttachmentDownloadEnabled} description="关闭后仅拦截站内附件的下载与购买入口，网盘附件的信息查看不受影响。" />
               <div className="md:col-span-2 xl:col-span-2">

@@ -43,13 +43,13 @@ export async function GET(request: Request, props: OAuthProviderRouteProps) {
       setAccountBindingFlash(response, {
         type: "error",
         message: "第三方登录状态已失效，请重新发起登录",
-      })
+      }, request)
     } else {
       const redirectUrl = await buildRedirectUrl(fallbackTarget)
       redirectUrl.searchParams.set("authError", "第三方登录状态已失效，请重新发起登录")
       return NextResponse.redirect(redirectUrl)
     }
-    clearOAuthFlowState(response, params.provider)
+    clearOAuthFlowState(response, params.provider, request)
     return response
   }
 
@@ -77,24 +77,24 @@ export async function GET(request: Request, props: OAuthProviderRouteProps) {
       setAccountBindingFlash(response, {
         type: "success",
         message: `${identity.providerLabel} 账号已绑定到当前站内账户`,
-      })
-      clearOAuthFlowState(response, params.provider)
-      clearPendingExternalAuthState(response)
+      }, request)
+      clearOAuthFlowState(response, params.provider, request)
+      clearPendingExternalAuthState(response, request)
       return response
     }
     const result = await resolveExternalAuth(identity, settings, request)
 
     if (result.kind === "pending") {
       const response = NextResponse.redirect(await buildRedirectUrl("/auth/complete"))
-      clearOAuthFlowState(response, params.provider)
-      clearPendingExternalAuthState(response)
-      await setPendingExternalAuthState(response, result.state)
+      clearOAuthFlowState(response, params.provider, request)
+      clearPendingExternalAuthState(response, request)
+      await setPendingExternalAuthState(response, result.state, request)
       return response
     }
 
     const response = NextResponse.redirect(await buildRedirectUrl("/"))
-    clearOAuthFlowState(response, params.provider)
-    clearPendingExternalAuthState(response)
+    clearOAuthFlowState(response, params.provider, request)
+    clearPendingExternalAuthState(response, request)
 
     if (!result.created) {
       await recordSuccessfulExternalLogin(request, result.user)
@@ -110,7 +110,7 @@ export async function GET(request: Request, props: OAuthProviderRouteProps) {
       setAccountBindingFlash(response, {
         type: "error",
         message: error instanceof Error ? error.message : "第三方登录失败",
-      })
+      }, request)
     } else if (error instanceof Error) {
       const redirectUrl = await buildRedirectUrl(fallbackTarget)
       redirectUrl.searchParams.set("authError", error.message)
@@ -120,7 +120,7 @@ export async function GET(request: Request, props: OAuthProviderRouteProps) {
       redirectUrl.searchParams.set("authError", "第三方登录失败")
       return NextResponse.redirect(redirectUrl)
     }
-    clearOAuthFlowState(response, params.provider)
+    clearOAuthFlowState(response, params.provider, request)
     return response
   }
 }

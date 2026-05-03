@@ -7,6 +7,7 @@ import { enforceSensitiveText } from "@/lib/content-safety"
 import { resolvePagination } from "@/db/helpers"
 import { getAnonymousMaskDisplayIdentity } from "@/lib/post-anonymous"
 import { mapListPost } from "@/lib/post-map"
+import { recordFavoritePostTaskEvent } from "@/lib/task-center-service"
 import { getUserDisplayName } from "@/lib/user-display"
 import { normalizeBoolean, normalizePositiveInteger, normalizeTrimmedText } from "@/lib/shared/normalizers"
 
@@ -281,6 +282,14 @@ export async function ensureUserFavorite(userId: number, postId: string) {
         },
       },
     })
+  })
+
+  void recordFavoritePostTaskEvent({
+    type: "FAVORITE_POST",
+    userId,
+    postId,
+  }).catch((error) => {
+    console.error("[favorite-collections] record favorite task event failed", error)
   })
 
   return true

@@ -4,9 +4,10 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
 
 import { AddonEditor } from "@/components/addon-editor"
-import { Kbd } from "@/components/ui/kbd"
+import { Kbd, KbdGroup } from "@/components/ui/kbd"
 import { Button } from "@/components/ui/rbutton"
 import { toast } from "@/components/ui/toast"
+import { getClientPlatform, type ClientPlatform } from "@/lib/client-platform"
 import type { MarkdownEmojiItem } from "@/lib/markdown-emoji"
 import { cn } from "@/lib/utils"
 
@@ -39,6 +40,7 @@ export function CommentForm({ postId, commentId, initialContent = "", mode = "cr
   const [message, setMessage] = useState("")
   const [loading, setLoading] = useState(false)
   const [expanded, setExpanded] = useState(mode === "edit" || !compact)
+  const [shortcutPlatform, setShortcutPlatform] = useState<ClientPlatform>("other")
 
   useEffect(() => {
     setContent(initialContent)
@@ -47,6 +49,10 @@ export function CommentForm({ postId, commentId, initialContent = "", mode = "cr
   useEffect(() => {
     setUseAnonymousIdentity(anonymousIdentityDefaultChecked)
   }, [anonymousIdentityDefaultChecked])
+
+  useEffect(() => {
+    setShortcutPlatform(getClientPlatform())
+  }, [])
 
   useEffect(() => {
     if (replyToUserName && mode === "create") {
@@ -64,7 +70,8 @@ export function CommentForm({ postId, commentId, initialContent = "", mode = "cr
 
   const helperMessage = commentsVisibleToAuthorOnly
     ? "当前帖子开启了评论仅楼主可见，你的评论仅楼主、管理员和你自己可见。"
-    : "可使用 @用户名 提及他人，"
+    : "可使用 @用户名 提及他人。"
+  const primaryShortcutKey = shortcutPlatform === "mac" ? "Cmd" : "Ctrl"
   const formClassName = compact
     ? "min-w-0 w-full flex flex-col gap-3 rounded-[18px] border border-border bg-card p-4"
     : embedded
@@ -199,14 +206,13 @@ export function CommentForm({ postId, commentId, initialContent = "", mode = "cr
         ) : (
           <span className="inline-flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
             <span>{helperMessage}</span>
-            <Kbd className="min-w-fit px-1.5 font-mono text-[10px]">Ctrl</Kbd>
-            <span>+</span>
-            <Kbd className="min-w-fit px-1.5 font-mono text-[10px]">Enter</Kbd>
-            <span>/</span>
-            <Kbd className="min-w-fit px-1.5 font-mono text-[10px]">Cmd</Kbd>
-            <span>+</span>
-            <Kbd className="min-w-fit px-1.5 font-mono text-[10px]">Enter</Kbd>
-            <span>快速提交</span>
+            <KbdGroup className="hidden flex-wrap items-center gap-1.5 sm:inline-flex">
+              <span>按</span>
+              <Kbd className="min-w-fit px-1.5 font-mono text-[10px]">{primaryShortcutKey}</Kbd>
+              <span>+</span>
+              <Kbd className="min-w-fit px-1.5 font-mono text-[10px]">Enter</Kbd>
+              <span>快速提交</span>
+            </KbdGroup>
           </span>
         )}
 

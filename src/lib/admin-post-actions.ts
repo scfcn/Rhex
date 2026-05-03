@@ -22,6 +22,7 @@ import { revalidateHomeSidebarStatsCache } from "@/lib/home-sidebar-stats"
 import { ensureCanManageBoard, ensureCanManagePost, getAvailablePinScopes } from "@/lib/moderator-permissions"
 import { createSystemNotification } from "@/lib/notification-writes"
 import { activatePostAuctionForPost } from "@/lib/post-auctions"
+import { recordApprovedPostTaskEvent } from "@/lib/task-center-service"
 import { expireTaxonomyCacheImmediately } from "@/lib/taxonomy-cache"
 
 export const adminPostActionHandlers: Record<string, AdminActionDefinition> = {
@@ -153,6 +154,15 @@ export const adminPostActionHandlers: Record<string, AdminActionDefinition> = {
     }
 
     await writeAdminActionLog(context, adminPostActionHandlers["post.approve"].metadata)
+    void recordApprovedPostTaskEvent({
+      type: "APPROVED_POST",
+      userId: post.authorId,
+      postId: post.id,
+      boardId: post.boardId,
+      postType: post.type,
+    }).catch((error) => {
+      console.warn("[admin-post-actions] failed to record task progress for approved post", error)
+    })
     return { message: "帖子已审核通过" }
   }),
   "post.reject": defineAdminAction({ targetType: "POST", revalidatePaths: ["/", "/admin"], buildDetail: () => "管理员驳回帖子审核" }, async (context) => {

@@ -123,6 +123,38 @@ export function CommentThread({ threadId, comments, flatComments = [], postId, p
 
   const replyHint = replyTarget ? `正在回复 @${replyTarget.replyToUserName}` : null
 
+  const findRootCommentByCommentId = useCallback((commentId: string) => {
+    for (const comment of localComments) {
+      if (comment.id === commentId || comment.replies.some((reply) => reply.id === commentId)) {
+        return comment
+      }
+    }
+
+    return null
+  }, [localComments])
+
+  const ensureHighlightedCommentVisible = useCallback((commentId: string) => {
+    if (currentDisplayMode !== "tree") {
+      return
+    }
+
+    const rootComment = findRootCommentByCommentId(commentId)
+    if (!rootComment || rootComment.id === commentId || rootComment.replies.length <= initialVisibleReplies) {
+      return
+    }
+
+    setExpandedReplies((current) => {
+      if (current[rootComment.id]) {
+        return current
+      }
+
+      return {
+        ...current,
+        [rootComment.id]: true,
+      }
+    })
+  }, [currentDisplayMode, findRootCommentByCommentId, initialVisibleReplies])
+
   const triggerCommentHighlight = useCallback((commentId: string) => {
     setHighlightedCommentId(null)
     window.requestAnimationFrame(() => {
@@ -165,14 +197,48 @@ export function CommentThread({ threadId, comments, flatComments = [], postId, p
       return
     }
 
+    ensureHighlightedCommentVisible(highlightedCommentId)
+
+    let cancelled = false
+    let rafId = 0
+    let attempts = 0
+
+    const scrollToHighlightedComment = () => {
+      if (cancelled) {
+        return
+      }
+
+      const target = document.getElementById(`comment-${highlightedCommentId}`)
+      if (target) {
+        target.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        })
+        return
+      }
+
+      if (attempts >= 10) {
+        return
+      }
+
+      attempts += 1
+      rafId = window.requestAnimationFrame(scrollToHighlightedComment)
+    }
+
+    rafId = window.requestAnimationFrame(scrollToHighlightedComment)
+
     const timeoutId = window.setTimeout(() => {
       setHighlightedCommentId((current) => current === highlightedCommentId ? null : current)
     }, 2600)
 
     return () => {
+      cancelled = true
+      if (rafId) {
+        window.cancelAnimationFrame(rafId)
+      }
       window.clearTimeout(timeoutId)
     }
-  }, [highlightedCommentId])
+  }, [ensureHighlightedCommentVisible, highlightedCommentId])
 
   const updateReplyBoxPinnedLayout = useCallback(() => {
     const element = replyBoxContainerRef.current

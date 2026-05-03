@@ -66,6 +66,7 @@ async function buildRedirectUrl(path: string) {
 }
 
 async function redirectWithError(
+  request: Request,
   targetPath: string,
   provider: string,
   message: string,
@@ -78,13 +79,13 @@ async function redirectWithError(
     setAccountBindingFlash(response, {
       type: "error",
       message,
-    })
+    }, request)
   } else {
     redirectUrl.searchParams.set("authError", message)
     response = NextResponse.redirect(redirectUrl)
   }
 
-  clearOAuthFlowState(response, provider)
+  clearOAuthFlowState(response, provider, request)
   return response
 }
 
@@ -146,6 +147,7 @@ export async function POST(request: Request) {
 
   if (!oauthState) {
     return redirectWithError(
+      request,
       fallbackTarget,
       providerCode,
       "第三方登录状态已失效，请重新发起登录",
@@ -176,9 +178,9 @@ export async function POST(request: Request) {
       setAccountBindingFlash(response, {
         type: "success",
         message: `${identity.providerLabel} 账号已绑定到当前站内账户`,
-      })
-      clearOAuthFlowState(response, providerCode)
-      clearPendingExternalAuthState(response)
+      }, request)
+      clearOAuthFlowState(response, providerCode, request)
+      clearPendingExternalAuthState(response, request)
       return response
     }
 
@@ -186,15 +188,15 @@ export async function POST(request: Request) {
 
     if (result.kind === "pending") {
       const response = NextResponse.redirect(await buildRedirectUrl("/auth/complete"))
-      clearOAuthFlowState(response, providerCode)
-      clearPendingExternalAuthState(response)
-      await setPendingExternalAuthState(response, result.state)
+      clearOAuthFlowState(response, providerCode, request)
+      clearPendingExternalAuthState(response, request)
+      await setPendingExternalAuthState(response, result.state, request)
       return response
     }
 
     const response = NextResponse.redirect(await buildRedirectUrl("/"))
-    clearOAuthFlowState(response, providerCode)
-    clearPendingExternalAuthState(response)
+    clearOAuthFlowState(response, providerCode, request)
+    clearPendingExternalAuthState(response, request)
 
     if (!result.created) {
       await recordSuccessfulExternalLogin(request, result.user)
@@ -204,6 +206,7 @@ export async function POST(request: Request) {
     return response
   } catch (error) {
     return redirectWithError(
+      request,
       fallbackTarget,
       providerCode,
       error instanceof Error ? error.message : "第三方登录失败",

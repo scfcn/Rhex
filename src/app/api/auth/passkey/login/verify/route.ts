@@ -61,7 +61,7 @@ export const POST = createRouteHandler(async ({ request }) => {
     username: linked.user.username,
   }, "success"))
 
-  clearPasskeyCeremonyState(response, "login")
+  clearPasskeyCeremonyState(response, "login", request)
   await attachAuthenticatedSession(response, request, linked.user)
 
   return response

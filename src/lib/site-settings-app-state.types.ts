@@ -142,6 +142,7 @@ export interface AttachmentFeatureSettings {
 export interface MessageMediaSettings {
   imageUploadEnabled: boolean
   fileUploadEnabled: boolean
+  promptAudioPath: string
 }
 
 export interface HomeSidebarAnnouncementSettings {

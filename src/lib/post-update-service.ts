@@ -92,8 +92,8 @@ export async function updatePostFlow(input: {
         content,
         isAnonymous: post.isAnonymous,
         coverPath,
-        boardSlug: validated.data.boardSlug,
-        postType: validated.data.postType,
+        boardSlug: post.board.slug,
+        postType: post.type,
         bountyPoints: validated.data.bountyPoints,
         auctionConfig: validated.data.auctionConfig,
         pollOptions: validated.data.pollOptions,
@@ -127,13 +127,23 @@ export async function updatePostFlow(input: {
       payload: {
         mode: "update",
         postId: input.postId,
-        boardSlug: validated.data.boardSlug,
-        postType: validated.data.postType,
+        boardSlug: post.board.slug,
+        postType: post.type,
       },
     })
-    const { value: hookedTitle } = resolveHookedStringValue(title, titleHookResult.value)
+    const { value: hookedTitle, changed: titleHookAdjusted } = resolveHookedStringValue(title, titleHookResult.value)
+    const contentHookResult = await executeAddonWaterfallHook("post.content.value", content, {
+      ...hookContext,
+      payload: {
+        mode: "update",
+        postId: input.postId,
+        boardSlug: post.board.slug,
+        postType: post.type,
+      },
+    })
+    const { value: hookedContent, changed: contentHookAdjusted } = resolveHookedStringValue(content, contentHookResult.value)
     const titleSafety = await enforceSensitiveText({ scene: "post.title", text: hookedTitle })
-    const contentSafety = await enforceSensitiveText({ scene: "post.content", text: content })
+    const contentSafety = await enforceSensitiveText({ scene: "post.content", text: hookedContent })
     const loginUnlockSafety = loginUnlockContent ? await enforceSensitiveText({ scene: "post.content", text: loginUnlockContent }) : null
     const replyUnlockSafety = replyUnlockContent ? await enforceSensitiveText({ scene: "post.content", text: replyUnlockContent }) : null
     const purchaseUnlockSafety = purchaseUnlockContent ? await enforceSensitiveText({ scene: "post.content", text: purchaseUnlockContent }) : null
@@ -152,7 +162,9 @@ export async function updatePostFlow(input: {
     }))
     const summary = extractSummaryFromContent(getAllPostContentText(serializedContent))
     const contentAdjusted = Boolean(
-      titleSafety.wasReplaced
+      titleHookAdjusted
+      || contentHookAdjusted
+      || titleSafety.wasReplaced
       || contentSafety.wasReplaced
       || loginUnlockSafety?.wasReplaced
       || replyUnlockSafety?.wasReplaced
@@ -266,7 +278,17 @@ export async function updatePostFlow(input: {
     }
   }
 
-  const appendSafety = await enforceSensitiveText({ scene: "post.content", text: appendedContent })
+  const appendedContentHookResult = await executeAddonWaterfallHook("post.content.value", appendedContent, {
+    ...hookContext,
+    payload: {
+      mode: "append",
+      postId: input.postId,
+      boardSlug: post.board.slug,
+      postType: post.type,
+    },
+  })
+  const { value: hookedAppendedContent, changed: appendHookAdjusted } = resolveHookedStringValue(appendedContent, appendedContentHookResult.value)
+  const appendSafety = await enforceSensitiveText({ scene: "post.content", text: hookedAppendedContent })
   const nextSortOrder = (post.appendices[0]?.sortOrder ?? -1) + 1
   let mentionUserIds = [] as number[]
 
@@ -326,7 +348,7 @@ export async function updatePostFlow(input: {
   return {
     post,
     mode: "append" as const,
-    contentAdjusted: appendSafety.wasReplaced,
+    contentAdjusted: appendHookAdjusted || appendSafety.wasReplaced,
     mentionUserIds,
   }
 }

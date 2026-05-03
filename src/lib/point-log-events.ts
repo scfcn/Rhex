@@ -19,6 +19,7 @@ export const POINT_LOG_EVENT_TYPES = {
   POST_TIP_RECEIVED: "POST_TIP_RECEIVED",
   POST_TIP_SENT: "POST_TIP_SENT",
   POINTS_TOPUP: "POINTS_TOPUP",
+  TASK_REWARD: "TASK_REWARD",
 } as const
 
 export type PointLogEventType = (typeof POINT_LOG_EVENT_TYPES)[keyof typeof POINT_LOG_EVENT_TYPES]
@@ -44,6 +45,7 @@ export const POINT_LOG_EVENT_LABELS: Record<PointLogEventType, string> = {
   POST_TIP_RECEIVED: "收到打赏",
   POST_TIP_SENT: "打赏支出",
   POINTS_TOPUP: "积分充值",
+  TASK_REWARD: "任务奖励",
 } as const
 
 export function normalizePointLogEventType(eventType?: string | null): PointLogEventType {

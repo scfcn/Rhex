@@ -549,6 +549,29 @@
   .markdown-body.markdown-body--image-only img.my-4 {
     max-width: 100%;
   }
+  .message-markdown img.my-3,
+  .message-markdown img.my-4 {
+    display: block;
+    width: auto;
+    max-width: min(100%, 20em);
+    max-height: min(22rem, 48vh);
+    object-fit: contain;
+    border-radius: 1rem;
+  }
+  .message-markdown p:has(> img:only-child),
+  .message-markdown p:has(> a:only-child > img:only-child) {
+    max-width: min(100%, 20em);
+  }
+  .message-markdown p:has(> img:only-child) > img,
+  .message-markdown p:has(> a:only-child > img:only-child) img {
+    width: auto;
+    max-height: min(22rem, 48vh);
+    object-fit: contain;
+  }
+  .message-markdown.markdown-body--image-only img.my-3,
+  .message-markdown.markdown-body--image-only img.my-4 {
+    max-width: min(100%, 20em);
+  }
   .markdown-body .md-emoji-image .md-emoji-icon {
     display: block;
     width: auto;

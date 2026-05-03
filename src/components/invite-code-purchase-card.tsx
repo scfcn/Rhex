@@ -221,6 +221,17 @@ export function InviteCodePurchaseCard({ enabled, price, priceDescription, point
             loading={historyLoading}
             onChange={(page) => { void loadPurchasedInviteCodes(page) }}
           />
+
+          <div className="border-t border-border pt-4 sm:hidden">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full rounded-full"
+              onClick={() => setHistoryOpen(false)}
+            >
+              关闭
+            </Button>
+          </div>
         </div>
       </Modal>
     </>

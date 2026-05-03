@@ -11,6 +11,7 @@ import { revalidateHomeSidebarStatsCache } from "@/lib/home-sidebar-stats"
 import { enqueueEvaluateUserLevelProgress } from "@/lib/level-system"
 import { enqueueNotifications } from "@/lib/notification-writes"
 import { logRequestSucceeded } from "@/lib/request-log"
+import { recordApprovedCommentTaskEvent } from "@/lib/task-center-service"
 import { revalidateUserSurfaceCache } from "@/lib/user-surface"
 import { getCurrentSessionActor } from "@/lib/auth"
 
@@ -106,6 +107,15 @@ export async function executeCommentCreation(body: unknown, options: ExecuteComm
   revalidateUserSurfaceCache(author.id)
   if (!result.reviewRequired) {
     revalidateHomeSidebarStatsCache()
+    void recordApprovedCommentTaskEvent({
+      type: "APPROVED_COMMENT",
+      userId: author.id,
+      commentId: result.created.id,
+      postId: result.postId,
+      boardId: result.boardId,
+    }).catch((error) => {
+      console.warn("[comment-create-execution] failed to record task progress", error)
+    })
   }
 
   if (!result.reviewRequired) {

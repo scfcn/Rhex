@@ -2,6 +2,7 @@ import { updateSiteSettingsRecord } from "@/db/site-settings-write-queries"
 import { apiError, readOptionalStringField, type JsonObject } from "@/lib/api-route"
 import { finalizeSiteSettingsUpdate, type SiteSettingsRecord } from "@/lib/admin-site-settings-shared"
 import { mergeAttachmentFeatureSettings, mergeImageWatermarkSettings, mergeMarkdownImageUploadSettings, mergeMessageMediaSettings, mergeUploadObjectStorageSettings, resolveAttachmentFeatureSettings, resolveImageWatermarkSettings, resolveMarkdownImageUploadSettings, resolveMessageMediaSettings, resolveUploadObjectStorageSettings, type ImageWatermarkPosition } from "@/lib/site-settings-app-state"
+import { DEFAULT_MESSAGE_PROMPT_AUDIO_PATH } from "@/lib/message-prompt-audio"
 import { normalizeNonNegativeInteger, normalizePositiveInteger } from "@/lib/shared/normalizers"
 import { mergeUploadStorageSensitiveConfig, resolveUploadStorageSensitiveConfig } from "@/lib/site-settings-sensitive-state"
 import { normalizeUploadLocalPath } from "@/lib/upload-path"
@@ -61,6 +62,7 @@ export async function updateUploadSiteSettingsSection(existing: SiteSettingsReco
     appStateJson: existing.appStateJson,
     imageUploadEnabledFallback: false,
     fileUploadEnabledFallback: false,
+    promptAudioPathFallback: DEFAULT_MESSAGE_PROMPT_AUDIO_PATH,
   })
   const existingUploadObjectStorageSettings = resolveUploadObjectStorageSettings({
     appStateJson: existing.appStateJson,
@@ -102,6 +104,9 @@ export async function updateUploadSiteSettingsSection(existing: SiteSettingsReco
   const messageFileUploadEnabled = body.messageFileUploadEnabled === undefined
     ? existingMessageMediaSettings.fileUploadEnabled
     : Boolean(body.messageFileUploadEnabled)
+  const messagePromptAudioPath = body.messagePromptAudioPath === undefined
+    ? existingMessageMediaSettings.promptAudioPath
+    : readOptionalStringField(body, "messagePromptAudioPath")
   const uploadS3ForcePathStyle = body.uploadS3ForcePathStyle === undefined
     ? existingUploadObjectStorageSettings.forcePathStyle
     : Boolean(body.uploadS3ForcePathStyle)
@@ -153,6 +158,7 @@ export async function updateUploadSiteSettingsSection(existing: SiteSettingsReco
   const appStateWithMessageMedia = mergeMessageMediaSettings(appStateWithAttachmentFeature, {
     imageUploadEnabled: messageImageUploadEnabled,
     fileUploadEnabled: messageFileUploadEnabled,
+    promptAudioPath: messagePromptAudioPath,
   })
   const appStateJson = mergeUploadObjectStorageSettings(appStateWithMessageMedia, {
     forcePathStyle: uploadS3ForcePathStyle,

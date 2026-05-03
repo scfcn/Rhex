@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto"
 
+import { shouldUseSecureCookies, type CookieSecurityContext } from "@/lib/cookie-security"
 import { normalizeIp } from "@/lib/request-ip"
 import { persistSessionRecord, readPersistedSessionRecord, revokePersistedSession } from "@/lib/session-store"
 import { getServerSiteSettings } from "@/lib/site-settings"
@@ -243,21 +244,21 @@ export function getSessionMaxAge() {
   return SESSION_TTL_SECONDS
 }
 
-export function getSessionCookieOptions() {
+export function getSessionCookieOptions(context?: CookieSecurityContext) {
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookies(context),
     path: "/",
     maxAge: SESSION_TTL_SECONDS,
   }
 }
 
-export function getSessionClearedCookieOptions() {
+export function getSessionClearedCookieOptions(context?: CookieSecurityContext) {
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookies(context),
     path: "/",
     maxAge: 0,
   }

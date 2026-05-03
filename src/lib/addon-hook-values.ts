@@ -16,3 +16,20 @@ export function resolveHookedStringValue(
     changed: nextValue !== currentValue,
   }
 }
+
+export function resolveHookedOptionalStringValue(
+  currentValue: string,
+  hookedValue: unknown,
+) {
+  if (typeof hookedValue !== "string") {
+    return {
+      value: currentValue,
+      changed: false,
+    }
+  }
+
+  return {
+    value: hookedValue,
+    changed: hookedValue !== currentValue,
+  }
+}

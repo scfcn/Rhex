@@ -7,6 +7,7 @@ import {
   readSiteSettingsState,
   writeSiteSettingsState,
 } from "@/lib/site-settings-app-state.types"
+import { normalizeMessagePromptAudioPath } from "@/lib/message-prompt-audio"
 import type {
   AttachmentFeatureSettings,
   ImageWatermarkPosition,
@@ -263,6 +264,7 @@ export function resolveMessageMediaSettings(options: {
   appStateJson?: string | null
   imageUploadEnabledFallback?: boolean
   fileUploadEnabledFallback?: boolean
+  promptAudioPathFallback?: string
 } = {}): MessageMediaSettings {
   const siteSettingsState = readSiteSettingsState(options.appStateJson)
   const messageMedia = isRecord(siteSettingsState.messageMedia)
@@ -278,6 +280,10 @@ export function resolveMessageMediaSettings(options: {
       typeof messageMedia.fileUploadEnabled === "boolean"
         ? messageMedia.fileUploadEnabled
         : options.fileUploadEnabledFallback ?? false,
+    promptAudioPath: normalizeMessagePromptAudioPath(
+      messageMedia.promptAudioPath,
+      options.promptAudioPathFallback,
+    ),
   }
 }
 
@@ -292,6 +298,7 @@ export function mergeMessageMediaSettings(
     messageMedia: {
       imageUploadEnabled: Boolean(input.imageUploadEnabled),
       fileUploadEnabled: Boolean(input.fileUploadEnabled),
+      promptAudioPath: normalizeMessagePromptAudioPath(input.promptAudioPath),
     },
   })
 }

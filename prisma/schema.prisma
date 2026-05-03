@@ -191,6 +191,50 @@ enum AnnouncementStatus {
   OFFLINE
 }
 
+enum TaskCategory {
+  NEWBIE
+  DAILY
+  CHALLENGE
+}
+
+enum TaskCycleType {
+  PERMANENT
+  DAILY
+  WEEKLY
+}
+
+enum TaskConditionType {
+  CHECK_IN_COUNT
+  APPROVED_POST_COUNT
+  APPROVED_COMMENT_COUNT
+  GIVEN_LIKE_COUNT
+  RECEIVED_LIKE_COUNT
+  APPROVED_COMMENT_DISTINCT_POST_COUNT
+  FAVORITE_POST_COUNT
+  FOLLOW_BOARD_COUNT
+  FOLLOW_USER_COUNT
+  FOLLOW_TAG_COUNT
+  FOLLOW_POST_COUNT
+}
+
+enum TaskDefinitionStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum TaskRewardTier {
+  NORMAL
+  VIP1
+  VIP2
+  VIP3
+}
+
+enum UserTaskProgressStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
 enum SiteDocumentType {
   ANNOUNCEMENT
   HELP
@@ -491,6 +535,10 @@ model User {
   autoCategorizeTasksRequested     AutoCategorizeTask[]           @relation("AutoCategorizeTaskRequesterUser")
   paymentOrders                    PaymentOrder[]
   aiModerationSuggestionsReviewed  AiModerationSuggestion[]
+  createdTaskDefinitions           TaskDefinition[]               @relation("TaskDefinitionCreator")
+  updatedTaskDefinitions           TaskDefinition[]               @relation("TaskDefinitionUpdater")
+  taskProgresses                   UserTaskProgress[]
+  taskEventLedgers                 UserTaskEventLedger[]
 
   @@index([role])
   @@index([status])
@@ -1930,6 +1978,42 @@ model SiteSetting {
   updatedAt                     DateTime @updatedAt @db.Timestamptz(3)
 }
 
+model TaskDefinition {
+  id                  String               @id @default(cuid())
+  code                String               @unique
+  title               String
+  description         String?
+  category            TaskCategory
+  cycleType           TaskCycleType
+  conditionType       TaskConditionType
+  conditionConfigJson Json?
+  targetCount         Int
+  rewardNormalMin     Int                  @default(0)
+  rewardNormalMax     Int                  @default(0)
+  rewardVip1Min       Int                  @default(0)
+  rewardVip1Max       Int                  @default(0)
+  rewardVip2Min       Int                  @default(0)
+  rewardVip2Max       Int                  @default(0)
+  rewardVip3Min       Int                  @default(0)
+  rewardVip3Max       Int                  @default(0)
+  status              TaskDefinitionStatus @default(ACTIVE)
+  sortOrder           Int                  @default(0)
+  startsAt            DateTime?            @db.Timestamptz(3)
+  endsAt              DateTime?            @db.Timestamptz(3)
+  createdById         Int?
+  updatedById         Int?
+  createdAt           DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime             @updatedAt @db.Timestamptz(3)
+  createdBy           User?                @relation("TaskDefinitionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy           User?                @relation("TaskDefinitionUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  progresses          UserTaskProgress[]
+  eventLedgers        UserTaskEventLedger[]
+
+  @@index([status, conditionType, sortOrder])
+  @@index([category, cycleType, sortOrder])
+  @@index([startsAt, endsAt])
+}
+
 model PaymentOrder {
   id                      String                   @id @default(cuid())
   merchantOrderNo         String                   @unique
@@ -2373,6 +2457,50 @@ model UserCheckInLog {
   @@index([userId])
   @@index([userId, createdAt])
   @@index([checkedInOn])
+}
+
+model UserTaskProgress {
+  id                    String                 @id @default(cuid())
+  userId                Int
+  taskId                String
+  cycleKey              String
+  categorySnapshot      TaskCategory
+  cycleTypeSnapshot     TaskCycleType
+  conditionTypeSnapshot TaskConditionType
+  targetCountSnapshot   Int
+  rewardTierSnapshot    TaskRewardTier
+  rewardMinSnapshot     Int
+  rewardMaxSnapshot     Int
+  progressCount         Int                    @default(0)
+  settledRewardPoints   Int?
+  status                UserTaskProgressStatus @default(IN_PROGRESS)
+  completedAt           DateTime?              @db.Timestamptz(3)
+  settledAt             DateTime?              @db.Timestamptz(3)
+  metadataJson          Json?
+  createdAt             DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime               @updatedAt @db.Timestamptz(3)
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task                  TaskDefinition         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, taskId, cycleKey])
+  @@index([userId, categorySnapshot, cycleKey])
+  @@index([userId, status, updatedAt])
+  @@index([taskId, cycleKey])
+}
+
+model UserTaskEventLedger {
+  id        String         @id @default(cuid())
+  userId    Int
+  taskId    String
+  cycleKey  String
+  eventKey  String
+  createdAt DateTime       @default(now()) @db.Timestamptz(3)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task      TaskDefinition @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, taskId, cycleKey, eventKey])
+  @@index([userId, createdAt])
+  @@index([taskId, cycleKey, createdAt])
 }
 
 model UserLoginLog {

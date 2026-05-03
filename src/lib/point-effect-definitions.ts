@@ -30,6 +30,7 @@ export const POINT_EFFECT_SCOPE_OPTIONS = [
   { value: "INVITE_REWARD_INVITEE", label: "被邀请人奖励", targetTypes: [PointEffectTargetType.POINTS], badgeEffectEnabled: false, badgeEffectRuntimeMatchable: false },
   { value: "REGISTER_INITIAL_REWARD", label: "注册初始奖励", targetTypes: [PointEffectTargetType.POINTS], badgeEffectEnabled: false, badgeEffectRuntimeMatchable: false },
   { value: "POINTS_TOPUP", label: "积分充值", targetTypes: [PointEffectTargetType.POINTS], badgeEffectEnabled: false, badgeEffectRuntimeMatchable: false },
+  { value: "TASK_REWARD", label: "任务奖励", targetTypes: [PointEffectTargetType.POINTS], badgeEffectEnabled: false, badgeEffectRuntimeMatchable: false },
   { value: "VIP_PURCHASE", label: "VIP 购买", targetTypes: [PointEffectTargetType.POINTS], badgeEffectEnabled: false, badgeEffectRuntimeMatchable: false },
   { value: "POST_OFFLINE_PURCHASE", label: "帖子下线消耗", targetTypes: [PointEffectTargetType.POINTS], badgeEffectEnabled: false, badgeEffectRuntimeMatchable: false },
   { value: "POST_UNLOCK_OUTGOING", label: "付费内容购买支出", targetTypes: [PointEffectTargetType.POINTS], badgeEffectEnabled: false, badgeEffectRuntimeMatchable: false },

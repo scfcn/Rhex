@@ -22,12 +22,12 @@ export async function proxy(request: NextRequest) {
 
   if (protectedPath) {
     const response = buildUnauthorizedResponse(request)
-    response.cookies.set(getSessionCookieName(), "", getSessionClearedCookieOptions())
+    response.cookies.set(getSessionCookieName(), "", getSessionClearedCookieOptions({ request }))
     return response
   }
 
   const response = NextResponse.next()
-  response.cookies.set(getSessionCookieName(), "", getSessionClearedCookieOptions())
+  response.cookies.set(getSessionCookieName(), "", getSessionClearedCookieOptions({ request }))
   return response
 }
 

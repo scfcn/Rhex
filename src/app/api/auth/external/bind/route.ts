@@ -28,7 +28,7 @@ export const POST = createRouteHandler(async ({ request }) => {
     redirectTo: "/",
   }, "success"))
 
-  clearPendingExternalAuthState(response)
+  clearPendingExternalAuthState(response, request)
   await attachAuthenticatedSession(response, request, user)
 
   return response

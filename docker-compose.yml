@@ -2,9 +2,19 @@ x-app-environment: &app-environment
   DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-bbs}?schema=public
   REDIS_URL: redis://redis:6379
 
+x-app-service: &app-service
+  image: ${APP_IMAGE:-ghcr.io/lovedevpanda/rhex:latest}
+  pull_policy: always
+  init: true
+  env_file:
+    - .env
+  volumes:
+    - ./uploads:/app/uploads
+    - ./addons:/app/addons
+
 services:
   postgres:
-    image: postgres:latest
+    image: postgres:18
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-bbs}
@@ -16,7 +26,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-bbs}"]
+      # Use TCP readiness so dependent containers don't start while initdb's socket-only server is running.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-bbs}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -38,30 +49,20 @@ services:
       start_period: 5s
 
   setup:
-    image: ${APP_IMAGE:-ghcr.io/lovedevpanda/rhex:latest}
-    pull_policy: always
-    env_file:
-      - .env
+    <<: *app-service
+    restart: on-failure
     environment: *app-environment
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./uploads:/app/uploads
-      - ./addons:/app/addons
     command: ["pnpm", "run", "setup:prod"]
-    restart: "no"
 
   web:
-    image: ${APP_IMAGE:-ghcr.io/lovedevpanda/rhex:latest}
-    pull_policy: always
-    init: true
+    <<: *app-service
     restart: unless-stopped
     stop_grace_period: 30s
-    env_file:
-      - .env
     environment:
       <<: *app-environment
       HOSTNAME: ${HOSTNAME:-0.0.0.0}
@@ -69,36 +70,30 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+        restart: true
       redis:
         condition: service_healthy
+        restart: true
       setup:
         condition: service_completed_successfully
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
-    volumes:
-      - ./uploads:/app/uploads
-      - ./addons:/app/addons
     command: ["pnpm", "run", "start"]
 
   worker:
-    image: ${APP_IMAGE:-ghcr.io/lovedevpanda/rhex:latest}
-    pull_policy: always
-    init: true
+    <<: *app-service
     restart: unless-stopped
     stop_grace_period: 30s
-    env_file:
-      - .env
     environment: *app-environment
     depends_on:
       postgres:
         condition: service_healthy
+        restart: true
       redis:
         condition: service_healthy
+        restart: true
       setup:
         condition: service_completed_successfully
-    volumes:
-      - ./uploads:/app/uploads
-      - ./addons:/app/addons
     command: ["pnpm", "run", "worker"]
 
 volumes:

@@ -95,9 +95,9 @@ function mapItem(item: Awaited<ReturnType<typeof findApprovedFriendLinks>>[numbe
   }
 }
 
-export async function getFriendLinkListData(): Promise<FriendLinkListData> {
+export async function getFriendLinkListData(compactLimit = 9): Promise<FriendLinkListData> {
   const [compact, featured] = await Promise.all([
-    findApprovedFriendLinks(9),
+    findApprovedFriendLinks(compactLimit),
     findApprovedFriendLinks(),
   ])
 

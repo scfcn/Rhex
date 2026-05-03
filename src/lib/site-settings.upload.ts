@@ -39,6 +39,7 @@ export interface SiteSettingsUploadData {
   attachmentMaxFileSizeMb: number
   messageImageUploadEnabled: boolean
   messageFileUploadEnabled: boolean
+  messagePromptAudioPath: string
   markdownEmojiMapJson?: string | null
   markdownEmojiMap: SiteSettingsMarkdownEmojiItem[]
   appStateJson?: string | null

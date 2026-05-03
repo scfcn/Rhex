@@ -12,6 +12,8 @@ import { AdminSettingsWorkspace } from "@/components/admin/admin-settings-worksp
 import { AdminShell } from "@/components/admin/admin-shell"
 import { AdminUploadSettingsForm } from "@/components/admin/admin-upload-settings-form"
 import { AdminVipSettingsForm } from "@/components/admin/admin-vip-settings-form"
+import { getAdminTaskList } from "@/lib/admin-task-center"
+import { getBoards } from "@/lib/boards"
 import { getInviteCodeList } from "@/lib/invite-codes"
 import { getLevelDefinitions } from "@/lib/level-system"
 import { getRedeemCodeList } from "@/lib/redeem-codes"
@@ -77,6 +79,8 @@ export default async function AdminSettingsPage(
     siteSettings,
     inviteCodes,
     redeemCodes,
+    tasks,
+    taskBoards,
     friendLinks,
     levelDefinitions,
   ] = await Promise.all([
@@ -89,6 +93,12 @@ export default async function AdminSettingsPage(
     resolved.section === "vip"
       ? getRedeemCodeList()
       : Promise.resolve<Awaited<ReturnType<typeof getRedeemCodeList>>>([]),
+    resolved.section === "vip"
+      ? getAdminTaskList()
+      : Promise.resolve<Awaited<ReturnType<typeof getAdminTaskList>>>([]),
+    resolved.section === "vip"
+      ? getBoards()
+      : Promise.resolve<Awaited<ReturnType<typeof getBoards>>>([]),
     resolved.section === "friend-links"
       ? getAdminFriendLinkPageData()
       : Promise.resolve<Awaited<ReturnType<typeof getAdminFriendLinkPageData>> | null>(null),
@@ -190,6 +200,12 @@ export default async function AdminSettingsPage(
             initialSubTab={resolved.subTab}
             tabRouteSection="vip"
             initialRedeemCodes={redeemCodes}
+            initialTasks={tasks}
+            initialTaskBoards={taskBoards.map((item) => ({
+              id: item.id,
+              name: item.name,
+              slug: item.slug,
+            }))}
           />
         ) : null}
 
@@ -232,6 +248,7 @@ export default async function AdminSettingsPage(
               attachmentMaxFileSizeMb: Number(siteSettings!.attachmentMaxFileSizeMb ?? 20),
               messageImageUploadEnabled: Boolean(siteSettings!.messageImageUploadEnabled),
               messageFileUploadEnabled: Boolean(siteSettings!.messageFileUploadEnabled),
+              messagePromptAudioPath: siteSettings!.messagePromptAudioPath,
             }}
             levelOptions={uploadLevelOptions}
             vipLevelOptions={uploadVipLevelOptions}

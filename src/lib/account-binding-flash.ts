@@ -1,5 +1,7 @@
 import type { NextResponse } from "next/server"
 
+import { shouldUseSecureCookies } from "@/lib/cookie-security"
+
 const ACCOUNT_BINDING_FLASH_COOKIE_NAME = "bbs_account_binding_flash"
 
 export interface AccountBindingFlashState {
@@ -7,11 +9,11 @@ export interface AccountBindingFlashState {
   message: string
 }
 
-export function setAccountBindingFlash(response: NextResponse, value: AccountBindingFlashState) {
+export function setAccountBindingFlash(response: NextResponse, value: AccountBindingFlashState, request?: Pick<Request, "headers" | "url"> | null) {
   response.cookies.set(ACCOUNT_BINDING_FLASH_COOKIE_NAME, encodeURIComponent(JSON.stringify(value)), {
     httpOnly: false,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookies({ request }),
     path: "/",
     maxAge: 120,
   })

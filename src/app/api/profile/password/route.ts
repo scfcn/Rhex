@@ -109,7 +109,7 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   })
 
   const response = NextResponse.json(apiSuccess(undefined, "密码已更新，请重新登录"))
-  response.cookies.set(getSessionCookieName(), "", getSessionClearedCookieOptions())
+  response.cookies.set(getSessionCookieName(), "", getSessionClearedCookieOptions({ request }))
 
   return response
 

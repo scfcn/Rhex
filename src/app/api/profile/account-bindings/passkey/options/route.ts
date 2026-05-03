@@ -6,7 +6,7 @@ import { createPasskeyRegistrationOptions } from "@/lib/passkey-auth"
 import { getServerSiteSettings } from "@/lib/site-settings"
 import { getUserDisplayName } from "@/lib/user-display"
 
-export const POST = createUserRouteHandler(async ({ currentUser }) => {
+export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
   const settings = await getServerSiteSettings()
 
   if (!settings.authPasskeyEnabled) {
@@ -19,13 +19,13 @@ export const POST = createUserRouteHandler(async ({ currentUser }) => {
   })
   const response = NextResponse.json(apiSuccess({ options }, "success"))
 
-  clearPasskeyCeremonyState(response, "connect")
+  clearPasskeyCeremonyState(response, "connect", request)
   await setPasskeyCeremonyState(response, "connect", {
     flow: "connect",
     challenge: options.challenge,
     connectUserId: currentUser.id,
     displayName: getUserDisplayName(currentUser),
-  })
+  }, request)
 
   return response
 }, {

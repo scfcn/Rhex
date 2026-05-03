@@ -60,9 +60,9 @@ export const POST = createRouteHandler(async ({ request }) => {
       redirectTo: "/auth/complete",
     }, "success"))
 
-    clearPasskeyCeremonyState(response, "register")
-    clearPendingExternalAuthState(response)
-    await setPendingExternalAuthState(response, result.state)
+    clearPasskeyCeremonyState(response, "register", request)
+    clearPendingExternalAuthState(response, request)
+    await setPendingExternalAuthState(response, result.state, request)
 
     return response
   }
@@ -72,8 +72,8 @@ export const POST = createRouteHandler(async ({ request }) => {
     username: result.user.username,
   }, "success"))
 
-  clearPasskeyCeremonyState(response, "register")
-  clearPendingExternalAuthState(response)
+  clearPasskeyCeremonyState(response, "register", request)
+  clearPendingExternalAuthState(response, request)
 
   if (!result.created) {
     await recordSuccessfulExternalLogin(request, result.user)

@@ -5,7 +5,7 @@ import { clearPasskeyCeremonyState, setPasskeyCeremonyState } from "@/lib/auth-f
 import { createPasskeyAuthenticationOptions } from "@/lib/passkey-auth"
 import { getServerSiteSettings } from "@/lib/site-settings"
 
-export const POST = createRouteHandler(async () => {
+export const POST = createRouteHandler(async ({ request }) => {
   const settings = await getServerSiteSettings()
 
   if (!settings.authPasskeyEnabled) {
@@ -15,11 +15,11 @@ export const POST = createRouteHandler(async () => {
   const options = await createPasskeyAuthenticationOptions(settings)
   const response = NextResponse.json(apiSuccess({ options }, "success"))
 
-  clearPasskeyCeremonyState(response, "login")
+  clearPasskeyCeremonyState(response, "login", request)
   await setPasskeyCeremonyState(response, "login", {
     flow: "login",
     challenge: options.challenge,
-  })
+  }, request)
 
   return response
 }, {

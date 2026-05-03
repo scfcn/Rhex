@@ -183,6 +183,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             currentUserId={currentUser?.id ?? null}
             initialUnreadMessageCount={surfaceSnapshot?.unreadMessageCount ?? 0}
             initialUnreadNotificationCount={surfaceSnapshot?.unreadNotificationCount ?? 0}
+            messagePromptAudioPath={settings.messagePromptAudioPath}
           >
             <SiteSettingsProvider
               markdownEmojiMap={settings.markdownEmojiMap}

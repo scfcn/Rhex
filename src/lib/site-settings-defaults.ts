@@ -1,5 +1,6 @@
 import { DEFAULT_FOOTER_LINKS } from "@/lib/shared/config-parsers"
 import { DEFAULT_SITE_HEADER_APP_LINKS } from "@/lib/site-header-app-links"
+import { DEFAULT_MESSAGE_PROMPT_AUDIO_PATH } from "@/lib/message-prompt-audio"
 
 const defaultFooterCopyrightText = `Rhex 论坛系统 ${new Date().getFullYear()}`
 
@@ -183,6 +184,7 @@ export const defaultSiteSettingsCreateInput = {
       messageMedia: {
         imageUploadEnabled: false,
         fileUploadEnabled: false,
+        promptAudioPath: DEFAULT_MESSAGE_PROMPT_AUDIO_PATH,
       },
       siteChat: {
         enabled: false,

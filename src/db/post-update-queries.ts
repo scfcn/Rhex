@@ -10,9 +10,15 @@ export function findPostUpdateContext(postId: string) {
       slug: true,
       authorId: true,
       isAnonymous: true,
+      type: true,
       content: true,
       createdAt: true,
       lastAppendedAt: true,
+      board: {
+        select: {
+          slug: true,
+        },
+      },
       appendices: {
         select: {
           sortOrder: true,

@@ -20,7 +20,7 @@ export const POST = createRouteHandler(async ({ request }) => {
   await revokeSessionToken(readSessionTokenFromCookieHeader(request.headers.get("cookie")))
   const response = NextResponse.json({ code: 0, message: "success" })
 
-  response.cookies.set(getSessionCookieName(), "", getSessionClearedCookieOptions())
+  response.cookies.set(getSessionCookieName(), "", getSessionClearedCookieOptions({ request }))
 
   if (currentUser) {
     await executeAddonActionHook("auth.logout.after", {

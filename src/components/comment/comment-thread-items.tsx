@@ -10,6 +10,7 @@ import { AnonymousUserIndicator } from "@/components/user/anonymous-user-indicat
 import { CommentForm } from "@/components/comment/comment-form"
 import { CommentLikeButton } from "@/components/comment/comment-like-button"
 import { AdminCommentStatusNotice, buildCommentAdminActions, CommentAuthorIdentityBadges, CommentJackpotDepositBadge, CommentReviewStatusNotice, CommentRewardBadge, CommentRewardEffectBadge, CommentUnavailablePlaceholder, copyCommentPermalink, getCommentUnavailableMessage, type CommentAdminAction } from "@/components/comment/comment-thread-shared"
+import { InlineTokenContent } from "@/components/inline-token-content"
 import { MarkdownContent } from "@/components/markdown-content"
 import { ReportDialog } from "@/components/post/report-dialog"
 import { TimeTooltip } from "@/components/time-tooltip"
@@ -501,7 +502,9 @@ export function CommentThreadReplyItem({
                               </button>
                             ) : null}
                           </div>
-                          <p className="mt-1.5 line-clamp-2">{reply.replyToCommentExcerpt ?? reply.parentCommentExcerpt}</p>
+                          <p className="mt-1.5 line-clamp-2">
+                            <InlineTokenContent content={reply.replyToCommentExcerpt ?? reply.parentCommentExcerpt ?? ""} />
+                          </p>
                         </div>
                       </div>
                     ) : null}

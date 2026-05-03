@@ -2,6 +2,7 @@ import { toggleFollowTarget } from "@/db/follow-queries"
 import { apiError, apiSuccess, createUserRouteHandler, readJsonBody, requireStringField } from "@/lib/api-route"
 import { enqueueUserFollowedNotification } from "@/lib/follow-notifications"
 import { getFollowTargetCopy, normalizeFollowTargetType } from "@/lib/follows"
+import { recordFollowPostTaskEvent, recordFollowTagTaskEvent, recordFollowUserTaskEvent } from "@/lib/task-center-service"
 import { revalidateUserSurfaceCache } from "@/lib/user-surface"
 import { ensureUsersCanInteract } from "@/lib/user-blocks"
 import { getUserDisplayName } from "@/lib/users"
@@ -60,6 +61,38 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
 
   if (targetType === "user" && result.changed) {
     revalidateUserSurfaceCache(Number(targetId))
+  }
+
+  if (result.followed && result.changed) {
+    if (targetType === "user") {
+      void recordFollowUserTaskEvent({
+        type: "FOLLOW_USER",
+        userId: currentUser.id,
+        targetUserId: Number(targetId),
+      }).catch((error) => {
+        console.error("[api/follows/toggle] record follow-user task event failed", error)
+      })
+    }
+
+    if (targetType === "tag") {
+      void recordFollowTagTaskEvent({
+        type: "FOLLOW_TAG",
+        userId: currentUser.id,
+        tagId: targetId,
+      }).catch((error) => {
+        console.error("[api/follows/toggle] record follow-tag task event failed", error)
+      })
+    }
+
+    if (targetType === "post") {
+      void recordFollowPostTaskEvent({
+        type: "FOLLOW_POST",
+        userId: currentUser.id,
+        postId: targetId,
+      }).catch((error) => {
+        console.error("[api/follows/toggle] record follow-post task event failed", error)
+      })
+    }
   }
 
   if (targetType === "user") {

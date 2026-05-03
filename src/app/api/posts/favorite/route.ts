@@ -1,7 +1,8 @@
 import { togglePostFavorite } from "@/db/interaction-queries"
-import {  apiSuccess, createUserRouteHandler, readJsonBody, requireStringField } from "@/lib/api-route"
+import { apiSuccess, createUserRouteHandler, readJsonBody, requireStringField } from "@/lib/api-route"
 import { handlePostFavoriteSideEffects } from "@/lib/interaction-side-effects"
 import { logRequestSucceeded } from "@/lib/request-log"
+import { recordFavoritePostTaskEvent } from "@/lib/task-center-service"
 import { revalidateUserSurfaceCache } from "@/lib/user-surface"
 import { executeAddonActionHook } from "@/addons-host/runtime/hooks"
 
@@ -19,6 +20,16 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     postId,
     userId: currentUser.id,
   })
+
+  if (result.favored) {
+    void recordFavoritePostTaskEvent({
+      type: "FAVORITE_POST",
+      userId: currentUser.id,
+      postId,
+    }).catch((error) => {
+      console.error("[api/posts/favorite] record favorite task event failed", error)
+    })
+  }
 
   revalidateUserSurfaceCache(currentUser.id)
 

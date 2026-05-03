@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { usePathname } from "next/navigation"
 
 import { applyInboxStreamEvent, shouldPlayInboxPrompt, type InboxUnreadCounts } from "@/lib/inbox-prompt"
+import { DEFAULT_MESSAGE_PROMPT_AUDIO_PATH, normalizeMessagePromptAudioPath } from "@/lib/message-prompt-audio"
 import type { InboxStreamEvent } from "@/lib/message-types"
 
 type InboxConnectionStatus = "connecting" | "connected" | "closed"
@@ -50,6 +51,7 @@ interface InboxRealtimeProviderProps {
   currentUserId?: number | null
   initialUnreadMessageCount?: number
   initialUnreadNotificationCount?: number
+  messagePromptAudioPath?: string
 }
 
 export function InboxRealtimeProvider({
@@ -57,6 +59,7 @@ export function InboxRealtimeProvider({
   currentUserId = null,
   initialUnreadMessageCount = 0,
   initialUnreadNotificationCount = 0,
+  messagePromptAudioPath = DEFAULT_MESSAGE_PROMPT_AUDIO_PATH,
 }: InboxRealtimeProviderProps) {
   const pathname = usePathname()
   const reconnectTimerRef = useRef<number | null>(null)
@@ -77,6 +80,10 @@ export function InboxRealtimeProvider({
   const [connectionStatus, setConnectionStatus] = useState<InboxConnectionStatus>(currentUserId ? "connecting" : "closed")
   const [unreadMessageCount, setUnreadMessageCount] = useState(initialUnreadMessageCount)
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(initialUnreadNotificationCount)
+  const resolvedMessagePromptAudioPath = useMemo(
+    () => normalizeMessagePromptAudioPath(messagePromptAudioPath, DEFAULT_MESSAGE_PROMPT_AUDIO_PATH),
+    [messagePromptAudioPath],
+  )
 
   useEffect(() => {
     currentUserIdRef.current = currentUserId
@@ -161,16 +168,17 @@ export function InboxRealtimeProvider({
       webkitAudioContext?: typeof AudioContext
     }
     const AudioContextConstructor = browserWindow.AudioContext ?? browserWindow.webkitAudioContext
-    const audioElement = new Audio("/apps/messages/prompt.mp3")
+    const audioElement = new Audio(resolvedMessagePromptAudioPath)
     const abortController = new AbortController()
     const audioContext = AudioContextConstructor ? new AudioContextConstructor() : null
 
     audioElement.preload = "auto"
     audioElement.setAttribute("playsinline", "true")
+    audioElement.crossOrigin = "anonymous"
     messagePromptAudioRef.current = audioElement
     messagePromptAudioContextRef.current = audioContext
 
-    void fetch("/apps/messages/prompt.mp3", {
+    void fetch(resolvedMessagePromptAudioPath, {
       cache: "force-cache",
       signal: abortController.signal,
     })
@@ -233,7 +241,7 @@ export function InboxRealtimeProvider({
         void audioContext.close().catch(() => undefined)
       }
     }
-  }, [currentUserId])
+  }, [currentUserId, resolvedMessagePromptAudioPath])
 
   const playPromptAudio = useCallback(() => {
     const audioContext = messagePromptAudioContextRef.current

@@ -15,7 +15,10 @@ import {
   findReportTargetUser,
   findReportTargetUsers,
 } from "@/db/report-queries"
+import type { AddonReportRecord, AddonReportTargetType } from "@/addons-host/types"
+import { executeAddonActionHook, executeAddonWaterfallHook } from "@/addons-host/runtime/hooks"
 import { resolvePagination } from "@/db/helpers"
+import { resolveHookedOptionalStringValue } from "@/lib/addon-hook-values"
 import { apiError } from "@/lib/api-route"
 import { enforceSensitiveText } from "@/lib/content-safety"
 
@@ -33,6 +36,35 @@ export interface CreateReportInput {
   targetId: string
   reasonType: string
   reasonDetail?: string | null
+  request?: Request
+}
+
+function mapAddonReportRecord(report: {
+  id: string
+  reporterId: number
+  targetType: TargetType
+  targetId: string
+  reasonType: string
+  reasonDetail: string | null
+  status: string
+  handledBy: number | null
+  handledNote: string | null
+  handledAt: Date | null
+  createdAt: Date
+}): AddonReportRecord {
+  return {
+    id: report.id,
+    reporterId: report.reporterId,
+    targetType: report.targetType as AddonReportTargetType,
+    targetId: report.targetId,
+    reasonType: report.reasonType,
+    reasonDetail: report.reasonDetail,
+    status: report.status as AddonReportRecord["status"],
+    handledBy: report.handledBy,
+    handledNote: report.handledNote,
+    handledAt: report.handledAt?.toISOString() ?? null,
+    createdAt: report.createdAt.toISOString(),
+  }
 }
 
 async function resolveReportTarget(targetType: TargetType, targetId: string) {
@@ -150,7 +182,15 @@ async function resolveReportTargets(
 
 export async function createReport(input: CreateReportInput) {
   const normalizedReasonType = input.reasonType.trim()
-  const normalizedReasonDetail = input.reasonDetail?.trim() || null
+  const normalizedReasonDetail = input.reasonDetail?.trim() || ""
+  const requestUrl = input.request ? new URL(input.request.url) : null
+  const hookContext = input.request
+    ? {
+        request: input.request,
+        pathname: requestUrl?.pathname,
+        searchParams: requestUrl?.searchParams,
+      }
+    : undefined
 
   if (!normalizedReasonType) {
     apiError(400, "请选择举报原因")
@@ -172,21 +212,58 @@ export async function createReport(input: CreateReportInput) {
     apiError(409, "你已经举报过该内容，处理中请耐心等待")
   }
 
+  const reasonDetailHookResult = await executeAddonWaterfallHook("report.reasonDetail.value", normalizedReasonDetail, {
+    ...hookContext,
+    payload: {
+      reporterId: input.reporterId,
+      targetType: input.targetType as AddonReportTargetType,
+      targetId: input.targetId,
+      reasonType: normalizedReasonType,
+    },
+  })
+  const { value: hookedReasonDetail, changed: reasonDetailHookAdjusted } = resolveHookedOptionalStringValue(
+    normalizedReasonDetail,
+    reasonDetailHookResult.value,
+  )
 
-  const reasonDetailSafety = normalizedReasonDetail
-    ? await enforceSensitiveText({ scene: "report.reasonDetail", text: normalizedReasonDetail })
+  const reasonDetailSafety = hookedReasonDetail
+    ? await enforceSensitiveText({ scene: "report.reasonDetail", text: hookedReasonDetail })
     : null
+  const nextReasonDetail = reasonDetailSafety?.sanitizedText ?? null
+
+  await executeAddonActionHook("report.create.before", {
+    reporterId: input.reporterId,
+    targetType: input.targetType as AddonReportTargetType,
+    targetId: input.targetId,
+    reasonType: normalizedReasonType,
+    reasonDetail: nextReasonDetail,
+  }, {
+    ...hookContext,
+    throwOnError: true,
+  })
+
   const report = await createReportRecord({
     reporterId: input.reporterId,
     targetType: input.targetType,
     targetId: input.targetId,
     reasonType: normalizedReasonType,
-    reasonDetail: reasonDetailSafety?.sanitizedText ?? null,
+    reasonDetail: nextReasonDetail,
   })
+  const contentAdjusted = reasonDetailHookAdjusted || Boolean(reasonDetailSafety?.wasReplaced)
+
+  await executeAddonActionHook("report.create.after", {
+    reporterId: input.reporterId,
+    targetType: input.targetType as AddonReportTargetType,
+    targetId: input.targetId,
+    reasonType: normalizedReasonType,
+    reasonDetail: nextReasonDetail,
+    contentAdjusted,
+    report: mapAddonReportRecord(report),
+  }, hookContext)
 
   return {
     ...report,
-    contentAdjusted: Boolean(reasonDetailSafety?.wasReplaced),
+    contentAdjusted,
   }
 }
 

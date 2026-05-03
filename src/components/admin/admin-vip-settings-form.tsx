@@ -12,7 +12,9 @@ import { IconPicker } from "@/components/ui/icon-picker"
 import { ColorPicker } from "@/components/ui/color-picker"
 import { AdminSettingsSubTabs } from "@/components/admin/admin-settings-sub-tabs"
 import { AdminRedeemCodeManager } from "@/components/admin/admin-redeem-code-manager"
+import { AdminTaskManager } from "@/components/admin/admin-task-manager"
 import { Button } from "@/components/ui/button"
+import type { AdminTaskItem } from "@/lib/admin-task-center"
 import { getAdminSettingsHref } from "@/lib/admin-settings-navigation"
 import type { AdminSettingsSectionKey } from "@/lib/admin-navigation"
 import { saveAdminSiteSettings } from "@/lib/admin-site-settings-client"
@@ -90,10 +92,17 @@ interface AdminVipSettingsFormProps {
     expiresAt: string | null
     note: string | null
   }>
+  initialTasks?: AdminTaskItem[]
+  initialTaskBoards?: Array<{
+    id: string
+    name: string
+    slug: string
+  }>
 }
 
 const VIP_TABS = [
   { key: "points-vip", label: "积分与VIP" },
+  { key: "tasks", label: "任务系统" },
   { key: "redeem-codes", label: "兑换码管理" },
 ] as const
 
@@ -106,6 +115,8 @@ export function AdminVipSettingsForm({
   initialSubTab,
   tabRouteSection,
   initialRedeemCodes = [],
+  initialTasks = [],
+  initialTaskBoards = [],
 }: AdminVipSettingsFormProps) {
   const normalizedCheckInRewardText = initialSettings.checkInRewardText ?? String(initialSettings.checkInReward ?? 0)
   const normalizedCheckInVip1RewardText = initialSettings.checkInVip1RewardText ?? String(initialSettings.checkInVip1Reward ?? initialSettings.checkInReward ?? 0)
@@ -186,6 +197,8 @@ export function AdminVipSettingsForm({
       ) : null}
 
       {activeTab === "redeem-codes" ? <AdminRedeemCodeManager initialRedeemCodes={initialRedeemCodes} /> : null}
+
+      {activeTab === "tasks" ? <AdminTaskManager initialTasks={initialTasks} boardOptions={initialTaskBoards} /> : null}
 
       {activeTab === "points-vip" ? (
         <form

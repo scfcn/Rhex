@@ -84,6 +84,7 @@ const adminSettingsSectionDetails: Record<
     defaultSubTab: "points-vip",
     subTabs: [
       { key: "points-vip", label: "积分与VIP" },
+      { key: "tasks", label: "任务系统" },
       { key: "redeem-codes", label: "兑换码管理" },
     ],
   },

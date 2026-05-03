@@ -16,6 +16,7 @@ import { type Prisma } from "@/db/types"
 
 import { verifyCreatePostCaptchaWithAddonProviders } from "@/lib/addon-captcha-providers"
 import { readAddonFormFieldsFromBody } from "@/lib/addon-form-fields"
+import { resolveHookedStringValue } from "@/lib/addon-hook-values"
 import { apiError } from "@/lib/api-route"
 import { checkBoardPermission, getBoardAccessContextBySlug } from "@/lib/board-access"
 import { extractSummaryFromContent } from "@/lib/content"
@@ -147,11 +148,18 @@ export async function createPostFlow(body: unknown, options: CreatePostFlowOptio
       postType,
     },
   })
-  const hookedTitle = typeof titleHookResult.value === "string" && titleHookResult.value.trim()
-    ? titleHookResult.value
-    : title
+  const { value: hookedTitle, changed: titleHookAdjusted } = resolveHookedStringValue(title, titleHookResult.value)
+  const contentHookResult = await executeAddonWaterfallHook("post.content.value", content, {
+    request: options.request,
+    payload: {
+      mode: "create",
+      boardSlug,
+      postType,
+    },
+  })
+  const { value: hookedContent, changed: contentHookAdjusted } = resolveHookedStringValue(content, contentHookResult.value)
   const titleSafety = await enforceSensitiveText({ scene: "post.title", text: hookedTitle })
-  const contentSafety = await enforceSensitiveText({ scene: "post.content", text: content })
+  const contentSafety = await enforceSensitiveText({ scene: "post.content", text: hookedContent })
   const loginUnlockSafety = loginUnlockContent ? await enforceSensitiveText({ scene: "post.content", text: loginUnlockContent }) : null
   const replyUnlockSafety = replyUnlockContent ? await enforceSensitiveText({ scene: "post.content", text: replyUnlockContent }) : null
   const purchaseUnlockSafety = purchaseUnlockContent ? await enforceSensitiveText({ scene: "post.content", text: purchaseUnlockContent }) : null
@@ -289,7 +297,9 @@ export async function createPostFlow(body: unknown, options: CreatePostFlowOptio
       ? false
       : Boolean(boardContext.settings.requirePostReview)
   const contentAdjusted = Boolean(
-    titleSafety.wasReplaced
+    titleHookAdjusted
+    || contentHookAdjusted
+    || titleSafety.wasReplaced
     || contentSafety.wasReplaced
     || loginUnlockSafety?.wasReplaced
     || replyUnlockSafety?.wasReplaced

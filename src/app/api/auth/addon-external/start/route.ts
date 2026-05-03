@@ -63,7 +63,7 @@ export async function POST(request: Request) {
         ? normalizeAddonExternalAuthRedirectTo(body.redirectTo)
         : null,
     connectUserId: mode === "connect" ? currentUser?.id : undefined,
-  })
+  }, request)
 
   return response
 }

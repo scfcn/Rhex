@@ -32,6 +32,7 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
       targetId,
       reasonType,
       reasonDetail: reasonDetail || null,
+      request,
     })
 
     return apiSuccess(undefined, result.contentAdjusted ? "举报已提交，部分内容已自动替换，管理员会尽快处理" : "举报已提交，管理员会尽快处理")

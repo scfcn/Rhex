@@ -9,6 +9,7 @@ export interface SettingsNavItem {
   key: string
   label: string
   description: string
+  href?: string
 }
 
 interface SettingsSidebarNavProps {
@@ -48,7 +49,7 @@ export function SettingsSidebarNav({
               type="button"
               onClick={() => {
                 onItemSelect?.(item)
-                router.push(buildHref ? buildHref(item) : `/settings?tab=${item.key}`)
+                router.push(item.href ?? (buildHref ? buildHref(item) : `/settings?tab=${item.key}`))
               }}
               className={cn(
                 "flex w-full items-center justify-between gap-3 rounded-xl px-4 py-3 text-left transition-colors",

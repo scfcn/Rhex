@@ -1,6 +1,7 @@
 import type { CurrentUserRecord } from "@/db/current-user"
 
-import { executeAddonActionHook } from "@/addons-host/runtime/hooks"
+import { executeAddonActionHook, executeAddonWaterfallHook } from "@/addons-host/runtime/hooks"
+import { resolveHookedStringValue } from "@/lib/addon-hook-values"
 import { logError } from "@/lib/logger"
 import { summarizeMessagePreview } from "@/lib/message-media"
 import { sendDirectMessage } from "@/lib/messages"
@@ -83,13 +84,26 @@ export async function executeDirectMessageSend(
   return runMessageWriteGuard(input, options.sender.id, options.request, async () => {
     const normalizedConversationId = input.conversationId?.trim()
     const recipientId = input.recipientId
+    const conversationKind = isSiteChatConversationId(normalizedConversationId) ? "SITE_CHAT" : "DIRECT"
+    const bodyHookResult = await executeAddonWaterfallHook("message.body.value", input.body, {
+      request: options.request,
+      pathname: requestUrl.pathname,
+      searchParams: requestUrl.searchParams,
+      payload: {
+        recipientId,
+        conversationId: normalizedConversationId,
+        conversationKind,
+      },
+    })
+    const { value: hookedBody, changed: bodyHookAdjusted } = resolveHookedStringValue(input.body, bodyHookResult.value)
 
     await executeAddonActionHook("message.send.before", {
       senderId: options.sender.id,
       senderUsername: options.sender.username,
       recipientId: recipientId ?? 0,
       conversationId: normalizedConversationId,
-      body: input.body,
+      conversationKind,
+      body: hookedBody,
     }, {
       request: options.request,
       pathname: requestUrl.pathname,
@@ -97,15 +111,16 @@ export async function executeDirectMessageSend(
       throwOnError: true,
     })
 
-    const data = isSiteChatConversationId(normalizedConversationId)
-      ? await sendDirectMessage(options.sender.id, undefined, input.body, {
+    const data = conversationKind === "SITE_CHAT"
+      ? await sendDirectMessage(options.sender.id, undefined, hookedBody, {
           conversationId: normalizedConversationId,
         })
       : typeof recipientId === "number"
-        ? await sendDirectMessage(options.sender.id, recipientId, input.body)
+        ? await sendDirectMessage(options.sender.id, recipientId, hookedBody)
         : (() => {
             throw new Error("缺少接收方信息")
           })()
+    const contentAdjusted = bodyHookAdjusted || data.contentAdjusted
 
     await executeAddonActionHook("message.send.after", {
       senderId: options.sender.id,
@@ -113,8 +128,9 @@ export async function executeDirectMessageSend(
       recipientId: recipientId ?? 0,
       messageId: data.id,
       conversationId: data.conversationId,
+      conversationKind,
       body: data.content,
-      contentAdjusted: data.contentAdjusted,
+      contentAdjusted,
       occurredAt: data.occurredAt,
     }, {
       request: options.request,
@@ -175,13 +191,16 @@ export async function executeDirectMessageSend(
         extra: {
           conversationId: data.conversationId,
           messageId: data.id,
-          contentAdjusted: data.contentAdjusted,
-          conversationKind: normalizedConversationId ? "SITE_CHAT" : "DIRECT",
+          contentAdjusted,
+          conversationKind,
           ...(options.log.extra ?? {}),
         },
       })
     }
 
-    return data
+    return {
+      ...data,
+      contentAdjusted,
+    }
   })
 }

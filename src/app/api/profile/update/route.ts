@@ -2,6 +2,9 @@ import { prisma } from "@/db/client"
 import { findUserByNicknameInsensitive } from "@/db/user-queries"
 import { apiError, apiSuccess, createUserRouteHandler, readJsonBody } from "@/lib/api-route"
 
+import type { AddonUserProfileRecord } from "@/addons-host/types"
+import { executeAddonActionHook, executeAddonWaterfallHook } from "@/addons-host/runtime/hooks"
+import { resolveHookedOptionalStringValue, resolveHookedStringValue } from "@/lib/addon-hook-values"
 import { enforceSensitiveText } from "@/lib/content-safety"
 import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
 import { validateProfilePayload } from "@/lib/validators"
@@ -12,7 +15,6 @@ import { revalidateUserSurfaceCache } from "@/lib/user-surface"
 import { isUserProfileVisibility, mapLegacyVisibilityBoolean, mergeUserProfileSettings, resolveUserProfileSettings, type UserProfileVisibility } from "@/lib/user-profile-settings"
 import { VerificationChannel } from "@/lib/shared/verification-channel"
 import { resolveVipTierPrice } from "@/lib/vip-tier-pricing"
-import { executeAddonActionHook } from "@/addons-host/runtime/hooks"
 
 type ProfileUpdateResponse = {
   username: string
@@ -58,6 +60,38 @@ function toProfileUpdateResponse(input: {
   }
 }
 
+function mapAddonUserProfileRecord(input: {
+  id: number
+  username: string
+  nickname: string | null
+  bio: string | null
+  introduction: string
+  gender: string | null
+  avatarPath: string | null
+  email: string | null
+  emailVerifiedAt?: Date | string | null
+  activityVisibility: UserProfileVisibility
+  introductionVisibility: UserProfileVisibility
+  points: number
+}): AddonUserProfileRecord {
+  return {
+    id: input.id,
+    username: input.username,
+    nickname: input.nickname,
+    bio: input.bio,
+    introduction: input.introduction,
+    gender: input.gender,
+    avatarPath: input.avatarPath,
+    email: input.email,
+    emailVerifiedAt: typeof input.emailVerifiedAt === "string"
+      ? input.emailVerifiedAt
+      : input.emailVerifiedAt?.toISOString() ?? null,
+    activityVisibility: input.activityVisibility,
+    introductionVisibility: input.introductionVisibility,
+    points: input.points,
+  }
+}
+
 export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ request, currentUser }) => {
 
   const body = await readJsonBody(request)
@@ -73,9 +107,6 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
     apiError(400, validated.message ?? "参数错误")
   }
 
-  const nicknameSafety = await enforceSensitiveText({ scene: "profile.nickname", text: validated.data.nickname })
-  const bioSafety = await enforceSensitiveText({ scene: "profile.bio", text: validated.data.bio })
-  const introductionSafety = await enforceSensitiveText({ scene: "profile.introduction", text: validated.data.introduction })
   const email = validated.data.email
   const gender = validated.data.gender || "unknown"
   const avatarPath = typeof body.avatarPath === "string" ? body.avatarPath.trim() : ""
@@ -87,6 +118,7 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
       id: true,
       username: true,
       nickname: true,
+      bio: true,
       gender: true,
       avatarPath: true,
       email: true,
@@ -100,7 +132,6 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
     apiError(404, "用户不存在")
   }
 
-  const nextNickname = nicknameSafety.sanitizedText
   const nextEmail = email || null
   const currentProfileSettings = resolveUserProfileSettings(dbUser.signature)
   const activityVisibilityInput = typeof body.activityVisibility === "string" ? body.activityVisibility.trim().toUpperCase() : null
@@ -119,6 +150,56 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
     ?? currentProfileSettings.activityVisibility
   const introductionVisibility = (introductionVisibilityInput && isUserProfileVisibility(introductionVisibilityInput) ? introductionVisibilityInput : null)
     ?? currentProfileSettings.introductionVisibility
+  const currentProfile = mapAddonUserProfileRecord({
+    id: dbUser.id,
+    username: dbUser.username,
+    nickname: dbUser.nickname,
+    bio: dbUser.bio,
+    introduction: currentProfileSettings.introduction,
+    gender: dbUser.gender,
+    avatarPath: dbUser.avatarPath,
+    email: dbUser.email,
+    emailVerifiedAt: dbUser.emailVerifiedAt,
+    activityVisibility: currentProfileSettings.activityVisibility,
+    introductionVisibility: currentProfileSettings.introductionVisibility,
+    points: dbUser.points,
+  })
+  const profileHookPayload = {
+    userId: currentUser.id,
+    username: dbUser.username,
+    currentProfile,
+    nextGender: gender,
+    nextAvatarPath: avatarPath,
+    nextEmail,
+    nextActivityVisibility: activityVisibility,
+    nextIntroductionVisibility: introductionVisibility,
+  }
+  const nicknameHookResult = await executeAddonWaterfallHook("user.profile.nickname.value", validated.data.nickname, {
+    request,
+    pathname: requestUrl.pathname,
+    searchParams: requestUrl.searchParams,
+    payload: profileHookPayload,
+  })
+  const bioHookResult = await executeAddonWaterfallHook("user.profile.bio.value", validated.data.bio, {
+    request,
+    pathname: requestUrl.pathname,
+    searchParams: requestUrl.searchParams,
+    payload: profileHookPayload,
+  })
+  const introductionHookResult = await executeAddonWaterfallHook("user.profile.introduction.value", validated.data.introduction, {
+    request,
+    pathname: requestUrl.pathname,
+    searchParams: requestUrl.searchParams,
+    payload: profileHookPayload,
+  })
+  const { value: hookedNickname, changed: nicknameHookAdjusted } = resolveHookedStringValue(validated.data.nickname, nicknameHookResult.value)
+  const { value: hookedBio, changed: bioHookAdjusted } = resolveHookedOptionalStringValue(validated.data.bio, bioHookResult.value)
+  const { value: hookedIntroduction, changed: introductionHookAdjusted } = resolveHookedOptionalStringValue(validated.data.introduction, introductionHookResult.value)
+  const nicknameSafety = await enforceSensitiveText({ scene: "profile.nickname", text: hookedNickname })
+  const bioSafety = await enforceSensitiveText({ scene: "profile.bio", text: hookedBio })
+  const introductionSafety = await enforceSensitiveText({ scene: "profile.introduction", text: hookedIntroduction })
+  const nextNickname = nicknameSafety.sanitizedText
+  const nextBio = bioSafety.sanitizedText
   const nextIntroduction = introductionSafety.sanitizedText
   const nextSignature = mergeUserProfileSettings(dbUser.signature, {
     activityVisibility,
@@ -127,11 +208,21 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
   })
   const emailChanged = (dbUser.email ?? null) !== nextEmail
   const currentNickname = (dbUser.nickname ?? "").trim()
+  const currentBio = (dbUser.bio ?? "").trim()
   const currentIntroduction = currentProfileSettings.introduction.trim()
   const currentAvatarPath = (dbUser.avatarPath ?? "").trim()
   const nicknameChanged = currentNickname !== nextNickname
+  const bioChanged = currentBio !== nextBio
   const introductionChanged = currentIntroduction !== nextIntroduction
   const avatarChanged = currentAvatarPath !== avatarPath
+  const contentAdjusted = Boolean(
+    nicknameHookAdjusted
+    || bioHookAdjusted
+    || introductionHookAdjusted
+    || nicknameSafety.wasReplaced
+    || bioSafety.wasReplaced
+    || introductionSafety.wasReplaced
+  )
   const avatarRequiresPointCost = avatarChanged && currentAvatarPath.length > 0
   const nicknameChangePointCost = Math.max(0, resolveVipTierPrice(currentUser, {
     normal: settings.nicknameChangePointCost,
@@ -226,8 +317,9 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
   await executeAddonActionHook("user.update.before", {
     userId: currentUser.id,
     username: dbUser.username,
+    currentProfile,
     nickname: nextNickname,
-    bio: bioSafety.sanitizedText,
+    bio: nextBio,
     introduction: nextIntroduction,
     gender,
     avatarPath,
@@ -235,9 +327,11 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
     activityVisibility,
     introductionVisibility,
     nicknameChanged,
+    bioChanged,
     introductionChanged,
     avatarChanged,
     emailChanged,
+    contentAdjusted,
   }, {
     request,
     pathname: requestUrl.pathname,
@@ -250,7 +344,7 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
       where: { id: currentUser.id },
       data: {
         nickname: nextNickname,
-        bio: bioSafety.sanitizedText || undefined,
+        bio: nextBio || null,
         gender,
         avatarPath: avatarPath || null,
         email: nextEmail,
@@ -299,6 +393,7 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
     return tx.user.findUniqueOrThrow({
       where: { id: currentUser.id },
       select: {
+        id: true,
         username: true,
         nickname: true,
         bio: true,
@@ -313,7 +408,7 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
   })
 
   const messageParts: string[] = []
-  if (bioSafety.wasReplaced || nicknameSafety.wasReplaced || introductionSafety.wasReplaced) {
+  if (contentAdjusted) {
     messageParts.push("资料已更新，部分内容已按规则替换")
   } else {
     messageParts.push("资料已更新")
@@ -335,6 +430,7 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
     targetId: String(currentUser.id),
     extra: {
       nicknameChanged,
+      bioChanged,
       introductionChanged,
       avatarChanged,
       avatarRequiresPointCost,
@@ -347,26 +443,30 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
   revalidateUserSurfaceCache(currentUser.id)
 
   const updatedProfileSettings = resolveUserProfileSettings(updated.signature)
+  const updatedProfile = mapAddonUserProfileRecord({
+    ...updated,
+    introduction: updatedProfileSettings.introduction,
+    activityVisibility: updatedProfileSettings.activityVisibility,
+    introductionVisibility: updatedProfileSettings.introductionVisibility,
+  })
 
   await executeAddonActionHook("user.update.after", {
     userId: currentUser.id,
     username: updated.username,
     nicknameChanged,
+    bioChanged,
     introductionChanged,
     avatarChanged,
     emailChanged,
+    contentAdjusted,
+    profile: updatedProfile,
   }, {
     request,
     pathname: requestUrl.pathname,
     searchParams: requestUrl.searchParams,
   })
 
-  return apiSuccess(toProfileUpdateResponse({
-    ...updated,
-    introduction: updatedProfileSettings.introduction,
-    activityVisibility: updatedProfileSettings.activityVisibility,
-    introductionVisibility: updatedProfileSettings.introductionVisibility,
-  }), messageParts.join("，"))
+  return apiSuccess(toProfileUpdateResponse(updatedProfile), messageParts.join("，"))
 
 
 }, {

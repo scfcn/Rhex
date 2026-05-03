@@ -2,7 +2,9 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Modal } from "@/components/ui/modal"
 import { formatBusinessMonthDayTime, formatNumber } from "@/lib/formatters"
 import type { GobangMatch, GobangPlayerSummary } from "@/lib/gobang"
 import { cn } from "@/lib/utils"
@@ -159,38 +161,49 @@ function PreviousResultModal({ open, match, message, winningLine, canSelectPrevi
   if (!open) return null
 
   return (
-    <div className="gobang-modal-overlay z-30">
-      <Card className="gobang-modal-card w-full max-w-[min(92vw,680px)] border-border/70 bg-background/95 shadow-[0_18px_48px_hsl(var(--foreground)/0.16)] backdrop-blur-md">
-        <CardHeader className="pb-2 pt-5">
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle className="text-base font-semibold tracking-tight text-foreground">上一局结果</CardTitle>
-            <button type="button" className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground" onClick={onClose}>关闭</button>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="上一局结果"
+      size="lg"
+      footer={match ? (
+        <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <Button type="button" variant="outline" className="flex-1 sm:flex-none" onClick={() => onSwitch("prev")} disabled={!canSelectPrevious}>
+              上一局
+            </Button>
+            <Button type="button" variant="outline" className="flex-1 sm:flex-none" onClick={() => onSwitch("next")} disabled={!canSelectNext}>
+              下一局
+            </Button>
           </div>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4 pt-0">
-          {match ? (
-            <>
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-                <span>{formatMatchTime(match.finishedAt || match.updatedAt || match.moves.at(-1)?.createdAt || match.createdAt)}</span>
-
-                <span>{match.challengeMode === "FREE" ? "免费挑战" : `付费挑战 · ${match.ticketCost} 积分`}</span>
-                <span>{match.firstHand === "PLAYER" ? "你先手" : "AI 先手"}</span>
-              </div>
-              <div className={cn("rounded-md p-3 font-bold", message.includes("你赢") ? "bg-green-100 text-green-700" : message.includes("平局") ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700")}>{message}</div>
-              <div className="mx-auto w-full max-w-[360px]">
-                <ChessBoard board={match.board} disabled onDropChess={() => undefined} lastMove={match.moves.at(-1) ? { r: match.moves.at(-1)!.y, c: match.moves.at(-1)!.x } : null} winningLine={winningLine} showNoRegretOverlay={false} />
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <button type="button" className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50" onClick={() => onSwitch("prev")} disabled={!canSelectPrevious}>上一局</button>
-                <button type="button" className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50" onClick={() => onSwitch("next")} disabled={!canSelectNext}>下一局</button>
-              </div>
-            </>
-          ) : (
-            <div className="rounded-md bg-muted p-4 text-sm text-muted-foreground">暂无可查看的历史对局。</div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+          <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={onClose}>
+            关闭
+          </Button>
+        </div>
+      ) : (
+        <div className="flex w-full justify-end">
+          <Button type="button" variant="outline" onClick={onClose}>
+            关闭
+          </Button>
+        </div>
+      )}
+    >
+      {match ? (
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+            <span>{formatMatchTime(match.finishedAt || match.updatedAt || match.moves.at(-1)?.createdAt || match.createdAt)}</span>
+            <span>{match.challengeMode === "FREE" ? "免费挑战" : `付费挑战 · ${match.ticketCost} 积分`}</span>
+            <span>{match.firstHand === "PLAYER" ? "你先手" : "AI 先手"}</span>
+          </div>
+          <div className={cn("rounded-md p-3 font-bold", message.includes("你赢") ? "bg-green-100 text-green-700" : message.includes("平局") ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700")}>{message}</div>
+          <div className="mx-auto w-full max-w-[360px]">
+            <ChessBoard board={match.board} disabled onDropChess={() => undefined} lastMove={match.moves.at(-1) ? { r: match.moves.at(-1)!.y, c: match.moves.at(-1)!.x } : null} winningLine={winningLine} showNoRegretOverlay={false} />
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-md bg-muted p-4 text-sm text-muted-foreground">暂无可查看的历史对局。</div>
+      )}
+    </Modal>
   )
 }
 

@@ -606,7 +606,7 @@ export async function attachAuthenticatedSession(response: NextResponse, request
   })
 
   const sessionToken = await createSessionToken(user.username, loginIp)
-  response.cookies.set(getSessionCookieName(), sessionToken, getSessionCookieOptions())
+  response.cookies.set(getSessionCookieName(), sessionToken, getSessionCookieOptions({ request }))
   await executeAddonActionHook("auth.login.after", {
     userId: user.id,
     username: user.username,
