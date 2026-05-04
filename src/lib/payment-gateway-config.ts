@@ -149,6 +149,14 @@ function buildDefaultServerConfig(channelDefinitions: PaymentGatewayChannelDefin
       alipayPublicCertConfigured: false,
       alipayRootCertConfigured: false,
     },
+    epay: {
+      apiBaseUrl: "https://pay.rliyun.cn",
+      pid: "",
+      notifyPath: "/api/payments/notify/epay",
+      returnPath: "/settings",
+      key: null,
+      keyConfigured: false,
+    },
   }
 }
 
@@ -411,6 +419,7 @@ function normalizeServerConfig(
   const defaultConfig = buildDefaultServerConfig(channelDefinitions)
   const config = record?.config ?? {}
   const alipayConfig = isRecord(config.alipay) ? config.alipay : {}
+  const epayConfig = isRecord(config.epay) ? config.epay : {}
   const sensitiveState = readSensitiveState(sensitiveStateJson)
   const paymentSensitiveState = isRecord(sensitiveState[PAYMENT_GATEWAY_SENSITIVE_KEY])
     ? sensitiveState[PAYMENT_GATEWAY_SENSITIVE_KEY]
@@ -418,12 +427,17 @@ function normalizeServerConfig(
   const alipaySensitiveConfig = isRecord(paymentSensitiveState.alipay)
     ? paymentSensitiveState.alipay
     : {}
+  const epaySensitiveConfig = isRecord(paymentSensitiveState.epay)
+    ? paymentSensitiveState.epay
+    : {}
 
   const privateKey = normalizeNullableSecret(alipaySensitiveConfig.privateKey)
   const alipayPublicKey = normalizeNullableSecret(alipaySensitiveConfig.alipayPublicKey)
   const appCertContent = normalizeNullableSecret(alipaySensitiveConfig.appCertContent)
   const alipayPublicCertContent = normalizeNullableSecret(alipaySensitiveConfig.alipayPublicCertContent)
   const alipayRootCertContent = normalizeNullableSecret(alipaySensitiveConfig.alipayRootCertContent)
+
+  const epayKey = normalizeNullableSecret(epaySensitiveConfig.key)
 
   return {
     enabled: normalizeBoolean(record?.enabled, defaultConfig.enabled),
@@ -467,6 +481,14 @@ function normalizeServerConfig(
       alipayPublicCertConfigured: Boolean(alipayPublicCertContent),
       alipayRootCertConfigured: Boolean(alipayRootCertContent),
     },
+    epay: {
+      apiBaseUrl: normalizeOptionalString(epayConfig.apiBaseUrl, defaultConfig.epay.apiBaseUrl, 300) || defaultConfig.epay.apiBaseUrl,
+      pid: normalizeOptionalString(epayConfig.pid, defaultConfig.epay.pid, 64),
+      notifyPath: normalizePathOrUrl(epayConfig.notifyPath, defaultConfig.epay.notifyPath),
+      returnPath: normalizePathOrUrl(epayConfig.returnPath, defaultConfig.epay.returnPath),
+      key: epayKey,
+      keyConfigured: Boolean(epayKey),
+    },
   }
 }
 
@@ -499,6 +521,13 @@ function toPublicConfig(config: ServerPaymentGatewayConfigData): PaymentGatewayC
       appCertConfigured: config.alipay.appCertConfigured,
       alipayPublicCertConfigured: config.alipay.alipayPublicCertConfigured,
       alipayRootCertConfigured: config.alipay.alipayRootCertConfigured,
+    },
+    epay: {
+      apiBaseUrl: config.epay.apiBaseUrl,
+      pid: config.epay.pid,
+      notifyPath: config.epay.notifyPath,
+      returnPath: config.epay.returnPath,
+      keyConfigured: config.epay.keyConfigured,
     },
   }
 }
@@ -571,6 +600,12 @@ function buildNextStateRecord(existing: PaymentGatewayStateRecord | null, config
         returnPath: config.alipay.returnPath,
         notifyPath: config.alipay.notifyPath,
       },
+      epay: {
+        apiBaseUrl: config.epay.apiBaseUrl,
+        pid: config.epay.pid,
+        notifyPath: config.epay.notifyPath,
+        returnPath: config.epay.returnPath,
+      },
     },
     status: "active",
     version: existing?.version ?? "hosted",
@@ -609,6 +644,9 @@ function mergePaymentGatewaySensitiveState(
         alipayPublicCertContent: normalizeNullableSecret(config.alipay.alipayPublicCertContent),
         alipayRootCertContent: normalizeNullableSecret(config.alipay.alipayRootCertContent),
       },
+      epay: {
+        key: normalizeNullableSecret(config.epay.key),
+      },
     },
   }
 
@@ -627,6 +665,20 @@ function hasEffectiveAlipayRoute(config: ServerPaymentGatewayConfigData) {
   }
 
   return config.routes.some((item) => item.enabled && item.providerCode === "alipay" && enabledChannels.has(item.channelCode))
+}
+
+function hasEffectiveEpayRoute(config: ServerPaymentGatewayConfigData) {
+  const enabledChannels = new Set(
+    config.channels
+      .filter((item) => item.enabled && item.channelCode.startsWith("epay."))
+      .map((item) => item.channelCode),
+  )
+
+  if (enabledChannels.size === 0) {
+    return false
+  }
+
+  return config.routes.some((item) => item.enabled && item.providerCode === "epay" && enabledChannels.has(item.channelCode))
 }
 
 function assertRuntimeConfig(config: ServerPaymentGatewayConfigData) {
@@ -660,6 +712,18 @@ function assertRuntimeConfig(config: ServerPaymentGatewayConfigData) {
 
   if (config.alipay.signMode === "CERT" && (!config.alipay.appCertContent || !config.alipay.alipayPublicCertContent || !config.alipay.alipayRootCertContent)) {
     apiError(400, "证书模式下必须完整填写应用公钥证书、支付宝公钥证书和支付宝根证书")
+  }
+
+  if (!hasEffectiveEpayRoute(config)) {
+    return
+  }
+
+  if (!config.epay.pid) {
+    apiError(400, "码支付商户 ID 不能为空")
+  }
+
+  if (!config.epay.key) {
+    apiError(400, "码支付商户密钥不能为空")
   }
 }
 
@@ -733,6 +797,14 @@ export async function resolvePaymentGatewayConfigDraftFromAdminInput(body: JsonO
       appCertConfigured: current.alipay.appCertConfigured,
       alipayPublicCertConfigured: current.alipay.alipayPublicCertConfigured,
       alipayRootCertConfigured: current.alipay.alipayRootCertConfigured,
+    },
+    epay: {
+      apiBaseUrl: current.epay.apiBaseUrl,
+      pid: current.epay.pid,
+      notifyPath: current.epay.notifyPath,
+      returnPath: current.epay.returnPath,
+      key: current.epay.key,
+      keyConfigured: current.epay.keyConfigured,
     },
   }
 
@@ -930,6 +1002,48 @@ export async function resolvePaymentGatewayAlipayConfigDraftFromAdminInput(body:
   }
 }
 
+export async function resolvePaymentGatewayEpayConfigDraftFromAdminInput(body: JsonObject): Promise<ResolvedPaymentGatewayConfigDraft> {
+  const record = await getOrCreatePaymentGatewaySettingsRecord()
+  const current = await getServerPaymentGatewayConfig()
+
+  const rawConfig = body.config
+  const rawSecret = body.secret
+  const configInput = isRecord(rawConfig) ? rawConfig : {}
+  const secretInput = isRecord(rawSecret) ? rawSecret : {}
+  const epayConfigInput = isRecord(configInput.epay) ? configInput.epay : {}
+
+  const nextConfig: ServerPaymentGatewayConfigData = {
+    ...current,
+    epay: {
+      ...current.epay,
+      apiBaseUrl: normalizeOptionalString(epayConfigInput.apiBaseUrl, current.epay.apiBaseUrl, 300) || current.epay.apiBaseUrl,
+      pid: normalizeOptionalString(epayConfigInput.pid, current.epay.pid, 64),
+      notifyPath: normalizePathOrUrl(epayConfigInput.notifyPath, current.epay.notifyPath),
+      returnPath: normalizePathOrUrl(epayConfigInput.returnPath, current.epay.returnPath),
+    },
+  }
+
+  const secretUpdates = {
+    key: normalizeNullableSecret(secretInput.key),
+  }
+
+  const clearSecretFlags = {
+    key: normalizeBoolean(secretInput.clearKey, false),
+  }
+
+  nextConfig.epay.key = clearSecretFlags.key
+    ? null
+    : (secretUpdates.key || current.epay.key)
+  nextConfig.epay.keyConfigured = Boolean(nextConfig.epay.key)
+
+  assertRuntimeConfig(nextConfig)
+
+  return {
+    record,
+    config: nextConfig,
+  }
+}
+
 export async function updatePaymentGatewayConfigFromAdminInput(body: JsonObject) {
   return persistResolvedPaymentGatewayConfigDraft(await resolvePaymentGatewayConfigDraftFromAdminInput(body))
 }
@@ -940,4 +1054,8 @@ export async function updatePaymentGatewayBaseConfigFromAdminInput(body: JsonObj
 
 export async function updatePaymentGatewayAlipayConfigFromAdminInput(body: JsonObject) {
   return persistResolvedPaymentGatewayConfigDraft(await resolvePaymentGatewayAlipayConfigDraftFromAdminInput(body))
+}
+
+export async function updatePaymentGatewayEpayConfigFromAdminInput(body: JsonObject) {
+  return persistResolvedPaymentGatewayConfigDraft(await resolvePaymentGatewayEpayConfigDraftFromAdminInput(body))
 }

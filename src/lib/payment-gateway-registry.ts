@@ -69,6 +69,30 @@ const BUILTIN_PAYMENT_GATEWAY_CHANNEL_DEFINITIONS = [
     clientTypes: ["QR_CODE", "WEB_DESKTOP", "WEB_MOBILE"],
     presentationType: "QR_CODE",
   },
+  {
+    channelCode: "epay.alipay",
+    providerCode: "epay",
+    label: "码支付-支付宝",
+    description: "通过码支付网关拉起支付宝进行页面跳转支付，支持 PC 与手机浏览器。",
+    clientTypes: ["WEB_DESKTOP", "WEB_MOBILE"],
+    presentationType: "HTML_FORM",
+  },
+  {
+    channelCode: "epay.wxpay",
+    providerCode: "epay",
+    label: "码支付-微信",
+    description: "通过码支付网关拉起微信支付进行页面跳转支付，支持 PC 与手机浏览器。",
+    clientTypes: ["WEB_DESKTOP", "WEB_MOBILE"],
+    presentationType: "HTML_FORM",
+  },
+  {
+    channelCode: "epay.qqpay",
+    providerCode: "epay",
+    label: "码支付-QQ钱包",
+    description: "通过码支付网关拉起 QQ 钱包进行页面跳转支付，支持 PC 与手机浏览器。",
+    clientTypes: ["WEB_DESKTOP", "WEB_MOBILE"],
+    presentationType: "HTML_FORM",
+  },
 ] as const satisfies readonly PaymentGatewayChannelDefinition[]
 
 const BUILTIN_PAYMENT_GATEWAY_PROVIDER_ENTRIES = [
@@ -78,6 +102,14 @@ const BUILTIN_PAYMENT_GATEWAY_PROVIDER_ENTRIES = [
     description: "内置支付宝接口，支持网页、H5 与扫码预下单。",
     source: "builtin",
     settingsHref: "/admin/apps/payment-gateway/alipay",
+    settingsLabel: "打开接口配置",
+  },
+  {
+    code: "epay",
+    label: "码支付",
+    description: "内置码支付接口，通过易支付网关聚合支付宝、微信、QQ 钱包，支持页面跳转支付。",
+    source: "builtin",
+    settingsHref: "/admin/apps/payment-gateway/epay",
     settingsLabel: "打开接口配置",
   },
 ] as const satisfies readonly PaymentGatewayProviderAdminEntry[]
@@ -181,7 +213,7 @@ export async function listAddonPaymentProviders(): Promise<LoadedAddonPaymentPro
 
 export async function findAddonPaymentProviderByCode(providerCode: string) {
   const normalizedCode = providerCode.trim()
-  if (!normalizedCode || normalizedCode === "alipay") {
+  if (!normalizedCode || normalizedCode === "alipay" || normalizedCode === "epay") {
     return null
   }
 
@@ -265,7 +297,7 @@ export async function findPaymentGatewayChannelDefinition(channelCode: string) {
     return null
   }
 
-  if (normalizedCode.startsWith("alipay.")) {
+  if (normalizedCode.startsWith("alipay.") || normalizedCode.startsWith("epay.")) {
     return findBuiltinPaymentGatewayChannelDefinition(normalizedCode)
   }
 

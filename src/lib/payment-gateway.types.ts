@@ -108,6 +108,18 @@ export interface ServerPaymentGatewayAlipayConfigData extends PaymentGatewayAlip
   alipayRootCertContent: string | null
 }
 
+export interface PaymentGatewayEpayConfigData {
+  apiBaseUrl: string
+  pid: string
+  notifyPath: string
+  returnPath: string
+  keyConfigured: boolean
+}
+
+export interface ServerPaymentGatewayEpayConfigData extends PaymentGatewayEpayConfigData {
+  key: string | null
+}
+
 export interface PaymentGatewayConfigData {
   enabled: boolean
   orderExpireMinutes: number
@@ -124,10 +136,12 @@ export interface PaymentGatewayConfigData {
   channels: PaymentGatewayChannelToggle[]
   routes: PaymentGatewayRouteRule[]
   alipay: PaymentGatewayAlipayConfigData
+  epay: PaymentGatewayEpayConfigData
 }
 
-export interface ServerPaymentGatewayConfigData extends Omit<PaymentGatewayConfigData, "alipay"> {
+export interface ServerPaymentGatewayConfigData extends Omit<PaymentGatewayConfigData, "alipay" | "epay"> {
   alipay: ServerPaymentGatewayAlipayConfigData
+  epay: ServerPaymentGatewayEpayConfigData
 }
 
 export interface PaymentGatewayCheckoutPresentation {

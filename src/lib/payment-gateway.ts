@@ -13,6 +13,12 @@ import {
   toAlipayResultError,
   verifyAlipayNotifySignature,
 } from "@/lib/payment-gateway-alipay"
+import {
+  createEpayCheckoutPresentation,
+  isEpayConfigRunnable,
+  queryEpayOrderStatus,
+  verifyEpayNotifySignature,
+} from "@/lib/payment-gateway-epay"
 import { getPaymentGatewayConfig, getServerPaymentGatewayConfig } from "@/lib/payment-gateway-config"
 import { maybeEnqueuePaymentGatewayOrderSuccessEmail, type PaymentGatewayOrderSuccessEmailSnapshot } from "@/lib/payment-gateway-email-notifications"
 import {
@@ -89,6 +95,10 @@ function buildRouteSceneWeight(route: PaymentGatewayRouteRule, scene: string) {
 async function isProviderRunnable(config: ServerPaymentGatewayConfigData, providerCode: string) {
   if (providerCode === "alipay") {
     return isAlipayConfigRunnable(config.alipay)
+  }
+
+  if (providerCode === "epay") {
+    return isEpayConfigRunnable(config.epay)
   }
 
   try {
@@ -181,6 +191,13 @@ async function resolveProviderDefaultPaths(config: ServerPaymentGatewayConfigDat
     return {
       notifyPath: config.alipay.notifyPath,
       returnPath: config.alipay.returnPath,
+    }
+  }
+
+  if (providerCode === "epay") {
+    return {
+      notifyPath: config.epay.notifyPath,
+      returnPath: config.epay.returnPath,
     }
   }
 
@@ -690,7 +707,19 @@ export async function createPaymentCheckout(input: {
           timeoutMinutes: config.orderExpireMinutes,
           config: config.alipay,
         })
-      : await createAddonPaymentCheckout(route.providerCode, {
+      : route.providerCode === "epay"
+        ? await createEpayCheckoutPresentation({
+            channelCode: route.channelCode as "epay.alipay" | "epay.wxpay" | "epay.qqpay",
+            merchantOrderNo,
+            amountFen: input.amountFen,
+            subject,
+            body: input.body?.trim() || null,
+            notifyUrl,
+            returnUrl,
+            requestIp: input.requestIp,
+            config: config.epay,
+          })
+        : await createAddonPaymentCheckout(route.providerCode, {
           merchantOrderNo,
           channelCode: route.channelCode,
           amountFen: input.amountFen,
@@ -1064,6 +1093,88 @@ export async function syncPaymentOrderStatusByQuery(merchantOrderNo: string) {
     return result
   }
 
+  if (order.providerCode === "epay") {
+    const config = await getServerPaymentGatewayConfig()
+    if (!isEpayConfigRunnable(config.epay)) {
+      apiError(400, "码支付配置不完整，无法查询订单")
+    }
+
+    const result = await queryEpayOrderStatus({
+      config: config.epay,
+      merchantOrderNo,
+    })
+
+    const isRecord = (value: unknown): value is Record<string, unknown> =>
+      Boolean(value) && typeof value === "object" && !Array.isArray(value)
+
+    if (!isRecord(result) || result.code !== 1) {
+      const errorMessage = isRecord(result) && typeof result.msg === "string"
+        ? result.msg
+        : "码支付查单失败"
+      await createCheckoutAttempt({
+        orderId: order.id,
+        providerCode: order.providerCode,
+        channelCode: order.channelCode,
+        attemptNo,
+        action: "query",
+        status: PaymentAttemptStatus.FAILED,
+        responsePayloadJson: toJsonValue(result),
+        errorCode: "QUERY_FAILED",
+        errorMessage,
+      })
+      return result
+    }
+
+    const epayStatus = result.status as number
+    const nextStatus = epayStatus === 1 ? PaymentOrderStatus.PAID : order.status
+    const endTime = typeof result.endtime === "string" ? result.endtime.trim() : ""
+    const paidAt = endTime ? new Date(endTime.replace(" ", "T")) : null
+
+    await prisma.$transaction([
+      prisma.paymentOrder.update({
+        where: { id: order.id },
+        data: {
+          status: nextStatus,
+          providerTradeNo: typeof result.trade_no === "string" ? result.trade_no : null,
+          paidAt: paidAt && !Number.isNaN(paidAt.getTime()) ? paidAt : undefined,
+          rawSuccessPayloadJson: toJsonValue(result),
+          lastErrorCode: null,
+          lastErrorMessage: null,
+        },
+      }),
+      prisma.paymentAttempt.create({
+        data: {
+          orderId: order.id,
+          attemptNo,
+          action: "query",
+          providerCode: order.providerCode,
+          channelCode: order.channelCode,
+          status: PaymentAttemptStatus.SUCCEEDED,
+          responsePayloadJson: toJsonValue(result),
+          providerTradeNo: typeof result.trade_no === "string" ? result.trade_no : null,
+        },
+      }),
+    ])
+
+    if (nextStatus === PaymentOrderStatus.PAID) {
+      await fulfillPaymentOrderIfNeeded(order.id)
+      if (order.status !== PaymentOrderStatus.PAID) {
+        await emitAddonPaymentPaidEvent({
+          orderId: order.id,
+          merchantOrderNo: order.merchantOrderNo,
+          bizScene: order.bizScene,
+          providerCode: order.providerCode,
+          channelCode: order.channelCode,
+          userId: order.userId,
+          amountFen: order.amountFen,
+          currency: order.currency,
+        })
+      }
+    }
+
+    return result
+  }
+
   const result = await queryAddonPaymentOrder(order.providerCode, {
     merchantOrderNo,
     currentStatus: order.status,
@@ -1249,6 +1360,147 @@ export async function handleAlipayPaymentNotification(payload: Record<string, st
         closedAt: tradeStatus === "TRADE_CLOSED"
           ? (tradeTime ?? new Date())
           : undefined,
+        rawSuccessPayloadJson: toJsonValue(payload),
+        lastErrorCode: null,
+        lastErrorMessage: null,
+      },
+    }),
+    prisma.paymentNotification.update({
+      where: { id: notification.id },
+      data: {
+        handled: true,
+        handledAt: new Date(),
+        errorMessage: null,
+      },
+    }),
+  ])
+
+  if (nextStatus === PaymentOrderStatus.PAID) {
+    await fulfillPaymentOrderIfNeeded(order.id)
+    if (order.status !== PaymentOrderStatus.PAID) {
+      await emitAddonPaymentPaidEvent({
+        orderId: order.id,
+        merchantOrderNo: order.merchantOrderNo,
+        bizScene: order.bizScene,
+        providerCode: order.providerCode,
+        channelCode: order.channelCode,
+        userId: order.userId,
+        amountFen: order.amountFen,
+        currency: order.currency,
+      })
+    }
+  }
+
+  return true
+}
+
+export async function handleEpayPaymentNotification(payload: Record<string, string>) {
+  const config = await getServerPaymentGatewayConfig()
+  const verified = verifyEpayNotifySignature(config.epay, payload)
+  const merchantOrderNo = (payload.out_trade_no ?? "").trim() || null
+
+  const order = merchantOrderNo
+    ? await prisma.paymentOrder.findUnique({
+        where: { merchantOrderNo },
+        select: {
+          id: true,
+          merchantOrderNo: true,
+          bizScene: true,
+          userId: true,
+          amountFen: true,
+          currency: true,
+          status: true,
+          fulfillmentStatus: true,
+          providerCode: true,
+          channelCode: true,
+        },
+      })
+    : null
+
+  const notification = await prisma.paymentNotification.create({
+    data: {
+      orderId: order?.id ?? null,
+      providerCode: "epay",
+      channelCode: order?.channelCode ?? null,
+      notifyType: payload.type?.trim() || null,
+      notifyId: payload.trade_no?.trim() || null,
+      merchantOrderNo,
+      providerTradeNo: payload.trade_no?.trim() || null,
+      tradeStatus: payload.trade_status?.trim() || null,
+      verified,
+      handled: false,
+      payloadJson: toJsonValue(payload) ?? Prisma.JsonNull,
+    },
+    select: {
+      id: true,
+    },
+  })
+
+  if (!verified) {
+    await prisma.paymentNotification.update({
+      where: { id: notification.id },
+      data: {
+        errorMessage: "码支付异步通知验签失败",
+      },
+    })
+    return false
+  }
+
+  if (!order) {
+    await prisma.paymentNotification.update({
+      where: { id: notification.id },
+      data: {
+        errorMessage: "未找到对应支付订单",
+      },
+    })
+    return false
+  }
+
+  if (order.providerCode !== "epay") {
+    await prisma.paymentNotification.update({
+      where: { id: notification.id },
+      data: {
+        errorMessage: "异步通知的支付提供方与订单记录不匹配",
+      },
+    })
+    return false
+  }
+
+  const payPid = (payload.pid ?? "").trim()
+  if (config.epay.pid && payPid && payPid !== config.epay.pid) {
+    await prisma.paymentNotification.update({
+      where: { id: notification.id },
+      data: {
+        errorMessage: "异步通知 pid 与当前配置不匹配",
+      },
+    })
+    return false
+  }
+
+  const money = Number(payload.money ?? "0")
+  const moneyFen = Number.isFinite(money) ? Math.round(money * 100) : -1
+  if (moneyFen > 0 && moneyFen !== order.amountFen) {
+    await prisma.paymentNotification.update({
+      where: { id: notification.id },
+      data: {
+        errorMessage: "异步通知金额与订单金额不匹配",
+      },
+    })
+    return false
+  }
+
+  const tradeStatus = (payload.trade_status ?? "").trim()
+  const nextStatus = tradeStatus === "TRADE_SUCCESS"
+    ? PaymentOrderStatus.PAID
+    : order.status
+
+  await prisma.$transaction([
+    prisma.paymentOrder.update({
+      where: { id: order.id },
+      data: {
+        status: nextStatus,
+        providerTradeNo: payload.trade_no?.trim() || null,
+        paidAt: tradeStatus === "TRADE_SUCCESS" ? new Date() : undefined,
         rawSuccessPayloadJson: toJsonValue(payload),
         lastErrorCode: null,
         lastErrorMessage: null,
