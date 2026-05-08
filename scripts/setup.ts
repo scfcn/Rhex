@@ -1,7 +1,10 @@
 import { spawnSync } from "node:child_process"
-import { existsSync } from "node:fs"
+import { existsSync, writeFileSync, unlinkSync } from "node:fs"
 import { config as loadDotenv } from "dotenv"
 import { resolve } from "node:path"
+import { randomUUID } from "node:crypto"
+
+import { buildSetupSchemaArgs, readBooleanEnv } from "./lib/setup-safety"
 
 interface RequiredEnvSpec {
   key: string
@@ -23,6 +26,8 @@ interface DatabaseState {
   zoneCount: number | null
   boardCount: number | null
   adminCount: number | null
+  addonRegistryCount: number | null
+  addonConfigCount: number | null
   inspectionOk: boolean
 }
 
@@ -47,10 +52,6 @@ const requiredEnvSpecs: RequiredEnvSpec[] = [
 function readEnvValue(key: string) {
   const value = process.env[key]
   return typeof value === "string" ? value.trim() : ""
-}
-
-function isTruthyEnv(key: string) {
-  return readEnvValue(key).toLowerCase() === "true"
 }
 
 function validateEnv() {
@@ -99,20 +100,30 @@ function runStep(command: string, args: string[], label: string) {
 }
 
 function shouldForceSeed() {
-  return isTruthyEnv("SETUP_FORCE_SEED")
+  return readBooleanEnv(process.env, "SETUP_FORCE_SEED")
 }
 
 function runSchemaStep() {
-  runStep("npx", ["tsx", "scripts/prisma-db-push.ts", "--accept-data-loss"], "同步数据库结构")
+  const schemaArgs = buildSetupSchemaArgs({ argv: process.argv.slice(2) })
+
+  runStep("npx", schemaArgs.args, "同步数据库结构")
 }
 
 function runPrismaScript<T>(script: string) {
-  const result = spawnSync("npx", ["tsx", "--eval", script], {
-    cwd: process.cwd(),
-    encoding: "utf8",
-    shell: process.platform === "win32",
-    env: process.env,
-  })
+  const tmpFile = resolve(process.cwd(), `.rhex-setup-${Date.now()}-${randomUUID().slice(0, 8)}.mts`)
+  writeFileSync(tmpFile, script, "utf8")
+
+  let result
+  try {
+    result = spawnSync("npx", ["tsx", tmpFile], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      shell: process.platform === "win32",
+      env: process.env,
+    })
+  } finally {
+    try { unlinkSync(tmpFile) } catch { /* ignore */ }
+  }
 
   const stdout = result.stdout ?? ""
   const stderr = result.stderr ?? ""
@@ -130,37 +141,41 @@ function runPrismaScript<T>(script: string) {
 
 function inspectDatabaseState(): DatabaseState {
   const inspectionResult = runPrismaScript<DatabaseState>(`
-    const { PrismaClient, UserRole } = require("@prisma/client");
+    const { PrismaClient, UserRole } = await import("@prisma/client");
     const prisma = new PrismaClient();
-    (async () => {
-      try {
-        const [siteSettingsCount, zoneCount, boardCount, adminCount] = await Promise.all([
-          prisma.siteSetting.count(),
-          prisma.zone.count(),
-          prisma.board.count(),
-          prisma.user.count({ where: { role: UserRole.ADMIN } }),
-        ]);
-        process.stdout.write(JSON.stringify({
-          siteSettingTableExists: true,
-          siteSettingsCount,
-          zoneCount,
-          boardCount,
-          adminCount,
-          inspectionOk: true,
-        }));
-      } catch {
-        process.stdout.write(JSON.stringify({
-          siteSettingTableExists: null,
-          siteSettingsCount: null,
-          zoneCount: null,
-          boardCount: null,
-          adminCount: null,
-          inspectionOk: false,
-        }));
-      } finally {
-        await prisma.$disconnect();
-      }
-    })();
+    try {
+      const [siteSettingsCount, zoneCount, boardCount, adminCount, addonRegistryCount, addonConfigCount] = await Promise.all([
+        prisma.siteSetting.count(),
+        prisma.zone.count(),
+        prisma.board.count(),
+        prisma.user.count({ where: { role: UserRole.ADMIN } }),
+        prisma.addonRegistry.count(),
+        prisma.addonConfig.count(),
+      ]);
+      process.stdout.write(JSON.stringify({
+        siteSettingTableExists: true,
+        siteSettingsCount,
+        zoneCount,
+        boardCount,
+        adminCount,
+        addonRegistryCount,
+        addonConfigCount,
+        inspectionOk: true,
+      }));
+    } catch {
+      process.stdout.write(JSON.stringify({
+        siteSettingTableExists: null,
+        siteSettingsCount: null,
+        zoneCount: null,
+        boardCount: null,
+        adminCount: null,
+        addonRegistryCount: null,
+        addonConfigCount: null,
+        inspectionOk: false,
+      }));
+    } finally {
+      await prisma.$disconnect();
+    }
   `)
 
   if (!inspectionResult.ok || !inspectionResult.value) {
@@ -170,6 +185,8 @@ function inspectDatabaseState(): DatabaseState {
       zoneCount: null,
       boardCount: null,
       adminCount: null,
+      addonRegistryCount: null,
+      addonConfigCount: null,
       inspectionOk: false,
     }
   }
@@ -207,6 +224,8 @@ function printDatabaseState(state: DatabaseState) {
   console.log(`- 分区数量：${state.zoneCount ?? "未知"}`)
   console.log(`- 板块数量：${state.boardCount ?? "未知"}`)
   console.log(`- 管理员数量：${state.adminCount ?? "未知"}`)
+  console.log(`- 插件注册记录：${state.addonRegistryCount ?? "未知"}`)
+  console.log(`- 插件配置记录：${state.addonConfigCount ?? "未知"}`)
 }
 
 function statefulSkipReason(state: DatabaseState) {
@@ -221,7 +240,7 @@ function main() {
   loadDotenv({ path: resolve(process.cwd(), ".env") })
 
   validateEnv()
-  console.log("Schema strategy: prisma db push")
+  console.log("数据库同步：自动应用 schema 变更，保护外部表和枚举")
 
   runStep("npx", ["prisma", "generate"], "生成 Prisma Client")
   runSchemaStep()

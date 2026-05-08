@@ -140,10 +140,10 @@ export function UserProfileOverviewCard({
                       targetType="user"
                       targetId={followAction.targetId}
                       initialFollowed={isFollowing}
-                      activeLabel={followAction.activeLabel ?? "取关"}
+                      activeLabel={followAction.activeLabel ?? "已关注"}
                       inactiveLabel={followAction.inactiveLabel ?? "关注"}
                       showLabel
-                      className="h-6 whitespace-nowrap justify-center rounded-full px-2 text-[10px] sm:h-8 sm:px-3 sm:text-xs"
+                      className="h-6 whitespace-nowrap justify-center px-2 text-[10px] sm:h-7 sm:px-2.5 sm:text-[11px]"
                       onFollowStateChange={({ followed, changed }) => {
                         setIsFollowing(followed)
 
@@ -163,7 +163,7 @@ export function UserProfileOverviewCard({
                       inactiveLabel={blockAction.inactiveLabel ?? "拉黑"}
                       showLabel
                       reloadOnChange
-                      className="h-6 whitespace-nowrap justify-center rounded-full px-2 text-[10px] sm:h-8 sm:px-3 sm:text-xs"
+                      className="h-6 whitespace-nowrap justify-center px-2 text-[10px] sm:h-7 sm:px-2.5 sm:text-[11px]"
                       onBlockStateChange={({ blocked, changed }) => {
                         setIsBlocked(blocked)
 

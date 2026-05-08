@@ -3,6 +3,8 @@
 import { Heart } from "lucide-react"
 import { useEffect, useState, useTransition } from "react"
 
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { toast } from "@/components/ui/toast"
 import type { FollowTargetType } from "@/lib/follows"
 import { cn } from "@/lib/utils"
@@ -30,29 +32,22 @@ export function FollowToggleButton({
 }: FollowToggleButtonProps) {
   const [followed, setFollowed] = useState(initialFollowed)
   const [isPending, startTransition] = useTransition()
+  const label = followed ? activeLabel : inactiveLabel
 
   useEffect(() => {
     setFollowed(initialFollowed)
   }, [initialFollowed])
 
   return (
-    <button
+    <Button
       type="button"
       disabled={isPending}
-      title={followed ? activeLabel : inactiveLabel}
-      aria-label={followed ? activeLabel : inactiveLabel}
+      title={label}
+      aria-label={label}
       aria-pressed={followed}
-      className={cn(
-        "inline-flex items-center rounded-full border font-medium transition-colors",
-        showLabel ? "gap-1.5 px-3 py-1.5 text-xs" : "size-8 justify-center p-0",
-        followed
-          ? "border-border bg-accent text-foreground"
-          : showLabel
-            ? "border-transparent bg-transparent text-muted-foreground hover:border-border/70 hover:bg-accent hover:text-foreground"
-            : "border-border/70 bg-secondary/40 text-foreground hover:border-border hover:bg-accent hover:text-foreground",
-        isPending && "cursor-not-allowed opacity-70",
-        className,
-      )}
+      variant={followed ? "secondary" : "outline"}
+      size={showLabel ? "xs" : "icon"}
+      className={cn("rounded-full", className)}
       onClick={() => {
         const desiredFollowed = !followed
 
@@ -83,8 +78,10 @@ export function FollowToggleButton({
         })
       }}
     >
-      <Heart className={followed ? "h-3.5 w-3.5 fill-current" : "h-3.5 w-3.5"} />
-      {showLabel ? <span>{followed ? activeLabel : inactiveLabel}</span> : null}
-    </button>
+      {isPending
+        ? <Spinner data-icon={showLabel ? "inline-start" : undefined} />
+        : <Heart data-icon={showLabel ? "inline-start" : undefined} className={cn(followed && "fill-current")} />}
+      {showLabel ? <span>{label}</span> : null}
+    </Button>
   )
 }

@@ -7,7 +7,7 @@ import { buildTaskConditionSummary, getTaskCategoryLabel, getTaskCycleTypeLabel 
 import { getTaskCycleKey } from "@/lib/task-center-cycle"
 import { ensureTaskCenterSeeded } from "@/lib/task-center-defaults"
 import { normalizeTaskDefinitionConditionConfig } from "@/lib/task-definition-validation"
-import { formatTaskRewardRange, resolveUserTaskRewardRange } from "@/lib/task-reward"
+import { formatTaskRewardRange, getTaskRewardRangeForTier, resolveUserTaskRewardRange } from "@/lib/task-reward"
 import { getSiteSettings } from "@/lib/site-settings"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
 
@@ -128,17 +128,22 @@ function resolveTaskAction(task: TaskDefinition, completed: boolean) {
 
 function mapTaskCard(task: TaskDefinition, progress: Awaited<ReturnType<typeof listUserTaskProgressesByUserId>>[number] | undefined, currentUser: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {
   const conditionConfig = normalizeTaskDefinitionConditionConfig(task.conditionConfigJson)
-  const rewardPreview = progress
-    ? { min: progress.rewardMinSnapshot, max: progress.rewardMaxSnapshot }
-    : resolveUserTaskRewardRange({
-      normal: { min: task.rewardNormalMin, max: task.rewardNormalMax },
-      vip1: { min: task.rewardVip1Min, max: task.rewardVip1Max },
-      vip2: { min: task.rewardVip2Min, max: task.rewardVip2Max },
-      vip3: { min: task.rewardVip3Min, max: task.rewardVip3Max },
-    }, currentUser).range
-  const targetCount = progress?.targetCountSnapshot ?? task.targetCount
-  const progressCount = Math.min(progress?.progressCount ?? 0, targetCount)
+  const rewardSettings = {
+    normal: { min: task.rewardNormalMin, max: task.rewardNormalMax },
+    vip1: { min: task.rewardVip1Min, max: task.rewardVip1Max },
+    vip2: { min: task.rewardVip2Min, max: task.rewardVip2Max },
+    vip3: { min: task.rewardVip3Min, max: task.rewardVip3Max },
+  }
   const completed = progress?.status === "COMPLETED"
+  const rewardPreview = completed && progress
+    ? { min: progress.rewardMinSnapshot, max: progress.rewardMaxSnapshot }
+    : progress
+      ? getTaskRewardRangeForTier(rewardSettings, progress.rewardTierSnapshot)
+      : resolveUserTaskRewardRange(rewardSettings, currentUser).range
+  const targetCount = completed
+    ? progress?.targetCountSnapshot ?? task.targetCount
+    : task.targetCount
+  const progressCount = Math.min(progress?.progressCount ?? 0, targetCount)
   const action = resolveTaskAction(task, completed)
 
   return {

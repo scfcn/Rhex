@@ -1,10 +1,13 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { UserX } from "lucide-react"
-import { useState } from "react"
 
 import { showConfirm } from "@/components/ui/alert-dialog"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { toast } from "@/components/ui/toast"
+import { cn } from "@/lib/utils"
 
 interface UserBlockToggleButtonProps {
   targetUserId: number
@@ -29,6 +32,11 @@ export function UserBlockToggleButton({
 }: UserBlockToggleButtonProps) {
   const [blocked, setBlocked] = useState(initialBlocked)
   const [isPending, setIsPending] = useState(false)
+  const label = blocked ? activeLabel : inactiveLabel
+
+  useEffect(() => {
+    setBlocked(initialBlocked)
+  }, [initialBlocked])
 
   async function handleToggle() {
     const desiredBlocked = !blocked
@@ -85,22 +93,24 @@ export function UserBlockToggleButton({
   }
 
   return (
-    <button
+    <Button
       type="button"
       disabled={isPending}
-      title={blocked ? activeLabel : inactiveLabel}
-      aria-label={blocked ? activeLabel : inactiveLabel}
-      className={`${blocked
-        ? "inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 transition-colors hover:bg-rose-100 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200"
-        : "inline-flex items-center gap-1.5 rounded-full border border-transparent bg-transparent px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-border/70 hover:bg-accent hover:text-foreground"
-      } ${isPending ? "cursor-not-allowed opacity-70" : ""} ${className}`.trim()}
+      title={label}
+      aria-label={label}
+      aria-pressed={blocked}
+      variant={blocked ? "destructive" : "outline"}
+      size={showLabel ? "xs" : "icon"}
+      className={cn("rounded-full", className)}
       onClick={() => {
         void handleToggle()
       }}
     >
-      <UserX className="h-3.5 w-3.5" />
-      {showLabel ? <span>{blocked ? activeLabel : inactiveLabel}</span> : null}
-    </button>
+      {isPending
+        ? <Spinner data-icon={showLabel ? "inline-start" : undefined} />
+        : <UserX data-icon={showLabel ? "inline-start" : undefined} />}
+      {showLabel ? <span>{label}</span> : null}
+    </Button>
   )
 }
 

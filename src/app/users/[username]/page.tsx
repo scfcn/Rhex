@@ -428,7 +428,7 @@ export default async function UserPage(props: PageProps<"/users/[username]">) {
                   followAction={canToggleFollow ? {
                     targetId: user.id,
                     initialFollowed: isFollowingUser,
-                    activeLabel: "取关",
+                    activeLabel: "已关注",
                     inactiveLabel: "关注",
                   } : null}
                   blockAction={currentUser && currentUser.id !== user.id && !isAnonymousMaskUser ? {

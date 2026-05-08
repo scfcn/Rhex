@@ -17,15 +17,30 @@ import { AddonSlotRenderer } from "@/addons-host"
 function SiteLogoMark({ logoPath, iconPath }: { logoPath?: string | null; iconPath?: string | null }) {
   if (logoPath) {
     return (
-      <div className="relative h-8 w-8 overflow-hidden rounded-md border border-border bg-background">
-        <Image src={logoPath} alt="站点 Logo" fill sizes="32px" unoptimized className="object-contain p-1" />
+      <div className="flex h-8 shrink-0 items-center">
+        <Image
+          src={logoPath}
+          alt="站点 Logo"
+          width={160}
+          height={32}
+          sizes="160px"
+          unoptimized
+          className="h-8 w-auto max-w-none"
+        />
       </div>
     )
   }
 
   return (
-    <div className="flex h-8 w-8 items-center justify-center rounded-md">
-      <Image src={resolveSiteIconPath(iconPath)} alt="" width={16} height={16} className="h-8 w-8" />
+    <div className="flex h-8 shrink-0 items-center">
+      <Image
+        src={resolveSiteIconPath(iconPath)}
+        alt=""
+        width={32}
+        height={32}
+        unoptimized
+        className="h-8 w-auto max-w-none"
+      />
     </div>
   )
 }
