@@ -306,7 +306,7 @@ export function CreatePostFormShell({
                   onChange={(event) => updateDraftField("postType", event.target.value as LocalPostType)}
                   disabled={isEditMode}
                   aria-label="帖子类型"
-                  className="h-11 w-full appearance-none rounded-full border border-border bg-card pr-10 pl-12 text-sm font-medium text-foreground outline-hidden transition-colors hover:bg-accent/35 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-70"
+                  className="h-11 w-full appearance-none rounded-full border border-border bg-card pr-10 pl-12 text-sm font-medium text-foreground outline-hidden transition-colors hover:bg-accent/35 focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {availablePostTypes.map((item) => (
                     <option key={item.value} value={item.value}>

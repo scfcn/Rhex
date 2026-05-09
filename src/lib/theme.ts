@@ -6,7 +6,11 @@ export const CUSTOM_THEME_VARIABLES_STORAGE_KEY = "rhex-custom-theme-variables"
 export const THEME_SETTINGS_CHANGE_EVENT = "rhex-theme-settings-change"
 export const CUSTOM_THEME_STYLE_ELEMENT_ID = "rhex-custom-theme-style"
 const THEME_SWITCH_TRANSITION_CLASS_NAME = "theme-switching"
-const THEME_SWITCH_TRANSITION_DURATION_MS = 180
+const THEME_SWITCH_TO_DARK_CLASS_NAME = "theme-switching-to-dark"
+const THEME_SWITCH_TO_LIGHT_CLASS_NAME = "theme-switching-to-light"
+const THEME_SWITCH_FALLBACK_CLASS_NAME = "theme-switching-fallback"
+const THEME_SWITCH_TRANSITION_DURATION_MS = 640
+const THEME_SWITCH_MOBILE_BREAKPOINT_PX = 768
 export const DEFAULT_THEME_FONT_FAMILY = "\"Microsoft YaHei\", \"PingFang SC\", \"Helvetica Neue\", Helvetica, Arial, sans-serif"
 export const DEFAULT_THEME_FONT_SIZE = "16px"
 const THEME_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
@@ -17,6 +21,14 @@ export type FontSizePreset = "compact" | "normal" | "relaxed"
 export type ThemePreset = keyof typeof THEME_PRESETS | "custom"
 type ThemeVariableName = "background" | "foreground" | "card" | "card-foreground" | "primary" | "primary-foreground" | "secondary" | "secondary-foreground" | "muted" | "muted-foreground" | "accent" | "accent-foreground" | "border" | "ring"
 type ThemeVariableMap = Partial<Record<ThemeVariableName, string>>
+type ThemeViewTransition = {
+  ready: Promise<void>
+  finished: Promise<void>
+}
+type ThemeViewTransitionDocument = Document & {
+  startViewTransition?: (callback: () => void) => ThemeViewTransition
+}
+type ThemeSwitchTransitionDirection = "left-to-right" | "right-to-left"
 
 interface CustomThemeModeConfig {
   primary: string
@@ -616,25 +628,82 @@ function notifyThemeSettingsChanged() {
 }
 
 let themeSwitchTransitionTimer: number | null = null
+let themeSwitchTransitionToken = 0
 
-function startThemeSwitchTransition() {
-  if (!isBrowser()) {
+function clearThemeSwitchTransitionTimer() {
+  if (themeSwitchTransitionTimer !== null) {
+    window.clearTimeout(themeSwitchTransitionTimer)
+    themeSwitchTransitionTimer = null
+  }
+}
+
+function clearThemeSwitchTransitionClasses() {
+  const root = document.documentElement
+  root.classList.remove(
+    THEME_SWITCH_TRANSITION_CLASS_NAME,
+    THEME_SWITCH_TO_DARK_CLASS_NAME,
+    THEME_SWITCH_TO_LIGHT_CLASS_NAME,
+    THEME_SWITCH_FALLBACK_CLASS_NAME,
+  )
+}
+
+function finishThemeSwitchTransition(token: number, className: string) {
+  if (token !== themeSwitchTransitionToken) {
     return
   }
 
-  if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) {
+  document.documentElement.classList.remove(className, THEME_SWITCH_TO_DARK_CLASS_NAME, THEME_SWITCH_TO_LIGHT_CLASS_NAME)
+}
+
+function getThemeSwitchTransitionClassName(direction: ThemeSwitchTransitionDirection) {
+  return direction === "left-to-right" ? THEME_SWITCH_TO_DARK_CLASS_NAME : THEME_SWITCH_TO_LIGHT_CLASS_NAME
+}
+
+function shouldSkipThemeSwitchTransition() {
+  return window.innerWidth < THEME_SWITCH_MOBILE_BREAKPOINT_PX || window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches
+}
+
+function runThemeSwitchTransition(direction: ThemeSwitchTransitionDirection, applyChange: () => void) {
+  if (!isBrowser()) {
+    applyChange()
+    return
+  }
+
+  if (shouldSkipThemeSwitchTransition()) {
+    clearThemeSwitchTransitionTimer()
+    clearThemeSwitchTransitionClasses()
+    applyChange()
     return
   }
 
   const root = document.documentElement
-  root.classList.add(THEME_SWITCH_TRANSITION_CLASS_NAME)
+  const transitionToken = themeSwitchTransitionToken + 1
+  themeSwitchTransitionToken = transitionToken
+  clearThemeSwitchTransitionTimer()
+  clearThemeSwitchTransitionClasses()
 
-  if (themeSwitchTransitionTimer !== null) {
-    window.clearTimeout(themeSwitchTransitionTimer)
+  const transitionDocument = document as ThemeViewTransitionDocument
+  if (typeof transitionDocument.startViewTransition === "function") {
+    const directionClassName = getThemeSwitchTransitionClassName(direction)
+    root.classList.add(THEME_SWITCH_TRANSITION_CLASS_NAME, directionClassName)
+
+    const transition = transitionDocument.startViewTransition(() => {
+      applyChange()
+    })
+
+    void transition.finished
+      .catch(() => undefined)
+      .finally(() => {
+        finishThemeSwitchTransition(transitionToken, THEME_SWITCH_TRANSITION_CLASS_NAME)
+      })
+    return
   }
 
+  root.classList.add(THEME_SWITCH_FALLBACK_CLASS_NAME)
+  applyChange()
+
   themeSwitchTransitionTimer = window.setTimeout(() => {
-    document.documentElement.classList.remove(THEME_SWITCH_TRANSITION_CLASS_NAME)
+    finishThemeSwitchTransition(transitionToken, THEME_SWITCH_FALLBACK_CLASS_NAME)
     themeSwitchTransitionTimer = null
   }, THEME_SWITCH_TRANSITION_DURATION_MS)
 }
@@ -696,12 +765,27 @@ function writeThemeSetting(storageKey: string, value: string) {
     return
   }
 
-  startThemeSwitchTransition()
+  const currentSnapshot = readThemeLocalSettingsSnapshot()
+  const currentMode = resolveThemeMode(currentSnapshot.preference)
+  const nextPreference = storageKey === THEME_STORAGE_KEY ? resolveStoredThemePreference(value) : currentSnapshot.preference
+  const nextMode = resolveThemeMode(nextPreference)
+  const transitionDirection: ThemeSwitchTransitionDirection = nextMode === "dark" ? "left-to-right" : "right-to-left"
+  const applyChange = () => {
+    window.localStorage.setItem(storageKey, value)
+    writeThemeCookie(storageKey, value)
 
-  window.localStorage.setItem(storageKey, value)
-  writeThemeCookie(storageKey, value)
-  updateThemeLocalSettingsSnapshot(readThemeLocalSettingsSnapshotFromStorage())
-  notifyThemeSettingsChanged()
+    const nextSnapshot = readThemeLocalSettingsSnapshotFromStorage()
+    updateThemeLocalSettingsSnapshot(nextSnapshot)
+    applyTheme(nextSnapshot.preference, nextSnapshot.preset, nextSnapshot.fontSizePreset)
+    notifyThemeSettingsChanged()
+  }
+
+  if (storageKey === THEME_STORAGE_KEY && currentMode !== nextMode) {
+    runThemeSwitchTransition(transitionDirection, applyChange)
+    return
+  }
+
+  applyChange()
 }
 
 export function setStoredThemePreference(preference: ThemePreference) {
