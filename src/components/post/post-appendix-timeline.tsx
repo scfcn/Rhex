@@ -45,6 +45,7 @@ export function PostAppendixTimeline({ appendices, markdownEmojiMap }: PostAppen
                   html={appendix.html}
                   className="text-[14px] leading-7 tracking-[0.015em] text-muted-foreground dark:text-muted-foreground/90"
                   markdownEmojiMap={markdownEmojiMap}
+                  collapseLongCodeBlocks
                 />
               </div>
             </section>

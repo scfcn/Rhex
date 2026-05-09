@@ -25,7 +25,9 @@ import { verifyPowCaptchaSolution } from "@/lib/pow-captcha"
 import { getRequestIp } from "@/lib/request-ip"
 import { getServerSiteSettings } from "@/lib/site-settings"
 import { isEquivalentNickname } from "@/lib/nickname"
+import { isPrismaUniqueConstraintError } from "@/lib/prisma-errors"
 import { verifyTurnstileToken } from "@/lib/turnstile"
+import { findUsernameSensitiveWord } from "@/lib/username-sensitive-words"
 import { validateAuthPayload } from "@/lib/validators"
 import { verifyCode } from "@/lib/verification"
 import { executeAddonActionHook } from "@/addons-host/runtime/hooks"
@@ -79,6 +81,18 @@ function assertRegisterPayload(body: unknown, options: { nicknameMinLength: numb
   }
 
   return validated.data
+}
+
+function isSameUsername(left: string, right: string) {
+  return left.trim().toLocaleLowerCase() === right.trim().toLocaleLowerCase()
+}
+
+function verifyUsernameSafety(context: RegisterContext) {
+  const matchedWord = findUsernameSensitiveWord(context.payload.username, context.settings)
+
+  if (matchedWord) {
+    apiError(400, `用户名包含敏感词：${matchedWord}`)
+  }
 }
 
 async function verifyRegisterCaptcha(context: RegisterContext) {
@@ -200,7 +214,7 @@ async function ensureRegisterTargetsAvailable(context: RegisterContext) {
     nickname: payload.nickname ? sanitizedNickname : undefined,
   })
 
-  if (existingUser?.username === payload.username) {
+  if (existingUser?.username && isSameUsername(existingUser.username, payload.username)) {
     apiError(409, "用户名已存在")
   }
 
@@ -263,6 +277,7 @@ export async function createRegisterFlow(options: RegisterFlowOptions): Promise<
   }
 
   verifyRequiredRegisterFields(context)
+  verifyUsernameSafety(context)
   await verifyRegisterCaptcha(context)
   await ensureRegisterTargetsAvailable(context)
   await verifyRegisterContactCodes(context)
@@ -316,7 +331,7 @@ export async function createRegisterFlow(options: RegisterFlowOptions): Promise<
         apiError(404, "邀请人不存在")
       }
 
-      if (inviter.username === payload.username) {
+      if (isSameUsername(inviter.username, payload.username)) {
         apiError(400, "邀请人不能填写自己")
       }
     }
@@ -335,7 +350,7 @@ export async function createRegisterFlow(options: RegisterFlowOptions): Promise<
       inviteCodeRecord = { id: foundCode.id, code: foundCode.code }
 
       if (!inviter && foundCode.createdBy) {
-        if (foundCode.createdBy.username === payload.username) {
+        if (isSameUsername(foundCode.createdBy.username, payload.username)) {
           apiError(400, "不能使用自己生成的邀请码注册")
         }
 
@@ -349,20 +364,30 @@ export async function createRegisterFlow(options: RegisterFlowOptions): Promise<
 
     const inviteeRegisterReward = inviter && inviteeReward > 0 ? inviteeReward : 0
 
-    const createdUser = await createRegisteredUserRecord({
-      tx,
-      username: payload.username,
-      email: settings.registerEmailEnabled ? payload.email || null : null,
-      phone: settings.registerPhoneEnabled ? payload.phone || null : null,
-      emailVerifiedAt: settings.registerEmailEnabled && settings.registerEmailVerification ? new Date() : null,
-      phoneVerifiedAt: settings.registerPhoneEnabled && settings.registerPhoneVerification ? new Date() : null,
-      passwordHash: hashSync(payload.password, 10),
-      nickname: settings.registerNicknameEnabled ? sanitizedNickname : payload.username,
-      gender: settings.registerGenderEnabled ? payload.gender : null,
-      inviterId: inviter?.id,
-      lastLoginAt: new Date(),
-      lastLoginIp: registerIp,
-    })
+    let createdUser: { id: number; username: string }
+
+    try {
+      createdUser = await createRegisteredUserRecord({
+        tx,
+        username: payload.username,
+        email: settings.registerEmailEnabled ? payload.email || null : null,
+        phone: settings.registerPhoneEnabled ? payload.phone || null : null,
+        emailVerifiedAt: settings.registerEmailEnabled && settings.registerEmailVerification ? new Date() : null,
+        phoneVerifiedAt: settings.registerPhoneEnabled && settings.registerPhoneVerification ? new Date() : null,
+        passwordHash: hashSync(payload.password, 10),
+        nickname: settings.registerNicknameEnabled ? sanitizedNickname : payload.username,
+        gender: settings.registerGenderEnabled ? payload.gender : null,
+        inviterId: inviter?.id,
+        lastLoginAt: new Date(),
+        lastLoginIp: registerIp,
+      })
+    } catch (error) {
+      if (isPrismaUniqueConstraintError(error, "username")) {
+        apiError(409, "用户名已存在")
+      }
+
+      throw error
+    }
 
     if (inviteCodeRecord) {
       await markInviteCodeAsUsed(inviteCodeRecord.id, createdUser.id, tx)

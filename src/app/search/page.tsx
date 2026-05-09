@@ -134,9 +134,9 @@ export default async function SearchPage(props: PageProps<"/search">) {
                       ) : null}
                     </div>
                   </div>
-                  <div className="space-y-5 pt-5">
+                  <div className="space-y-5 p-4">
                     {!hasKeyword ? (
-                      <div className="rounded-xl border border-dashed border-border bg-background px-4 py-5 text-sm leading-6 text-muted-foreground">
+                      <div className="rounded-xl border border-dashed border-border bg-background px-4 py-5 text-sm leading-6 text-muted-foreground ">
                         {settings.search.enabled
                           ? "支持搜索帖子标题、正文摘要、作者昵称和节点名称。输入更短、更明确的关键词通常更容易找到结果。"
                           : "站内搜索当前已关闭。输入关键词后，可直接使用下方的外部搜索选项继续查找。"}
@@ -153,12 +153,11 @@ export default async function SearchPage(props: PageProps<"/search">) {
                     ) : (
                       <>
                         <ForumPostStream posts={resultItems} compactFirstItem={false} />
-                        <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center justify-between gap-2 border-t border-border p-4">
                           <PaginationLink
                             href={results!.hasPrevPage && results!.prevCursor ? buildSearchHref({ before: results!.prevCursor }) : null}
                             label="上一页"
                           />
-                          <p className="text-sm text-muted-foreground">使用上一页和下一页继续浏览当前关键词的结果。</p>
                           <PaginationLink
                             href={results!.hasNextPage && results!.nextCursor ? buildSearchHref({ after: results!.nextCursor }) : null}
                             label="下一页"
@@ -180,7 +179,7 @@ export default async function SearchPage(props: PageProps<"/search">) {
 }
 
 function PaginationLink({ href, label }: { href: string | null; label: string }) {
-  const className = "inline-flex items-center justify-center rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium transition-colors"
+  const className = "inline-flex flex-1 items-center justify-center rounded-full border border-border bg-background px-4 py-2 text-sm font-medium transition-colors sm:flex-none sm:min-w-24"
 
   if (!href) {
     return <span className={`${className} pointer-events-none opacity-50`}>{label}</span>

@@ -1,4 +1,4 @@
-import Redis from "ioredis"
+import Redis, { type RedisOptions } from "ioredis"
 
 import { attachRedisMetricsListeners } from "@/lib/redis-metrics"
 
@@ -55,6 +55,38 @@ function readRedisUrl() {
   return url
 }
 
+function readOptionalRedisEnv(key: string) {
+  const value = process.env[key]
+  if (typeof value !== "string") {
+    return undefined
+  }
+
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return undefined
+  }
+
+  return trimmed
+}
+
+function readRedisDatabase() {
+  const raw = readOptionalRedisEnv("REDIS_DB")
+  if (raw === undefined) {
+    return undefined
+  }
+
+  if (!/^\d+$/.test(raw)) {
+    throw new Error(`REDIS_DB 必须是非负整数，当前值：${raw}`)
+  }
+
+  const db = Number(raw)
+  if (!Number.isSafeInteger(db)) {
+    throw new Error(`REDIS_DB 超出安全整数范围，当前值：${raw}`)
+  }
+
+  return db
+}
+
 function detectRedisProcessRole() {
   const entrypoint = process.argv[1]?.replace(/\\/g, "/").toLowerCase() ?? ""
 
@@ -76,13 +108,34 @@ function buildRedisConnectionName(role: string) {
   return [prefix, processRole, String(process.pid), role].join(":")
 }
 
-function createRedisClient(role = "shared") {
-  const client = new Redis(readRedisUrl(), {
+export function buildRedisConnectionOptions(role: string): RedisOptions {
+  const options: RedisOptions = {
     lazyConnect: true,
     maxRetriesPerRequest: 1,
     enableAutoPipelining: true,
     connectionName: buildRedisConnectionName(role),
-  })
+  }
+  const username = readOptionalRedisEnv("REDIS_USERNAME")
+  const password = readOptionalRedisEnv("REDIS_PASSWORD")
+  const db = readRedisDatabase()
+
+  if (username) {
+    options.username = username
+  }
+
+  if (password !== undefined) {
+    options.password = password
+  }
+
+  if (db !== undefined) {
+    options.db = db
+  }
+
+  return options
+}
+
+function createRedisClient(role = "shared") {
+  const client = new Redis(readRedisUrl(), buildRedisConnectionOptions(role))
 
   attachRedisMetricsListeners(client, role)
   registerRedisLuaCommands(client)

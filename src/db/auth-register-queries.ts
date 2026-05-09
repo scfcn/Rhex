@@ -8,7 +8,14 @@ export function findRegistrationConflict(input: {
   phone?: string
   nickname?: string
 }) {
-  const or: Prisma.UserWhereInput[] = [{ username: input.username }]
+  const or: Prisma.UserWhereInput[] = [
+    {
+      username: {
+        equals: input.username,
+        mode: "insensitive",
+      },
+    },
+  ]
 
   if (input.email) {
     or.push({
@@ -45,8 +52,13 @@ export function findRegistrationConflict(input: {
 
 export function findRegisterInviterByUsername(username: string, tx?: Prisma.TransactionClient) {
   const client = tx ?? prisma
-  return client.user.findUnique({
-    where: { username },
+  return client.user.findFirst({
+    where: {
+      username: {
+        equals: username,
+        mode: "insensitive",
+      },
+    },
     select: { id: true, username: true, points: true },
   })
 }

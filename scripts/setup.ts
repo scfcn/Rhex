@@ -44,8 +44,8 @@ const requiredEnvSpecs: RequiredEnvSpec[] = [
   },
   {
     key: "REDIS_URL",
-    description: "Redis 连接串，用于请求写保护、验证码存储与消费锁",
-    example: "redis://127.0.0.1:6379",
+    description: "Redis 连接串，用于请求写保护、验证码存储与消费锁；可在连接串中包含密码和分库",
+    example: "redis://:password@127.0.0.1:6379/0",
   },
 ]
 

@@ -9,8 +9,13 @@ function resolveClient(client?: DbClient) {
 }
 
 export function findUserIdByUsername(username: string, client?: DbClient) {
-  return resolveClient(client).user.findUnique({
-    where: { username },
+  return resolveClient(client).user.findFirst({
+    where: {
+      username: {
+        equals: username,
+        mode: "insensitive",
+      },
+    },
     select: { id: true },
   })
 }
@@ -18,9 +23,12 @@ export function findUserIdByUsername(username: string, client?: DbClient) {
 export function findUsersByUsernames(usernames: string[], client?: DbClient) {
   return resolveClient(client).user.findMany({
     where: {
-      username: {
-        in: usernames,
-      },
+      OR: usernames.map((username) => ({
+        username: {
+          equals: username,
+          mode: "insensitive" as const,
+        },
+      })),
     },
     select: {
       username: true,
@@ -67,7 +75,12 @@ export function findUserLoginCandidate(login: string, client?: DbClient) {
   return resolveClient(client).user.findFirst({
     where: {
       OR: [
-        { username: login },
+        {
+          username: {
+            equals: login,
+            mode: "insensitive",
+          },
+        },
         {
           email: {
             equals: login,

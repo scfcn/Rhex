@@ -53,7 +53,7 @@ export function UserVerificationBadge({ verification, compact = false, className
         <LevelIcon
           icon={effectiveIcon}
           color={verification.color}
-          className={cn(compact ? "h-3 min-w-3 text-[12px]" : "h-3.5 min-w-3.5 text-[14px]", iconClassName)}
+          className={cn(compact ? "h-5 min-w-5 text-[12px]" : "h-3.5 min-w-3.5 text-[14px]", iconClassName)}
           emojiClassName="text-inherit"
           svgClassName="[&>svg]:block"
         />

@@ -511,7 +511,7 @@ export function CommentThreadReplyItem({
                     {replyUnavailableMessage ? (
                       <CommentUnavailablePlaceholder message={replyUnavailableMessage} />
                     ) : (
-                      <MarkdownContent content={reply.content} className="text-[13px] leading-6 text-foreground/90 dark:text-foreground/85 sm:text-sm sm:leading-7" markdownEmojiMap={markdownEmojiMap} />
+                      <MarkdownContent content={reply.content} className="text-[13px] leading-6 text-foreground/90 dark:text-foreground/85 sm:text-sm sm:leading-7" markdownEmojiMap={markdownEmojiMap} collapseLongCodeBlocks />
                     )}
                   </>
                 )}
@@ -674,7 +674,7 @@ export function CommentThreadCommentItem({
                     {commentUnavailableMessage ? (
                       <CommentUnavailablePlaceholder message={commentUnavailableMessage} />
                     ) : (
-                      <MarkdownContent content={comment.content} className="text-[13px] leading-6 text-foreground/90 dark:text-foreground/85 sm:text-sm sm:leading-7" markdownEmojiMap={markdownEmojiMap} />
+                      <MarkdownContent content={comment.content} className="text-[13px] leading-6 text-foreground/90 dark:text-foreground/85 sm:text-sm sm:leading-7" markdownEmojiMap={markdownEmojiMap} collapseLongCodeBlocks />
                     )}
                   </>
                 )}

@@ -34,6 +34,7 @@ import { enforceSensitiveText } from "@/lib/content-safety"
 import { parseBusinessDateTime } from "@/lib/formatters"
 import { ensureCanModerateUser, isScopedModerator, isSiteAdmin } from "@/lib/moderator-permissions"
 import { getServerSiteSettings } from "@/lib/site-settings"
+import { findUsernameSensitiveWord } from "@/lib/username-sensitive-words"
 import { mergeUserProfileSettings } from "@/lib/user-profile-settings"
 import { validateProfilePayload } from "@/lib/validators"
 import { normalizeConfigurableVipLevel } from "@/lib/vip-status"
@@ -184,6 +185,16 @@ export const adminUserActionHandlers: Record<string, AdminActionDefinition> = {
     const nicknameSafety = await enforceSensitiveText({ scene: "profile.nickname", text: validated.data.nickname })
     const bioSafety = await enforceSensitiveText({ scene: "profile.bio", text: validated.data.bio })
     const introductionSafety = await enforceSensitiveText({ scene: "profile.introduction", text: validated.data.introduction })
+    const currentNickname = (currentUser.nickname ?? "").trim()
+    const nextNickname = nicknameSafety.sanitizedText
+
+    if (currentNickname !== nextNickname) {
+      const matchedNicknameSensitiveWord = findUsernameSensitiveWord(nextNickname, settings)
+      if (matchedNicknameSensitiveWord) {
+        apiError(400, `昵称包含敏感词：${matchedNicknameSensitiveWord}`)
+      }
+    }
+
     const existingNicknameUser = await findUserByNicknameInsensitive(nicknameSafety.sanitizedText, userId)
 
     if (existingNicknameUser) {

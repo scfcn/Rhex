@@ -57,12 +57,12 @@ export async function buildUsernameSuggestions(base: string, minimumCount = 4) {
 
   const candidates = Array.from(candidatePool)
   const existingUsers = await findUsersByUsernames(candidates)
-  const taken = new Set(existingUsers.map((item) => item.username))
-  const available = candidates.filter((item) => !taken.has(item))
+  const taken = new Set(existingUsers.map((item) => item.username.toLocaleLowerCase()))
+  const available = candidates.filter((item) => !taken.has(item.toLocaleLowerCase()))
 
   while (available.length < minimumCount) {
     const fallback = fitUsernameLength("user", `_${Math.floor(1000 + Math.random() * 9000)}`)
-    if (!available.includes(fallback) && !taken.has(fallback)) {
+    if (!available.includes(fallback) && !taken.has(fallback.toLocaleLowerCase())) {
       available.push(fallback)
     }
   }

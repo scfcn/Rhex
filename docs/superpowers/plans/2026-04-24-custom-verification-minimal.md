@@ -209,7 +209,7 @@ return {
 <LevelIcon
   icon={verification.customIconText?.trim() || verification.iconText}
   color={verification.color}
-  className={cn(compact ? "h-3 min-w-3 text-[12px]" : "h-3.5 min-w-3.5 text-[14px]", iconClassName)}
+  className={cn(compact ? "h-5 min-w-5 text-[12px]" : "h-3.5 min-w-3.5 text-[14px]", iconClassName)}
 />
 ```
 

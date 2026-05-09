@@ -1,6 +1,8 @@
 x-app-environment: &app-environment
   DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-bbs}?schema=public
   REDIS_URL: redis://redis:6379
+  REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+  REDIS_DB: ${REDIS_DB:-}
 
 x-app-service: &app-service
   image: ghcr.io/lovedevpanda/rhex:latest
@@ -36,13 +38,23 @@ services:
   redis:
     image: redis:latest
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        if [ -n "$${REDIS_PASSWORD:-}" ]; then
+          exec redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"
+        fi
+        exec redis-server --appendonly yes
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
     ports:
       - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "if [ -n \"$${REDIS_PASSWORD:-}\" ]; then redis-cli -a \"$${REDIS_PASSWORD}\" --no-auth-warning ping; else redis-cli ping; fi"]
       interval: 10s
       timeout: 5s
       retries: 10

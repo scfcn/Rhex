@@ -5,6 +5,8 @@ export const CUSTOM_THEME_STORAGE_KEY = "rhex-custom-theme"
 export const CUSTOM_THEME_VARIABLES_STORAGE_KEY = "rhex-custom-theme-variables"
 export const THEME_SETTINGS_CHANGE_EVENT = "rhex-theme-settings-change"
 export const CUSTOM_THEME_STYLE_ELEMENT_ID = "rhex-custom-theme-style"
+const THEME_SWITCH_TRANSITION_CLASS_NAME = "theme-switching"
+const THEME_SWITCH_TRANSITION_DURATION_MS = 180
 export const DEFAULT_THEME_FONT_FAMILY = "\"Microsoft YaHei\", \"PingFang SC\", \"Helvetica Neue\", Helvetica, Arial, sans-serif"
 export const DEFAULT_THEME_FONT_SIZE = "16px"
 const THEME_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
@@ -613,6 +615,30 @@ function notifyThemeSettingsChanged() {
   window.dispatchEvent(new Event(THEME_SETTINGS_CHANGE_EVENT))
 }
 
+let themeSwitchTransitionTimer: number | null = null
+
+function startThemeSwitchTransition() {
+  if (!isBrowser()) {
+    return
+  }
+
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) {
+    return
+  }
+
+  const root = document.documentElement
+  root.classList.add(THEME_SWITCH_TRANSITION_CLASS_NAME)
+
+  if (themeSwitchTransitionTimer !== null) {
+    window.clearTimeout(themeSwitchTransitionTimer)
+  }
+
+  themeSwitchTransitionTimer = window.setTimeout(() => {
+    document.documentElement.classList.remove(THEME_SWITCH_TRANSITION_CLASS_NAME)
+    themeSwitchTransitionTimer = null
+  }, THEME_SWITCH_TRANSITION_DURATION_MS)
+}
+
 function writeThemeCookie(cookieName: string, value: string) {
   if (!isBrowser()) {
     return
@@ -655,6 +681,22 @@ function writeThemeSetting(storageKey: string, value: string) {
   if (!isBrowser()) {
     return
   }
+
+  let storedValue: string | null = null
+
+  try {
+    storedValue = window.localStorage.getItem(storageKey)
+  } catch {
+    storedValue = null
+  }
+
+  const cookieValue = readThemeCookieValue(storageKey)
+
+  if (storedValue === value && cookieValue === value) {
+    return
+  }
+
+  startThemeSwitchTransition()
 
   window.localStorage.setItem(storageKey, value)
   writeThemeCookie(storageKey, value)

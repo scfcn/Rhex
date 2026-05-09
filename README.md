@@ -163,7 +163,18 @@ CAPTCHA_SECRET_KEY="replace-with-a-long-random-secret"
 REDIS_URL="redis://127.0.0.1:6379"
 ```
 
-建议同时设置 `SITE_URL` / `APP_URL`。其他配置按需修改 `.env.example` 里的注释即可。
+如果 Redis 有密码或需要使用非 0 分库，可以二选一配置：
+
+```env
+# 推荐：直接写进连接串
+REDIS_URL="redis://:your-password@127.0.0.1:6379/2"
+
+# 或者保持 REDIS_URL 不含认证信息，额外设置：
+REDIS_PASSWORD="your-password"
+REDIS_DB="2"
+```
+
+多程序共用同一个 Redis 时，建议设置不同的 `REDIS_KEY_PREFIX`；如果使用 Docker Compose 内置 Redis，`REDIS_PASSWORD` 也会自动启用 Redis `requirepass`。建议同时设置 `SITE_URL` / `APP_URL`。其他配置按需修改 `.env.example` 里的注释即可。
 
 ## Docker Compose 部署
 

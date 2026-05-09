@@ -19,7 +19,7 @@ import { defaultSiteSettingsCreateInput } from "@/lib/site-settings-defaults"
 import { parseMarkdownEmojiMapJson } from "@/lib/markdown-emoji"
 import { normalizePostListLoadMode } from "@/lib/post-list-load-mode"
 import { normalizePostListDisplayMode } from "@/lib/post-list-display"
-import { resolveAnonymousPostSettings, resolveAttachmentFeatureSettings, resolveAuthProviderSettings, resolveAvatarChangePointCostSettings, resolveBoardApplicationSettings, resolveBoardTreasurySettings, resolveCheckInMakeUpPriceSettings, resolveCheckInRewardSettings, resolveCheckInStreakSettings, resolveCommentAccessSettings, resolveFooterCopyrightSettings, resolveHomeFeedPostListLoadSettings, resolveHomeHotFeedSettings, resolveHomeSidebarAnnouncementSettings, resolveImageWatermarkSettings, resolveInteractionGateSettings, resolveIntroductionChangePointCostSettings, resolveInviteCodePurchasePriceSettings, resolveLeftSidebarDisplaySettings, resolveMarkdownImageUploadSettings, resolveMessageMediaSettings, resolveNicknameChangePointCostSettings, resolvePostContentLengthSettings, resolvePostJackpotSettings, resolvePostPageSizeSettings, resolvePostRedPacketSettings, resolvePostSlugGenerationSettings, resolveRegisterEmailWhitelistSettings, resolveRegisterInviteCodeHelpSettings, resolveRegisterNicknameLengthSettings, resolveRegistrationEmailTemplateSettings, resolveRegistrationRewardSettings, resolveSiteBrandingSettings, resolveSiteChatSettings, resolveSiteSecuritySettings, resolveUploadObjectStorageSettings, resolveVipLevelIconSettings, resolveVipNameColorSettings } from "@/lib/site-settings-app-state"
+import { resolveAnonymousPostSettings, resolveAttachmentFeatureSettings, resolveAuthProviderSettings, resolveAvatarChangePointCostSettings, resolveBoardApplicationSettings, resolveBoardTreasurySettings, resolveCheckInMakeUpPriceSettings, resolveCheckInRewardSettings, resolveCheckInStreakSettings, resolveCommentAccessSettings, resolveFooterCopyrightSettings, resolveHomeFeedPostListLoadSettings, resolveHomeHotFeedSettings, resolveHomeSidebarAnnouncementSettings, resolveImageWatermarkSettings, resolveInteractionGateSettings, resolveIntroductionChangePointCostSettings, resolveInviteCodePurchasePriceSettings, resolveLeftSidebarDisplaySettings, resolveMarkdownImageUploadSettings, resolveMessageMediaSettings, resolveNicknameChangePointCostSettings, resolvePostContentLengthSettings, resolvePostJackpotSettings, resolvePostPageSizeSettings, resolvePostRedPacketSettings, resolvePostSlugGenerationSettings, resolveRegisterEmailWhitelistSettings, resolveRegisterInviteCodeHelpSettings, resolveRegisterNicknameLengthSettings, resolveRegistrationEmailTemplateSettings, resolveRegistrationRewardSettings, resolveSiteBrandingSettings, resolveSiteChatSettings, resolveSiteSecuritySettings, resolveUploadObjectStorageSettings, resolveUsernameSensitiveWordSettings, resolveVipLevelIconSettings, resolveVipNameColorSettings } from "@/lib/site-settings-app-state"
 import { resolveAuthPageShowcaseSettings } from "@/lib/site-settings-app-state"
 import { resolveAuthProviderSensitiveConfig, resolveCaptchaSensitiveConfig, resolveUploadStorageSensitiveConfig } from "@/lib/site-settings-sensitive-state"
 import { resolveSiteSearchSettings } from "@/lib/site-search-settings"
@@ -302,6 +302,9 @@ function mapSiteSettings(record: SiteSettingsRecordData, tippingGifts: SiteTippi
   const siteSecuritySettings = resolveSiteSecuritySettings({
     appStateJson: record.appStateJson,
   })
+  const usernameSensitiveWordSettings = resolveUsernameSensitiveWordSettings({
+    appStateJson: record.appStateJson,
+  })
   const redeemCodeHelpSettings = resolveRedeemCodeHelpSettingsFromAppState(record.appStateJson)
   const authPageShowcaseSettings = resolveAuthPageShowcaseSettings({
     appStateJson: record.appStateJson,
@@ -487,6 +490,8 @@ function mapSiteSettings(record: SiteSettingsRecordData, tippingGifts: SiteTippi
     sessionIpMismatchLogoutEnabled: siteSecuritySettings.sessionIpMismatchLogoutEnabled,
     loginIpChangeEmailAlertEnabled: siteSecuritySettings.loginIpChangeEmailAlertEnabled,
     passwordChangeRequireEmailVerification: siteSecuritySettings.passwordChangeRequireEmailVerification,
+    usernameSensitiveWordsEnabled: usernameSensitiveWordSettings.usernameSensitiveWordsEnabled,
+    usernameSensitiveWords: usernameSensitiveWordSettings.usernameSensitiveWords,
     registerEmailWhitelistEnabled: registerEmailWhitelistSettings.enabled,
     registerEmailWhitelistDomains: registerEmailWhitelistSettings.domains,
     registerPhoneEnabled: record.registerPhoneEnabled,

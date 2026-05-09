@@ -1,6 +1,7 @@
 import type { RegistrationEmailTemplateSettings } from "@/lib/site-settings-app-state"
+import type { UsernameSensitiveWordSettings } from "@/lib/username-sensitive-words"
 
-export interface SiteSettingsRegistrationData {
+export interface SiteSettingsRegistrationData extends UsernameSensitiveWordSettings {
   registrationEnabled: boolean
   authPageShowcaseEnabled: boolean
   registrationRequireInviteCode: boolean

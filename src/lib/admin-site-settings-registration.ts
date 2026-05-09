@@ -11,15 +11,18 @@ import {
   mergeRegistrationEmailTemplateSettings,
   mergeRegistrationRewardSettings,
   mergeSiteSecuritySettings,
+  mergeUsernameSensitiveWordSettings,
   resolveRegisterInviteCodeHelpSettings,
   resolveRegisterEmailWhitelistSettings,
   resolveRegistrationEmailTemplateSettings,
   resolveRegisterNicknameLengthSettings,
   resolveRegistrationRewardSettings,
   resolveSiteSecuritySettings,
+  resolveUsernameSensitiveWordSettings,
 } from "@/lib/site-settings-app-state"
 import { mergeAuthProviderSensitiveConfig, mergeCaptchaSensitiveConfig } from "@/lib/site-settings-sensitive-state"
 import { normalizeCaptchaMode } from "@/lib/shared/config-parsers"
+import { normalizeUsernameSensitiveWords } from "@/lib/username-sensitive-words"
 
 function isSupportedInviteCodeHelpUrl(value: string) {
   return value.startsWith("/") || /^https?:\/\//i.test(value)
@@ -71,6 +74,9 @@ export async function updateRegistrationSiteSettingsSection(existing: SiteSettin
   const existingSiteSecuritySettings = resolveSiteSecuritySettings({
     appStateJson: existing.appStateJson,
   })
+  const existingUsernameSensitiveWordSettings = resolveUsernameSensitiveWordSettings({
+    appStateJson: existing.appStateJson,
+  })
   const sessionIpMismatchLogoutEnabled = "sessionIpMismatchLogoutEnabled" in body
     ? Boolean(body.sessionIpMismatchLogoutEnabled)
     : existingSiteSecuritySettings.sessionIpMismatchLogoutEnabled
@@ -80,6 +86,12 @@ export async function updateRegistrationSiteSettingsSection(existing: SiteSettin
   const passwordChangeRequireEmailVerification = "passwordChangeRequireEmailVerification" in body
     ? Boolean(body.passwordChangeRequireEmailVerification)
     : existingSiteSecuritySettings.passwordChangeRequireEmailVerification
+  const usernameSensitiveWordsEnabled = "usernameSensitiveWordsEnabled" in body
+    ? Boolean(body.usernameSensitiveWordsEnabled)
+    : existingUsernameSensitiveWordSettings.usernameSensitiveWordsEnabled
+  const usernameSensitiveWords = "usernameSensitiveWords" in body
+    ? normalizeUsernameSensitiveWords(body.usernameSensitiveWords)
+    : existingUsernameSensitiveWordSettings.usernameSensitiveWords
   const registerEmailWhitelistDomainsInput = "registerEmailWhitelistDomains" in body
     ? readOptionalStringField(body, "registerEmailWhitelistDomains")
     : existingRegisterEmailWhitelistSettings.domains.join("\n")
@@ -215,7 +227,11 @@ export async function updateRegistrationSiteSettingsSection(existing: SiteSettin
     loginIpChangeEmailAlertEnabled,
     passwordChangeRequireEmailVerification,
   })
-  const appStateJson = mergeRegisterEmailWhitelistSettings(appStateWithSiteSecurity, {
+  const appStateWithUsernameSensitiveWords = mergeUsernameSensitiveWordSettings(appStateWithSiteSecurity, {
+    usernameSensitiveWordsEnabled,
+    usernameSensitiveWords,
+  })
+  const appStateJson = mergeRegisterEmailWhitelistSettings(appStateWithUsernameSensitiveWords, {
     enabled: registerEmailWhitelistEnabled,
     domains: registerEmailWhitelistDomains,
   })

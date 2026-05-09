@@ -19,7 +19,6 @@ import {
   resolveStoredFontSizePreset,
   resolveStoredThemePreset,
   setStoredFontSizePreset,
-  setStoredThemePreference,
   setStoredThemePreset,
 } from "@/lib/theme"
 
@@ -39,6 +38,7 @@ const themeMeta: Record<ThemePreference, { label: string; icon: typeof Sun }> = 
 }
 
 const themeOptions: ThemePreference[] = ["light", "dark", "system"]
+const themeToggleFallbackLabel = "\u5207\u6362\u4e3b\u9898"
 const themePresetOptions = Object.entries(THEME_PRESETS) as Array<[keyof typeof THEME_PRESETS, (typeof THEME_PRESETS)[keyof typeof THEME_PRESETS]]>
 const fontSizePresetOptions = Object.entries(FONT_SIZE_PRESETS) as Array<[FontSizePreset, (typeof FONT_SIZE_PRESETS)[FontSizePreset]]>
 
@@ -121,7 +121,6 @@ export function ThemeToggle() {
 
   function handleThemeSelect(preference: ThemePreference) {
     setTheme(preference)
-    setStoredThemePreference(preference)
   }
 
   function handlePresetSelect(preset: ThemePreset) {
@@ -151,8 +150,8 @@ export function ThemeToggle() {
         onClick={() => setMenuOpen((current) => !current)}
         aria-expanded={menuOpen}
         aria-haspopup="menu"
-        aria-label={mounted ? `当前${currentMeta.label}，主题 ${currentPresetMeta.label}` : "切换主题"}
-        title={mounted ? `当前${currentMeta.label}，主题 ${currentPresetMeta.label}` : "切换主题"}
+        aria-label={mounted ? `${"\u5f53\u524d"}${currentMeta.label}${"\uff0c\u4e3b\u9898 "}${currentPresetMeta.label}` : themeToggleFallbackLabel}
+        title={mounted ? `${"\u5f53\u524d"}${currentMeta.label}${"\uff0c\u4e3b\u9898 "}${currentPresetMeta.label}` : themeToggleFallbackLabel}
       >
         <CurrentIcon className="h-3.5 w-3.5" />
 
