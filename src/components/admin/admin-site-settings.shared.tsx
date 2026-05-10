@@ -100,6 +100,8 @@ export interface AdminBasicSettingsInitialSettings {
   sessionIpMismatchLogoutEnabled: boolean
   loginIpChangeEmailAlertEnabled: boolean
   passwordChangeRequireEmailVerification: boolean
+  usernameSensitiveWordsEnabled: boolean
+  usernameSensitiveWords: string[]
   registerEmailWhitelistEnabled: boolean
   registerEmailWhitelistDomains: string[]
   registerPhoneEnabled: boolean
@@ -231,6 +233,8 @@ export interface AdminBasicSettingsDraft {
   sessionIpMismatchLogoutEnabled: boolean
   loginIpChangeEmailAlertEnabled: boolean
   passwordChangeRequireEmailVerification: boolean
+  usernameSensitiveWordsEnabled: boolean
+  usernameSensitiveWords: string
   registerEmailWhitelistEnabled: boolean
   registerEmailWhitelistDomains: string
   registerPhoneEnabled: boolean
@@ -437,6 +441,10 @@ export function createAdminBasicSettingsDraft(initialSettings: AdminBasicSetting
     sessionIpMismatchLogoutEnabled: coerceBoolean(initialSettings.sessionIpMismatchLogoutEnabled, true),
     loginIpChangeEmailAlertEnabled: coerceBoolean(initialSettings.loginIpChangeEmailAlertEnabled, false),
     passwordChangeRequireEmailVerification: coerceBoolean(initialSettings.passwordChangeRequireEmailVerification, false),
+    usernameSensitiveWordsEnabled: coerceBoolean(initialSettings.usernameSensitiveWordsEnabled, false),
+    usernameSensitiveWords: Array.isArray(initialSettings.usernameSensitiveWords)
+      ? initialSettings.usernameSensitiveWords.join("\n")
+      : "",
     registerEmailWhitelistEnabled: coerceBoolean(initialSettings.registerEmailWhitelistEnabled, false),
     registerEmailWhitelistDomains: Array.isArray(initialSettings.registerEmailWhitelistDomains)
       ? initialSettings.registerEmailWhitelistDomains.join("\n")
@@ -541,6 +549,8 @@ export function buildAdminBasicSettingsPayload(draft: AdminBasicSettingsDraft, m
       sessionIpMismatchLogoutEnabled: draft.sessionIpMismatchLogoutEnabled,
       loginIpChangeEmailAlertEnabled: draft.loginIpChangeEmailAlertEnabled,
       passwordChangeRequireEmailVerification: draft.passwordChangeRequireEmailVerification,
+      usernameSensitiveWordsEnabled: draft.usernameSensitiveWordsEnabled,
+      usernameSensitiveWords: draft.usernameSensitiveWords,
       registerEmailWhitelistEnabled: draft.registerEmailWhitelistEnabled,
       registerEmailWhitelistDomains: draft.registerEmailWhitelistDomains,
       registerPhoneEnabled: draft.registerPhoneEnabled,

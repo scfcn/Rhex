@@ -11,6 +11,10 @@ export interface LightboxImage {
   alt: string
 }
 
+interface MarkdownEnhancementOptions {
+  collapseLongCodeBlocks?: boolean
+}
+
 interface Base64SegmentMatch {
   start: number
   end: number
@@ -25,6 +29,8 @@ interface MarkdownLinkIndicatorHost extends HTMLSpanElement {
 const BASE64_CANDIDATE_PATTERN = /[A-Za-z0-9+/]+={0,2}/g
 const BASE64_MIN_LENGTH = 16
 const BASE64_TEXT_NODE_EXCLUDE_SELECTOR = "a, button, code, pre, input, textarea, script, style, .md-copy-button, .md-base64-token, .md-heading-anchor, .katex, .hljs, .mermaid"
+const CODE_BLOCK_COLLAPSE_LINE_THRESHOLD = 24
+const CODE_BLOCK_COLLAPSE_HEIGHT_THRESHOLD = 520
 
 function getLightboxImageElements(container: HTMLElement) {
   return Array.from(container.querySelectorAll<HTMLImageElement>("img"))
@@ -564,6 +570,73 @@ function appendCodeCopyButtons(container: HTMLElement) {
   }
 }
 
+function bindLongCodeBlockToggles(container: HTMLElement) {
+  const cleanups: Array<() => void> = []
+
+  for (const codeBlock of Array.from(container.querySelectorAll<HTMLElement>("pre.md-code-block"))) {
+    const header = codeBlock.querySelector<HTMLElement>(":scope > .md-code-header")
+    const code = codeBlock.querySelector<HTMLElement>(":scope > code")
+
+    if (!header || !code || header.querySelector(".md-code-toggle-button") || codeBlock.querySelector(".md-code-bottom-toggle-button")) {
+      continue
+    }
+
+    const source = code.textContent ?? ""
+    const lineCount = source.split(/\r\n|\r|\n/).length
+    const shouldCollapse = lineCount >= CODE_BLOCK_COLLAPSE_LINE_THRESHOLD || code.scrollHeight >= CODE_BLOCK_COLLAPSE_HEIGHT_THRESHOLD
+
+    if (!shouldCollapse) {
+      continue
+    }
+
+    const button = document.createElement("button")
+    button.type = "button"
+    button.className = "md-code-toggle-button"
+    button.setAttribute("aria-expanded", "false")
+    button.textContent = "展开代码"
+
+    const bottomButton = document.createElement("button")
+    bottomButton.type = "button"
+    bottomButton.className = "md-code-bottom-toggle-button"
+    bottomButton.setAttribute("aria-expanded", "false")
+    bottomButton.textContent = "展开代码"
+
+    const setExpanded = (expanded: boolean) => {
+      codeBlock.dataset.codeExpanded = String(expanded)
+      button.setAttribute("aria-expanded", String(expanded))
+      bottomButton.setAttribute("aria-expanded", String(expanded))
+      button.textContent = expanded ? "收起代码" : "展开代码"
+      bottomButton.textContent = expanded ? "收起代码" : "展开代码"
+      bottomButton.hidden = expanded
+    }
+
+    const handleClick = () => {
+      setExpanded(codeBlock.dataset.codeExpanded !== "true")
+    }
+
+    codeBlock.dataset.codeCollapsible = "true"
+    setExpanded(false)
+    button.addEventListener("click", handleClick)
+    bottomButton.addEventListener("click", handleClick)
+    header.appendChild(button)
+    codeBlock.appendChild(bottomButton)
+    cleanups.push(() => {
+      button.removeEventListener("click", handleClick)
+      bottomButton.removeEventListener("click", handleClick)
+      button.remove()
+      bottomButton.remove()
+      delete codeBlock.dataset.codeCollapsible
+      delete codeBlock.dataset.codeExpanded
+    })
+  }
+
+  return () => {
+    for (const cleanup of cleanups) {
+      cleanup()
+    }
+  }
+}
+
 async function renderMermaidBlocks(container: HTMLElement) {
   const mermaidBlocks = Array.from(container.querySelectorAll<HTMLElement>("[data-mermaid]"))
   if (mermaidBlocks.length === 0) {
@@ -611,12 +684,16 @@ async function renderMermaidBlocks(container: HTMLElement) {
   )
 }
 
-export async function enhanceMarkdown(container: HTMLElement) {
+export async function enhanceMarkdown(container: HTMLElement, options: MarkdownEnhancementOptions = {}) {
   const removeMarkdownLinkIndicators = enhanceMarkdownLinks(container)
   appendHeadingAnchors(container)
   appendCodeCopyButtons(container)
+  const removeLongCodeBlockToggles = options.collapseLongCodeBlocks
+    ? bindLongCodeBlockToggles(container)
+    : () => {}
   await renderMermaidBlocks(container)
   return () => {
     removeMarkdownLinkIndicators()
+    removeLongCodeBlockToggles()
   }
 }

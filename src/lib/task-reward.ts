@@ -113,20 +113,26 @@ export function resolveUserTaskRewardTier(source: VipStateSource | null | undefi
   return TaskRewardTier.VIP1
 }
 
+export function getTaskRewardRangeForTier(
+  settings: TieredTaskRewardSettings,
+  tier: TaskRewardTier,
+) {
+  switch (tier) {
+    case TaskRewardTier.VIP3:
+      return settings.vip3
+    case TaskRewardTier.VIP2:
+      return settings.vip2
+    case TaskRewardTier.VIP1:
+      return settings.vip1
+    default:
+      return settings.normal
+  }
+}
+
 export function resolveUserTaskRewardRange(
   settings: TieredTaskRewardSettings,
   source: VipStateSource | null | undefined,
 ) {
   const tier = resolveUserTaskRewardTier(source)
-
-  switch (tier) {
-    case TaskRewardTier.VIP3:
-      return { tier, range: settings.vip3 }
-    case TaskRewardTier.VIP2:
-      return { tier, range: settings.vip2 }
-    case TaskRewardTier.VIP1:
-      return { tier, range: settings.vip1 }
-    default:
-      return { tier, range: settings.normal }
-  }
+  return { tier, range: getTaskRewardRangeForTier(settings, tier) }
 }

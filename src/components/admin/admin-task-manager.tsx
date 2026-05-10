@@ -495,7 +495,7 @@ export function AdminTaskManager({ initialTasks, boardOptions }: AdminTaskManage
           resetDraft()
         }}
         title={editingId ? "编辑任务" : "新建任务"}
-        description="奖励字段支持固定值 `5` 或随机区间 `5-10`。部分任务模板支持按节点或帖子类型进一步限定统计范围。"
+        description="奖励字段支持固定值 `5` 或随机区间 `5-10`。保存后，任务中心未完成任务会同步展示最新配置；已完成任务保留实际结算积分。"
         size="lg"
         onSubmit={submitDraft}
         footer={({ formId }) => (

@@ -11,6 +11,7 @@ import { validateProfilePayload } from "@/lib/validators"
 import { verifyCode } from "@/lib/verification"
 import { logRouteWriteSuccess } from "@/lib/route-metadata"
 import { getSiteSettings } from "@/lib/site-settings"
+import { findUsernameSensitiveWord } from "@/lib/username-sensitive-words"
 import { revalidateUserSurfaceCache } from "@/lib/user-surface"
 import { isUserProfileVisibility, mapLegacyVisibilityBoolean, mergeUserProfileSettings, resolveUserProfileSettings, type UserProfileVisibility } from "@/lib/user-profile-settings"
 import { VerificationChannel } from "@/lib/shared/verification-channel"
@@ -212,6 +213,14 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
   const currentIntroduction = currentProfileSettings.introduction.trim()
   const currentAvatarPath = (dbUser.avatarPath ?? "").trim()
   const nicknameChanged = currentNickname !== nextNickname
+
+  if (nicknameChanged) {
+    const matchedNicknameSensitiveWord = findUsernameSensitiveWord(nextNickname, settings)
+    if (matchedNicknameSensitiveWord) {
+      apiError(400, `昵称包含敏感词：${matchedNicknameSensitiveWord}`)
+    }
+  }
+
   const bioChanged = currentBio !== nextBio
   const introductionChanged = currentIntroduction !== nextIntroduction
   const avatarChanged = currentAvatarPath !== avatarPath

@@ -1,6 +1,6 @@
 "use client"
 
-import { createElement, useState, type ReactNode } from "react"
+import { createElement, useState, type ComponentPropsWithoutRef, type ReactNode } from "react"
 import { ChevronDown, Coins, Gavel, Gift, Info, Loader2, MessageSquareText, Vote, type LucideIcon } from "lucide-react"
 
 import { AddonSurfaceClientRenderer } from "@/addons-host/client/addon-surface-client-renderer"
@@ -16,14 +16,6 @@ import { PostDraftNotice, type PostDraftNoticeAction } from "@/components/post/p
 import { AddonEditor } from "@/components/addon-editor"
 import { Modal } from "@/components/ui/modal"
 import { Button } from "@/components/ui/rbutton"
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-} from "@/components/ui/select"
 import { Tooltip } from "@/components/ui/tooltip"
 import { PostDraftBox } from "@/components/post/post-draft-box"
 import type { MarkdownEmojiItem } from "@/lib/markdown-emoji"
@@ -72,8 +64,8 @@ function getPostTypeIcon(type: LocalPostType): LucideIcon {
   }
 }
 
-function PostTypeIcon({ type, className }: { type: LocalPostType; className?: string }) {
-  return createElement(getPostTypeIcon(type), { className })
+function PostTypeIcon({ type, ...props }: { type: LocalPostType } & ComponentPropsWithoutRef<"svg">) {
+  return createElement(getPostTypeIcon(type), props)
 }
 
 export function CreatePostFormShell({
@@ -228,6 +220,11 @@ export function CreatePostFormShell({
   const draftNoticeDescription = pendingDraftToRestore
     ? `你在${isEditMode ? "编辑帖子" : "发帖"}页的草稿箱里有历史草稿，可先恢复最近一份。`
     : undefined
+  const postTypeHelperText = isEditMode
+    ? "编辑模式下暂不允许切换帖子类型。"
+    : selectedPostTypeOption
+      ? `当前类型：${selectedPostTypeOption.label}，${selectedPostTypeOption.hint}${anonymousPostEnabled ? "，可按需搭配匿名发布" : ""}。`
+      : "选择帖子类型后，下方会展开对应扩展配置。"
 
   const toolsContent = (
     <>
@@ -296,47 +293,29 @@ export function CreatePostFormShell({
           </div>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
             <div className="space-y-3">
-              <Select
-                value={draft.postType}
-                onValueChange={(value) => updateDraftField("postType", value as LocalPostType)}
-                disabled={isEditMode}
-              >
-                <SelectTrigger className="h-auto min-h-11 rounded-full bg-card px-4 py-2.5 text-left">
-                  {selectedPostTypeOption ? (
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground">
-                        <PostTypeIcon type={selectedPostTypeOption.value} className="h-4 w-4" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-medium">{selectedPostTypeOption.label}</span>
-                      </span>
-                    </div>
-                  ) : null}
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>帖子类型</SelectLabel>
-                    {availablePostTypes.map((item) => {
-                      return (
-                        <SelectItem
-                          key={item.value}
-                          value={item.value}
-                          className="rounded-xl py-2.5 pl-10 pr-3 [&>span:last-child]:flex [&>span:last-child]:w-full"
-                        >
-                          <div className="flex w-full items-start gap-3">
-                            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground">
-                              <PostTypeIcon type={item.value} className="h-3.5 w-3.5" />
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block text-sm font-medium text-foreground">{item.label}</span>
-                            </span>
-                          </div>
-                        </SelectItem>
-                      )
-                    })}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              <div className="relative">
+                {selectedPostTypeOption ? (
+                  <span className="pointer-events-none absolute top-1/2 left-2.5 flex -translate-y-1/2 items-center gap-2">
+                    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground">
+                      <PostTypeIcon type={selectedPostTypeOption.value} className="h-4 w-4" />
+                    </span>
+                  </span>
+                ) : null}
+                <select
+                  value={draft.postType}
+                  onChange={(event) => updateDraftField("postType", event.target.value as LocalPostType)}
+                  disabled={isEditMode}
+                  aria-label="帖子类型"
+                  className="h-11 w-full appearance-none rounded-full border border-border bg-card pr-10 pl-12 text-sm font-medium text-foreground outline-hidden transition-colors hover:bg-accent/35 focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {availablePostTypes.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute top-1/2 right-4 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              </div>
             </div>
             {!isEditMode && anonymousPostEnabled ? (
               <label className="flex h-11 shrink-0 items-center justify-between gap-3 rounded-full border border-border bg-card px-4 text-sm sm:min-w-[168px]">
@@ -361,6 +340,7 @@ export function CreatePostFormShell({
               </label>
             ) : null}
           </div>
+          <p className="text-xs leading-6 text-muted-foreground">{postTypeHelperText}</p>
         </div>
       </div>
 

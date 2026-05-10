@@ -40,6 +40,7 @@ const SCRATCH_MASK_SYNTAX_PATTERN = /(^|[^!\\])!!([^!\n]+?)!!(?=[^!]|$)/g
 const HTML_CODE_BLOCK_START_PATTERN = /^\s*<(?:!doctype|html|head|body|meta|title|style|script|link)\b/i
 const HTML_CODE_BLOCK_TAG_LINE_PATTERN = /^\s*(?:<!doctype[^>]*>|<!--.*?-->|<\/?[a-zA-Z][\w:-]*(?:\s+[^>]*)?\s*\/?>)\s*$/i
 const HTML_CODE_BLOCK_INLINE_TAG_PATTERN = /^\s*<([a-zA-Z][\w:-]*)(?:\s+[^>]*)?>.*<\/\1>\s*$/i
+const HTML_CODE_BLOCK_LANGUAGE_ALIASES = new Set(["html", "htm"])
 
 type CalloutType = (typeof CALLOUT_TYPES)[number]
 const MARKDOWN_RENDERER_CACHE_LIMIT = 8
@@ -258,6 +259,21 @@ function wrapHtmlDocumentBlocks(input: string) {
   }
 
   return output.join("\n")
+}
+
+function resolveCodeBlockLanguage(code: string, language: string) {
+  const languageName = language.trim().toLowerCase()
+  const trimmedCode = code.trimStart()
+
+  if (HTML_CODE_BLOCK_START_PATTERN.test(trimmedCode)) {
+    return "html"
+  }
+
+  if (HTML_CODE_BLOCK_LANGUAGE_ALIASES.has(languageName)) {
+    return "html"
+  }
+
+  return languageName
 }
 
 function splitRubyReading(value: string) {
@@ -485,7 +501,7 @@ function createMarkdownRenderer(emojiItems: MarkdownEmojiItem[]) {
     typographer: true,
     breaks: true,
     highlight(code, language) {
-      const languageName = language.trim().toLowerCase()
+      const languageName = resolveCodeBlockLanguage(code, language)
       const safeLanguage = escapeHtml(languageName || "text")
 
       if (languageName === "mermaid") {

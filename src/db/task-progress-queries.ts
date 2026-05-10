@@ -1,4 +1,12 @@
-import { type Prisma, type PrismaClient } from "@prisma/client"
+import {
+  TaskRewardTier,
+  UserTaskProgressStatus,
+  type Prisma,
+  type PrismaClient,
+  type TaskCategory,
+  type TaskConditionType,
+  type TaskCycleType,
+} from "@prisma/client"
 
 import { prisma } from "@/db/client"
 
@@ -43,6 +51,40 @@ export function updateUserTaskProgressRecordById(params: {
     where: { id: params.id },
     data: params.data,
   })
+}
+
+export async function syncOpenUserTaskProgressSnapshotsForTask(params: {
+  taskId: string
+  categorySnapshot: TaskCategory
+  cycleTypeSnapshot: TaskCycleType
+  conditionTypeSnapshot: TaskConditionType
+  targetCountSnapshot: number
+  rewards: Record<TaskRewardTier, { min: number; max: number }>
+  client?: TaskProgressQueryClient
+}) {
+  const client = resolveClient(params.client)
+  const baseData = {
+    categorySnapshot: params.categorySnapshot,
+    cycleTypeSnapshot: params.cycleTypeSnapshot,
+    conditionTypeSnapshot: params.conditionTypeSnapshot,
+    targetCountSnapshot: params.targetCountSnapshot,
+  }
+  const results = await Promise.all(Object.values(TaskRewardTier).map((tier) => client.userTaskProgress.updateMany({
+    where: {
+      taskId: params.taskId,
+      status: UserTaskProgressStatus.IN_PROGRESS,
+      rewardTierSnapshot: tier,
+    },
+    data: {
+      ...baseData,
+      rewardMinSnapshot: params.rewards[tier].min,
+      rewardMaxSnapshot: params.rewards[tier].max,
+    },
+  })))
+
+  return {
+    count: results.reduce((total, result) => total + result.count, 0),
+  }
 }
 
 export async function createTaskEventLedgerIfAbsent(params: {

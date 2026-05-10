@@ -19,6 +19,7 @@ interface MarkdownContentProps {
   markdownEmojiMap?: MarkdownEmojiItem[]
   expandImagesWhenImageOnly?: boolean
   imageOnly?: boolean
+  collapseLongCodeBlocks?: boolean
 }
 
 interface MarkdownBodyProps {
@@ -26,6 +27,7 @@ interface MarkdownBodyProps {
   className?: string
   onOpenLightbox: (images: LightboxImage[], index: number) => void
   isImageOnly?: boolean
+  collapseLongCodeBlocks?: boolean
 }
 
 interface LightboxState {
@@ -98,7 +100,7 @@ function LightboxPortal({ lightbox, onClose, onChange }: LightboxPortalProps) {
   )
 }
 
-const MarkdownBody = memo(function MarkdownBody({ html, className, onOpenLightbox, isImageOnly = false }: MarkdownBodyProps) {
+const MarkdownBody = memo(function MarkdownBody({ html, className, onOpenLightbox, isImageOnly = false, collapseLongCodeBlocks = false }: MarkdownBodyProps) {
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -113,7 +115,7 @@ const MarkdownBody = memo(function MarkdownBody({ html, className, onOpenLightbo
     let removeImageLightbox = () => {}
     let cancelled = false
 
-    void enhanceMarkdown(container).then((cleanup) => {
+    void enhanceMarkdown(container, { collapseLongCodeBlocks }).then((cleanup) => {
       if (cancelled) {
         cleanup()
         return
@@ -130,7 +132,7 @@ const MarkdownBody = memo(function MarkdownBody({ html, className, onOpenLightbo
       removeMarkdownEnhancements()
       removeImageLightbox()
     }
-  }, [html, onOpenLightbox])
+  }, [collapseLongCodeBlocks, html, onOpenLightbox])
 
   return (
     <div
@@ -142,7 +144,7 @@ const MarkdownBody = memo(function MarkdownBody({ html, className, onOpenLightbo
   )
 })
 
-export function MarkdownContent({ content, html, className, emptyText, markdownEmojiMap, expandImagesWhenImageOnly = false, imageOnly }: MarkdownContentProps) {
+export function MarkdownContent({ content, html, className, emptyText, markdownEmojiMap, expandImagesWhenImageOnly = false, imageOnly, collapseLongCodeBlocks = false }: MarkdownContentProps) {
   const [lightbox, setLightbox] = useState<LightboxState | null>(null)
   const normalized = content.replace(/\r\n/g, "\n").trim()
   const resolvedMarkdownEmojiMap = useMarkdownEmojiMap(markdownEmojiMap)
@@ -174,7 +176,7 @@ export function MarkdownContent({ content, html, className, emptyText, markdownE
 
   return (
     <>
-      <MarkdownBody html={resolvedHtml} className={className} onOpenLightbox={handleOpenLightbox} isImageOnly={isImageOnly} />
+      <MarkdownBody html={resolvedHtml} className={className} onOpenLightbox={handleOpenLightbox} isImageOnly={isImageOnly} collapseLongCodeBlocks={collapseLongCodeBlocks} />
       {lightbox ? (
         <LightboxPortal
           lightbox={lightbox}

@@ -24,7 +24,7 @@ interface RestrictedPostBlockProps {
   markdownEmojiMap?: MarkdownEmojiItem[]
 }
 
-function UnlockedContentFrame({ title, content, html, summary }: { title: string; content: string; html?: string; summary?: string; markdownEmojiMap?: MarkdownEmojiItem[] }) {
+function UnlockedContentFrame({ title, content, html, summary, markdownEmojiMap }: { title: string; content: string; html?: string; summary?: string; markdownEmojiMap?: MarkdownEmojiItem[] }) {
 
   return (
     <div className="rounded-xl border border-border bg-secondary/35 p-5">
@@ -32,7 +32,7 @@ function UnlockedContentFrame({ title, content, html, summary }: { title: string
         <div className="text-sm font-medium text-foreground">{title}</div>
         {summary ? <div className="text-xs text-muted-foreground">{summary}</div> : null}
       </div>
-      <MarkdownContent content={content} html={html} />
+      <MarkdownContent content={content} html={html} markdownEmojiMap={markdownEmojiMap} collapseLongCodeBlocks />
     </div>
   )
 }

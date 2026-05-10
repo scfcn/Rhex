@@ -359,6 +359,20 @@ export function AdminRegistrationSettingsForm({
               />
               <p className="text-xs leading-6 text-muted-foreground">开启后，用户中心修改密码除了校验当前密码，还必须输入发送到已验证邮箱的验证码。前台也会提前检查邮箱和邮件能力，不满足条件时直接提示不可用。</p>
             </FieldGroup>
+            <FieldGroup title="用户名 / 昵称敏感词">
+              <AdminBooleanSelectField
+                label="启用用户名和昵称敏感词拦截"
+                checked={draft.usernameSensitiveWordsEnabled}
+                onChange={(value) => updateDraftField("usernameSensitiveWordsEnabled", value)}
+              />
+              <SettingsTextareaField
+                label="敏感词列表"
+                value={draft.usernameSensitiveWords}
+                onChange={(value) => updateDraftField("usernameSensitiveWords", value)}
+                placeholder={"支持换行、空格或逗号分隔，如\nadmin\nroot\n官方"}
+                description="注册用户名、第三方登录补全用户名，以及用户修改昵称时都会按包含匹配拦截，大小写不敏感。"
+              />
+            </FieldGroup>
           </div>
           {!draft.smtpEnabled ? (
             <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-800">

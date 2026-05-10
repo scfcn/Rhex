@@ -35,7 +35,7 @@ export function ExternalSearchOptions({
   const searchKeyword = resolvedSiteHost ? `site:${resolvedSiteHost} ${trimmedKeyword}` : trimmedKeyword
 
   return (
-    <div className={variant === "menu" ? "grid gap-1" : "grid gap-3 sm:grid-cols-2"}>
+    <div className={variant === "menu" ? "grid gap-1" : "grid gap-3 sm:grid-cols-2 p-4"}>
       {engines.map((engine) => {
         const href = buildExternalSearchUrl(engine.urlTemplate, searchKeyword)
 

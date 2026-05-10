@@ -52,7 +52,7 @@ export function UserDisplayedBadges({ badges = [], compact = false, appearance =
                     color: badge.color,
                   }}
             >
-              <LevelIcon icon={badge.iconText} color={badge.color} className={cn(compact ? "h-3 min-w-3 text-[12px]" : "h-3.5 min-w-3.5 text-[14px]", iconClassName)} emojiClassName="text-inherit" svgClassName="[&>svg]:block" />
+              <LevelIcon icon={badge.iconText} color={badge.color} className={cn(compact ? "h-5 min-w-5 text-[12px]" : "h-3.5 min-w-3.5 text-[14px]", iconClassName)} emojiClassName="text-inherit" svgClassName="[&>svg]:block" />
             </Link>
           ) : (
             <span
@@ -73,7 +73,7 @@ export function UserDisplayedBadges({ badges = [], compact = false, appearance =
                     color: badge.color,
                   }}
             >
-              <LevelIcon icon={badge.iconText} color={badge.color} className={cn(compact ? "h-3 min-w-3 text-[12px]" : "h-3.5 min-w-3.5 text-[14px]", iconClassName)} emojiClassName="text-inherit" svgClassName="[&>svg]:block" />
+              <LevelIcon icon={badge.iconText} color={badge.color} className={cn(compact ? "h-5 min-w-5 text-[12px]" : "h-3.5 min-w-3.5 text-[14px]", iconClassName)} emojiClassName="text-inherit" svgClassName="[&>svg]:block" />
             </span>
           )}
         </Tooltip>

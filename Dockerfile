@@ -5,6 +5,7 @@ ENV PATH=$PNPM_HOME:$PATH
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN corepack enable \
+  && corepack prepare pnpm@10.33.4 --activate \
   && apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates openssl \
   && rm -rf /var/lib/apt/lists/*

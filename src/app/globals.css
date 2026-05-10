@@ -475,6 +475,46 @@
     @apply ml-auto rounded-full border border-border bg-background/80 px-3 py-1 text-[11px] font-semibold tracking-normal text-muted-foreground transition hover:bg-accent hover:text-foreground;
   }
 
+  .markdown-body .md-code-toggle-button {
+    @apply rounded-full border border-border bg-background/80 px-3 py-1 text-[11px] font-semibold tracking-normal text-muted-foreground transition hover:bg-accent hover:text-foreground;
+  }
+
+  .markdown-body .md-code-bottom-toggle-button {
+    @apply absolute bottom-3 left-1/2 z-10 hidden -translate-x-1/2 rounded-full border border-border bg-background/95 px-4 py-1.5 text-xs font-semibold text-foreground shadow-sm transition hover:bg-accent;
+  }
+
+  .markdown-body pre.md-code-block[data-code-collapsible='true'] {
+    @apply relative;
+    isolation: isolate;
+  }
+
+  .markdown-body pre.md-code-block[data-code-collapsible='true'][data-code-expanded='false'] .md-code-bottom-toggle-button {
+    @apply inline-flex items-center justify-center;
+  }
+
+  .markdown-body pre.md-code-block[data-code-collapsible='true'][data-code-expanded='false'] code.hljs {
+    max-height: min(28rem, 58vh);
+    overflow: hidden;
+    padding-bottom: 4.5rem;
+    position: relative;
+    z-index: 0;
+  }
+
+  .markdown-body pre.md-code-block[data-code-collapsible='true'][data-code-expanded='false']::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 5.5rem;
+    pointer-events: none;
+    background: linear-gradient(to bottom, transparent, hsl(var(--secondary)) 68%, hsl(var(--secondary)));
+  }
+
+  .dark .markdown-body pre.md-code-block[data-code-collapsible='true'][data-code-expanded='false']::after {
+    background: linear-gradient(to bottom, transparent, hsl(var(--card)) 68%, hsl(var(--card)));
+  }
+
   .markdown-body .md-mermaid {
     @apply my-5 overflow-x-auto rounded-2xl border border-border bg-card p-4 shadow-xs;
   }
@@ -1433,6 +1473,89 @@
     animation: root-boot-spinner 0.72s linear infinite;
   }
 
+  html.theme-switching::view-transition-group(root) {
+    animation-duration: 0.64s;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  html.theme-switching::view-transition-image-pair(root) {
+    isolation: isolate;
+  }
+
+  html.theme-switching::view-transition-old(root),
+  html.theme-switching::view-transition-new(root) {
+    animation-duration: 0.64s;
+    animation-fill-mode: both;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+    mix-blend-mode: normal;
+  }
+
+  html.theme-switching::view-transition-old(root) {
+    animation-name: theme-switch-stay;
+  }
+
+  html.theme-switching-to-dark::view-transition-new(root) {
+    animation-name: theme-switch-reveal-left-to-right;
+  }
+
+  html.theme-switching-to-light::view-transition-new(root) {
+    animation-name: theme-switch-reveal-right-to-left;
+  }
+
+  html.theme-switching::view-transition-old(root) {
+    z-index: 0;
+  }
+
+  html.theme-switching::view-transition-new(root) {
+    z-index: 1;
+  }
+
+  @keyframes theme-switch-stay {
+    from,
+    to {
+      clip-path: inset(0);
+    }
+  }
+
+  @keyframes theme-switch-reveal-left-to-right {
+    from {
+      clip-path: inset(0 100% 0 0);
+    }
+
+    to {
+      clip-path: inset(0);
+    }
+  }
+
+  @keyframes theme-switch-reveal-right-to-left {
+    from {
+      clip-path: inset(0 0 0 100%);
+    }
+
+    to {
+      clip-path: inset(0);
+    }
+  }
+
+  html.theme-switching-fallback,
+  html.theme-switching-fallback body {
+    transition:
+      background-color 0.42s ease,
+      color 0.42s ease !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html.theme-switching-fallback,
+    html.theme-switching-fallback body {
+      transition: none !important;
+    }
+
+    html.theme-switching::view-transition-group(root),
+    html.theme-switching::view-transition-old(root),
+    html.theme-switching::view-transition-new(root) {
+      animation: none !important;
+    }
+  }
   .theme {
     --font-heading: var(--font-sans);
     --font-sans: var(--font-sans);

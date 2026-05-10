@@ -32,7 +32,7 @@ import { normalizeTaskDefinitionConditionConfig } from "@/lib/task-definition-va
 import { ensureTaskCenterSeeded } from "@/lib/task-center-defaults"
 import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
 import { getServerSiteSettings } from "@/lib/site-settings"
-import { resolveUserTaskRewardRange } from "@/lib/task-reward"
+import { getTaskRewardRangeForTier, resolveUserTaskRewardRange } from "@/lib/task-reward"
 
 interface TaskEventProcessingResult {
   awardedPoints: number
@@ -217,24 +217,32 @@ async function settleSingleTaskProgress(params: {
       })
     }
 
-    const nextProgressCount = Math.min(progress.progressCount + 1, progress.targetCountSnapshot)
-    const completedNow = nextProgressCount >= progress.targetCountSnapshot
+    const currentRewardRange = getTaskRewardRangeForTier(
+      resolveTaskRewardRanges(params.task),
+      progress.rewardTierSnapshot,
+    )
+    const currentTargetCount = params.task.targetCount
+    const nextProgressCount = Math.min(progress.progressCount + 1, currentTargetCount)
+    const completedNow = nextProgressCount >= currentTargetCount
 
     if (!completedNow) {
       await updateUserTaskProgressRecordById({
         id: progress.id,
         client: tx,
         data: {
+          categorySnapshot: params.task.category,
+          cycleTypeSnapshot: params.task.cycleType,
+          conditionTypeSnapshot: params.task.conditionType,
+          targetCountSnapshot: currentTargetCount,
+          rewardMinSnapshot: currentRewardRange.min,
+          rewardMaxSnapshot: currentRewardRange.max,
           progressCount: nextProgressCount,
         },
       })
       return null
     }
 
-    const rewardAmount = pickRewardAmount({
-      min: progress.rewardMinSnapshot,
-      max: progress.rewardMaxSnapshot,
-    })
+    const rewardAmount = pickRewardAmount(currentRewardRange)
     const rewardDelta = await prepareScopedPointDelta({
       scopeKey: "TASK_REWARD",
       baseDelta: rewardAmount,
@@ -262,6 +270,12 @@ async function settleSingleTaskProgress(params: {
       client: tx,
       data: {
         progressCount: nextProgressCount,
+        categorySnapshot: params.task.category,
+        cycleTypeSnapshot: params.task.cycleType,
+        conditionTypeSnapshot: params.task.conditionType,
+        targetCountSnapshot: currentTargetCount,
+        rewardMinSnapshot: currentRewardRange.min,
+        rewardMaxSnapshot: currentRewardRange.max,
         status: UserTaskProgressStatus.COMPLETED,
         completedAt: new Date(),
         settledAt: new Date(),

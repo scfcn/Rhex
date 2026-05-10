@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto"
 
-import { TaskDefinitionStatus, PostType, type TaskDefinition } from "@/db/types"
+import { TaskDefinitionStatus, PostType, TaskRewardTier, type TaskDefinition } from "@/db/types"
 import {
   createTaskDefinitionRecord,
   findAdminTaskDefinitions,
   findTaskDefinitionById,
   updateTaskDefinitionRecordById,
 } from "@/db/task-definition-queries"
+import { syncOpenUserTaskProgressSnapshotsForTask } from "@/db/task-progress-queries"
 import { requireAdminUser } from "@/lib/admin"
 import { apiError } from "@/lib/api-route"
 import { buildTaskConditionSummary, getTaskCategoryLabel, getTaskCycleTypeLabel } from "@/lib/task-condition-templates"
@@ -91,6 +92,22 @@ function buildCreatePayload(input: TaskDefinitionInput, userId: number) {
   }
 }
 
+async function syncOpenProgressSnapshots(item: TaskDefinition) {
+  await syncOpenUserTaskProgressSnapshotsForTask({
+    taskId: item.id,
+    categorySnapshot: item.category,
+    cycleTypeSnapshot: item.cycleType,
+    conditionTypeSnapshot: item.conditionType,
+    targetCountSnapshot: item.targetCount,
+    rewards: {
+      [TaskRewardTier.NORMAL]: { min: item.rewardNormalMin, max: item.rewardNormalMax },
+      [TaskRewardTier.VIP1]: { min: item.rewardVip1Min, max: item.rewardVip1Max },
+      [TaskRewardTier.VIP2]: { min: item.rewardVip2Min, max: item.rewardVip2Max },
+      [TaskRewardTier.VIP3]: { min: item.rewardVip3Min, max: item.rewardVip3Max },
+    },
+  })
+}
+
 export interface AdminTaskItem extends TaskDefinitionView {
   categoryLabel: string
   cycleTypeLabel: string
@@ -150,11 +167,13 @@ export async function saveAdminTaskDefinition(raw: unknown) {
 
   const payload = buildCreatePayload(input, admin.id)
   if (existing) {
-    return mapAdminTaskItem(await updateTaskDefinitionRecordById(existing.id, {
+    const updated = await updateTaskDefinitionRecordById(existing.id, {
       ...payload,
       code: existing.code,
       createdById: existing.createdById,
-    }))
+    })
+    await syncOpenProgressSnapshots(updated)
+    return mapAdminTaskItem(updated)
   }
 
   return mapAdminTaskItem(await createTaskDefinitionRecord(payload))
